@@ -27,6 +27,8 @@
 #include <string.h>       // for string functions
 #include <stdio.h>        // for FILE type
 #include <dlfcn.h>        // for dlopen/dlsym
+#include <fcntl.h>        // for O_* file flags
+#include <sys/stat.h>     // for stat function
 
 #ifdef __cplusplus
 extern "C" {
@@ -395,6 +397,23 @@ typedef struct _SYSTEM_INFO {
 #define INFINITE 0xFFFFFFFF
 #define CREATE_SUSPENDED 0x00000004
 
+// Windows file opening flags (macOS equivalents)
+#define _O_RANDOM       0x0000  // No direct equivalent on macOS
+#define _O_TEXT         0x4000  // Text mode
+#define _O_BINARY       0x8000  // Binary mode  
+#define _O_RDONLY       O_RDONLY // Read only
+#define _O_WRONLY       O_WRONLY // Write only
+#define _O_RDWR         O_RDWR   // Read/write
+#define _O_SEQUENTIAL   0x0020   // Sequential access hint
+#define _O_SHORT_LIVED  0x1000   // Short-lived file hint
+#define _O_TEMPORARY    0x0040   // Temporary file
+
+// Windows file mode global variable
+extern int _fmode;
+
+// Windows file attribute constants
+#define INVALID_FILE_ATTRIBUTES 0xFFFFFFFF
+
 // Windows overlapped I/O structures
 typedef struct _OVERLAPPED {
     uintptr_t Internal;
@@ -540,6 +559,21 @@ inline void OutputDebugString(const char* lpOutputString) {
     }
 }
 
+// Windows file path functions
+inline char* _fullpath(char* absPath, const char* relPath, size_t maxLength) {
+    // Use realpath for macOS
+    return realpath(relPath, absPath);
+}
+
+// Windows file attribute functions
+inline uint32_t GetFileAttributes(const char* lpFileName) {
+    struct stat st;
+    if (stat(lpFileName, &st) == 0) {
+        return 0;  // FILE_ATTRIBUTE_NORMAL
+    }
+    return INVALID_FILE_ATTRIBUTES;
+}
+
 inline void* LoadLibrary(const char* lpLibFileName) {
     // Use dlopen for dynamic library loading on macOS
     return dlopen(lpLibFileName, RTLD_LAZY);
@@ -666,6 +700,7 @@ inline T InterlockedDecrement(volatile T* target) {
 
 // macOS-specific global variables for compatibility
 extern void* g_hSystemHandle;
+extern int _fmode;  // Global file mode variable
 #define DLL_SYSTEM "libCrySystem.dylib"  // macOS shared library name
 #define DLL_GAME   "libCryGame.dylib"
 

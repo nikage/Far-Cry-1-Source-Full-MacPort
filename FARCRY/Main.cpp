@@ -100,6 +100,7 @@ static HMODULE g_hSystemHandle=NULL;
 #define DLL_GAME	 "CryGame.dll"
 #elif defined(__APPLE__) && defined(__MACH__)
 void* g_hSystemHandle = NULL;
+int _fmode = 0;  // Global file mode variable for macOS
 // DLL_SYSTEM and DLL_GAME defined in MacOSspecific.h
 #endif
 
