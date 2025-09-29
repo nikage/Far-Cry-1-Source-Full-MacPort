@@ -532,6 +532,14 @@ inline int MessageBox(void* hWnd, const char* lpText, const char* lpCaption, uin
     return 1; // IDOK
 }
 
+// Windows debug output function
+inline void OutputDebugString(const char* lpOutputString) {
+    // Print to console on macOS
+    if (lpOutputString) {
+        printf("[DEBUG] %s", lpOutputString);
+    }
+}
+
 inline void* LoadLibrary(const char* lpLibFileName) {
     // Use dlopen for dynamic library loading on macOS
     return dlopen(lpLibFileName, RTLD_LAZY);

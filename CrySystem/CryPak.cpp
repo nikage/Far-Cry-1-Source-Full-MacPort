@@ -34,6 +34,9 @@
 #ifdef LINUX
 #include <sys/dir.h>
 #include <sys/io.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include <dirent.h>    // macOS directory functions
+#include <unistd.h>    // macOS I/O functions
 #else
 #	include <direct.h>
 #	include <io.h>

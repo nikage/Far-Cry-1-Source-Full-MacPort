@@ -5,6 +5,8 @@
 #include "zlib/zlib.h"
 #if defined(LINUX)
 #	include <sys/io.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#	include <unistd.h>  // macOS equivalent
 #else
 #	include <io.h>
 #endif
