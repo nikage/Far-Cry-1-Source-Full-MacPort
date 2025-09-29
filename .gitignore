@@ -68,6 +68,38 @@ bld/
 [Ll]og/
 [Ll]ogs/
 
+# CMake build directories
+build/
+build_*/
+Build/
+BUILD/
+cmake-build-*/
+
+# Mac Silicon port build directories
+build_game/
+build_test/
+build_macos/
+build_arm64/
+
+# Mac Silicon port test files
+test_*.cpp
+test_*
+*_test.cpp
+*_test
+platform_test*
+compile_test*
+advanced_test*
+
+# Platform-specific backup files
+*.h.backup
+*.cpp.backup
+platform.h.*
+CMakeLists*.txt.backup
+
+# macOS specific
+.DS_Store
+*.dSYM/
+
 # Visual Studio 2015/2017 cache/options directory
 .vs/
 # Uncomment if you have tasks that create the project's static files in wwwroot

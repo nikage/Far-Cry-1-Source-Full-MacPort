@@ -53,9 +53,8 @@ typedef uint64_t        u64;
 // Windows compatibility types (avoid conflicts with system headers)
 typedef void*           THREAD_HANDLE;
 typedef void*           EVENT_HANDLE;
-#ifndef BOOL
-typedef int             BOOL;  // Use int for BOOL on macOS
-#endif
+// Define BOOL before any system headers are included
+#define BOOL int
 typedef uint32_t        DWORD;
 typedef int32_t         LONG;
 typedef void*           HMODULE;
