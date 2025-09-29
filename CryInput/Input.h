@@ -22,6 +22,8 @@
 #include <dinput.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include "MacOSInput.h"
 #endif
 #else
 #include <xtl.h>

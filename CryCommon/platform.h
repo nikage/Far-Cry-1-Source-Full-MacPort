@@ -30,6 +30,12 @@ typedef void *EVENT_HANDLE;
 
 #if defined(WIN32) || defined(WIN64)
 #define DEBUG_BREAK _asm { int 3 }
+#elif defined(__APPLE__) && defined(__MACH__)
+    #if defined(__aarch64__) || defined(__arm64__)
+        #define DEBUG_BREAK __builtin_debugtrap()
+    #else
+        #define DEBUG_BREAK __builtin_trap()
+    #endif
 #else
 #define DEBUG_BREAK
 #endif
@@ -81,6 +87,18 @@ typedef void *EVENT_HANDLE;
 #if defined(LINUX32)
 #define _CPU_X86
 #include <Linux32Specific.h>
+#endif
+
+#if defined(__APPLE__) && defined(__MACH__)
+    #if defined(__aarch64__) || defined(__arm64__)
+        #define _CPU_ARM64
+        #include "MacARM64specific.h"
+        #define RC_EXECUTABLE "rc_mac"
+    #else
+        #define _CPU_X86_64
+        #include "MacOSspecific.h"
+        #define RC_EXECUTABLE "rc_mac"
+    #endif
 #endif
 
 #include "stdio.h"

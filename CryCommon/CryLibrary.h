@@ -43,6 +43,7 @@
 	#define CrySharedLibraySupported true
 	#define CrySharedLibrayExtension ".dll"
 	#define CryLoadLibrary(libName) ::LoadLibrary(libName)
+	#define CryLoadLibraryDefExt(libName) CryLoadLibrary(libName CrySharedLibrayExtension)
 	#define CryGetProcAddress(libHandle, procName) ::GetProcAddress((HMODULE)libHandle, procName)
 	#define CryFreeLibrary(libHandle) ::FreeLibrary(libHandle)
 #elif defined(LINUX)
@@ -55,6 +56,7 @@
 	#define CrySharedLibrayExtension ".so"
 	#define CryGetProcAddress(libHandle, procName) ::dlsym(libHandle, procName)
 	#define CryFreeLibrary(libHandle) ::dlclose(libHandle)
+	#define CryLoadLibraryDefExt(libName) CryLoadLibrary(libName CrySharedLibrayExtension)
 
 	#define HMODULE void*
 	static const char* gEnvName("MODULE_PATH");
@@ -85,6 +87,46 @@
 		return ::dlopen(newLibName.c_str(), cLoadLazy?(RTLD_LAZY | RTLD_GLOBAL):(RTLD_NOW | RTLD_GLOBAL));
 	}
 
+#elif defined(__APPLE__) && defined(__MACH__)
+	#include <dlfcn.h>
+	#include <stdlib.h>
+	#include "platform.h"
+
+	// macOS dylib support
+	#define CrySharedLibraySupported true
+	#define CrySharedLibrayExtension ".dylib"
+	#define CryGetProcAddress(libHandle, procName) ::dlsym(libHandle, procName)
+	#define CryFreeLibrary(libHandle) ::dlclose(libHandle)
+	#define CryLoadLibraryDefExt(libName) CryLoadLibrary(libName CrySharedLibrayExtension)
+
+	#define HMODULE void*
+	static const char* gEnvName("MODULE_PATH");
+
+	static const char* GetModulePath()
+	{
+		return getenv(gEnvName);
+	}
+
+	static void SetModulePath(const char* pModulePath)
+	{
+		setenv(gEnvName, pModulePath?pModulePath:"",true);
+	}
+
+	static HMODULE CryLoadLibrary(const char* libName, const bool cAppend = true, const bool cLoadLazy = false)
+	{
+		string newLibName(GetModulePath());
+#if !defined(NDEBUG)
+		string t(libName);
+		string c("_debug.dylib");
+		if(cAppend)
+			t.replace(t.size()-6, c.size(), c.c_str());
+		newLibName += t;
+		printf("loading library  %s...\n",newLibName.c_str());
+#else
+		newLibName += libName;
+#endif
+		return ::dlopen(newLibName.c_str(), cLoadLazy?(RTLD_LAZY | RTLD_GLOBAL):(RTLD_NOW | RTLD_GLOBAL));
+	}
 
 #else
 #define CrySharedLibraySupported false
