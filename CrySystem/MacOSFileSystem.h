@@ -132,9 +132,9 @@ class CMacOSCaseInsensitivePath
 public:
     static std::string Resolve(const std::string& path);
     static bool Compare(const std::string& path1, const std::string& path2);
+    static std::string ToLower(const std::string& str);
     
 private:
-    static std::string ToLower(const std::string& str);
 };
 
 #endif // __APPLE__ && __MACH__

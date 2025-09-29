@@ -25,13 +25,13 @@
 #endif
 
 #include "DataProbe.h"
-#include "zlib\zlib.h"
+#include "zlib/zlib.h"
 #include "ISystem.h"
 #include "CryFile.h"
 
 #include "md5.h"
 //#define FARCRY_EXE_CRC_CHECK
-#if !defined(LINUX)
+#if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 	extern HMODULE gDLLHandle;
 #endif
 // embedd searchable string.
@@ -222,7 +222,7 @@ CDataProbe::CDataProbe()
 	SModuleInfo module;
 	module.filename = string("CrySystem")+string(".dll");
 	module.handle = (void*)test_name;
-#if !defined(LINUX)
+#if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 	module.handle = gDLLHandle;
 	m_loadedModules.push_back(module);
 #endif
@@ -289,7 +289,7 @@ bool CDataProbe::GetDataCode( char *pBuf,int nSize,SDataProbeContext &ctx )
 		}
 	}
 	// scramble code not to look like crc or alike.
-	int tkey[4] = {2985634234,378634893,387681212,436851212};
+	int tkey[4] = {(int)2985634234,378634893,387681212,436851212};
 	TEA_ENCODE( (unsigned int*)&nCode,(unsigned int*)&nCode,8,(unsigned int*)tkey );
 	ctx.nCode = nCode;
 	return true;
@@ -500,7 +500,7 @@ bool CDataProbe::CheckLoader( void *pFunc )
 		{1178362782,223786232,371615531,90884141},
 		{89158165, 1389745433,971685123,785741042},
 		{389623487,373673863,657846392,378467832},
-		{1982697467,3278962783,278963782,287678311},
+		{1982697467,(int)3278962783,278963782,287678311},
 	};
 
 	m_rand.Seed( GetTickCount() );
@@ -645,7 +645,7 @@ void CDataProbe::RandomAlloc()
 #endif
 }
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 //////////////////////////////////////////////////////////////////////////
 // Get address of executable code RAM for loaded DLL or EXE.
 //////////////////////////////////////////////////////////////////////////
@@ -861,7 +861,7 @@ void CDataProbe::AESDecryptBuffer( const char *pSrcBuffer,int nSrcSize,char *pDe
 //////////////////////////////////////////////////////////////////////////
 void CDataProbe::GetMD5( const char *pSrcBuffer,int nSrcSize,char signatureMD5[16] )
 {
-//#if !defined(LINUX)
+//#if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 	struct MD5Context md5c; 
 	MD5Init(&md5c);
 	MD5Update(&md5c, (unsigned char*)pSrcBuffer,nSrcSize ); 

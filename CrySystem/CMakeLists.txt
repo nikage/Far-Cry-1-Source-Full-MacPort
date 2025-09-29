@@ -19,6 +19,13 @@ if(NOT WIN32)
     list(FILTER CRYSYSTEM_HEADERS EXCLUDE REGEX ".*Windows.*")
 endif()
 
+# Exclude Windows-specific non-essential files for macOS
+if(APPLE)
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*HTTPDownloader.*")
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*DownloadManager.*")
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*LuaDebugger.*")
+endif()
+
 if(NOT UNIX OR APPLE)
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*Linux.*")
     list(FILTER CRYSYSTEM_HEADERS EXCLUDE REGEX ".*Linux.*")
