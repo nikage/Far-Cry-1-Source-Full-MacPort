@@ -172,7 +172,7 @@ protected:
 // default implementation is int counter - for better alignment
 typedef _reference_target<int> _reference_target_t;
 
-#if (defined(_WINDOWS_)||defined(LINUX))
+#if (defined(_WINDOWS_)||defined(LINUX)||(defined(__APPLE__) && defined(__MACH__)))
 
 // reference target for smart pointer
 // implements AddRef() and Release() strategy using reference counter of the specified type

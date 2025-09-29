@@ -27,6 +27,7 @@ endif()
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/CryCommon)
 
 # Global macOS settings
 if(APPLE)
@@ -62,10 +63,7 @@ set(FARCRY_WORKING_SOURCES
 # Create the working Far Cry executable
 add_executable(FarCryWorking ${FARCRY_WORKING_SOURCES})
 
-# Use our clean platform header
-target_compile_options(FarCryWorking PRIVATE
-    -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
-)
+# Platform header will be included automatically via #include <platform.h>
 
 # Link frameworks  
 if(APPLE)
