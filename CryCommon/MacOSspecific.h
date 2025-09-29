@@ -559,9 +559,9 @@ inline int GetProcessAffinityMask(void* hProcess, uintptr_t* lpProcessAffinityMa
 }
 
 // Windows thread creation function - use proper function pointer type
-typedef unsigned long (*LPTHREAD_START_ROUTINE)(void*);
+typedef uint32_t (*LPTHREAD_START_ROUTINE)(void*);
 
-inline void* CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, unsigned long* lpThreadId) {
+inline void* CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, uint32_t* lpThreadId) {
     // This is a complex function that would need proper pthread implementation
     // For now, return a dummy handle since this is used for CPU detection
     if (lpThreadId) *lpThreadId = 1;
@@ -847,6 +847,158 @@ extern void* g_hSystemHandle;
 extern int _fmode;  // Global file mode variable
 #define DLL_SYSTEM "libCrySystem.dylib"  // macOS shared library name
 #define DLL_GAME   "libCryGame.dylib"
+
+// Additional Windows API functions needed for RefStreamEngine
+// File access constants
+#define GENERIC_READ 0x80000000
+#define GENERIC_WRITE 0x40000000
+#define GENERIC_EXECUTE 0x20000000
+#define GENERIC_ALL 0x10000000
+
+#define FILE_SHARE_READ 0x00000001
+#define FILE_SHARE_WRITE 0x00000002
+#define FILE_SHARE_DELETE 0x00000004
+
+#define CREATE_NEW 1
+#define CREATE_ALWAYS 2
+#define OPEN_EXISTING 3
+#define OPEN_ALWAYS 4
+#define TRUNCATE_EXISTING 5
+
+#define INVALID_FILE_SIZE 0xFFFFFFFF
+
+// Event functions
+inline void* CreateEvent(void* lpEventAttributes, int bManualReset, int bInitialState, const char* lpName) {
+    // Create a simple event using condition variable and mutex
+    typedef struct {
+        pthread_mutex_t mutex;
+        pthread_cond_t condition;
+        int signaled;
+        int manual_reset;
+    } macos_event_t;
+    
+    macos_event_t* event = (macos_event_t*)malloc(sizeof(macos_event_t));
+    if (event) {
+        pthread_mutex_init(&event->mutex, NULL);
+        pthread_cond_init(&event->condition, NULL);
+        event->signaled = bInitialState;
+        event->manual_reset = bManualReset;
+    }
+    return event;
+}
+
+inline int SetEvent(void* hEvent) {
+    if (!hEvent) return 0;
+    typedef struct {
+        pthread_mutex_t mutex;
+        pthread_cond_t condition;
+        int signaled;
+        int manual_reset;
+    } macos_event_t;
+    
+    macos_event_t* event = (macos_event_t*)hEvent;
+    pthread_mutex_lock(&event->mutex);
+    event->signaled = 1;
+    if (event->manual_reset) {
+        pthread_cond_broadcast(&event->condition);
+    } else {
+        pthread_cond_signal(&event->condition);
+    }
+    pthread_mutex_unlock(&event->mutex);
+    return 1;
+}
+
+inline int ResetEvent(void* hEvent) {
+    if (!hEvent) return 0;
+    typedef struct {
+        pthread_mutex_t mutex;
+        pthread_cond_t condition;
+        int signaled;
+        int manual_reset;
+    } macos_event_t;
+    
+    macos_event_t* event = (macos_event_t*)hEvent;
+    pthread_mutex_lock(&event->mutex);
+    event->signaled = 0;
+    pthread_mutex_unlock(&event->mutex);
+    return 1;
+}
+
+inline uint32_t WaitForSingleObjectEx(void* hHandle, uint32_t dwMilliseconds, int bAlertable) {
+    // For now, just use regular WaitForSingleObject
+    return WaitForSingleObject(hHandle, dwMilliseconds);
+}
+
+inline void SleepEx(uint32_t dwMilliseconds, int bAlertable) {
+    usleep(dwMilliseconds * 1000);
+}
+
+// File functions
+inline void* CreateFile(const char* lpFileName, uint32_t dwDesiredAccess, uint32_t dwShareMode, 
+                       void* lpSecurityAttributes, uint32_t dwCreationDisposition, 
+                       uint32_t dwFlagsAndAttributes, void* hTemplateFile) {
+    int flags = 0;
+    if (dwDesiredAccess & GENERIC_READ) {
+        flags |= O_RDONLY;
+    }
+    if (dwDesiredAccess & GENERIC_WRITE) {
+        flags |= O_WRONLY;
+    }
+    
+    switch (dwCreationDisposition) {
+        case CREATE_ALWAYS:
+            flags |= O_CREAT | O_TRUNC;
+            break;
+        case CREATE_NEW:
+            flags |= O_CREAT | O_EXCL;
+            break;
+        case OPEN_ALWAYS:
+            flags |= O_CREAT;
+            break;
+        case OPEN_EXISTING:
+            // No additional flags
+            break;
+        case TRUNCATE_EXISTING:
+            flags |= O_TRUNC;
+            break;
+    }
+    
+    int fd = open(lpFileName, flags, 0644);
+    if (fd == -1) {
+        return (void*)(intptr_t)INVALID_HANDLE_VALUE;
+    }
+    return (void*)(intptr_t)fd;
+}
+
+inline uint32_t GetFileSize(void* hFile, uint32_t* lpFileSizeHigh) {
+    if (!hFile || hFile == (void*)(intptr_t)INVALID_HANDLE_VALUE) {
+        return INVALID_FILE_SIZE;
+    }
+    
+    int fd = (int)(intptr_t)hFile;
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) == -1) {
+        return INVALID_FILE_SIZE;
+    }
+    
+    if (lpFileSizeHigh) {
+        *lpFileSizeHigh = (uint32_t)(fileStat.st_size >> 32);
+    }
+    
+    return (uint32_t)(fileStat.st_size & 0xFFFFFFFF);
+}
+
+// Disk space function
+inline int GetDiskFreeSpace(const char* lpRootPathName, uint32_t* lpSectorsPerCluster, 
+                           uint32_t* lpBytesPerSector, uint32_t* lpNumberOfFreeClusters, 
+                           uint32_t* lpTotalNumberOfClusters) {
+    // Simplified implementation - just return default values
+    if (lpSectorsPerCluster) *lpSectorsPerCluster = 8;  // 8 sectors per cluster
+    if (lpBytesPerSector) *lpBytesPerSector = 512;      // 512 bytes per sector
+    if (lpNumberOfFreeClusters) *lpNumberOfFreeClusters = 1000000;  // dummy value
+    if (lpTotalNumberOfClusters) *lpTotalNumberOfClusters = 2000000; // dummy value
+    return 1;  // success
+}
 
 // Forward declarations for CryEngine math functions (defined in headers)
 template <class F> struct Vec3_tpl;

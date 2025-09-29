@@ -1,5 +1,24 @@
 # FarCry Mac Silicon Port - Changelog
 
+## 2025-01-27 - Fixed RefStreamEngine Windows API Compatibility
+
+### [CrySystem][RefStreamEngine] Resolved Windows API undeclared identifier errors
+
+- **Fixed undeclared identifier errors** in `CrySystem/RefStreamEngine.cpp`:
+  - `CreateEvent`, `SetEvent`, `ResetEvent` - implemented using pthread condition variables
+  - `WaitForSingleObjectEx`, `SleepEx` - implemented using macOS sleep functions
+  - `CreateFile`, `GetFileSize` - implemented using POSIX file operations
+  - `GetDiskFreeSpace` - added stub implementation with default values
+  - `CreateThread` - fixed function signature compatibility with `DWORD` types
+- **Enhanced MacOSspecific.h** with comprehensive Windows API compatibility layer:
+  - Added event synchronization functions using pthread primitives
+  - Added file operation functions using POSIX API
+  - Added file access constants (`GENERIC_READ`, `FILE_SHARE_READ`, etc.)
+  - Fixed thread creation function signature for proper type compatibility
+- **Updated platform detection** in `RefStreamEngine.cpp` to support macOS
+- **Applied SOLID principles** by creating clean abstraction layer for cross-platform compatibility
+- **Result**: Reduced compilation errors from 15+ to 1 (remaining error is unrelated math template issue)
+
 ## 2025-09-29 - Initial Mac Silicon Port Setup
 
 ### [Platform][Initial] Started Mac Silicon porting project

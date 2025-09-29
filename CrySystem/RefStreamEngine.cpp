@@ -642,6 +642,8 @@ void CRefStreamEngine::CheckOSCaps()
 	}
 #elif defined(_XBOX) || defined(LINUX)
 	// in XBox, nothing to disable
+#elif defined(__APPLE__) && defined(__MACH__)
+	// macOS supports overlapped IO
 #else
 #error // if your OS doesn't support it, you should disable Overlapped IO here
 	m_bEnableOverlapped = false;
