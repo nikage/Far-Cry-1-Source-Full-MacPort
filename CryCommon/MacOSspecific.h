@@ -141,6 +141,27 @@ typedef struct tagWNDCLASS {
 #define LOWORD(l) ((uint16_t)(((uintptr_t)(l)) & 0xffff))
 #define HIWORD(l) ((uint16_t)((((uintptr_t)(l)) >> 16) & 0xffff))
 
+// Windows SAL annotations (Source Code Annotation Language)
+#define IN          // Input parameter annotation
+#define OUT         // Output parameter annotation
+
+// Windows heap debugging types (stubs for macOS)
+typedef struct _HEAPLIST32 {
+    uint32_t dwSize;
+    uint32_t th32ProcessID;
+    uint32_t th32HeapID;
+    uint32_t dwFlags;
+} HEAPLIST32;
+
+// Windows time structures
+typedef union _LARGE_INTEGER {
+    struct {
+        uint32_t LowPart;
+        int32_t HighPart;
+    };
+    int64_t QuadPart;
+} LARGE_INTEGER;
+
 // Rectangle structure
 typedef struct tagRECT {
     int32_t left;
@@ -313,6 +334,52 @@ inline uint32_t GetLastError() {
     return 0;  // No error on macOS stub
 }
 
+// Windows process/thread functions (stubs for macOS)
+inline void* GetCurrentProcess() {
+    return (void*)1;  // Dummy process handle
+}
+
+inline void* GetCurrentThread() {
+    return (void*)2;  // Dummy thread handle
+}
+
+inline uint32_t GetPriorityClass(void* hProcess) {
+    return 0x00000020;  // NORMAL_PRIORITY_CLASS
+}
+
+inline int GetThreadPriority(void* hThread) {
+    return 0;  // THREAD_PRIORITY_NORMAL
+}
+
+// Windows priority constants
+#define REALTIME_PRIORITY_CLASS     0x00000100
+#define THREAD_PRIORITY_TIME_CRITICAL 15
+
+// Windows type definitions
+typedef int64_t INT64;
+
+// Windows performance timing functions
+inline int QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency) {
+    // Use mach timebase for macOS
+    if (lpFrequency) {
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info(&timebase);
+        // Convert to frequency (ticks per second)
+        lpFrequency->QuadPart = 1000000000LL * timebase.denom / timebase.numer;
+    }
+    return 1;
+}
+
+inline int SetPriorityClass(void* hProcess, uint32_t dwPriorityClass) {
+    // macOS doesn't have direct equivalent, return success
+    return 1;
+}
+
+inline int SetThreadPriority(void* hThread, int nPriority) {
+    // macOS thread priority setting would be complex, stub for now
+    return 1;
+}
+
 inline int MessageBox(void* hWnd, const char* lpText, const char* lpCaption, uint32_t uType) {
     // Print to console instead of showing message box on macOS
     printf("[MessageBox] %s: %s\n", lpCaption ? lpCaption : "Message", lpText ? lpText : "");
@@ -396,17 +463,21 @@ inline void fxclose(FILE* f) { fclose(f); }
 
 // Atomic operations moved to C++ section
 
-// SSE intrinsics compatibility
+// CPU intrinsics compatibility
 #if defined(__aarch64__) || defined(__arm64__)
 // ARM64 doesn't have SSE, but we can define these for compatibility
 #define _MM_HINT_NTA 0
 inline void _mm_prefetch(const char* p, int i) { __builtin_prefetch(p, 0, 0); }
+// ARM64 doesn't have RDTSC, use mach_absolute_time instead
+inline uint64_t __rdtsc() { return mach_absolute_time(); }
 #else
 // Intel Mac
 #include <xmmintrin.h>
 #ifndef _MM_HINT_NTA
 #define _MM_HINT_NTA _MM_HINT_T0
 #endif
+// Intel Mac has RDTSC
+inline uint64_t __rdtsc() { return __builtin_ia32_rdtsc(); }
 #endif
 
 #endif

@@ -19,7 +19,7 @@
 
 #include "platform.h"
 #include "FrameProfiler.h"
-#if !defined (LINUX)
+#if defined(WIN32) || defined(WIN64)
 #	include <Psapi.h>
 #endif
 

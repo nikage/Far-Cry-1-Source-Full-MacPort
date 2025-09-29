@@ -123,8 +123,10 @@ struct SSystemInitParams
 	bool bDedicatedServer;								// When runing a dedicated server.
 	ISystem *pSystem;											// Pointer to existing ISystem interface, it will be reused if not NULL.
 //	char szLocalIP[256];									// local IP address (needed if we have several servers on one machine)
-#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(LINUX)
 	void (*pCheckFunc)(void*);							// authentication function (must be set).
+#elif defined(__APPLE__) && defined(__MACH__)
+	void (*pCheckFunc)(void*);							// macOS also uses function pointer like Linux
 #else
 	void *pCheckFunc;											// authentication function (must be set).
 #endif

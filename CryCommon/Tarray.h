@@ -2,8 +2,10 @@
 #define __TARRAY_H__
 
 #include 	"platform.h"
-#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(LINUX)
 	#include "ILog.h"
+#elif defined(__APPLE__) && defined(__MACH__)
+	#include "ILog.h"  // macOS also needs ILog.h for fxopen
 #else
 	#include <assert.h>
 #endif

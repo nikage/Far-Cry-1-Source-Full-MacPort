@@ -132,6 +132,15 @@ IsAMD64()
 {
 #if defined(LINUX32)
 	return false;
+#elif defined(__APPLE__) && defined(__MACH__)
+	// macOS: ARM64 doesn't have CPUID, but this is checking for AMD64 support
+	// On Apple Silicon, we're running ARM64, not AMD64
+#if defined(__aarch64__) || defined(__arm64__)
+	return false;  // ARM64 is not AMD64
+#else
+	// Intel Mac could theoretically be AMD64, but for simplicity return false
+	return false;
+#endif
 #else
 	_asm
 	{

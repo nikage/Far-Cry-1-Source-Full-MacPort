@@ -55,6 +55,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
 endif()
 
+# Add CryCommon as interface library
+add_subdirectory(CryCommon)
+
+# Try to build CrySystem (we'll fix compilation issues)
+add_subdirectory(CrySystem)
+
 # Just compile the Main.cpp which we know works
 set(FARCRY_WORKING_SOURCES
     FARCRY/Main.cpp
@@ -62,6 +68,9 @@ set(FARCRY_WORKING_SOURCES
 
 # Create the working Far Cry executable
 add_executable(FarCryWorking ${FARCRY_WORKING_SOURCES})
+
+# Link the CrySystem library
+target_link_libraries(FarCryWorking PRIVATE CrySystem)
 
 # Platform header will be included automatically via #include <platform.h>
 

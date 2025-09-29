@@ -67,6 +67,17 @@ extern HMODULE gDLLHandle;
 #		define DLL_FONT					"cryfont.so"
 #		define DLL_3DENGINE			"cry3dengine.so"
 #		define DLL_NULLRENDERER	"xrendernull.so"
+#elif defined(__APPLE__) && defined(__MACH__)
+#		define DLL_SOUND				"libCrySoundSystem.dylib"
+#		define DLL_NETWORK			"libCryNetwork.dylib"
+#		define DLL_ENTITYSYSTEM	"libCryEntitySystem.dylib"
+#		define DLL_INPUT				"libCryInput.dylib"
+#		define DLL_PHYSICS			"libCryPhysics.dylib"
+#		define DLL_MOVIE				"libCryMovie.dylib"
+#		define DLL_AI						"libCryAISystem.dylib"
+#		define DLL_FONT					"libCryFont.dylib"
+#		define DLL_3DENGINE			"libCry3DEngine.dylib"
+#		define DLL_NULLRENDERER	"libXRenderNULL.dylib"
 #else
 #	define DLL_SOUND				"CrySoundSystem.dll"
 #	define DLL_NETWORK			"CryNetwork.dll"
@@ -785,6 +796,8 @@ bool CSystem::InitScriptSystem()
 #ifndef _XBOX
 #if defined(LINUX)
 	m_dll.hScript = LoadDLL("cryscriptsystem.so");
+#elif defined(__APPLE__) && defined(__MACH__)
+	m_dll.hScript = LoadDLL("libCryScriptSystem.dylib");
 #else
 	m_dll.hScript = LoadDLL("CryScriptSystem.dll");
 #endif
