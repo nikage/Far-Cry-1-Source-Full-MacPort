@@ -28,6 +28,10 @@
 	#define CRY3DENGINEENGINE_API
 #endif
 
+#ifdef __APPLE__
+#include "IRenderer.h"
+#endif
+
 // !!! Do not add any headers here !!!
 #include <IProcess.h>
 #include <CryEngineDecalInfo.h> 
@@ -74,6 +78,7 @@ private:
 };
 
 // Specialation for vectors.
+template<>
 inline Vec3 SVariationValue<Vec3>::GetVariantValue() const
 {
 	Vec3 v;

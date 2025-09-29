@@ -187,7 +187,7 @@ struct IScriptSystem
 			
 	*/
 	//##@{
-	virtual int BeginCall(HSCRIPTFUNCTION hFunc) = 0;						 // Márcio: changed the return type 
+	virtual int BeginCall(HSCRIPTFUNCTION hFunc) = 0;						 // Mï¿½rcio: changed the return type 
 	virtual int BeginCall(const char *sFuncName) = 0;						 // from void to int for error checking
 	virtual int BeginCall(const char *sTableName, const char *sFuncName) = 0;//
 	//##@}
@@ -601,7 +601,7 @@ struct IFunctionHandler
 #if defined(WIN64) || defined(LINUX)
 	inline bool GetParam(int nIdx, char * &s) {return GetParam(nIdx, (const char*&)s);}
 #endif
-#if defined(WIN64) || defined(LINUX64)
+#if defined(WIN64) || defined(LINUX64) || defined(__APPLE__)
 	virtual bool GetParam(int nIdx, INT_PTR &n) = 0;	//## AMD Port
 #endif
 	virtual bool GetParam(int nIdx,bool &b) = 0;

@@ -21,7 +21,7 @@
 #include <ISound.h>
 #include <IGame.h>									// IGame
 #include <ICryPak.h>
-#if !defined(LINUX)
+#ifdef _WIN32
 	#include "ddraw.h"
 #endif
 #include "HTTPDownloader.h"

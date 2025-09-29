@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <stdlib.h>  // for malloc/free on macOS
 #include <mach/mach_time.h>
+#include <mach/mach.h>
 #include <mach-o/dyld.h>  // for _NSGetExecutablePath
 #include <string.h>       // for string functions
 #include <stdio.h>        // for FILE type
@@ -33,6 +34,7 @@
 #include <stdarg.h>       // for va_list
 
 #ifdef __cplusplus
+
 extern "C" {
 #endif
 
@@ -146,6 +148,8 @@ typedef struct tagWNDCLASS {
 // Windows utility macros
 #define LOWORD(l) ((uint16_t)(((uintptr_t)(l)) & 0xffff))
 #define HIWORD(l) ((uint16_t)((((uintptr_t)(l)) >> 16) & 0xffff))
+
+#define INVALID_HANDLE_VALUE (HANDLE)-1l
 
 // Windows SAL annotations (Source Code Annotation Language)
 #define IN          // Input parameter annotation
@@ -345,12 +349,27 @@ inline void* GetCurrentProcess() {
     return (void*)1;  // Dummy process handle
 }
 
-// Only define GetCurrentThread if not in MacOSFileSystem context
-#ifndef MACOS_FILESYSTEM_IMPLEMENTATION
-inline void* GetCurrentThread() {
-    // Use pthread_self() to get actual current thread
+// Windows thread functions - avoid conflicts with Carbon framework
+// Only define if not already defined by system headers
+#ifndef GetCurrentThread
+inline void* Win32GetCurrentThread() {
     return (void*)pthread_self();
 }
+#define GetCurrentThread Win32GetCurrentThread
+#endif
+
+#ifndef GetCurrentThreadId
+inline uint32_t Win32GetCurrentThreadId() {
+    // Use mach_thread_self() on macOS for a proper thread ID
+    #ifdef __APPLE__
+        return (uint32_t)mach_thread_self();
+    #else
+        // Fallback: use a hash of pthread_t to avoid truncation
+        pthread_t tid = pthread_self();
+        return (uint32_t)((uintptr_t)tid ^ ((uintptr_t)tid >> 32));
+    #endif
+}
+#define GetCurrentThreadId Win32GetCurrentThreadId
 #endif
 
 inline uint32_t GetPriorityClass(void* hProcess) {
@@ -479,9 +498,16 @@ typedef struct _OVERLAPPED {
         void* Pointer;
     };
     void* hEvent;
-} OVERLAPPED;
+} OVERLAPPED, *LPOVERLAPPED;
 
-typedef OVERLAPPED* LPOVERLAPPED;
+// Windows overlapped I/O functions
+inline bool GetOverlappedResult(void* hFile, LPOVERLAPPED lpOverlapped, uint32_t* lpNumberOfBytesTransferred, bool bWait) {
+    // For macOS, we don't have overlapped I/O, so just return success
+    if (lpNumberOfBytesTransferred) {
+        *lpNumberOfBytesTransferred = 0;
+    }
+    return true;
+}
 
 // Windows performance timing functions
 inline int QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency) {

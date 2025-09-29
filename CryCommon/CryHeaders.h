@@ -384,7 +384,7 @@ inline void CopyPhysInfo (BONE_PHYSICS& left, const BONE_PHYSICS_COMP& right)
 }
 inline void CopyPhysInfo (BONE_PHYSICS_COMP& left, const BONE_PHYSICS& right)
 {
-	left.nPhysGeom = (int)right.pPhysGeom;
+	left.nPhysGeom = reinterpret_cast<intptr_t>(right.pPhysGeom);
 	left.flags     = right.flags;
 	__copy3(min);
 	__copy3(max);
@@ -502,7 +502,7 @@ inline void CopyMatEntity(MAT_ENTITY& left, const MAT_ENTITY_COMP& right)
 inline void CopyMatEntity(MAT_ENTITY_COMP& left, const MAT_ENTITY& right)
 {
 	(MAT_ENTITY_DATA&)left = (MAT_ENTITY_DATA&)right;
-	left.m_iMaterialChildren = (int)right.m_pMaterialChildren;
+	left.m_iMaterialChildren = reinterpret_cast<intptr_t>(right.m_pMaterialChildren);
 }
 
 #ifdef WIN64

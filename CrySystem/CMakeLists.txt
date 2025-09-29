@@ -24,7 +24,8 @@ if(APPLE)
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*HTTPDownloader.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*DownloadManager.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*LuaDebugger.*")
-    # Temporarily exclude MacOSFileSystem due to header conflicts
+    # Temporarily exclude MacOSFileSystem due to Carbon framework conflicts
+    # TODO: Fix Foundation.h include conflict with GetCurrentThread
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*MacOSFileSystem.*")
 endif()
 
