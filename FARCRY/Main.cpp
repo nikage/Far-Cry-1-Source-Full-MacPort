@@ -904,3 +904,18 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 
 	return true;
 }
+
+#if defined(__APPLE__) && defined(__MACH__)
+// macOS entry point - call WinMain with appropriate parameters
+int main(int argc, char* argv[]) {
+    // Convert command line arguments to single string like Windows
+    char cmdLine[1024] = "";
+    for (int i = 1; i < argc; i++) {
+        if (i > 1) strcat(cmdLine, " ");
+        strcat(cmdLine, argv[i]);
+    }
+    
+    // Call WinMain with dummy parameters
+    return WinMain((HINSTANCE)1, (HINSTANCE)0, cmdLine, 1);
+}
+#endif

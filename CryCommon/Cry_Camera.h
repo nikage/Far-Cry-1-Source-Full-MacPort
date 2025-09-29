@@ -26,7 +26,9 @@
 #include "Cry_Vector3.h"  // Explicit include for Plane class and GetPlane function
 #include "Cry_Geo.h"
 
-// GetPlane function is now available from proper includes
+// GetPlane function forward declaration for ADL
+Plane GetPlane(const Vec3& v0, const Vec3& v1, const Vec3& v2);
+Plane GetPlane(const Vec3& normal, const Vec3& point);
 //DOC-IGNORE-END
 
 #ifdef WIN64
