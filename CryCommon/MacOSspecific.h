@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <stdlib.h>  // for malloc/free on macOS
 #include <mach/mach_time.h>
 #include <mach-o/dyld.h>  // for _NSGetExecutablePath
 #include <string.h>       // for string functions
@@ -357,6 +358,57 @@ inline int GetThreadPriority(void* hThread) {
 
 // Windows type definitions
 typedef int64_t INT64;
+typedef void VOID;
+
+// Windows file time structure
+typedef struct _FILETIME {
+    uint32_t dwLowDateTime;
+    uint32_t dwHighDateTime;
+} FILETIME;
+
+// Windows synchronization structures
+typedef struct _CRITICAL_SECTION {
+    void* DebugInfo;
+    int32_t LockCount;
+    int32_t RecursionCount;
+    void* OwningThread;
+    void* LockSemaphore;
+    uintptr_t SpinCount;
+} CRITICAL_SECTION;
+
+// Windows system information structure
+typedef struct _SYSTEM_INFO {
+    uint16_t wProcessorArchitecture;
+    uint16_t wReserved;
+    uint32_t dwPageSize;
+    void* lpMinimumApplicationAddress;
+    void* lpMaximumApplicationAddress;
+    uintptr_t dwActiveProcessorMask;
+    uint32_t dwNumberOfProcessors;
+    uint32_t dwProcessorType;
+    uint32_t dwAllocationGranularity;
+    uint16_t wProcessorLevel;
+    uint16_t wProcessorRevision;
+} SYSTEM_INFO;
+
+// Windows thread creation constants
+#define CREATE_SUSPENDED 0x00000004
+
+// Windows overlapped I/O structures
+typedef struct _OVERLAPPED {
+    uintptr_t Internal;
+    uintptr_t InternalHigh;
+    union {
+        struct {
+            uint32_t Offset;
+            uint32_t OffsetHigh;
+        };
+        void* Pointer;
+    };
+    void* hEvent;
+} OVERLAPPED;
+
+typedef OVERLAPPED* LPOVERLAPPED;
 
 // Windows performance timing functions
 inline int QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency) {
@@ -370,6 +422,14 @@ inline int QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency) {
     return 1;
 }
 
+inline int QueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount) {
+    // Use mach_absolute_time for macOS high-resolution timing
+    if (lpPerformanceCount) {
+        lpPerformanceCount->QuadPart = mach_absolute_time();
+    }
+    return 1;
+}
+
 inline int SetPriorityClass(void* hProcess, uint32_t dwPriorityClass) {
     // macOS doesn't have direct equivalent, return success
     return 1;
@@ -378,6 +438,82 @@ inline int SetPriorityClass(void* hProcess, uint32_t dwPriorityClass) {
 inline int SetThreadPriority(void* hThread, int nPriority) {
     // macOS thread priority setting would be complex, stub for now
     return 1;
+}
+
+// Windows process affinity functions
+inline int GetProcessAffinityMask(void* hProcess, uintptr_t* lpProcessAffinityMask, uintptr_t* lpSystemAffinityMask) {
+    // macOS doesn't have direct process affinity, return all CPUs available
+    if (lpProcessAffinityMask) *lpProcessAffinityMask = 0xFFFFFFFF;
+    if (lpSystemAffinityMask) *lpSystemAffinityMask = 0xFFFFFFFF;
+    return 1;
+}
+
+// Windows thread creation function - use proper function pointer type
+typedef unsigned long (*LPTHREAD_START_ROUTINE)(void*);
+
+inline void* CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, uint32_t* lpThreadId) {
+    // This is a complex function that would need proper pthread implementation
+    // For now, return a dummy handle since this is used for CPU detection
+    if (lpThreadId) *lpThreadId = 1;
+    return (void*)1;
+}
+
+// Windows thread control functions
+inline uint32_t ResumeThread(void* hThread) {
+    // Return previous suspend count (0 = wasn't suspended)
+    return 0;
+}
+
+inline int CloseHandle(void* hObject) {
+    // macOS equivalent would depend on handle type, return success for now
+    return 1;
+}
+
+// Windows system information function
+inline void GetSystemInfo(SYSTEM_INFO* lpSystemInfo) {
+    if (lpSystemInfo) {
+        // Fill with basic macOS system info
+        lpSystemInfo->dwNumberOfProcessors = sysconf(_SC_NPROCESSORS_ONLN);
+        lpSystemInfo->dwPageSize = getpagesize();
+        lpSystemInfo->wProcessorArchitecture = 0; // Generic
+        lpSystemInfo->dwActiveProcessorMask = (1 << lpSystemInfo->dwNumberOfProcessors) - 1;
+    }
+}
+
+// Windows thread affinity function
+inline uintptr_t SetThreadAffinityMask(void* hThread, uintptr_t dwThreadAffinityMask) {
+    // macOS doesn't have direct thread affinity control, return success mask
+    return dwThreadAffinityMask;
+}
+
+// Windows critical section functions - implement using pthread mutex
+inline void InitializeCriticalSection(CRITICAL_SECTION* lpCriticalSection) {
+    if (lpCriticalSection) {
+        pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(mutex, NULL);
+        lpCriticalSection->DebugInfo = mutex;
+        lpCriticalSection->LockCount = 0;
+    }
+}
+
+inline void DeleteCriticalSection(CRITICAL_SECTION* lpCriticalSection) {
+    if (lpCriticalSection && lpCriticalSection->DebugInfo) {
+        pthread_mutex_destroy((pthread_mutex_t*)lpCriticalSection->DebugInfo);
+        free(lpCriticalSection->DebugInfo);
+        lpCriticalSection->DebugInfo = NULL;
+    }
+}
+
+inline void EnterCriticalSection(CRITICAL_SECTION* lpCriticalSection) {
+    if (lpCriticalSection && lpCriticalSection->DebugInfo) {
+        pthread_mutex_lock((pthread_mutex_t*)lpCriticalSection->DebugInfo);
+    }
+}
+
+inline void LeaveCriticalSection(CRITICAL_SECTION* lpCriticalSection) {
+    if (lpCriticalSection && lpCriticalSection->DebugInfo) {
+        pthread_mutex_unlock((pthread_mutex_t*)lpCriticalSection->DebugInfo);
+    }
 }
 
 inline int MessageBox(void* hWnd, const char* lpText, const char* lpCaption, uint32_t uType) {
@@ -452,6 +588,19 @@ inline void fxclose(FILE* f) { fclose(f); }
 #define strnicmp strncasecmp
 #define _stricmp strcasecmp
 #define _strnicmp strncasecmp
+
+// Windows sleep function (Sleep vs sleep - different parameters)
+inline void Sleep(uint32_t dwMilliseconds) {
+    usleep(dwMilliseconds * 1000);  // usleep takes microseconds
+}
+
+// Windows memory comparison function
+inline int memicmp(const void* buf1, const void* buf2, size_t count) {
+    return strncasecmp((const char*)buf1, (const char*)buf2, count);
+}
+
+// Windows constants
+#define INFINITE 0xFFFFFFFF
 
 // Path constants
 #define _MAX_PATH 1024

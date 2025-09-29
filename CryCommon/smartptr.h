@@ -252,7 +252,7 @@ protected:
 
 typedef _i_reference_target<int> _i_reference_target_t;
 
-#if (defined(WIN32) || defined(LINUX))
+#if (defined(WIN32) || defined(LINUX) || (defined(__APPLE__) && defined(__MACH__)))
 
 //////////////////////////////////////////////////////////////////////////
 // This class describes the set template that facilitates creation

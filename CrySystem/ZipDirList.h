@@ -1,6 +1,11 @@
 #ifndef _ZIP_DIR_LIST_HDR_
 #define _ZIP_DIR_LIST_HDR_
 
+#include "smartptr.h"  // for RefCountedDataInstance
+
+// Forward declaration to ensure template is available
+template <class Header> class RefCountedDataInstance;
+
 namespace ZipDir
 {
 
