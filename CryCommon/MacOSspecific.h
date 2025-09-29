@@ -345,9 +345,13 @@ inline void* GetCurrentProcess() {
     return (void*)1;  // Dummy process handle
 }
 
+// Only define GetCurrentThread if not in MacOSFileSystem context
+#ifndef MACOS_FILESYSTEM_IMPLEMENTATION
 inline void* GetCurrentThread() {
-    return (void*)2;  // Dummy thread handle
+    // Use pthread_self() to get actual current thread
+    return (void*)pthread_self();
 }
+#endif
 
 inline uint32_t GetPriorityClass(void* hProcess) {
     return 0x00000020;  // NORMAL_PRIORITY_CLASS

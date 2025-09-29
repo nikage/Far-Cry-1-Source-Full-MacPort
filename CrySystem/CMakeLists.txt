@@ -24,6 +24,8 @@ if(APPLE)
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*HTTPDownloader.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*DownloadManager.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*LuaDebugger.*")
+    # Temporarily exclude MacOSFileSystem due to header conflicts
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*MacOSFileSystem.*")
 endif()
 
 if(NOT UNIX OR APPLE)

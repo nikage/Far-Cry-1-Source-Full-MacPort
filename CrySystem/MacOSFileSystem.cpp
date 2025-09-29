@@ -15,12 +15,13 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
+#define MACOS_FILESYSTEM_IMPLEMENTATION
 #include "MacOSFileSystem.h"
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fnmatch.h>
 #include <algorithm>
-#include <CoreFoundation/CoreFoundation.h>
+// CoreFoundation not needed - removed to avoid header conflicts
 
 // Static utility methods
 std::string CMacOSFileSystem::ConvertPathSeparators(const std::string& path)
