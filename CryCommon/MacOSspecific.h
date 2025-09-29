@@ -391,7 +391,8 @@ typedef struct _SYSTEM_INFO {
     uint16_t wProcessorRevision;
 } SYSTEM_INFO;
 
-// Windows thread creation constants
+// Windows constants
+#define INFINITE 0xFFFFFFFF
 #define CREATE_SUSPENDED 0x00000004
 
 // Windows overlapped I/O structures
@@ -451,7 +452,7 @@ inline int GetProcessAffinityMask(void* hProcess, uintptr_t* lpProcessAffinityMa
 // Windows thread creation function - use proper function pointer type
 typedef unsigned long (*LPTHREAD_START_ROUTINE)(void*);
 
-inline void* CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, uint32_t* lpThreadId) {
+inline void* CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, unsigned long* lpThreadId) {
     // This is a complex function that would need proper pthread implementation
     // For now, return a dummy handle since this is used for CPU detection
     if (lpThreadId) *lpThreadId = 1;
@@ -467,6 +468,15 @@ inline uint32_t ResumeThread(void* hThread) {
 inline int CloseHandle(void* hObject) {
     // macOS equivalent would depend on handle type, return success for now
     return 1;
+}
+
+// Windows synchronization function
+inline uint32_t WaitForSingleObject(void* hHandle, uint32_t dwMilliseconds) {
+    // Simplified implementation - just sleep for the timeout period
+    if (dwMilliseconds != INFINITE) {
+        usleep(dwMilliseconds * 1000);  // Use usleep directly to avoid circular dependency
+    }
+    return 0;  // WAIT_OBJECT_0 (success)
 }
 
 // Windows system information function
@@ -594,13 +604,12 @@ inline void Sleep(uint32_t dwMilliseconds) {
     usleep(dwMilliseconds * 1000);  // usleep takes microseconds
 }
 
+// Moved to earlier in file
+
 // Windows memory comparison function
 inline int memicmp(const void* buf1, const void* buf2, size_t count) {
     return strncasecmp((const char*)buf1, (const char*)buf2, count);
 }
-
-// Windows constants
-#define INFINITE 0xFFFFFFFF
 
 // Path constants
 #define _MAX_PATH 1024
