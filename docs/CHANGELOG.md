@@ -1,6 +1,6 @@
 # FarCry Mac Silicon Port - Changelog
 
-## 2025-01-27 - Fixed RefStreamEngine Windows API Compatibility
+## 2025-01-27 - Fixed Windows API Compatibility Issues
 
 ### [CrySystem][RefStreamEngine] Resolved Windows API undeclared identifier errors
 
@@ -18,6 +18,19 @@
 - **Updated platform detection** in `RefStreamEngine.cpp` to support macOS
 - **Applied SOLID principles** by creating clean abstraction layer for cross-platform compatibility
 - **Result**: Reduced compilation errors from 15+ to 1 (remaining error is unrelated math template issue)
+
+### [CrySystem][CPUDetect] Fixed CreateThread function signature compatibility
+
+- **Fixed CreateThread function signature issue** in `CrySystem/CPUDetect.cpp`:
+  - Resolved type mismatch between `unsigned long*` and `uint32_t*` thread ID parameters
+  - Created generic `CreateThreadImpl` function with macro wrapper for type compatibility
+  - Updated `LPTHREAD_START_ROUTINE` typedef to use `unsigned long` return type for macOS compatibility
+- **Enhanced MacOSspecific.h** with flexible CreateThread implementation:
+  - Added macro-based approach to handle different thread ID pointer types
+  - Implemented proper function pointer casting for cross-platform compatibility
+  - Maintained backward compatibility with existing Windows API interface
+- **Applied SOLID principles** by creating unified interface that handles multiple parameter types
+- **Result**: Both `RefStreamEngine.cpp` and `CPUDetect.cpp` now compile successfully without CreateThread errors
 
 ## 2025-09-29 - Initial Mac Silicon Port Setup
 

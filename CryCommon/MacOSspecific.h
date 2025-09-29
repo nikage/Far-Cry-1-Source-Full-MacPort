@@ -559,14 +559,28 @@ inline int GetProcessAffinityMask(void* hProcess, uintptr_t* lpProcessAffinityMa
 }
 
 // Windows thread creation function - use proper function pointer type
-typedef uint32_t (*LPTHREAD_START_ROUTINE)(void*);
+typedef unsigned long (*LPTHREAD_START_ROUTINE)(void*);
 
-inline void* CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, uint32_t* lpThreadId) {
+// CreateThread implementation - generic version
+inline void* CreateThreadImpl(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, uint32_t dwCreationFlags, void* lpThreadId) {
     // This is a complex function that would need proper pthread implementation
     // For now, return a dummy handle since this is used for CPU detection
-    if (lpThreadId) *lpThreadId = 1;
+    if (lpThreadId) {
+        // Handle different thread ID types
+        if (sizeof(unsigned long) == sizeof(uint32_t)) {
+            // Same size, can safely cast
+            *(uint32_t*)lpThreadId = 1;
+        } else {
+            // Different sizes, handle as unsigned long
+            *(unsigned long*)lpThreadId = 1;
+        }
+    }
     return (void*)1;
 }
+
+// Macro to handle different thread ID types
+#define CreateThread(attrs, stack, func, param, flags, threadId) \
+    CreateThreadImpl(attrs, stack, (LPTHREAD_START_ROUTINE)(func), param, flags, (void*)(threadId))
 
 // Windows thread control functions
 inline uint32_t ResumeThread(void* hThread) {
@@ -828,6 +842,7 @@ inline uint64_t __rdtsc() { return __builtin_ia32_rdtsc(); }
 
 #ifdef __cplusplus
 }
+
 
 // Atomic operations for multi-threading - template approach like Linux
 template<typename T>
