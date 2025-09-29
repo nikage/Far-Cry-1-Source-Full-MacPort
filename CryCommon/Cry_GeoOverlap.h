@@ -17,8 +17,10 @@
 # pragma once
 #endif
 
+// GetPlane function should be available from math headers
 
-#include <Cry_Geo.h>
+
+// Note: This file is included by Cry_Geo.h, don't include it back
 
 
 

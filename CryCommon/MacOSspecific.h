@@ -25,6 +25,7 @@
 #include <mach-o/dyld.h>  // for _NSGetExecutablePath
 #include <string.h>       // for string functions
 #include <stdio.h>        // for FILE type
+#include <dlfcn.h>        // for dlopen/dlsym
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,17 +76,60 @@ typedef uint16_t        WORD;
 typedef uintptr_t       WPARAM;
 typedef intptr_t        LPARAM;
 typedef intptr_t        LRESULT;
+typedef void*           HBRUSH;
+typedef void*           HICON;
+typedef void*           HCURSOR;
 #define CALLBACK        // Empty macro for macOS
+
+// Window class constants
+#define CS_OWNDC        0x0020
+#define CS_HREDRAW      0x0002
+#define CS_VREDRAW      0x0001
+#define BLACK_BRUSH     4
+#define IDI_ICON        1
+
+// MessageBox constants
+#define MB_OK                   0x00000000L
+#define MB_ICONERROR           0x00000010L
+#define MB_DEFAULT_DESKTOP_ONLY 0x00020000L
+
+// Window procedure function pointer type
+typedef LRESULT (*WNDPROC)(HWND, uint32_t, WPARAM, LPARAM);
+
+// Window class structure
+typedef struct tagWNDCLASS {
+    uint32_t    style;
+    WNDPROC     lpfnWndProc;  // Window procedure
+    int         cbClsExtra;
+    int         cbWndExtra;
+    HINSTANCE   hInstance;
+    HICON       hIcon;
+    HCURSOR     hCursor;
+    HBRUSH      hbrBackground;
+    const char* lpszMenuName;
+    const char* lpszClassName;
+} WNDCLASS;
 
 // Windows message constants (stubs for macOS)
 #define WM_MOVE             0x0003
 #define WM_SIZE             0x0005  
 #define WM_ACTIVATE         0x0006
+#define WM_SETFOCUS         0x0007
+#define WM_KILLFOCUS        0x0008
+#define WM_DESTROY          0x0002
 #define WM_DISPLAYCHANGE    0x007E
 #define WM_ACTIVATEAPP      0x001C
 #define WM_MOUSEACTIVATE    0x0021
 #define WM_ENTERSIZEMOVE    0x0231
 #define WM_ENTERMENULOOP    0x0211
+#define WM_HOTKEY           0x0312
+#define WM_SYSKEYDOWN       0x0104
+#define WM_SYSKEYUP         0x0105
+#define WM_KEYDOWN          0x0100
+#define WM_KEYUP            0x0101
+#define WM_CHAR             0x0102
+#define WM_QUIT             0x0012
+#define WM_CLOSE            0x0010
 #define SIZE_MAXHIDE       4
 #define SIZE_MINIMIZED     1
 #define MA_ACTIVATEANDEAT   2
@@ -243,6 +287,43 @@ inline int GetClientRect(void* hWnd, RECT* lpRect) {
     return 1;
 }
 
+inline LRESULT DefWindowProc(void* hWnd, uint32_t Msg, WPARAM wParam, LPARAM lParam) {
+    // Default window procedure stub for macOS
+    return 0;  // Return 0 for all messages
+}
+
+// Resource and GDI function stubs
+inline void* MAKEINTRESOURCE(int id) {
+    return (void*)(uintptr_t)id;
+}
+
+inline void* LoadIcon(void* hInstance, void* lpIconName) {
+    return NULL;  // No icon loading on macOS console
+}
+
+inline void* GetStockObject(int i) {
+    return (void*)1;  // Return dummy brush handle
+}
+
+inline uint16_t RegisterClass(const WNDCLASS* lpWndClass) {
+    return 1;  // Always succeed on macOS stub
+}
+
+inline uint32_t GetLastError() {
+    return 0;  // No error on macOS stub
+}
+
+inline int MessageBox(void* hWnd, const char* lpText, const char* lpCaption, uint32_t uType) {
+    // Print to console instead of showing message box on macOS
+    printf("[MessageBox] %s: %s\n", lpCaption ? lpCaption : "Message", lpText ? lpText : "");
+    return 1; // IDOK
+}
+
+inline void* LoadLibrary(const char* lpLibFileName) {
+    // Use dlopen for dynamic library loading on macOS
+    return dlopen(lpLibFileName, RTLD_LAZY);
+}
+
 // Math functions compatibility
 #include <math.h>
 inline void cry_sincos(double angle, double* pCosSin) 
@@ -292,11 +373,12 @@ inline float cry_powf(float base, float exp) { return powf(base, exp); }
 inline double cry_pow(double base, double exp) { return pow(base, exp); }
 
 // File operations - macOS doesn't use CryPak by default
-#ifndef FXOPEN_DEFINED
-#define FXOPEN_DEFINED
-inline FILE* fxopen(const char* file, const char* mode) { return fopen(file, mode); }
+// Note: fxopen is defined in ILog.h, but we need fopen_nocase for Linux-style behavior
+inline FILE* fopen_nocase(const char* file, const char* mode) { 
+    // macOS is case-sensitive like Linux, so just use regular fopen
+    return fopen(file, mode); 
+}
 inline void fxclose(FILE* f) { fclose(f); }
-#endif
 
 // String comparison functions
 #define stricmp strcasecmp
@@ -312,23 +394,7 @@ inline void fxclose(FILE* f) { fclose(f); }
 #define _MAX_FNAME 256
 #define _MAX_EXT 256
 
-// Atomic operations for multi-threading
-inline long InterlockedIncrement(volatile long* target) {
-    return __sync_add_and_fetch(target, 1);
-}
-
-inline long InterlockedDecrement(volatile long* target) {
-    return __sync_sub_and_fetch(target, 1);
-}
-
-// For int variant used on Linux
-inline int InterlockedIncrement(volatile int* target) {
-    return __sync_add_and_fetch(target, 1);
-}
-
-inline int InterlockedDecrement(volatile int* target) {
-    return __sync_sub_and_fetch(target, 1);
-}
+// Atomic operations moved to C++ section
 
 // SSE intrinsics compatibility
 #if defined(__aarch64__) || defined(__arm64__)
@@ -347,6 +413,24 @@ inline void _mm_prefetch(const char* p, int i) { __builtin_prefetch(p, 0, 0); }
 
 #ifdef __cplusplus
 }
+
+// Atomic operations for multi-threading - template approach like Linux
+template<typename T>
+inline T InterlockedIncrement(volatile T* target) {
+    return __sync_add_and_fetch(target, 1);
+}
+
+template<typename T>  
+inline T InterlockedDecrement(volatile T* target) {
+    return __sync_sub_and_fetch(target, 1);
+}
+
+// Math function support will be handled by proper include order
+
+// macOS-specific global variables for compatibility
+extern void* g_hSystemHandle;
+#define DLL_SYSTEM "libCrySystem.dylib"  // macOS shared library name
+#define DLL_GAME   "libCryGame.dylib"
 
 // Forward declarations for CryEngine math functions (defined in headers)
 template <class F> struct Vec3_tpl;

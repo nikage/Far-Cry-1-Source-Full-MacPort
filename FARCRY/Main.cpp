@@ -71,6 +71,7 @@ void AuthCheckFunction( void *data )
 // CRY Stuff ////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 #include "Cry_Math.h"
+#include "Cry_Vector3.h"  // Explicit include to ensure Plane class and GetPlane function are available
 #include <Cry_Camera.h>
 
 
@@ -97,6 +98,9 @@ static char szMasterCDFolder[_MAX_PATH];
 static HMODULE g_hSystemHandle=NULL;
 #define DLL_SYSTEM "CrySystem.dll"
 #define DLL_GAME	 "CryGame.dll"
+#elif defined(__APPLE__) && defined(__MACH__)
+void* g_hSystemHandle = NULL;
+// DLL_SYSTEM and DLL_GAME defined in MacOSspecific.h
 #endif
 
 #ifndef PS2
@@ -591,7 +595,9 @@ string FormatWinError(DWORD dwError)
 }
 
 #define MAX_CMDLINE_LEN 256
+#ifdef _WIN32
 #include <crtdbg.h>
+#endif
 ///////////////////////////////////////////////
 // Load the game DLL and run it
 
@@ -854,7 +860,7 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 			::DestroyWindow((HWND)hWnd);
 			hWnd = NULL;
 		}
-#endif;
+#endif
 
 	} while(false);
 
@@ -893,7 +899,7 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 		// Now terminate this process as fast as possible.
 		ExitProcess( 0 );
 
-#endif WIN32
+#endif // WIN32
 	}
 
 	return true;

@@ -424,6 +424,10 @@ ILINE  Vec3_tpl<F> GetOrthogonal( const Vec3_tpl<F>& v ) {
 
 
 
+// Forward declarations for angle functions
+ILINE f32 Snap_s180( f32 val );
+ILINE f32 Snap_s360( f32 val );
+
 template <class F> 
 struct Ang3_tpl : public Vec3_tpl<F>
 {

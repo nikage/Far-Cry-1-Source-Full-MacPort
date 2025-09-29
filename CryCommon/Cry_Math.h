@@ -264,7 +264,7 @@ template<class F> inline F sqr_signed(const F &op) { return op*fabs_tpl(op); }
 #define sz csz[1]
 
 //#include "Cry_Vector2.h"
-//#include "Cry_Vector3.h"
+//#include "Cry_Vector3.h"  
 #include "Cry_Matrix.h"
 //#include "Cry_Quat.h"
 

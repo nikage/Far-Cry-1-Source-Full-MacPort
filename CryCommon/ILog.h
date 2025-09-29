@@ -164,7 +164,7 @@ inline FILE * fxopen(const char *file, const char *mode)
   _ConvertNameForXBox(name, file);
   return fopen(name, mode);
 #else
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 	return fopen_nocase(file, mode);
 #else
   return fopen(file, mode);
