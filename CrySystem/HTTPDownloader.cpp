@@ -60,7 +60,7 @@ int CHTTPDownloader::Download(const char *szURL, const char *szDestination)
 	m_szDstFile = szDestination;
 	m_bContinue = 1;
 
-	CreateThread();
+	CreateDownloadThread();
 
 	return 1;
 }
@@ -80,7 +80,7 @@ DWORD CHTTPDownloader::DownloadProc(CHTTPDownloader *_this)
 }
 
 //------------------------------------------------------------------------------------------------- 
-void CHTTPDownloader::CreateThread()
+void CHTTPDownloader::CreateDownloadThread()
 {
 	DWORD dwThreadId = 0;
 

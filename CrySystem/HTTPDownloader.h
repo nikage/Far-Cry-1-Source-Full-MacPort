@@ -60,7 +60,7 @@ private:
 
 	static
 	DWORD DownloadProc(CHTTPDownloader *_this);
-	void	CreateThread();
+	void	CreateDownloadThread();
 	DWORD DoDownload();
 	void	PrepareBuffer();
 

@@ -38,7 +38,7 @@ bool CRefReadStream::Activate()
 			m_bOverlapped?FILE_FLAG_OVERLAPPED:0,
 			NULL);
 #if !defined(LINUX64)
-	if (m_pZipEntry == NULL && m_hFile == INVALID_HANDLE_VALUE)
+	if (!m_pZipEntry && m_hFile == INVALID_HANDLE_VALUE)
 #else
 	if (m_pZipEntry == 0 && m_hFile == INVALID_HANDLE_VALUE)
 #endif

@@ -369,7 +369,7 @@ DWORD CRefReadStreamProxy::CallReadFileEx ()
 #if defined(LINUX)
 		m_Overlapped.pCaller = (void*)this;//store caller address here
 #endif
-		if (!ReadFileEx (hFile, ((char*)m_pBuffer) + m_nPieceOffset, m_nPieceLength, &m_Overlapped, FileIOCompletionRoutine))
+		if (!ReadFileEx (hFile, ((char*)m_pBuffer) + m_nPieceOffset, m_nPieceLength, &m_Overlapped, (void*)FileIOCompletionRoutine))
 		{
 			DWORD dwError = GetLastError();
 			if (!dwError)

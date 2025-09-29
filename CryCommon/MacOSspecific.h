@@ -771,6 +771,7 @@ typedef void* HANDLE;
 typedef intptr_t INT_PTR;
 typedef uintptr_t UINT_PTR;
 typedef uintptr_t ULONG_PTR;
+typedef intptr_t LONG_PTR;
 typedef uintptr_t DWORD_PTR;
 
 // Additional math functions - use function overloading properly
@@ -881,6 +882,14 @@ extern int _fmode;  // Global file mode variable
 #define TRUNCATE_EXISTING 5
 
 #define INVALID_FILE_SIZE 0xFFFFFFFF
+
+// Additional Windows API constants
+#define FILE_FLAG_OVERLAPPED 0x40000000
+#define ERROR_NOT_ENOUGH_MEMORY 8
+#define ERROR_INVALID_USER_BUFFER 1784
+#define ERROR_NO_SYSTEM_RESOURCES 1450
+#define FILE_BEGIN 0
+#define INVALID_SET_FILE_POINTER 0xFFFFFFFF
 
 // Event functions
 inline void* CreateEvent(void* lpEventAttributes, int bManualReset, int bInitialState, const char* lpName) {
@@ -1001,6 +1010,52 @@ inline uint32_t GetFileSize(void* hFile, uint32_t* lpFileSizeHigh) {
     }
     
     return (uint32_t)(fileStat.st_size & 0xFFFFFFFF);
+}
+
+// CancelIo function
+inline int CancelIo(void* hFile) {
+    // Simplified implementation - just return success
+    // On macOS, we don't have the same async I/O cancellation model
+    return 1;  // success
+}
+
+// Additional Windows API functions
+inline int ReadFile(void* hFile, void* lpBuffer, uint32_t nNumberOfBytesToRead, 
+                   uint32_t* lpNumberOfBytesRead, void* lpOverlapped) {
+    if (!hFile || hFile == (void*)(intptr_t)INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+    int fd = (int)(intptr_t)hFile;
+    ssize_t bytesRead = read(fd, lpBuffer, nNumberOfBytesToRead);
+    if (bytesRead == -1) {
+        return 0;
+    }
+    if (lpNumberOfBytesRead) {
+        *lpNumberOfBytesRead = (uint32_t)bytesRead;
+    }
+    return 1;
+}
+
+inline int ReadFileEx(void* hFile, void* lpBuffer, uint32_t nNumberOfBytesToRead,
+                     void* lpOverlapped, void* lpCompletionRoutine) {
+    // Simplified implementation - just call ReadFile
+    return ReadFile(hFile, lpBuffer, nNumberOfBytesToRead, NULL, lpOverlapped);
+}
+
+inline uint32_t SetFilePointer(void* hFile, int32_t lDistanceToMove, int32_t* lpDistanceToMoveHigh, uint32_t dwMoveMethod) {
+    if (!hFile || hFile == (void*)(intptr_t)INVALID_HANDLE_VALUE) {
+        return INVALID_SET_FILE_POINTER;
+    }
+    int fd = (int)(intptr_t)hFile;
+    off_t offset = (off_t)lDistanceToMove;
+    if (lpDistanceToMoveHigh) {
+        offset |= ((off_t)*lpDistanceToMoveHigh) << 32;
+    }
+    off_t result = lseek(fd, offset, dwMoveMethod);
+    if (result == -1) {
+        return INVALID_SET_FILE_POINTER;
+    }
+    return (uint32_t)(result & 0xFFFFFFFF);
 }
 
 // Disk space function
