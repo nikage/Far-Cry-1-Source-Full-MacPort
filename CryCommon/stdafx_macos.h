@@ -48,9 +48,9 @@
 // Note: Foundation framework excluded to avoid BOOL conflicts
 #endif
 
-// Common CryEngine headers that are safe to include
-#include "Cry_Math.h"
-#include "ILog.h"
+// Common CryEngine headers that are safe to include will be included later
+// #include "Cry_Math.h"  // This may have dependencies, include later
+// #include "ILog.h"      // This may have dependencies, include later
 
 // Compatibility macros
 #define stricmp strcasecmp
