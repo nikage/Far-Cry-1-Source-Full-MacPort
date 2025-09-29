@@ -1,61 +1,118 @@
 cmake_minimum_required(VERSION 3.20)
-project(FarCryPortTest VERSION 1.0 LANGUAGES C CXX OBJCXX)
+project(FarCry VERSION 1.34 LANGUAGES C CXX OBJCXX)
 
+# Require C++14 for compatibility with original codebase
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Platform detection
 if(APPLE)
-    message(STATUS "Building test for macOS")
+    set(PLATFORM_MACOS TRUE)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
-        message(STATUS "Target: Apple Silicon (ARM64)")
-        add_compile_definitions(_CPU_ARM64=1)
+        set(PLATFORM_ARM64 TRUE)
+        message(STATUS "Building for macOS ARM64 (Apple Silicon)")
     else()
-        message(STATUS "Target: Intel Mac (x86_64)")
-        add_compile_definitions(_CPU_X86_64=1)
+        set(PLATFORM_X86_64 TRUE)
+        message(STATUS "Building for macOS x86_64")
     endif()
-    
-    add_compile_definitions(__APPLE__=1 __MACH__=1)
-    
-    # macOS deployment target
+elseif(WIN32)
+    set(PLATFORM_WINDOWS TRUE)
+    message(STATUS "Building for Windows")
+elseif(UNIX)
+    set(PLATFORM_LINUX TRUE)
+    message(STATUS "Building for Linux")
+endif()
+
+# Compiler-specific settings
+if(APPLE)
+    set(CMAKE_OSX_ARCHITECTURES "${CMAKE_SYSTEM_PROCESSOR}")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
     
+    # Enable ARM64 optimizations for Apple Silicon
+    if(PLATFORM_ARM64)
+        add_compile_definitions(_CPU_ARM64=1)
+        add_compile_options(-mcpu=apple-m1)
+    endif()
+    
+    # macOS-specific defines
+    add_compile_definitions(__APPLE__=1 __MACH__=1)
+    
     # Find required frameworks
-    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
-    find_library(METAL_FRAMEWORK Metal REQUIRED)
+    find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+    find_library(OPENGL_FRAMEWORK OpenGL REQUIRED)
     find_library(CORE_AUDIO_FRAMEWORK CoreAudio REQUIRED)
+    find_library(AUDIO_TOOLBOX_FRAMEWORK AudioToolbox REQUIRED)
+    find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
+    find_library(CORE_FOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
     
-    message(STATUS "Found Foundation: ${FOUNDATION_FRAMEWORK}")
-    message(STATUS "Found Metal: ${METAL_FRAMEWORK}")
-    message(STATUS "Found CoreAudio: ${CORE_AUDIO_FRAMEWORK}")
+elseif(WIN32)
+    add_compile_definitions(WIN32=1 _WINDOWS=1)
+elseif(UNIX)
+    add_compile_definitions(LINUX=1)
 endif()
 
-# Include directories
-include_directories(${CMAKE_SOURCE_DIR})
+# Global include directories
+include_directories(
+    ${CMAKE_SOURCE_DIR}/CryCommon
+    ${CMAKE_SOURCE_DIR}/CrySystem
+)
 
-# Test executable
-add_executable(farcry_port_test test_simple.cpp)
-
-# Disable memory manager for this test
-target_compile_definitions(farcry_port_test PRIVATE NOT_USE_CRY_MEMORY_MANAGER=1)
-
-# Set Objective-C++ for macOS frameworks
-if(APPLE)
-    set_source_files_properties(test_simple.cpp PROPERTIES 
-        COMPILE_FLAGS "-x objective-c++")
-    
-    target_link_libraries(farcry_port_test PRIVATE
-        ${FOUNDATION_FRAMEWORK}
-        ${METAL_FRAMEWORK}
-        ${CORE_AUDIO_FRAMEWORK}
-    )
+# Add STLPORT only for Windows (macOS uses standard library)
+if(WIN32)
+    include_directories(${CMAKE_SOURCE_DIR}/STLPORT/stlport)
 endif()
 
-# Compiler warnings
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(farcry_port_test PRIVATE
+# Global compiler flags for legacy code compatibility
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options(
         -Wno-deprecated-declarations
         -Wno-unused-variable
+        -Wno-unused-function
         -Wno-format-security
+        -Wno-reorder
+        -Wno-switch
+        -Wno-macro-redefined
+        -Wno-nonportable-include-path
     )
+endif()
+
+# Disable custom memory manager for macOS (use standard library)
+if(APPLE)
+    add_compile_definitions(NOT_USE_CRY_MEMORY_MANAGER=1)
+endif()
+
+# Subdirectories for each module (in dependency order)
+add_subdirectory(CryCommon)
+add_subdirectory(CrySystem)
+add_subdirectory(CryEntitySystem)
+add_subdirectory(CryPhysics)
+add_subdirectory(CryScriptSystem)
+add_subdirectory(CryFont)
+add_subdirectory(CryNetwork)
+add_subdirectory(CryAISystem)
+add_subdirectory(CryMovie)
+add_subdirectory(CryAnimation)
+add_subdirectory(Cry3DEngine)
+add_subdirectory(CryInput)
+add_subdirectory(CrySoundSystem)
+add_subdirectory(CryGame)
+
+# Renderer modules
+add_subdirectory(RenderDll)
+
+# Main executable
+add_subdirectory(FARCRY)
+
+# Platform-specific configurations
+if(APPLE)
+    # macOS app bundle configuration will be set in FARCRY/CMakeLists.txt
+    message(STATUS "macOS app bundle configuration will be applied to FarCry target")
+endif()
+
+# Installation
+if(APPLE)
+    install(TARGETS FarCry BUNDLE DESTINATION .)
+else()
+    install(TARGETS FarCry RUNTIME DESTINATION bin)
 endif()

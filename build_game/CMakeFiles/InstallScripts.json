@@ -1,0 +1,26 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/mykola/projects/FarCry/build_game/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryCommon/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CrySystem/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryEntitySystem/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryPhysics/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryScriptSystem/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryFont/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryNetwork/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryAISystem/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryMovie/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryAnimation/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/Cry3DEngine/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryInput/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CrySoundSystem/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/CryGame/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/RenderDll/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/RenderDll/XRenderMetal/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/RenderDll/XRenderNULL/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/RenderDll/Common/cmake_install.cmake",
+		"/Users/mykola/projects/FarCry/build_game/FARCRY/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,9 +1,13 @@
 #ifndef _CRY_MEMORY_MANAGER_H_
 #define _CRY_MEMORY_MANAGER_H_
 
-#include <malloc.h>
 #include <platform.h>
 #include <stdlib.h>
+#if defined(__APPLE__) && defined(__MACH__)
+    #include <malloc/malloc.h>
+#elif !defined(LINUX)
+    #include <malloc.h>
+#endif
 
 #ifdef WIN32
 	#ifdef CRYSYSTEM_EXPORTS
@@ -12,9 +16,9 @@
 		#define CRYMEMORYMANAGER_API __declspec(dllimport)
 	#endif
 #endif //WIN32 
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 	#define CRYMEMORYMANAGER_API
-#endif //LINUX 
+#endif //LINUX || macOS 
 
 #if defined(LINUX)
 	#define HMODULE void*

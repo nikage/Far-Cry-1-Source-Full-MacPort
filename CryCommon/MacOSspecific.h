@@ -53,7 +53,9 @@ typedef uint64_t        u64;
 // Windows compatibility types (avoid conflicts with system headers)
 typedef void*           THREAD_HANDLE;
 typedef void*           EVENT_HANDLE;
-// typedef int32_t         BOOL;  // Commented out to avoid conflict with objc BOOL
+#ifndef BOOL
+typedef int             BOOL;  // Use int for BOOL on macOS
+#endif
 typedef uint32_t        DWORD;
 typedef int32_t         LONG;
 typedef void*           HMODULE;
@@ -84,6 +86,33 @@ inline int CryIsHeapValid()
 }
 
 // Note: IsHeapValid macro removed to avoid conflict with Carbon framework
+
+// Windows compatibility macros
+#define ILINE inline
+#define APIENTRY
+#define WINAPI
+#define _ACCESS_POOL   // Empty macro for macOS
+
+// Math functions compatibility
+#include <math.h>
+inline void cry_sincos(double angle, double* pCosSin) 
+{
+    pCosSin[0] = cos(angle);
+    pCosSin[1] = sin(angle);
+}
+
+inline void cry_sincosf(float angle, float* pCosSin)
+{
+    pCosSin[0] = cosf(angle);
+    pCosSin[1] = sinf(angle);
+}
+
+inline float cry_cosf(float op) { return cosf(op); }
+inline float cry_sinf(float op) { return sinf(op); }
+
+// Handle declaration
+typedef void* HANDLE;
+
 #endif
 
 #ifdef __cplusplus

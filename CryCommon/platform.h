@@ -126,8 +126,13 @@ typedef void *EVENT_HANDLE;
 
 #ifdef __cplusplus
 // define the standard string
+#if defined(__APPLE__) && defined(__MACH__)
+// On macOS, use standard library directly (avoid STLPORT issues)
 #include <string>
-#if defined(WIN64)// || defined(LINUX64)// && defined(_DLL), be careful when changing this to adapt the changes to IXml.h too
+#else
+#include <string>
+#endif
+#if defined(WIN64) || (defined(__APPLE__) && defined(__MACH__))// || defined(LINUX64)// && defined(_DLL), be careful when changing this to adapt the changes to IXml.h too
 namespace cry_std
 {
 	template<typename T>
@@ -155,7 +160,7 @@ namespace cry_std
 		// the string gets destructed, which renders the pointer hanging.
 		// to correct this, we avoid self-assignment through pointer
 		if (s.c_str() != this->c_str())
-			assign(s.c_str());
+			this->assign(s.c_str());
 		return *this;
 		}
 		string& operator = (const T* p)
@@ -165,7 +170,7 @@ namespace cry_std
 		// the string gets destructed, which renders the pointer hanging.
 		// to correct this, we avoid self-assignment through pointer
 		if (p != this->c_str())
-			assign(p);
+			this->assign(p);
 		return *this;
 		}
 		string& operator = (const string& s)
@@ -175,15 +180,15 @@ namespace cry_std
 		// the string gets destructed, which renders the pointer hanging.
 		// to correct this, we avoid self-assignment through pointer
 		if (s.c_str() != this->c_str())
-			assign (s.c_str());
+			this->assign(s.c_str());
 		return *this;
 		}
 		void push_back(char c) {(*this) += c;}
 		void clear() {this->resize(0);}
 
-		string& operator += (const Base& s) {append(s);return *this;}
-		string& operator += (char c) {append(1,c); return *this;}
-		string& operator += (const T* p) {append(p);return *this;}
+		string& operator += (const Base& s) {this->append(s);return *this;}
+		string& operator += (char c) {this->append(1,c); return *this;}
+		string& operator += (const T* p) {this->append(p);return *this;}
 	};
 	template <typename T> string<T> operator + (const string<T>& left, const string<T>& right) {return string<T>(left)+=right;}
 	template <typename T> string<T> operator + (const typename string<T>::Base& left, const string<T>& right) {return string<T>(left)+=right;}
@@ -198,10 +203,10 @@ typedef cry_std::string<char>//std::basic_string<char, cry_std::char_traits<char
 	string;
 typedef cry_std::string<wchar_t>//std::basic_string<wchar_t, cry_std::char_traits<wchar_t>, std::allocator<wchar_t> >
 	wstring;
-#else	// defined(WIN64)
+#else	// defined(WIN64) || macOS
 typedef std::string string;
 typedef std::wstring wstring;
-#endif // defined(WIN64)
+#endif // defined(WIN64) || macOS
 
 
 #endif // __cplusplus

@@ -1,0 +1,1 @@
+/usr/bin/c++ -g -arch arm64 -mmacosx-version-min=11.0 -dynamiclib -Wl,-headerpad_max_install_names -o libXRenderMetal.dylib -install_name @rpath/libXRenderMetal.dylib CMakeFiles/XRenderMetal.dir/MetalRenderer.cpp.o  -framework Cocoa -framework OpenGL -framework Metal -framework MetalKit -framework QuartzCore
