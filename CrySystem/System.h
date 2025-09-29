@@ -117,7 +117,7 @@ public:
 	IRenderer				*GetIRenderer(){ return CSystem::m_pRenderer; }
 	IInput					*GetIInput(){ return m_pIInput; }
 	ITimer					*GetITimer(){ return &m_Time; }
-	ICryPak					*GetIPak(){ return m_pIPak; }
+	ICryPak					*GetIPak(){ return (ICryPak*)m_pIPak; }
 	IConsole				*GetIConsole();
 	IScriptSystem		*GetIScriptSystem(){ return m_pScriptSystem; }
 	I3DEngine				*GetI3DEngine(){ return m_pI3DEngine; }
@@ -131,7 +131,7 @@ public:
 	IEntitySystem		*GetIEntitySystem(){ return m_pEntitySystem;}
 	ICryFont				*GetICryFont(){ return m_pICryFont; }
 	ILog						*GetILog(){ return m_pLog; }
-	IStreamEngine   *GetStreamEngine() {return m_pStreamEngine;}
+	IStreamEngine   *GetStreamEngine() {return (IStreamEngine*)m_pStreamEngine;}
 	CLUADbg					*GetLuaDebugger() { return m_pLuaDebugger; }
 	IValidator			*GetIValidator() { return m_pValidator; };
 	IFrameProfileSystem* GetIProfileSystem() { return &m_FrameProfileSystem; }
