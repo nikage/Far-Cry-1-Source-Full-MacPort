@@ -91,6 +91,11 @@ inline int CryIsHeapValid()
 #define APIENTRY
 #define WINAPI
 #define _ACCESS_POOL   // Empty macro for macOS
+#define __forceinline inline
+
+// Windows API compatibility
+#define GetProcAddress(hModule, lpProcName) dlsym(hModule, lpProcName)
+#define HINSTANCE void*
 
 // Math functions compatibility
 #include <math.h>
@@ -108,9 +113,28 @@ inline void cry_sincosf(float angle, float* pCosSin)
 
 inline float cry_cosf(float op) { return cosf(op); }
 inline float cry_sinf(float op) { return sinf(op); }
+inline float cry_acosf(float op) { return acosf(op); }
+inline float cry_asinf(float op) { return asinf(op); }
+inline float cry_atanf(float op) { return atanf(op); }
+inline float cry_atan2f(float y, float x) { return atan2f(y, x); }
+inline float cry_expf(float op) { return expf(op); }
+inline float cry_logf(float op) { return logf(op); }
+inline float cry_sqrtf(float op) { return sqrtf(op); }
+inline float cry_fabsf(float op) { return fabsf(op); }
+inline float cry_floorf(float op) { return floorf(op); }
+inline float cry_ceilf(float op) { return ceilf(op); }
+inline float cry_tanf(float op) { return tanf(op); }
 
 // Handle declaration
 typedef void* HANDLE;
+
+// Missing Windows types
+typedef intptr_t INT_PTR;
+typedef uintptr_t UINT_PTR;
+
+// Additional math functions
+inline float cry_fmod(float x, float y) { return fmodf(x, y); }
+inline double cry_fmod(double x, double y) { return fmod(x, y); }
 
 #endif
 

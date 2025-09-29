@@ -29,7 +29,15 @@ target_include_directories(CryGame PUBLIC
 # Preprocessor definitions
 target_compile_definitions(CryGame PRIVATE
     CRYGAME_EXPORTS=1
+    NOT_USE_CRY_MEMORY_MANAGER=1
 )
+
+# For macOS, use forced include of clean headers to bypass legacy issues
+if(APPLE)
+    target_compile_options(CryGame PRIVATE
+        -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
+    )
+endif()
 
 # Disable specific warnings for legacy code
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

@@ -61,7 +61,19 @@ endif()
 # Preprocessor definitions
 target_compile_definitions(CryInput PRIVATE
     CRYINPUT_EXPORTS=1
+    NOT_USE_CRY_MEMORY_MANAGER=1
 )
+
+# For macOS, use forced include of clean headers to bypass legacy issues
+if(APPLE)
+    target_compile_options(CryInput PRIVATE
+        -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
+        -D_PLATFORM_H_=1  # Prevent original platform.h from being included
+    )
+    target_compile_definitions(CryInput PRIVATE
+        _PLATFORM_H_=1  # Prevent original platform.h from being included
+    )
+endif()
 
 # Disable specific warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")

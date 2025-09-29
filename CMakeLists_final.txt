@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
-project(FarCryWorking VERSION 1.34 LANGUAGES C CXX OBJCXX)
+project(FarCryComplete VERSION 1.34 LANGUAGES C CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Platform detection
 if(APPLE)
-    message(STATUS "Building working Far Cry for macOS ARM64 (Apple Silicon)")
+    message(STATUS "Building complete Far Cry for macOS ARM64 (Apple Silicon)")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
     
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
@@ -27,8 +27,6 @@ endif()
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR})
-# Add CryCommon to system include path so <platform.h> can be found
-include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/CryCommon)
 
 # Global macOS settings
 if(APPLE)
@@ -36,7 +34,11 @@ if(APPLE)
         __APPLE__=1
         __MACH__=1
         NOT_USE_CRY_MEMORY_MANAGER=1
+        _PLATFORM_H_=1  # Prevent problematic platform.h
     )
+    
+    # Use our clean platform header
+    add_compile_options(-include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h)
 endif()
 
 # Compiler flags
@@ -52,26 +54,40 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         -Wno-nonportable-include-path
         -Wno-unused-private-field
         -Wno-inconsistent-missing-override
-        -Wno-deprecated-register
     )
 endif()
 
-# Just compile the Main.cpp which we know works
-set(FARCRY_WORKING_SOURCES
+# Core game source files - build everything into one executable
+set(CORE_GAME_SOURCES
+    # Main executable
     FARCRY/Main.cpp
+    
+    # Essential system files
+    CrySystem/System.cpp
+    CrySystem/Log.cpp
+    CrySystem/Timer.cpp
+    
+    # Input system  
+    CryInput/Input.cpp
+    CryInput/MacOSInput.cpp
+    
+    # Core game files
+    CryGame/Game.cpp
+    CryGame/XPlayer.cpp
+    
+    # Sound system
+    CrySoundSystem/MacOSSound.cpp
+    
+    # Graphics
+    RenderDll/XRenderMetal/MetalRenderer.cpp
 )
 
-# Create the working Far Cry executable
-add_executable(FarCryWorking ${FARCRY_WORKING_SOURCES})
-
-# Use our clean platform header
-target_compile_options(FarCryWorking PRIVATE
-    -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
-)
+# Create the complete Far Cry executable
+add_executable(FarCryComplete ${CORE_GAME_SOURCES})
 
 # Link frameworks  
 if(APPLE)
-    target_link_libraries(FarCryWorking PRIVATE
+    target_link_libraries(FarCryComplete PRIVATE
         ${COCOA_FRAMEWORK}
         ${METAL_FRAMEWORK}
         ${CORE_AUDIO_FRAMEWORK}
@@ -80,20 +96,30 @@ if(APPLE)
         ${CORE_FOUNDATION_FRAMEWORK}
         ${CARBON_FRAMEWORK}
         ${APPKIT_FRAMEWORK}
+        "-framework AVFoundation"
+        "-framework MetalKit"
+        "-framework QuartzCore"
     )
     
     # Configure as macOS app bundle
-    set_target_properties(FarCryWorking PROPERTIES
+    set_target_properties(FarCryComplete PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "Far Cry"
+        MACOSX_BUNDLE_BUNDLE_NAME "Far Cry Complete"
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-        MACOSX_BUNDLE_IDENTIFIER "com.crytek.farcry"
-        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/FARCRY/Info.plist.in"
+        MACOSX_BUNDLE_IDENTIFIER "com.crytek.farcry.complete"
+    )
+    
+    # Set Objective-C++ for files that need it
+    set_source_files_properties(
+        CryInput/MacOSInput.cpp
+        CrySoundSystem/MacOSSound.cpp
+        RenderDll/XRenderMetal/MetalRenderer.cpp
+        PROPERTIES COMPILE_FLAGS "-x objective-c++"
     )
 endif()
 
 # Install
 if(APPLE)
-    install(TARGETS FarCryWorking BUNDLE DESTINATION .)
+    install(TARGETS FarCryComplete BUNDLE DESTINATION .)
 endif()

@@ -86,7 +86,15 @@ target_include_directories(FarCry PRIVATE
 # Preprocessor definitions
 target_compile_definitions(FarCry PRIVATE
     FARCRY_EXECUTABLE=1
+    NOT_USE_CRY_MEMORY_MANAGER=1
 )
+
+# For macOS, use forced include of clean headers to bypass legacy issues  
+if(APPLE)
+    target_compile_options(FarCry PRIVATE
+        -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
+    )
+endif()
 
 if(APPLE)
     target_compile_definitions(FarCry PRIVATE
