@@ -27,8 +27,6 @@ endif()
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR})
-# Add CryCommon to system include path so <platform.h> can be found
-include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/CryCommon)
 
 # Global macOS settings
 if(APPLE)

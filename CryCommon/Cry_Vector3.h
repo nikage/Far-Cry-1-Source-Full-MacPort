@@ -32,7 +32,7 @@ extern const float gf_PI;
 #define RAD2DEG( a ) ( (a) * (180.0f/gf_PI) )
 
 
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 template <class F> struct Vec3_tpl;
 template<class F> 
 F GetLengthSquared( const Vec3_tpl<F> &v );
@@ -329,10 +329,10 @@ typedef Vec3_f64 vectorr;
 typedef Vec3_tpl<int>		vectori;
 
 
-inline Vec3_tpl<f32>::Vec3_tpl(type_min) { x=y=z=-3.3E38f; }
-inline Vec3_tpl<f32>::Vec3_tpl(type_max) { x=y=z=3.3E38f; }
-inline Vec3_tpl<f64>::Vec3_tpl(type_min) { x=y=z=-1.7E308; }
-inline Vec3_tpl<f64>::Vec3_tpl(type_max) { x=y=z=1.7E308; }
+template<> inline Vec3_tpl<f32>::Vec3_tpl(type_min) { x=y=z=-3.3E38f; }
+template<> inline Vec3_tpl<f32>::Vec3_tpl(type_max) { x=y=z=3.3E38f; }
+template<> inline Vec3_tpl<f64>::Vec3_tpl(type_min) { x=y=z=-1.7E308; }
+template<> inline Vec3_tpl<f64>::Vec3_tpl(type_max) { x=y=z=1.7E308; }
 
 template<class F> 
 ILINE F GetLengthSquared( const Vec3_tpl<F> &v ) { return v.x*v.x + v.y*v.y + v.z*v.z; }

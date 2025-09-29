@@ -136,10 +136,41 @@ typedef uintptr_t UINT_PTR;
 inline float cry_fmod(float x, float y) { return fmodf(x, y); }
 inline double cry_fmod(double x, double y) { return fmod(x, y); }
 
+// Windows min/max macros
+#define __min(a,b) ((a) < (b) ? (a) : (b))
+#define __max(a,b) ((a) > (b) ? (a) : (b))
+
+// Additional missing functions
+inline float cry_powf(float base, float exp) { return powf(base, exp); }
+inline double cry_pow(double base, double exp) { return pow(base, exp); }
+
 #endif
 
 #ifdef __cplusplus
 }
+
+// Forward declarations for CryEngine math functions (defined in headers)
+template <class F> struct Vec3_tpl;
+template <class F> struct Quaternion_tpl;
+template <class F, int SI, int SJ> struct Matrix33_tpl;
+
+// These will be properly defined when the math headers are included
+template<class F> 
+F GetLengthSquared( const Vec3_tpl<F> &v );
+template<class F> 
+F GetLength( const Vec3_tpl<F>& v );
+
+// Plane utility function  
+template<class F>
+struct Plane_tpl;
+
+template<class F>
+Plane_tpl<F> GetPlane(const Vec3_tpl<F>& normal, const Vec3_tpl<F>& point);
+
+// Quaternion from matrix conversion
+template<class F,int SI,int SJ> 
+Quaternion_tpl<F> GetQuatFromMat33(const Matrix33_tpl<F,SI,SJ>& m);
+#endif
 #endif
 
 #endif //_CRY_COMMON_MACOS_SPECIFIC_HDR_
