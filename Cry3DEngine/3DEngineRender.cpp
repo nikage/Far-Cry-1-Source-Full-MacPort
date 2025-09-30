@@ -175,7 +175,7 @@ void C3DEngine::RenderScene(unsigned int dwDrawFlags)
 #endif
   
 	// it's correct only before StartEf()
-  int nRecursionLevel = (int)GetRenderer()->EF_Query(EFQ_RecurseLevel);
+  int nRecursionLevel = (int)(intptr_t)GetRenderer()->EF_Query(EFQ_RecurseLevel);
 	assert(nRecursionLevel>=0);
 	m_pObjManager->m_nRenderStackLevel = m_pTerrain->m_nRenderStackLevel = nRecursionLevel;
 	if(m_pObjManager->m_nRenderStackLevel<0 || m_pObjManager->m_nRenderStackLevel>1)
@@ -775,7 +775,7 @@ void C3DEngine::RenderSkyBox(IShader *pSH)
         vTrans = GetViewCamera().GetPos() + 0.9f*t*(vTrans-GetViewCamera().GetPos());
       }
 
-      m_SunObject[m_pTerrain->m_nRenderStackLevel]->m_Matrix = GetTranslationMat(vTrans);
+      m_SunObject[m_pTerrain->m_nRenderStackLevel]->m_Matrix.SetTranslationMat(vTrans);
       m_SunObject[m_pTerrain->m_nRenderStackLevel]->m_ObjFlags |= FOB_DRSUN | FOB_TRANS_TRANSLATE;
       m_SunObject[m_pTerrain->m_nRenderStackLevel]->m_TempVars[2] = 1.0f;
       float fWaterLevel = GetWaterLevel();
@@ -1584,8 +1584,10 @@ void C3DEngine::DrawShadowSpotOnTerrain(Vec3d vPos, float fRadius)
 			verts.Add(tmp);
 		}
 
-		if(verts.Count())
-			GetRenderer()->DrawTriStrip(&(CVertexBuffer (&verts[0].xyz.x,VERTEX_FORMAT_P3F_COL4UB_TEX2F)),verts.Count());
+		if(verts.Count()) {
+			CVertexBuffer vb(&verts[0].xyz.x,VERTEX_FORMAT_P3F_COL4UB_TEX2F);
+			GetRenderer()->DrawTriStrip(&vb,verts.Count());
+		}
 	}
 }
 

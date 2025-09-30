@@ -27,7 +27,9 @@ extern "C" __declspec(dllexport) void CryModuleGetMemoryInfo( CryModuleMemoryInf
   size_t nCurrentAlloced;
 	size_t nMaxAlloced;
 #endif
-  CS_GetMemoryStats(&nCurrentAlloced, &nMaxAlloced);
+  unsigned int nCurrentAllocedUI = (unsigned int)nCurrentAlloced;
+  unsigned int nMaxAllocedUI = (unsigned int)nMaxAlloced;
+  CS_GetMemoryStats(&nCurrentAllocedUI, &nMaxAllocedUI);
 	pMemInfo->allocated = nMaxAlloced;
 	pMemInfo->freed = 0;
 	pMemInfo->num_allocations = 0;

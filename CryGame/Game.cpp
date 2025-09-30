@@ -89,7 +89,7 @@ ISystem* GetISystem()
 
 //////////////////////////////////////////////////////////////////////
 // interface of the DLL
-IGame* ()
+IGame* CreateGameInstance()
 {
 	CXGame *pGame = new CXGame();
 	return pGame;
@@ -763,7 +763,7 @@ bool CXGame::Run(bool &bRelaunch)
 	return true;
 }
 
-#if !defined(_XBOX) && !defined(PS2) && !defined(LINUX)
+#if !defined(_XBOX) && !defined(PS2) && !defined(LINUX) && !defined(__APPLE__)
 #include <Mmsystem.h>
 #include ".\game.h"
 #pragma comment (lib , "Winmm.lib")

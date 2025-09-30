@@ -181,6 +181,7 @@ struct _CryMemoryManagerPoolHelper
 			}
 		}
 #endif
+#if defined(LINUX) || defined(WIN32)
 		if(hSystem)
 		{
 #if defined(LINUX)
@@ -189,7 +190,7 @@ struct _CryMemoryManagerPoolHelper
 			_CryReallocSize=(FNC_CryReallocSize)::dlsym(hSystem,"CryReallocSize"); 
 			_CryFree=(FNC_CryFree)::dlsym(hSystem,"CryFree"); 
 			_CryFreeSize=(FNC_CryFreeSize)::dlsym(hSystem,"CryFreeSize"); 
-#else
+#elif defined(WIN32)
 			_CryMalloc=(FNC_CryMalloc)GetProcAddress((HINSTANCE)hSystem,"CryMalloc"); 
 			_CryRealloc=(FNC_CryRealloc)GetProcAddress((HINSTANCE)hSystem,"CryRealloc"); 
 			_CryReallocSize=(FNC_CryReallocSize)GetProcAddress((HINSTANCE)hSystem,"CryReallocSize"); 
@@ -197,6 +198,7 @@ struct _CryMemoryManagerPoolHelper
 			_CryFreeSize=(FNC_CryFreeSize)GetProcAddress((HINSTANCE)hSystem,"CryFreeSize"); 
 #endif
 		};
+#endif
 		// Not need system anymore.
 #if defined(LINUX)
 			if(!_CryMalloc)
@@ -211,6 +213,9 @@ struct _CryMemoryManagerPoolHelper
 				printf("Could not read symbol: CryFreeSize from crysystem.so\n");
 			if(!_CryMalloc || !_CryRealloc || !_CryReallocSize || !_CryFree || !_CryFreeSize)
 				exit(1);
+#elif defined(__APPLE__)
+		// macOS doesn't use dynamic library loading for memory manager
+		// Use standard malloc/free instead
 #else
 		if(!hSystem || !_CryMalloc || !_CryRealloc || !_CryReallocSize || !_CryFree || !_CryFreeSize)
 		{
@@ -319,7 +324,11 @@ struct _CryMemoryManagerPoolHelper
 #endif
 
 #ifdef __cplusplus
+#if defined(WIN32)
 #include <new.h>
+#else
+#include <new>
+#endif
 #endif
 
 

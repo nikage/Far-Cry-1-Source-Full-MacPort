@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - Manage and cache glyphs, retrieving them from the renderer as needed
@@ -19,6 +19,9 @@
 #else
 #if defined(LINUX)
 #include <ext/hash_map>
+#elif defined(__APPLE__)
+#include <unordered_map>
+#define hash_map std::unordered_map
 #else
 #include <hash_map>
 #endif

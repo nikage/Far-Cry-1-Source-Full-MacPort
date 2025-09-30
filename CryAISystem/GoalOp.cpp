@@ -2226,6 +2226,15 @@ int COPJumpCmd::XMLExport(const char *pBuffer)
 	return strlen(pBuffer);
 }
 
+// COPClear XMLExport implementation
+int COPClear::XMLExport(const char *pBuffer)
+{
+	strcat((char*)pBuffer,"<clear type=\"Goal\" Description=\"Clears the actions for the operand puppet\">\n");
+	strcat((char*)pBuffer,"</clear>\n");
+
+	return strlen(pBuffer);
+}
+
 
 
 

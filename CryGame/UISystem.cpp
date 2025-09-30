@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - UI System Window and Input Manager
@@ -3324,16 +3324,16 @@ int CUISystem::InheritParentAttributes(CUIWidget *pWidget, CUIWidget *pParent)
 #define CHECKATTRIBUTE(name, type)			((strcmp(szAttributeName, name) == 0) && (pObject->GetCurrentType() == (type)))
 int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidget)
 {
-	char	*szKeyName;
+	const char	*szKeyName;
 	char	szAttributeName[128];
 
-	char	*szValue;
+	const char	*szValue;
 	float	fValue;
 	int		iValue;
 
 	pObject->GetCurrentKey(szKeyName);
 
-	strcpy(szAttributeName, szKeyName);
+	strcpy(szAttributeName, szKeyName ? szKeyName : "");
 	strlwr(szAttributeName);
 
 	pObject->GetCurrent(szValue);
@@ -3610,15 +3610,15 @@ int CUISystem::RetrieveTexRect(float *pTexCoords, INT_PTR iTextureID, char *szTe
 //------------------------------------------------------------------------------------------------- 
 int CUISystem::RetrieveTextAttribute(CUIWidget *pWidget, IScriptObject *pObject, const string &szTextField)
 {
-	char	*szKeyName;
+	const char	*szKeyName;
 	char	szAttributeName[256];
 	
-	char					*szValue;
+	const char					*szValue;
 	wstring	szWValue;
 
 	pObject->GetCurrentKey(szKeyName);
 
-	strcpy(szAttributeName, szKeyName);
+	strcpy(szAttributeName, szKeyName ? szKeyName : "");
 	strlwr(szAttributeName);
 
 	if (szTextField == szAttributeName)
@@ -3945,7 +3945,7 @@ int CUISystem::SetupStaticFromTable(CUIStatic *pStatic, IScriptObject *pObject)
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4073,7 +4073,7 @@ int CUISystem::SetupButtonFromTable(CUIButton *pButton, IScriptObject *pObject)
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4153,7 +4153,7 @@ int CUISystem::SetupEditBoxFromTable(CUIEditBox *pEditBox, IScriptObject *pObjec
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4281,7 +4281,7 @@ int CUISystem::SetupScrollBarFromTable(CUIScrollBar *pScrollBar, IScriptObject *
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4371,7 +4371,7 @@ int CUISystem::SetupListViewFromTable(CUIListView *pListView, IScriptObject *pOb
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4477,7 +4477,7 @@ int CUISystem::SetupCheckBoxFromTable(CUICheckBox *pCheckBox, IScriptObject *pOb
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4565,7 +4565,7 @@ int CUISystem::SetupComboBoxFromTable(CUIComboBox *pComboBox, IScriptObject *pOb
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);
@@ -4679,7 +4679,7 @@ int CUISystem::SetupVideoPanelFromTable(CUIVideoPanel *pVideoPanel, IScriptObjec
 	{
 		pObject->GetCurrentKey(szKeyName);
 
-		strcpy(szAttributeName, szKeyName);
+		strcpy(szAttributeName, szKeyName ? szKeyName : "");
 		strlwr(szAttributeName);
 
 		pObject->GetCurrent(szValue);

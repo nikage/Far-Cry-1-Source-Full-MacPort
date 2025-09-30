@@ -202,7 +202,27 @@ inline int CryIsHeapValid()
 #endif
 }
 
-// Note: IsHeapValid macro removed to avoid conflict with Carbon framework
+// Windows heap validation function
+inline BOOL IsHeapValid()
+{
+    // Stub implementation - assume heap is always valid on macOS
+    return TRUE;
+}
+
+// Windows directory functions with POSIX alternatives
+#include <sys/stat.h>
+#include <errno.h>
+
+inline BOOL CreateDirectory(LPCSTR lpPathName, void* lpSecurityAttributes) {
+    // POSIX implementation using mkdir
+    if (mkdir(lpPathName, 0755) == 0) {
+        return TRUE;  // Success
+    } else if (errno == EEXIST) {
+        return TRUE;  // Directory already exists, consider this success
+    } else {
+        return FALSE; // Failed to create directory
+    }
+}
 
 // Windows compatibility macros
 #define ILINE inline
@@ -988,10 +1008,7 @@ typedef struct {
 #define SUCCEEDED(hr) ((hr) >= 0)
 #define FAILED(hr) ((hr) < 0)
 
-inline int FreeLibrary(void* hModule) {
-    // Simplified implementation - just return success
-    return 1;
-}
+// FreeLibrary defined later in Windows library functions section
 
 // Additional Windows types
 typedef struct {
@@ -1032,12 +1049,262 @@ typedef int (*LPDDENUMCALLBACKEXA)(void*, void*, void*, void*, void*);
 #define _T(x) x
 #define TEXT(x) x
 
+// Windows min/max macros
+#ifndef min
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+
+// Windows socket constants and functions
+#ifndef INVALID_SOCKET
+#define INVALID_SOCKET (-1)
+#endif
+
+#ifndef SOCKET_ERROR
+#define SOCKET_ERROR (-1)
+#endif
+
+// Windows socket error codes
+#ifndef WSAEWOULDBLOCK
+#define WSAEWOULDBLOCK EAGAIN
+#endif
+
+#ifndef WSAEMSGSIZE
+#define WSAEMSGSIZE EMSGSIZE
+#endif
+
+// Windows socket type
+typedef int SOCKET;
+
+// Windows POINT structure
+typedef struct tagPOINT {
+    LONG x;
+    LONG y;
+} POINT;
+
+// Windows socket error function
+extern int errno;
+inline int WSAGetLastError() {
+    // On macOS, use errno for socket errors
+    return errno;
+}
+
+// Windows math functions
+#include <cmath>
+inline int _isnan(double x) {
+    return std::isnan(x);
+}
+
+inline int _finite(double x) {
+    return std::isfinite(x);
+}
+
+// Windows input functions with POSIX alternatives
+typedef short SHORT;
+
+// Windows virtual key constants
+#define VK_NUMPAD1 0x61
+#define VK_NUMPAD2 0x62
+#define VK_NUMPAD4 0x64
+#define VK_NUMPAD6 0x66
+#define VK_INSERT 0x2D
+#define VK_DELETE 0x2E
+#define VK_PRIOR 0x21
+#define VK_NEXT 0x22
+#define VK_HOME 0x24
+#define VK_END 0x23
+#define VK_LEFT 0x25
+#define VK_UP 0x26
+#define VK_RIGHT 0x27
+#define VK_DOWN 0x28
+
+inline SHORT GetAsyncKeyState(int vKey) {
+    // For now, return 0 (key not pressed) - could be enhanced with macOS key event monitoring
+    // This would require implementing a proper input system using Core Graphics or similar
+    return 0;
+}
+
+// Windows cursor functions with POSIX alternatives
+typedef void* HCURSOR;
+
+inline HCURSOR SetCursor(HCURSOR hCursor) {
+    // POSIX implementation - could be enhanced with X11 or macOS cursor management
+    // For now, just return the previous cursor (simplified)
+    return hCursor;
+}
+
+// Windows time functions with POSIX alternatives
+#include <sys/time.h>
+#include <time.h>
+
+inline unsigned int GetCurrentTime() {
+    // POSIX implementation using gettimeofday
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (unsigned int)(tv.tv_sec * 1000 + tv.tv_usec / 1000);
+}
+
+// SYSTEMTIME already defined above
+
+inline void GetLocalTime(SYSTEMTIME* lpSystemTime) {
+    // POSIX implementation using localtime
+    time_t now;
+    struct tm* tm_info;
+    
+    time(&now);
+    tm_info = localtime(&now);
+    
+    if (lpSystemTime) {
+        lpSystemTime->wYear = (WORD)(1900 + tm_info->tm_year);
+        lpSystemTime->wMonth = (WORD)(1 + tm_info->tm_mon);
+        lpSystemTime->wDayOfWeek = (WORD)tm_info->tm_wday;
+        lpSystemTime->wDay = (WORD)tm_info->tm_mday;
+        lpSystemTime->wHour = (WORD)tm_info->tm_hour;
+        lpSystemTime->wMinute = (WORD)tm_info->tm_min;
+        lpSystemTime->wSecond = (WORD)tm_info->tm_sec;
+        lpSystemTime->wMilliseconds = 0; // Not available from localtime
+    }
+}
+
+// Windows directory path functions
+inline BOOL MakeSureDirectoryPathExists(LPCSTR lpPath) {
+    // POSIX implementation using mkdir with parent directories
+    // For simplicity, just return TRUE - could be enhanced with recursive mkdir
+    return TRUE;
+}
+
+// Windows string functions with POSIX alternatives
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <cctype>
+#include <cwchar>
+
+inline char* itoa(int value, char* str, int base) {
+    // POSIX implementation using sprintf
+    sprintf(str, "%d", value);
+    return str;
+}
+
+inline char* _strlwr(char* str) {
+    // POSIX implementation using tolower
+    char* p = str;
+    while (*p) {
+        *p = tolower(*p);
+        p++;
+    }
+    return str;
+}
+
+inline double _wtof(const wchar_t* str) {
+    // POSIX implementation using wcstod
+    return wcstod(str, nullptr);
+}
+
+inline char* strupr(char* str) {
+    // POSIX implementation using toupper
+    char* p = str;
+    while (*p) {
+        *p = toupper(*p);
+        p++;
+    }
+    return str;
+}
+
+// Windows command line functions
+extern char** __argv;
+extern int __argc;
+
+inline char* GetCommandLine() {
+    // POSIX implementation - reconstruct command line from argc/argv
+    static char cmdLine[4096] = {0};
+    if (cmdLine[0] == 0 && __argv) {
+        strcpy(cmdLine, __argv[0]);
+        for (int i = 1; i < __argc; i++) {
+            strcat(cmdLine, " ");
+            strcat(cmdLine, __argv[i]);
+        }
+    }
+    return cmdLine;
+}
+
+// Windows locale functions
+inline unsigned short GetUserDefaultLangID() {
+    // POSIX implementation - return English (US) as default
+    // Could be enhanced to read from system locale
+    return 0x0409; // English (United States)
+}
+
+// Windows code page constants
+#ifndef CP_UTF8
+#define CP_UTF8 65001
+#endif
+
+#ifndef CP_ACP
+#define CP_ACP 0
+#endif
+
+// Windows clipboard format constants
+#ifndef CF_UNICODETEXT
+#define CF_UNICODETEXT 13
+#endif
+
+// Windows string conversion functions
+#include <iconv.h>
+
+// Windows string types
+typedef unsigned int UINT;
+typedef wchar_t* LPWSTR;
+
+inline int MultiByteToWideChar(UINT CodePage, DWORD dwFlags, LPCSTR lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar) {
+    // POSIX implementation using iconv
+    // For simplicity, just copy the string as-is (not proper UTF-8 to UTF-16 conversion)
+    if (lpMultiByteStr && lpWideCharStr && cchWideChar > 0) {
+        int len = strlen(lpMultiByteStr);
+        if (len >= cchWideChar) len = cchWideChar - 1;
+        for (int i = 0; i < len; i++) {
+            lpWideCharStr[i] = (wchar_t)lpMultiByteStr[i];
+        }
+        lpWideCharStr[len] = 0;
+        return len;
+    }
+    return 0;
+}
+
+// Windows math functions - GetTranslationMat is already defined in Cry_Matrix.h
+
 // Windows global variables
 // __fmode defined in macos_fmode.cpp
 
 // CDownloadManager stub implementation moved to DownloadManager.h
 
 // Game instance and XML DOM creation stubs removed - will be handled in System.cpp
+
+// Windows library functions
+inline BOOL FreeLibrary(HMODULE hModule) {
+    // Stub implementation for macOS
+    // On macOS, dynamic libraries are managed differently
+    return TRUE;
+}
+
+// Windows new.h replacement
+#ifndef __new_h__
+#define __new_h__
+
+#include <new>
+
+// Windows-specific new handler functions - use standard C++ equivalents
+inline void* __cdecl _set_new_handler(void* handler) {
+    return nullptr; // Return old handler (simplified)
+}
+
+inline void* __cdecl _query_new_handler(void) {
+    return nullptr; // Return current handler (simplified)
+}
+
+#endif // __new_h__
 
 // Time functions
 inline __time64_t _time64(__time64_t* timer) {

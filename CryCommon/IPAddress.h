@@ -101,8 +101,11 @@ inline unsigned short __ntohs(unsigned short us)
 */
 #if defined(LINUX)
 	#define ADDR sin_addr_win.S_un.S_addr
-#else
+#elif defined(WIN32)
 	#define ADDR sin_addr.S_un.S_addr
+#else
+	// macOS uses standard POSIX structure
+	#define ADDR sin_addr.s_addr
 #endif
 
 class CIPAddress
@@ -208,24 +211,24 @@ inline char *CIPAddress::GetAsString(bool bPort) const
 {
 	static char s[64];
 	if (bPort)
-#ifndef LINUX	
+#if defined(WIN32)
 		wsprintf(s, "%i.%i.%i.%i:%i", m_Address.sin_addr.S_un.S_un_b.s_b1,
 		m_Address.sin_addr.S_un.S_un_b.s_b2,
 		m_Address.sin_addr.S_un.S_un_b.s_b3,
 		m_Address.sin_addr.S_un.S_un_b.s_b4, __ntohs(m_Address.sin_port));
-#else	//LINUX
+#else	//LINUX and macOS
 		sprintf(s, "%s:%i", 
 			inet_ntoa(m_Address.sin_addr), 
 			ntohs(m_Address.sin_port)
 		);
 #endif	//LINUX
 	else
-#ifndef LINUX
+#if defined(WIN32)
 		wsprintf(s, "%i.%i.%i.%i", m_Address.sin_addr.S_un.S_un_b.s_b1,
 		m_Address.sin_addr.S_un.S_un_b.s_b2,
 		m_Address.sin_addr.S_un.S_un_b.s_b3,
 		m_Address.sin_addr.S_un.S_un_b.s_b4);
-#else	//LINUX
+#else	//LINUX and macOS
 		sprintf(s, "%s", 
 			inet_ntoa(m_Address.sin_addr)
 		);

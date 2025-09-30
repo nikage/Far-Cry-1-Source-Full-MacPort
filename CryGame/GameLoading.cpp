@@ -46,7 +46,7 @@
 #include <ISound.h>
 #include <IAgent.h>
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 #	include <dbghelp.h>
 #	pragma comment(lib, "dbghelp.lib")
 #else
@@ -118,7 +118,8 @@ struct PropertyWriter : IScriptObjectDumpSink
 			{
 				_SmartScriptObject t(m_pScriptSystem, true);
 				_VERIFY(iskey ? table->GetValue(sName, t) : table->GetAt(nIdx, t));
-				t->Dump(&PropertyWriter(t, stm, m_pScriptSystem));
+				PropertyWriter writer(t, stm, m_pScriptSystem);
+				t->Dump(&writer);
 				stm.Write((char)TABLE_END);
 				break;
 			};
@@ -437,15 +438,24 @@ bool CXGame::SaveToStream(CStream &stm, Vec3d *pos, Vec3d *angles,string sFilena
 		stm.AlignWrite();
 
 		_SmartScriptObject props(m_pScriptSystem, true);
-		if(so->GetValue("Properties", props)) props->Dump(&PropertyWriter(props, stm, m_pScriptSystem));
+		if(so->GetValue("Properties", props)) {
+			PropertyWriter writer(props, stm, m_pScriptSystem);
+			props->Dump(&writer);
+		}
 		stm.Write((char)TABLE_END);
 
 		_SmartScriptObject propsi(m_pScriptSystem, true);
-		if(so->GetValue("PropertiesInstance", propsi)) propsi->Dump(&PropertyWriter(propsi, stm, m_pScriptSystem));
+		if(so->GetValue("PropertiesInstance", propsi)) {
+			PropertyWriter writer(propsi, stm, m_pScriptSystem);
+			propsi->Dump(&writer);
+		}
 		stm.Write((char)TABLE_END);
 
 		_SmartScriptObject events(m_pScriptSystem, true);
-		if(so->GetValue("Events", events)) events->Dump(&PropertyWriter(events, stm, m_pScriptSystem));
+		if(so->GetValue("Events", events)) {
+			PropertyWriter writer(events, stm, m_pScriptSystem);
+			events->Dump(&writer);
+		}
 		stm.Write((char)TABLE_END);
 
 		WRITE_COOKIE_NO(stm,78);

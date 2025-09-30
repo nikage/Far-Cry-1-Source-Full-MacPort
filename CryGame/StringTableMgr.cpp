@@ -146,7 +146,7 @@ bool CStringTableMgr::LoadExcelXmlSpreadsheet( const string &sFileName )
 	int nRow = 0;
 	pRowsList->reset();
 	// get all strings in table
-	while (pRowNode = pRowsList->nextNode())
+	while ((pRowNode = pRowsList->nextNode()))
 	{
 		XDOM::IXMLDOMNodeListPtr pCellList = pRowNode->getElementsByTagName("Cell");
 		
@@ -161,11 +161,11 @@ bool CStringTableMgr::LoadExcelXmlSpreadsheet( const string &sFileName )
 
 		int nCell = 0;
 		pCellList->reset();
-		while (pCellNode = pCellList->nextNode())
+		while ((pCellNode = pCellList->nextNode()))
 		{
 			XDOM::IXMLDOMNodeListPtr pDataList = pCellNode->getElementsByTagName("Data");
 #if !defined(LINUX64)
-			if (pDataList==NULL)
+			if (!pDataList)
 #else
 			if (pDataList==0)
 #endif
@@ -518,7 +518,7 @@ void CStringTableMgr::AppendToUnicodeString(const string& sSource, wstring &sDes
 	std::vector<wchar_t> swTemp;
 	swTemp.resize(sSource.size()+1);
 
-#if defined(LINUX)
+#if defined(LINUX) || defined(__APPLE__)
 	swprintf (&swTemp[0], swTemp.size(), L"%S", sSource.c_str());
 #else
 	swprintf (&swTemp[0], L"%S", sSource.c_str());

@@ -35,6 +35,7 @@ if(APPLE)
         __APPLE__=1
         __MACH__=1
         NOT_USE_CRY_MEMORY_MANAGER=1
+        NOT_USE_UBICOM_SDK=1
     )
 endif()
 
@@ -58,8 +59,26 @@ endif()
 # Add CryCommon as interface library
 add_subdirectory(CryCommon)
 
-# Try to build CrySystem (we'll fix compilation issues)
+# Build all CryEngine components
 add_subdirectory(CrySystem)
+add_subdirectory(Cry3DEngine)
+add_subdirectory(CryEntitySystem)
+add_subdirectory(CryAnimation)
+# CryInput temporarily excluded due to interface mismatch issues
+# add_subdirectory(CryInput)
+add_subdirectory(CryMovie)
+add_subdirectory(CryPhysics)
+add_subdirectory(CryAISystem)
+# CryFont temporarily excluded due to missing FreeType dependency
+# add_subdirectory(CryFont)
+# CryNetwork temporarily excluded due to socket compatibility issues
+# add_subdirectory(CryNetwork)
+# CryScriptSystem temporarily excluded due to missing Lua dependency
+# add_subdirectory(CryScriptSystem)
+# CrySoundSystem temporarily excluded due to interface mismatch issues
+# add_subdirectory(CrySoundSystem)
+# CryGame temporarily excluded due to complex Windows-specific UI issues
+# add_subdirectory(CryGame)
 
 # Just compile the Main.cpp which we know works
 set(FARCRY_WORKING_SOURCES
@@ -69,8 +88,28 @@ set(FARCRY_WORKING_SOURCES
 # Create the working Far Cry executable
 add_executable(FarCryWorking ${FARCRY_WORKING_SOURCES})
 
-# Link the CrySystem library
-target_link_libraries(FarCryWorking PRIVATE CrySystem)
+# Link all CryEngine libraries
+target_link_libraries(FarCryWorking PRIVATE
+    CrySystem
+    Cry3DEngine
+    CryEntitySystem
+    CryAnimation
+    # CryInput temporarily excluded due to interface mismatch issues
+    # CryInput
+    CryMovie
+    CryPhysics
+    CryAISystem
+    # CryFont temporarily excluded due to missing FreeType dependency
+    # CryFont
+    # CryNetwork temporarily excluded due to socket compatibility issues
+    # CryNetwork
+    # CryScriptSystem temporarily excluded due to missing Lua dependency
+    # CryScriptSystem
+    # CrySoundSystem temporarily excluded due to interface mismatch issues
+    # CrySoundSystem
+    # CryGame temporarily excluded due to complex Windows-specific UI issues
+    # CryGame
+)
 
 # Platform header will be included automatically via #include <platform.h>
 
