@@ -7,6 +7,23 @@ file(GLOB_RECURSE CRYINPUT_SOURCES
     "*.c"
 )
 
+# Remove Xbox-specific files for non-Xbox platforms
+if(NOT _XBOX)
+    list(REMOVE_ITEM CRYINPUT_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/XGamepad.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/XDebugKeyboard.cpp"
+    )
+endif()
+
+# Remove Windows-specific files for macOS
+if(APPLE)
+    list(REMOVE_ITEM CRYINPUT_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/XKeyboard.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/XMouse.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Joystick.cpp"
+    )
+endif()
+
 file(GLOB_RECURSE CRYINPUT_HEADERS
     "*.h"
 )
@@ -15,6 +32,9 @@ file(GLOB_RECURSE CRYINPUT_HEADERS
 if(APPLE)
     list(APPEND CRYINPUT_SOURCES
         MacOSInput.cpp
+        JoystickMacOS.cpp
+        XKeyboardMacOS.cpp
+        XMouseMacOS.cpp
     )
     list(APPEND CRYINPUT_HEADERS
         MacOSInput.h

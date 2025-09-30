@@ -65,7 +65,7 @@ add_subdirectory(Cry3DEngine)
 add_subdirectory(CryEntitySystem)
 add_subdirectory(CryAnimation)
 # CryInput temporarily excluded due to interface mismatch issues
-# add_subdirectory(CryInput)
+add_subdirectory(CryInput)
 add_subdirectory(CryMovie)
 add_subdirectory(CryPhysics)
 add_subdirectory(CryAISystem)
@@ -95,7 +95,7 @@ target_link_libraries(FarCryWorking PRIVATE
     CryEntitySystem
     CryAnimation
     # CryInput temporarily excluded due to interface mismatch issues
-    # CryInput
+    CryInput
     CryMovie
     CryPhysics
     CryAISystem

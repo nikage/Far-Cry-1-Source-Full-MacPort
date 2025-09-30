@@ -211,7 +211,11 @@ int g_nKeys[]={
     XKEY_NULL
 };
 
+#if defined(__APPLE__)
+bool CInput::Init(ISystem *pSystem, void* hinst, void* hwnd, bool dinput)
+#else
 bool CInput::Init(ISystem *pSystem,HINSTANCE hinst,HWND hwnd,bool dinput)
+#endif
 {
 	m_pSystem = pSystem;
 
@@ -219,10 +223,13 @@ bool CInput::Init(ISystem *pSystem,HINSTANCE hinst,HWND hwnd,bool dinput)
 	m_pLog=pSystem->GetILog();
   
 #ifndef _XBOX
+#if !defined(__APPLE__)
 	m_hinst=hinst;
 	m_hwnd=hwnd;
+#endif
 	m_postingenable = 1;
 		
+#if !defined(__APPLE__)
 	//if (dinput)
 	{
 		m_pLog->Log("Initializing Direct Input\n");
@@ -243,10 +250,13 @@ bool CInput::Init(ISystem *pSystem,HINSTANCE hinst,HWND hwnd,bool dinput)
 	//else
 	//	return (true);
 	
-	m_pLog->Log("Direct Input initialized (CryInputDLL)\n");	
+		m_pLog->Log("Direct Input initialized (CryInputDLL)\n");	
+	}
+#endif // !defined(__APPLE__)
 #endif //_XBOX
 
 #ifndef _XBOX
+#if !defined(__APPLE__)
 	//if (!m_Keyboard.Init(this,m_pLog,m_g_pdi,hinst,hwnd) && dinput) 
 	if (!m_Keyboard.Init(this,m_pSystem,m_g_pdi,hinst,hwnd) && dinput) 
 		return (false);
@@ -262,7 +272,8 @@ bool CInput::Init(ISystem *pSystem,HINSTANCE hinst,HWND hwnd,bool dinput)
 		m_pLog->Log("Cannot initialize joystick\n");
 	}		
 	else 
-		m_pLog->Log("Joystick initialized\n");		
+		m_pLog->Log("Joystick initialized\n");
+#endif		
 #else //_XBOX
 
   if (!m_Gamepad.Init(m_pLog)) 
@@ -375,11 +386,13 @@ void CInput::ShutDown()
 
 #ifndef PS2
 #ifndef _XBOX
+#if !defined(__APPLE__)
 	if (m_g_pdi)
 	{
 		m_g_pdi->Release();
 		m_g_pdi = NULL;
-	}	
+	}
+#endif // !defined(__APPLE__)
 #endif //_XBOX
 #endif
 	//

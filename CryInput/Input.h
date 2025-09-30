@@ -79,11 +79,15 @@ public:
 		m_console = 0;
 		m_pSystem = NULL;
 		m_pLog=NULL; 
-#if !defined(_XBOX) && !defined(PS2)
+#if !defined(_XBOX) && !defined(PS2) && !defined(__APPLE__)
 		m_g_pdi = NULL; 
 #endif
 	}
+#if defined(__APPLE__)
+	bool	Init(ISystem *pSystem, void* hinst, void* hwnd, bool usedinput);
+#else
 	bool	Init(ISystem *pSystem,HINSTANCE hinst, HWND hwnd, bool usedinput);
+#endif
 
 #ifdef PS2
 
@@ -243,7 +247,7 @@ private:
 #endif // _XBOX
 
 	ILog *m_pLog;	
-#if !defined(_XBOX) && !defined(PS2)
+#if !defined(_XBOX) && !defined(PS2) && !defined(__APPLE__)
 	LPDIRECTINPUT8	m_g_pdi;	
 	HINSTANCE		m_hinst;
 	HWND			m_hwnd;

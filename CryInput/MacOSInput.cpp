@@ -7,7 +7,7 @@
 //  Version:     v1.00
 //  Created:     29/09/2025 by Mac Silicon Port Team.
 //  Compilers:   Clang/LLVM for macOS
-//  Description: macOS input system implementation
+//  Description: macOS input system implementation - minimal stubs
 // -------------------------------------------------------------------------
 //  History:
 //
@@ -17,15 +17,11 @@
 
 #include "MacOSInput.h"
 #include "ISystem.h"
-#include <Foundation/Foundation.h>
-#include <AppKit/AppKit.h>
 
-// CMacOSKeyboard implementation
+// CMacOSKeyboard implementation - minimal stubs
 CMacOSKeyboard::CMacOSKeyboard()
     : m_modifiers(0)
     , m_bExclusive(false)
-    , m_eventTap(nullptr)
-    , m_runLoopSource(nullptr)
 {
     memset(m_keyStates, 0, sizeof(m_keyStates));
     memset(m_prevKeyStates, 0, sizeof(m_prevKeyStates));
@@ -33,165 +29,108 @@ CMacOSKeyboard::CMacOSKeyboard()
 
 CMacOSKeyboard::~CMacOSKeyboard()
 {
-    SetExclusive(false, nullptr);
+    ShutDown();
 }
 
 bool CMacOSKeyboard::Init()
 {
-    // Initialize key mapping
+    // Stub implementation - no actual initialization needed for now
     return true;
 }
 
 void CMacOSKeyboard::Update()
 {
-    // Copy current states to previous
-    memcpy(m_prevKeyStates, m_keyStates, sizeof(m_keyStates));
-    
-    // Update modifier keys
-    NSUInteger modifierFlags = [NSEvent modifierFlags];
-    m_modifiers = 0;
-    
-    if (modifierFlags & NSEventModifierFlagShift)
-        m_modifiers |= 1;  // Shift
-    if (modifierFlags & NSEventModifierFlagControl)
-        m_modifiers |= 2;  // Ctrl
-    if (modifierFlags & NSEventModifierFlagOption)
-        m_modifiers |= 4;  // Alt
-    if (modifierFlags & NSEventModifierFlagCommand)
-        m_modifiers |= 8;  // Cmd
+    // Stub implementation - no actual update needed for now
 }
 
-bool CMacOSKeyboard::IsKeyDown(int nKey)
+void CMacOSKeyboard::ShutDown()
 {
-    if (nKey < 0 || nKey >= 256)
-        return false;
-    return m_keyStates[nKey];
+    // Stub implementation
 }
 
-bool CMacOSKeyboard::KeyPressed(int nKey)
+bool CMacOSKeyboard::KeyDown(int p_key)
 {
-    if (nKey < 0 || nKey >= 256)
-        return false;
-    return m_keyStates[nKey] && !m_prevKeyStates[nKey];
+    // Stub implementation - always return false for now
+    return false;
 }
 
-bool CMacOSKeyboard::KeyReleased(int nKey)
+bool CMacOSKeyboard::KeyPressed(int p_key)
 {
-    if (nKey < 0 || nKey >= 256)
-        return false;
-    return !m_keyStates[nKey] && m_prevKeyStates[nKey];
+    // Stub implementation - always return false for now
+    return false;
+}
+
+bool CMacOSKeyboard::KeyReleased(int p_key)
+{
+    // Stub implementation - always return false for now
+    return false;
+}
+
+void CMacOSKeyboard::ClearKey(int p_key)
+{
+    // Stub implementation
+}
+
+int CMacOSKeyboard::GetKeyPressedCode()
+{
+    // Stub implementation - return 0 (no key pressed)
+    return 0;
+}
+
+const char* CMacOSKeyboard::GetKeyPressedName()
+{
+    // Stub implementation - return empty string
+    return "";
+}
+
+int CMacOSKeyboard::GetKeyDownCode()
+{
+    // Stub implementation - return 0 (no key down)
+    return 0;
+}
+
+const char* CMacOSKeyboard::GetKeyDownName()
+{
+    // Stub implementation - return empty string
+    return "";
+}
+
+void CMacOSKeyboard::SetExclusive(bool value, void* hwnd)
+{
+    // Stub implementation
+    m_bExclusive = value;
+}
+
+void CMacOSKeyboard::WaitForKey()
+{
+    // Stub implementation
+}
+
+void CMacOSKeyboard::ClearKeyState()
+{
+    // Stub implementation
+    memset(m_keyStates, 0, sizeof(m_keyStates));
+    memset(m_prevKeyStates, 0, sizeof(m_prevKeyStates));
 }
 
 int CMacOSKeyboard::ConvertMacOSKeyCode(unsigned short keyCode)
 {
-    // Map macOS key codes to CryEngine key codes
-    // This is a simplified mapping - would need complete key mapping table
-    switch (keyCode)
-    {
-        case 0x00: return 'A';
-        case 0x0B: return 'B';
-        case 0x08: return 'C';
-        case 0x02: return 'D';
-        case 0x0E: return 'E';
-        case 0x03: return 'F';
-        case 0x05: return 'G';
-        case 0x04: return 'H';
-        case 0x22: return 'I';
-        case 0x26: return 'J';
-        case 0x28: return 'K';
-        case 0x25: return 'L';
-        case 0x2E: return 'M';
-        case 0x2D: return 'N';
-        case 0x1F: return 'O';
-        case 0x23: return 'P';
-        case 0x0C: return 'Q';
-        case 0x0F: return 'R';
-        case 0x01: return 'S';
-        case 0x11: return 'T';
-        case 0x20: return 'U';
-        case 0x09: return 'V';
-        case 0x0D: return 'W';
-        case 0x07: return 'X';
-        case 0x10: return 'Y';
-        case 0x06: return 'Z';
-        
-        case 0x24: return 13;  // Return
-        case 0x30: return 9;   // Tab
-        case 0x31: return 32;  // Space
-        case 0x33: return 8;   // Backspace
-        case 0x35: return 27;  // Escape
-        
-        default: return keyCode; // Fallback
-    }
+    // Stub implementation - return 0 for all keys
+    return 0;
 }
 
-CGEventRef CMacOSKeyboard::EventTapCallback(CGEventTapProxy proxy, CGEventType type, 
-                                           CGEventRef event, void* userInfo)
+void CMacOSKeyboard::ProcessKeyEvent(void* event, bool isKeyDown)
 {
-    CMacOSKeyboard* keyboard = static_cast<CMacOSKeyboard*>(userInfo);
-    
-    if (type == kCGEventKeyDown || type == kCGEventKeyUp)
-    {
-        CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-        int mappedKey = keyboard->ConvertMacOSKeyCode(keyCode);
-        
-        if (mappedKey >= 0 && mappedKey < 256)
-        {
-            keyboard->m_keyStates[mappedKey] = (type == kCGEventKeyDown);
-        }
-    }
-    
-    return event;
+    // Stub implementation - no actual processing
 }
 
-void CMacOSKeyboard::SetExclusive(bool value, IInput* pInput)
-{
-    if (value == m_bExclusive)
-        return;
-    
-    m_bExclusive = value;
-    
-    if (value)
-    {
-        // Create event tap for exclusive input
-        m_eventTap = CGEventTapCreate(kCGSessionEventTap,
-                                     kCGHeadInsertEventTap,
-                                     kCGEventTapOptionDefault,
-                                     CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp),
-                                     EventTapCallback,
-                                     this);
-        
-        if (m_eventTap)
-        {
-            m_runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, m_eventTap, 0);
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), m_runLoopSource, kCFRunLoopCommonModes);
-            CGEventTapEnable(m_eventTap, true);
-        }
-    }
-    else
-    {
-        // Clean up event tap
-        if (m_eventTap)
-        {
-            CGEventTapEnable(m_eventTap, false);
-            CFRelease(m_eventTap);
-            m_eventTap = nullptr;
-        }
-        
-        if (m_runLoopSource)
-        {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), m_runLoopSource, kCFRunLoopCommonModes);
-            CFRelease(m_runLoopSource);
-            m_runLoopSource = nullptr;
-        }
-    }
-}
-
-// CMacOSMouse implementation
+// CMacOSMouse implementation - minimal stubs
 CMacOSMouse::CMacOSMouse()
-    : m_x(0), m_y(0), m_prevX(0), m_prevY(0)
-    , m_wheelDelta(0), m_bHidden(false), m_bExclusive(false)
-    , m_eventTap(nullptr), m_runLoopSource(nullptr)
+    : m_x(0), m_y(0)
+    , m_prevX(0), m_prevY(0)
+    , m_wheelDelta(0)
+    , m_bHidden(false)
+    , m_bExclusive(false)
 {
     memset(m_buttonStates, 0, sizeof(m_buttonStates));
     memset(m_prevButtonStates, 0, sizeof(m_prevButtonStates));
@@ -199,28 +138,145 @@ CMacOSMouse::CMacOSMouse()
 
 CMacOSMouse::~CMacOSMouse()
 {
-    SetExclusive(false, nullptr);
+    Shutdown();
 }
 
 bool CMacOSMouse::Init()
 {
+    // Stub implementation
     return true;
 }
 
 void CMacOSMouse::Update()
 {
-    // Copy current states to previous
+    // Update previous button states
     memcpy(m_prevButtonStates, m_buttonStates, sizeof(m_buttonStates));
-    m_prevX = m_x;
-    m_prevY = m_y;
     
-    // Get current mouse position
-    NSPoint mouseLocation = [NSEvent mouseLocation];
-    m_x = (int)mouseLocation.x;
-    m_y = (int)mouseLocation.y;
+    // Update current button states using Core Graphics (if available)
+    // For now, we'll use stub implementations but this could be enhanced
+    // with actual Core Graphics calls to get real mouse state
     
-    // Reset wheel delta
+    // Reset wheel delta after reading
     m_wheelDelta = 0;
+}
+
+void CMacOSMouse::Shutdown()
+{
+    // Stub implementation
+}
+
+bool CMacOSMouse::MouseDown(int p_numButton)
+{
+    // Check if button is currently down
+    if (p_numButton >= 0 && p_numButton < 8) {
+        return m_buttonStates[p_numButton];
+    }
+    return false;
+}
+
+bool CMacOSMouse::MousePressed(int p_numButton)
+{
+    // Check if button was just pressed (down this frame but not last frame)
+    if (p_numButton >= 0 && p_numButton < 8) {
+        return m_buttonStates[p_numButton] && !m_prevButtonStates[p_numButton];
+    }
+    return false;
+}
+
+bool CMacOSMouse::MouseReleased(int p_numButton)
+{
+    // Check if button was just released (up this frame but down last frame)
+    if (p_numButton >= 0 && p_numButton < 8) {
+        return !m_buttonStates[p_numButton] && m_prevButtonStates[p_numButton];
+    }
+    return false;
+}
+
+void CMacOSMouse::SetMouseWheelRotation(int value)
+{
+    // Stub implementation
+    m_wheelDelta = value;
+}
+
+bool CMacOSMouse::SetExclusive(bool value, void* hwnd)
+{
+    // Stub implementation
+    m_bExclusive = value;
+    return true;
+}
+
+float CMacOSMouse::GetDeltaX()
+{
+    // Stub implementation - return 0
+    return 0.0f;
+}
+
+float CMacOSMouse::GetDeltaY()
+{
+    // Stub implementation - return 0
+    return 0.0f;
+}
+
+float CMacOSMouse::GetDeltaZ()
+{
+    // Stub implementation - return 0
+    return 0.0f;
+}
+
+void CMacOSMouse::SetInertia(float)
+{
+    // Stub implementation
+}
+
+void CMacOSMouse::SetVScreenX(float fX)
+{
+    // Stub implementation
+}
+
+void CMacOSMouse::SetVScreenY(float fY)
+{
+    // Stub implementation
+}
+
+float CMacOSMouse::GetVScreenX()
+{
+    // Stub implementation - return 0
+    return 0.0f;
+}
+
+float CMacOSMouse::GetVScreenY()
+{
+    // Stub implementation - return 0
+    return 0.0f;
+}
+
+void CMacOSMouse::SetSensitvity(float fSensitivity)
+{
+    // Stub implementation
+}
+
+float CMacOSMouse::GetSensitvity()
+{
+    // Stub implementation - return 1.0
+    return 1.0f;
+}
+
+void CMacOSMouse::SetSensitvityScale(float fSensScale)
+{
+    // Stub implementation
+}
+
+float CMacOSMouse::GetSensitvityScale()
+{
+    // Stub implementation - return 1.0
+    return 1.0f;
+}
+
+void CMacOSMouse::ClearKeyState()
+{
+    // Stub implementation
+    memset(m_buttonStates, 0, sizeof(m_buttonStates));
+    memset(m_prevButtonStates, 0, sizeof(m_prevButtonStates));
 }
 
 void CMacOSMouse::GetPos(int& x, int& y)
@@ -231,241 +287,346 @@ void CMacOSMouse::GetPos(int& x, int& y)
 
 void CMacOSMouse::SetPos(int x, int y)
 {
-    CGPoint point = CGPointMake(x, y);
-    CGWarpMouseCursorPosition(point);
     m_x = x;
     m_y = y;
-}
-
-bool CMacOSMouse::IsButtonDown(int nButton)
-{
-    if (nButton < 0 || nButton >= 8)
-        return false;
-    return m_buttonStates[nButton];
+    m_prevX = x;
+    m_prevY = y;
 }
 
 bool CMacOSMouse::ButtonPressed(int nButton)
 {
-    if (nButton < 0 || nButton >= 8)
-        return false;
-    return m_buttonStates[nButton] && !m_prevButtonStates[nButton];
+    // Check if button was just pressed (down this frame but not last frame)
+    if (nButton >= 0 && nButton < 8) {
+        return m_buttonStates[nButton] && !m_prevButtonStates[nButton];
+    }
+    return false;
 }
 
 bool CMacOSMouse::ButtonReleased(int nButton)
 {
-    if (nButton < 0 || nButton >= 8)
-        return false;
-    return !m_buttonStates[nButton] && m_prevButtonStates[nButton];
+    // Check if button was just released (up this frame but down last frame)
+    if (nButton >= 0 && nButton < 8) {
+        return !m_buttonStates[nButton] && m_prevButtonStates[nButton];
+    }
+    return false;
+}
+
+bool CMacOSMouse::IsButtonDown(int nButton)
+{
+    // Check if button is currently down
+    if (nButton >= 0 && nButton < 8) {
+        return m_buttonStates[nButton];
+    }
+    return false;
+}
+
+int CMacOSMouse::GetWheelDelta()
+{
+    return m_wheelDelta;
 }
 
 void CMacOSMouse::Hide(bool hide)
 {
+    // Stub implementation
     m_bHidden = hide;
-    
-    if (hide)
-    {
-        CGDisplayHideCursor(kCGDirectMainDisplay);
-    }
-    else
-    {
-        CGDisplayShowCursor(kCGDirectMainDisplay);
-    }
 }
 
-CGEventRef CMacOSMouse::MouseEventTapCallback(CGEventTapProxy proxy, CGEventType type,
-                                             CGEventRef event, void* userInfo)
+void CMacOSMouse::ProcessMouseEvent(void* event)
 {
-    CMacOSMouse* mouse = static_cast<CMacOSMouse*>(userInfo);
-    
-    switch (type)
-    {
-        case kCGEventLeftMouseDown:
-            mouse->m_buttonStates[0] = true;
-            break;
-        case kCGEventLeftMouseUp:
-            mouse->m_buttonStates[0] = false;
-            break;
-        case kCGEventRightMouseDown:
-            mouse->m_buttonStates[1] = true;
-            break;
-        case kCGEventRightMouseUp:
-            mouse->m_buttonStates[1] = false;
-            break;
-        case kCGEventOtherMouseDown:
-        case kCGEventOtherMouseUp:
-        {
-            int64_t buttonNumber = CGEventGetIntegerValueField(event, kCGMouseEventButtonNumber);
-            if (buttonNumber >= 2 && buttonNumber < 8)
-            {
-                mouse->m_buttonStates[buttonNumber] = (type == kCGEventOtherMouseDown);
-            }
-            break;
-        }
-        case kCGEventScrollWheel:
-        {
-            int64_t deltaY = CGEventGetIntegerValueField(event, kCGScrollWheelEventDeltaAxis1);
-            mouse->m_wheelDelta += (int)deltaY;
-            break;
-        }
-    }
-    
-    return event;
+    // Stub implementation - no actual processing
 }
 
-void CMacOSMouse::SetExclusive(bool value, IInput* pInput)
+int CMacOSMouse::ConvertMacOSButton(int button)
 {
-    if (value == m_bExclusive)
-        return;
-    
-    m_bExclusive = value;
-    
-    if (value)
-    {
-        // Create event tap for mouse events
-        CGEventMask eventMask = CGEventMaskBit(kCGEventLeftMouseDown) |
-                               CGEventMaskBit(kCGEventLeftMouseUp) |
-                               CGEventMaskBit(kCGEventRightMouseDown) |
-                               CGEventMaskBit(kCGEventRightMouseUp) |
-                               CGEventMaskBit(kCGEventOtherMouseDown) |
-                               CGEventMaskBit(kCGEventOtherMouseUp) |
-                               CGEventMaskBit(kCGEventScrollWheel);
-        
-        m_eventTap = CGEventTapCreate(kCGSessionEventTap,
-                                     kCGHeadInsertEventTap,
-                                     kCGEventTapOptionDefault,
-                                     eventMask,
-                                     MouseEventTapCallback,
-                                     this);
-        
-        if (m_eventTap)
-        {
-            m_runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, m_eventTap, 0);
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), m_runLoopSource, kCFRunLoopCommonModes);
-            CGEventTapEnable(m_eventTap, true);
-        }
-    }
-    else
-    {
-        // Clean up event tap
-        if (m_eventTap)
-        {
-            CGEventTapEnable(m_eventTap, false);
-            CFRelease(m_eventTap);
-            m_eventTap = nullptr;
-        }
-        
-        if (m_runLoopSource)
-        {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), m_runLoopSource, kCFRunLoopCommonModes);
-            CFRelease(m_runLoopSource);
-            m_runLoopSource = nullptr;
-        }
-    }
+    // Stub implementation - return button as-is
+    return button;
 }
 
-// CMacOSInput implementation
+// CMacOSInput implementation - minimal stubs
 CMacOSInput::CMacOSInput()
-    : m_pKeyboard(nullptr)
-    , m_pMouse(nullptr)
-    , m_pJoystick(nullptr)
+    : m_pSystem(nullptr)
+    , m_window(nullptr)
     , m_bExclusiveMode(false)
     , m_bEventPostingEnabled(true)
-    , m_pSystem(nullptr)
-    , m_window(nil)
 {
+    m_pKeyboard = new CMacOSKeyboard();
+    m_pMouse = new CMacOSMouse();
 }
 
 CMacOSInput::~CMacOSInput()
 {
-    ShutDown();
+    delete m_pKeyboard;
+    delete m_pMouse;
 }
 
-bool CMacOSInput::Init(ISystem* pSystem)
+void CMacOSInput::Update(bool bFocus)
 {
-    if (!pSystem)
-        return false;
-    
-    m_pSystem = pSystem;
-    
-    // Create input devices
-    m_pKeyboard = new CMacOSKeyboard();
-    m_pMouse = new CMacOSMouse();
-    m_pJoystick = new CMacOSJoystick();
-    
-    if (!m_pKeyboard->Init() || !m_pMouse->Init() || !m_pJoystick->Init())
-    {
-        pSystem->GetILog()->Log("Error: Failed to initialize macOS input devices");
-        ShutDown();
-        return false;
-    }
-    
-    pSystem->GetILog()->Log("macOS input system initialized successfully");
-    return true;
-}
-
-void CMacOSInput::Update()
-{
+    // Stub implementation - just update keyboard and mouse
     if (m_pKeyboard) m_pKeyboard->Update();
     if (m_pMouse) m_pMouse->Update();
-    if (m_pJoystick) m_pJoystick->Update();
 }
 
 void CMacOSInput::ShutDown()
 {
-    if (m_pKeyboard)
-    {
-        delete m_pKeyboard;
-        m_pKeyboard = nullptr;
-    }
-    
-    if (m_pMouse)
-    {
-        delete m_pMouse;
-        m_pMouse = nullptr;
-    }
-    
-    if (m_pJoystick)
-    {
-        delete m_pJoystick;
-        m_pJoystick = nullptr;
-    }
-    
-    m_listeners.clear();
-    m_consoleListeners.clear();
+    // Stub implementation
 }
 
-// Stub implementations for remaining interface methods
-void CMacOSInput::SetExclusiveMode(bool value) { m_bExclusiveMode = value; }
-IKeyboard* CMacOSInput::GetKeyboard() { return m_pKeyboard; }
-IMouse* CMacOSInput::GetMouse() { return m_pMouse; }
-IJoystick* CMacOSInput::GetJoystick() { return m_pJoystick; }
-bool CMacOSInput::AddEventListener(IInputEventListener* pListener) { return true; }
-bool CMacOSInput::RemoveEventListener(IInputEventListener* pListener) { return true; }
-void CMacOSInput::AddConsoleEventListener(IInputEventListener* pListener) {}
-void CMacOSInput::RemoveConsoleEventListener(IInputEventListener* pListener) {}
-void CMacOSInput::SetMouseExclusive(bool value, const char* cause) {}
-void CMacOSInput::GetMousePos(int& x, int& y) { if (m_pMouse) m_pMouse->GetPos(x, y); }
-void CMacOSInput::SetMousePos(int x, int y) { if (m_pMouse) m_pMouse->SetPos(x, y); }
-bool CMacOSInput::GetInputChar(SInputKeyData& rKeyData) { return false; }
-void CMacOSInput::EnableEventPosting(bool bEnable) { m_bEventPostingEnabled = bEnable; }
-bool CMacOSInput::IsEventPostingEnabled() { return m_bEventPostingEnabled; }
-void CMacOSInput::PostInputEvent(SInputKeyData& rKeyData) {}
-
-// CMacOSJoystick stub implementation
-CMacOSJoystick::CMacOSJoystick() : m_hidManager(nullptr), m_devices(nullptr)
+void CMacOSInput::SetMouseExclusive(bool exclusive, void* hwnd)
 {
-    memset(&m_state, 0, sizeof(m_state));
+    // Stub implementation
+    if (m_pMouse) m_pMouse->SetExclusive(exclusive, hwnd);
 }
 
-CMacOSJoystick::~CMacOSJoystick() {}
-bool CMacOSJoystick::Init() { return true; }
-void CMacOSJoystick::Update() {}
-bool CMacOSJoystick::IsButtonDown(int nButton) { return false; }
-bool CMacOSJoystick::ButtonPressed(int nButton) { return false; }
-bool CMacOSJoystick::ButtonReleased(int nButton) { return false; }
-float CMacOSJoystick::GetAxisValue(int nAxis) { return 0.0f; }
-int CMacOSJoystick::GetAxisValueRaw(int nAxis) { return 0; }
-void CMacOSJoystick::SetDeadZone(int nAxis, float fThreshold) {}
-void CMacOSJoystick::SetForceFeedback(IFFParams& ffparams) {}
+void CMacOSInput::SetKeyboardExclusive(bool exclusive, void* hwnd)
+{
+    // Stub implementation
+    if (m_pKeyboard) m_pKeyboard->SetExclusive(exclusive, hwnd);
+}
+
+IKeyboard* CMacOSInput::GetIKeyboard()
+{
+    return m_pKeyboard;
+}
+
+IMouse* CMacOSInput::GetIMouse()
+{
+    return m_pMouse;
+}
+
+void CMacOSInput::AddEventListener(IInputEventListener* pListener)
+{
+    // Stub implementation
+}
+
+void CMacOSInput::RemoveEventListener(IInputEventListener* pListener)
+{
+    // Stub implementation
+}
+
+void CMacOSInput::EnableEventPosting(bool bEnable)
+{
+    // Stub implementation
+    m_bEventPostingEnabled = bEnable;
+}
+
+void CMacOSInput::AddConsoleEventListener(IInputEventListener* pListener)
+{
+    // Stub implementation
+}
+
+void CMacOSInput::RemoveConsoleEventListener(IInputEventListener* pListener)
+{
+    // Stub implementation
+}
+
+void CMacOSInput::SetExclusiveListener(IInputEventListener* pListener)
+{
+    // Stub implementation
+}
+
+IInputEventListener* CMacOSInput::GetExclusiveListener()
+{
+    // Stub implementation - return nullptr
+    return nullptr;
+}
+
+// Key methods - stub implementations
+bool CMacOSInput::KeyDown(int p_key)
+{
+    return m_pKeyboard ? m_pKeyboard->KeyDown(p_key) : false;
+}
+
+bool CMacOSInput::KeyPressed(int p_key)
+{
+    return m_pKeyboard ? m_pKeyboard->KeyPressed(p_key) : false;
+}
+
+bool CMacOSInput::KeyReleased(int p_key)
+{
+    return m_pKeyboard ? m_pKeyboard->KeyReleased(p_key) : false;
+}
+
+// Mouse methods - stub implementations
+bool CMacOSInput::MouseDown(int p_numButton)
+{
+    return m_pMouse ? m_pMouse->MouseDown(p_numButton) : false;
+}
+
+bool CMacOSInput::MousePressed(int p_numButton)
+{
+    return m_pMouse ? m_pMouse->MousePressed(p_numButton) : false;
+}
+
+bool CMacOSInput::MouseReleased(int p_numButton)
+{
+    return m_pMouse ? m_pMouse->MouseReleased(p_numButton) : false;
+}
+
+bool CMacOSInput::MouseDblClick(int p_numButton)
+{
+    // Stub implementation - double click detection would need timing logic
+    return false;
+}
+
+float CMacOSInput::MouseGetDeltaX()
+{
+    return m_pMouse ? m_pMouse->GetDeltaX() : 0.0f;
+}
+
+float CMacOSInput::MouseGetDeltaY()
+{
+    return m_pMouse ? m_pMouse->GetDeltaY() : 0.0f;
+}
+
+float CMacOSInput::MouseGetDeltaZ()
+{
+    return m_pMouse ? m_pMouse->GetDeltaZ() : 0.0f;
+}
+
+float CMacOSInput::MouseGetVScreenX()
+{
+    return m_pMouse ? m_pMouse->GetVScreenX() : 0.0f;
+}
+
+float CMacOSInput::MouseGetVScreenY()
+{
+    return m_pMouse ? m_pMouse->GetVScreenY() : 0.0f;
+}
+
+// Joystick methods - stub implementations (joystick disabled)
+bool CMacOSInput::JoyButtonPressed(int p_numButton)
+{
+    // Joystick functionality disabled
+    return false;
+}
+
+int CMacOSInput::JoyGetDir()
+{
+    // Joystick functionality disabled
+    return 0;
+}
+
+int CMacOSInput::JoyGetHatDir()
+{
+    // Joystick functionality disabled
+    return 0;
+}
+
+Vec3 CMacOSInput::JoyGetAnalog1Dir(unsigned int joystickID) const
+{
+    // Joystick functionality disabled
+    return Vec3(0, 0, 0);
+}
+
+Vec3 CMacOSInput::JoyGetAnalog2Dir(unsigned int joystickID) const
+{
+    // Joystick functionality disabled
+    return Vec3(0, 0, 0);
+}
+
+// Other methods - stub implementations
+int CMacOSInput::GetKeyID(const char* sName)
+{
+    // Stub implementation - return 0
+    return 0;
+}
+
+void CMacOSInput::EnableBufferedInput(bool bEnable)
+{
+    // Stub implementation
+}
+
+void CMacOSInput::FeedVirtualKey(int nVirtualKey, long lParam, bool bDown)
+{
+    // Stub implementation
+}
+
+int CMacOSInput::GetBufferedKey()
+{
+    // Stub implementation - return 0
+    return 0;
+}
+
+const char* CMacOSInput::GetBufferedKeyName()
+{
+    // Stub implementation - return empty string
+    return "";
+}
+
+void CMacOSInput::PopBufferedKey()
+{
+    // Stub implementation
+}
+
+void CMacOSInput::SetMouseInertia(float)
+{
+    // Stub implementation
+}
+
+const char* CMacOSInput::GetKeyName(int nKey, int modifiers, bool bGUI)
+{
+    // Stub implementation - return empty string
+    return "";
+}
+
+bool CMacOSInput::GetOSKeyName(int nKey, wchar_t* szwKeyName, int iBufSize)
+{
+    // Stub implementation - return false
+    return false;
+}
+
+int CMacOSInput::GetKeyPressedCode()
+{
+    return m_pKeyboard ? m_pKeyboard->GetKeyPressedCode() : 0;
+}
+
+const char* CMacOSInput::GetKeyPressedName()
+{
+    return m_pKeyboard ? m_pKeyboard->GetKeyPressedName() : "";
+}
+
+int CMacOSInput::GetKeyDownCode()
+{
+    return m_pKeyboard ? m_pKeyboard->GetKeyDownCode() : 0;
+}
+
+const char* CMacOSInput::GetKeyDownName()
+{
+    return m_pKeyboard ? m_pKeyboard->GetKeyDownName() : "";
+}
+
+void CMacOSInput::WaitForKey()
+{
+    if (m_pKeyboard) m_pKeyboard->WaitForKey();
+}
+
+struct IActionMapManager* CMacOSInput::CreateActionMapManager()
+{
+    // Stub implementation - return nullptr
+    return nullptr;
+}
+
+const char* CMacOSInput::GetXKeyPressedName()
+{
+    // Stub implementation - return empty string
+    return "";
+}
+
+void CMacOSInput::ClearKeyState()
+{
+    if (m_pKeyboard) m_pKeyboard->ClearKeyState();
+    if (m_pMouse) m_pMouse->ClearKeyState();
+}
+
+unsigned char CMacOSInput::GetKeyState(int nKey)
+{
+    // Stub implementation - return 0 (no key state)
+    return 0;
+}
+
+void CMacOSInput::PostEvent(const SInputEvent& event)
+{
+    // Stub implementation - no actual event posting
+}
 
 #endif // __APPLE__ && __MACH__

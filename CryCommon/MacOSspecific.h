@@ -16,6 +16,11 @@
 #ifndef _CRY_COMMON_MACOS_SPECIFIC_HDR_
 #define _CRY_COMMON_MACOS_SPECIFIC_HDR_
 
+// Define BOOL before any system headers to avoid conflicts
+#ifndef BOOL
+#define BOOL int
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -64,13 +69,16 @@ typedef uint64_t        u64;
 // Windows compatibility types (avoid conflicts with system headers)
 typedef void*           THREAD_HANDLE;
 typedef void*           EVENT_HANDLE;
-// Define BOOL before any system headers are included
-#define BOOL int
+// BOOL is defined at the top of the file
 #ifndef DWORD
 typedef uint32_t        DWORD;
 #endif
 typedef int32_t         LONG;
-typedef uint32_t        HRESULT;  // COM HRESULT type
+// HRESULT is defined by macOS system headers as SInt32 (int)
+// But we need to ensure it's available for our code
+#ifndef HRESULT
+typedef int HRESULT;
+#endif
 typedef void*           HMODULE;
 typedef void*           HINSTANCE;
 typedef void*           HWND;
@@ -202,12 +210,12 @@ inline int CryIsHeapValid()
 #endif
 }
 
-// Windows heap validation function
-inline BOOL IsHeapValid()
-{
-    // Stub implementation - assume heap is always valid on macOS
-    return TRUE;
-}
+// Windows heap validation function - commented out due to conflict with system headers
+// inline BOOL IsHeapValid()
+// {
+//     // Stub implementation - assume heap is always valid on macOS
+//     return TRUE;
+// }
 
 inline BOOL IsBadReadPtr(const void* lp, size_t ucb)
 {
@@ -428,21 +436,22 @@ inline uint32_t GetLastError() {
 }
 
 // Windows process/thread functions (stubs for macOS)
-inline void* GetCurrentProcess() {
-    return (void*)1;  // Dummy process handle
-}
+// inline void* GetCurrentProcess() {
+//     return (void*)1;  // Dummy process handle
+// }
 
 // Windows thread functions - avoid conflicts with Carbon framework
 // Only define if not already defined by system headers
-#ifndef GetCurrentThread
-#ifndef WIN32GETCURRENTTHREAD_DEFINED
-#define WIN32GETCURRENTTHREAD_DEFINED
-inline void* Win32GetCurrentThread() {
-    return (void*)pthread_self();
-}
-#endif
-#define GetCurrentThread Win32GetCurrentThread
-#endif
+// Commented out due to conflicts with system headers
+// #ifndef GetCurrentThread
+// #ifndef WIN32GETCURRENTTHREAD_DEFINED
+// #define WIN32GETCURRENTTHREAD_DEFINED
+// inline void* Win32GetCurrentThread() {
+//     return (void*)pthread_self();
+// }
+// #endif
+// #define GetCurrentThread Win32GetCurrentThread
+// #endif
 
 #ifndef GetCurrentThreadId
 inline uint32_t Win32GetCurrentThreadId() {
@@ -1080,9 +1089,7 @@ typedef struct {
     uint8_t Data4[8];
 } GUID;
 
-typedef GUID IID;
-typedef GUID REFIID;
-typedef void* IUnknown;
+// IID, REFIID, and IUnknown are defined by macOS system headers
 
 // Time types
 typedef time_t __time64_t;
@@ -1181,6 +1188,72 @@ typedef short SHORT;
 #define VK_UP 0x26
 #define VK_RIGHT 0x27
 #define VK_DOWN 0x28
+#define VK_ESCAPE 0x1B
+#define VK_BACK 0x08
+#define VK_TAB 0x09
+#define VK_SUBTRACT 0x6D
+#define VK_OEM_PLUS 0xBB
+#define VK_OEM_4 0xDB
+#define VK_OEM_6 0xDD
+#define VK_RETURN 0x0D
+#define VK_LCONTROL 0xA2
+#define VK_OEM_1 0xBA
+#define VK_OEM_7 0xDE
+#define VK_OEM_3 0xC0
+#define VK_LSHIFT 0xA0
+#define VK_OEM_5 0xDC
+#define VK_OEM_COMMA 0xBC
+#define VK_OEM_PERIOD 0xBE
+#define VK_OEM_2 0xBF
+#define VK_RSHIFT 0xA1
+#define VK_MULTIPLY 0x6A
+#define VK_LMENU 0xA4
+#define VK_SPACE 0x20
+#define VK_CAPITAL 0x14
+#define VK_F1 0x70
+#define VK_F2 0x71
+#define VK_F3 0x72
+#define VK_F4 0x73
+#define VK_F5 0x74
+#define VK_F6 0x75
+#define VK_F7 0x76
+#define VK_F8 0x77
+#define VK_F9 0x78
+#define VK_F10 0x79
+#define VK_F11 0x7A
+#define VK_F12 0x7B
+#define VK_NUMLOCK 0x90
+#define VK_SCROLL 0x91
+#define VK_NUMPAD7 0x67
+#define VK_NUMPAD8 0x68
+#define VK_NUMPAD9 0x69
+#define VK_NUMPAD5 0x65
+#define VK_ADD 0x6B
+#define VK_NUMPAD3 0x63
+#define VK_NUMPAD0 0x60
+#define VK_DECIMAL 0x6E
+#define VK_F13 0x7C
+#define VK_F14 0x7D
+#define VK_F15 0x7E
+#define VK_KANA 0x15
+#define VK_CONVERT 0x1C
+#define VK_NONCONVERT 0x1D
+#define VK_ACCEPT 0x1E
+#define VK_MODECHANGE 0x1F
+#define VK_SELECT 0x29
+#define VK_PRINT 0x2A
+#define VK_EXECUTE 0x2B
+#define VK_SNAPSHOT 0x2C
+#define VK_HELP 0x2F
+#define VK_RCONTROL 0xA3
+#define VK_DIVIDE 0x6F
+#define VK_RMENU 0xA5
+#define VK_PAUSE 0x13
+#define VK_LWIN 0x5B
+#define VK_RWIN 0x5C
+#define VK_APPS 0x5D
+#define VK_OEM_102 0xE2
+#define VK_OEM_MINUS 0xBD
 
 inline SHORT GetAsyncKeyState(int vKey) {
     // For now, return 0 (key not pressed) - could be enhanced with macOS key event monitoring
@@ -1546,7 +1619,7 @@ public:
 };
 
 // Function stubs
-inline HRESULT DirectDrawCreateEx(GUID* lpGUID, void* lplpDD, REFIID iid, IUnknown* pUnkOuter) {
+inline HRESULT DirectDrawCreateEx(GUID* lpGUID, void* lplpDD, const GUID& iid, void* pUnkOuter) {
     if (lplpDD) {
         *(LPDIRECTDRAW7*)lplpDD = new StubDirectDraw7();
     }
