@@ -80,4 +80,12 @@ private:
 	CDownloadManager	*m_pParent;
 };
 
+#ifdef __APPLE__
+// macOS stub implementation for InitializeTemplate
+inline void CHTTPDownloader::InitializeTemplate(IScriptSystem *pSS)
+{
+	// Stub implementation - no-op on macOS
+}
+#endif
+
 //#endif //LINUX

@@ -99,9 +99,9 @@ static HMODULE g_hSystemHandle=NULL;
 #define DLL_SYSTEM "CrySystem.dll"
 #define DLL_GAME	 "CryGame.dll"
 #elif defined(__APPLE__) && defined(__MACH__)
-void* g_hSystemHandle = NULL;
-int _fmode = 0;  // Global file mode variable for macOS
+void* g_hSystemHandle = nullptr;
 // DLL_SYSTEM and DLL_GAME defined in MacOSspecific.h
+// __fmode defined in CryPak.cpp
 #endif
 
 #ifndef PS2

@@ -89,7 +89,7 @@ ISystem* GetISystem()
 
 //////////////////////////////////////////////////////////////////////
 // interface of the DLL
-IGame* CreateGameInstance()
+IGame* ()
 {
 	CXGame *pGame = new CXGame();
 	return pGame;

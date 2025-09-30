@@ -1032,6 +1032,13 @@ typedef int (*LPDDENUMCALLBACKEXA)(void*, void*, void*, void*, void*);
 #define _T(x) x
 #define TEXT(x) x
 
+// Windows global variables
+// __fmode defined in macos_fmode.cpp
+
+// CDownloadManager stub implementation moved to DownloadManager.h
+
+// Game instance and XML DOM creation stubs removed - will be handled in System.cpp
+
 // Time functions
 inline __time64_t _time64(__time64_t* timer) {
     if (timer) {
@@ -1190,6 +1197,8 @@ inline void* GetProcAddress(void* hModule, const char* lpProcName) {
 }
 
 // CryLoadLibrary is already defined in CryLibrary.h
+
+// Implementation moved to macos_stubs.cpp
 
 // Event functions
 inline void* CreateEvent(void* lpEventAttributes, int bManualReset, int bInitialState, const char* lpName) {

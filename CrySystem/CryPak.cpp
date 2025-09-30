@@ -20,6 +20,13 @@
 #include <ilog.h>
 #include <StringUtils.h>
 
+// Windows compatibility
+extern "C" {
+    int _fmode = 0;    // macOS uses one underscore
+    int __fmode = 0;
+    int ___fmode = 0;  // macOS uses three underscores
+}
+
 /////////////////////////////////////////////////////
 
 #ifndef _XBOX

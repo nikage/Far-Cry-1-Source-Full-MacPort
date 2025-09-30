@@ -37,13 +37,18 @@ if(NOT UNIX OR APPLE)
 endif()
 
 # Add our macOS-specific files
+# MacOSFileSystem.cpp temporarily disabled due to Carbon framework conflicts
 if(APPLE)
+    # Add macOS compatibility stubs
     list(APPEND CRYSYSTEM_SOURCES
-        MacOSFileSystem.cpp
+        macos_stubs.cpp
     )
-    list(APPEND CRYSYSTEM_HEADERS
-        MacOSFileSystem.h
-    )
+    # list(APPEND CRYSYSTEM_SOURCES
+    #     MacOSFileSystem.cpp
+    # )
+    # list(APPEND CRYSYSTEM_HEADERS
+    #     MacOSFileSystem.h
+    # )
 endif()
 
 # Create the CrySystem library
@@ -75,9 +80,9 @@ if(APPLE)
     )
     
     # Set source files that need Objective-C++ compilation
-    set_source_files_properties(MacOSFileSystem.cpp PROPERTIES
-        COMPILE_FLAGS "-x objective-c++"
-    )
+    # set_source_files_properties(MacOSFileSystem.cpp PROPERTIES
+    #     COMPILE_FLAGS "-x objective-c++"
+    # )
     
 elseif(WIN32)
     target_link_libraries(CrySystem PRIVATE

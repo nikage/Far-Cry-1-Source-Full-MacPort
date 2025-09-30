@@ -14,8 +14,79 @@
 #include "stdafx.h"
 #include "System.h"
 #include <time.h>
+#include <stdarg.h>
 //#include "ini_vars.h"
 #include "CryLibrary.h"
+
+// Stub XML node implementation for macOS
+class CXmlNodeStub : public IXmlNode {
+public:
+    CXmlNodeStub(const char* name) : m_name(name ? name : ""), m_refCount(1) {}
+    virtual ~CXmlNodeStub() {}
+    
+    // IXmlNode interface - comprehensive stub implementations
+    virtual XmlNodeRef createNode(const char* tag) override { return XmlNodeRef(); }
+    virtual void AddRef() override { m_refCount++; }
+    virtual void Release() override { if(--m_refCount <= 0) delete this; }
+    virtual int GetRefCount() const { return m_refCount; }
+    
+    // Tag methods
+    virtual const char* getTag() const override { return m_name.c_str(); }
+    virtual void setTag(const char* tag) override { m_name = tag ? tag : ""; }
+    virtual bool isTag(const char* tag) const override { return m_name == (tag ? tag : ""); }
+    
+    // Attribute methods
+    virtual int getNumAttributes() const override { return 0; }
+    virtual bool getAttributeByIndex(int index, const char** key, const char** value) override { return false; }
+    virtual void copyAttributes(XmlNodeRef fromNode) override {}
+    virtual const char* getAttr(const char* key) const override { return nullptr; }
+    virtual bool haveAttr(const char* key) const override { return false; }
+    virtual void delAttr(const char* key) override {}
+    virtual void removeAllAttributes() override {}
+    
+    // Child methods
+    virtual void addChild(XmlNodeRef& node) override {}
+    virtual XmlNodeRef newChild(const char* tagName) override { return XmlNodeRef(); }
+    virtual void removeChild(XmlNodeRef& node) override {}
+    virtual void removeAllChilds() override {}
+    virtual int getChildCount() const override { return 0; }
+    virtual XmlNodeRef getChild(int i) const override { return XmlNodeRef(); }
+    virtual XmlNodeRef findChild(const char* tag) const override { return XmlNodeRef(); }
+    virtual XmlNodeRef getParent() const override { return XmlNodeRef(); }
+    
+    // Content methods
+    virtual const char* getContent() const override { return ""; }
+    virtual void setContent(const char* str) override {}
+    virtual void addContent(const char* str) override {}
+    
+    // Utility methods
+    virtual XmlNodeRef clone() override { return XmlNodeRef(); }
+    virtual int getLine() const override { return 0; }
+    virtual void setLine(int line) override {}
+    virtual XmlString getXML(int level = 0) const override { return XmlString(""); }
+    virtual bool saveToFile(const char* fileName) override { return false; }
+    
+    // Set attribute methods
+    virtual void setAttr(const char* key, const char* value) override {}
+    virtual void setAttr(const char* key, int value) override {}
+    virtual void setAttr(const char* key, unsigned int value) override {}
+    virtual void setAttr(const char* key, float value) override {}
+    virtual void setAttr(const char* key, const Vec3& value) override {}
+    virtual void setAttr(const char* key, const Quat& value) override {}
+    
+    // Get attribute methods
+    virtual bool getAttr(const char* key, int& value) const override { return false; }
+    virtual bool getAttr(const char* key, unsigned int& value) const override { return false; }
+    virtual bool getAttr(const char* key, float& value) const override { return false; }
+    virtual bool getAttr(const char* key, Vec3& value) const override { return false; }
+    virtual bool getAttr(const char* key, Quat& value) const override { return false; }
+    virtual bool getAttr(const char* key, bool& value) const override { return false; }
+    virtual bool getAttr(const char* key, XmlString& value) const override { return false; }
+    
+private:
+    std::string m_name;
+    int m_refCount;
+};
 
 #ifndef _XBOX
 #ifdef WIN32
@@ -48,7 +119,7 @@
 #include "CrySizerImpl.h"
 #include "DownloadManager.h"
 
-#include "XML/xml.h"
+// #include "XML/xml.h" // Excluded for macOS - using stub implementation
 #include "DataProbe.h"
 #include "ApplicationHelper.h"			// CApplicationHelper
 
@@ -1078,23 +1149,103 @@ XDOM::IXMLDOMDocument *CSystem::CreateXMLDocument()
 //////////////////////////////////////////////////////////////////////////
 XmlNodeRef CSystem::CreateXmlNode( const char *sNodeName )
 {
-	return new CXmlNode( sNodeName );
+	return new CXmlNodeStub( sNodeName );
 }
 
 //////////////////////////////////////////////////////////////////////////
 XmlNodeRef CSystem::LoadXmlFile( const char *sFilename )
 {
-	XmlParser parser;
-	XmlNodeRef node = parser.parse( sFilename );
-	return node;
+	// Stub implementation for macOS - XML parsing disabled
+	// XmlParser parser;
+	// XmlNodeRef node = parser.parse( sFilename );
+	// return node;
+	return XmlNodeRef(); // Return empty node
 }
 
 //////////////////////////////////////////////////////////////////////////
 XmlNodeRef CSystem::LoadXmlFromString( const char *sXmlString )
 {
-	XmlParser parser;
-	XmlNodeRef node = parser.parseBuffer( sXmlString );
-	return node;
+	// Stub implementation for macOS - XML parsing disabled
+	// XmlParser parser;
+	// XmlNodeRef node = parser.parseBuffer( sXmlString );
+	// return node;
+	return XmlNodeRef(); // Return empty node
+}
+
+//////////////////////////////////////////////////////////////////////////
+void CSystem::Error( const char *sFormat, ... )
+{
+	// Stub implementation for macOS
+	va_list args;
+	va_start(args, sFormat);
+	printf("ERROR: ");
+	vprintf(sFormat, args);
+	printf("\n");
+	va_end(args);
+}
+
+//////////////////////////////////////////////////////////////////////////
+void CSystem::DumpMemoryUsageStatistics()
+{
+	// Stub implementation for macOS
+	printf("Memory usage statistics not available on macOS\n");
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool CSystem::GetSSFileInfo( const char *szFileName, char *szLevelName, unsigned int dwLevelNameSize )
+{
+	// Stub implementation for macOS
+	if (szLevelName && dwLevelNameSize > 0) {
+		strncpy(szLevelName, "Unknown", dwLevelNameSize - 1);
+		szLevelName[dwLevelNameSize - 1] = '\0';
+	}
+	return false; // Return false to indicate failure
+}
+
+//////////////////////////////////////////////////////////////////////////
+void CSystem::TickMemStats(MemStatsPurposeEnum nPurpose)
+{
+	// Stub implementation for macOS
+	// Memory statistics not available
+}
+
+//////////////////////////////////////////////////////////////////////////
+void CSystem::DumpWinHeaps()
+{
+	// Stub implementation for macOS
+	printf("Windows heap dump not available on macOS\n");
+}
+
+//////////////////////////////////////////////////////////////////////////
+void CSystem::SetAffinity()
+{
+	// Stub implementation for macOS
+	// CPU affinity setting not available
+}
+
+//////////////////////////////////////////////////////////////////////////
+const char* CSystem::GetUserName()
+{
+	// Stub implementation for macOS
+	static const char* username = "macOSUser";
+	return username;
+}
+
+//////////////////////////////////////////////////////////////////////////
+int CSystem::DumpMMStats(bool log)
+{
+	// Stub implementation for macOS
+	if (log) {
+		printf("Memory Manager Statistics not available on macOS\n");
+	}
+	return 0; // Return 0 bytes used
+}
+
+//////////////////////////////////////////////////////////////////////////
+void CSystem::DebugStats(bool checkpoint, bool leaks)
+{
+	// Stub implementation for macOS
+	printf("Debug statistics not available on macOS\n");
 }
 
 //////////////////////////////////////////////////////////////////////////

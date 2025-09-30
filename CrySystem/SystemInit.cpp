@@ -41,7 +41,7 @@
 #include "ScriptSink.h"
 #include "Font.h"
 #include "Log.h"
-#include "XML/xml.h"
+// #include "XML/xml.h" // Excluded for macOS - using stub implementation
 #include "DataProbe.h"
 #include "ApplicationHelper.h"				// CApplicationHelper
 
