@@ -188,7 +188,7 @@ void CVisAreaManager::LoadVisAreaBoxFromXML(XDOM::IXMLDOMDocumentPtr pDoc)
 			{
 				pNodeList->reset();
 				XDOM::IXMLDOMNodePtr pNode;
-				while (pNode = pNodeList->nextNode())
+				while ((pNode = pNodeList->nextNode()))
 				{
 					XDOM::IXMLDOMNodePtr pName = pNode->getAttribute("Type");
 					if (pName)
@@ -353,8 +353,9 @@ void CVisAreaManager::PortalsDrawDebug()
 		for(int v=0; v<m_lstVisAreas.Count(); v++)
 		{
 			GetRenderer()->Draw3dBBox(m_lstVisAreas[v]->m_vBoxMin, m_lstVisAreas[v]->m_vBoxMax, DPRIM_SOLID_BOX);
+			Vec3d visAreaColor(1,1,1);
 			GetRenderer()->DrawLabelEx((m_lstVisAreas[v]->m_vBoxMin+ m_lstVisAreas[v]->m_vBoxMax)*0.5f,
-        1,(float*)&Vec3d(1,1,1),0,1,m_lstVisAreas[v]->m_sName);
+        1,(float*)&visAreaColor,0,1,m_lstVisAreas[v]->m_sName);
 
 			GetRenderer()->SetMaterialColor(0,1,0,0.25f);
 			GetRenderer()->Draw3dBBox(m_lstVisAreas[v]->m_vGeomBoxMin, m_lstVisAreas[v]->m_vGeomBoxMax);
@@ -367,8 +368,9 @@ void CVisAreaManager::PortalsDrawDebug()
 			GetRenderer()->SetMaterialColor(fError,fError*(m_lstPortals[v]->m_lstConnections.Count()<2),0,0.25f);
 			GetRenderer()->Draw3dBBox(m_lstPortals[v]->m_vBoxMin, m_lstPortals[v]->m_vBoxMax, DPRIM_SOLID_BOX);
 
+			Vec3d portalColor(1,1,1);
 			GetRenderer()->DrawLabelEx((m_lstPortals[v]->m_vBoxMin+ m_lstPortals[v]->m_vBoxMax)*0.5f,
-				1,(float*)&Vec3d(1,1,1),0,1,m_lstPortals[v]->m_sName);
+				1,(float*)&portalColor,0,1,m_lstPortals[v]->m_sName);
 
 			CVisArea * pPortal = m_lstPortals[v];
 			Vec3d vCenter = (pPortal->m_vBoxMin+pPortal->m_vBoxMax)*0.5f;
@@ -699,7 +701,7 @@ void CVisAreaManager::LoadVisAreaShapeFromXML(XDOM::IXMLDOMDocumentPtr pDoc)
 		{
 			pNodeList->reset();
 			XDOM::IXMLDOMNodePtr pNode;
-			while (pNode = pNodeList->nextNode())
+			while ((pNode = pNodeList->nextNode()))
 			{
 				XDOM::IXMLDOMNodePtr pName = pNode->getAttribute("Type");
 				if (pName)
@@ -787,7 +789,7 @@ void CVisAreaManager::LoadVisAreaShapeFromXML(XDOM::IXMLDOMDocumentPtr pDoc)
 								{
 									pNodeList->reset();
 									XDOM::IXMLDOMNodePtr pNode;
-									while (pNode = pNodeList->nextNode())
+									while ((pNode = pNodeList->nextNode()))
 									{
 										XDOM::IXMLDOMNodePtr pPos = pNode->getAttribute("Pos");
 										if (pPos)

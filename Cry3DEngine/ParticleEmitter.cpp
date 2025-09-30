@@ -314,7 +314,7 @@ void CParticleEmitter::OnActivate( bool bActive )
 		// Play sound if have.
 		ISoundSystem *pISoundSystem = GetISystem()->GetISoundSystem();
 #if !defined(LINUX64)
-		if (pISoundSystem != NULL && m_pEffect != NULL)
+                if (pISoundSystem != NULL && m_pEffect)
 #else
 		if (pISoundSystem != 0 && m_pEffect != 0)
 #endif
@@ -335,7 +335,7 @@ void CParticleEmitter::OnActivate( bool bActive )
 
 				m_pSound = pISoundSystem->LoadSound( soundParams.szSound,nSndFlags );
 #if !defined(LINUX64)
-				if (m_pSound != NULL && !soundParams.bOnEverySpawn)
+                                if (m_pSound && !soundParams.bOnEverySpawn)
 #else
 				if (m_pSound != 0 && !soundParams.bOnEverySpawn)
 #endif
@@ -388,7 +388,7 @@ void CParticleEmitter::PlaySound()
 void CParticleEmitter::OnSpawnParticles( bool bChildProcess )
 {
 #if !defined(LINUX64)
-	if (!bChildProcess && m_pSound != NULL && m_pEffect != NULL)
+        if (!bChildProcess && m_pSound && m_pEffect)
 #else
 	if (!bChildProcess && m_pSound != 0 && m_pEffect != 0)
 #endif

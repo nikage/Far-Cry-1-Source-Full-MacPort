@@ -30,7 +30,7 @@ void CTerrain::PreCacheArea(const Vec3d & vPos, float fRadius)
 
 #ifndef _DEBUG
 #if !defined(_XBOX) && !defined(LINUX)
-  assert(GetConsole()->Exit("Assert should do nothing in release mode")); // just check
+  GetConsole()->Exit("Assert should do nothing in release mode"); // just check
 #endif // _XBOX
 #endif // DEBUG
 

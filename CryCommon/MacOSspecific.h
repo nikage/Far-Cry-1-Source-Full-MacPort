@@ -209,6 +209,13 @@ inline BOOL IsHeapValid()
     return TRUE;
 }
 
+inline BOOL IsBadReadPtr(const void* lp, size_t ucb)
+{
+    // Stub implementation - assume all pointers are valid on macOS
+    // In a real implementation, this would check if the memory is readable
+    return FALSE;
+}
+
 // Windows directory functions with POSIX alternatives
 #include <sys/stat.h>
 #include <errno.h>
@@ -224,10 +231,65 @@ inline BOOL CreateDirectory(LPCSTR lpPathName, void* lpSecurityAttributes) {
     }
 }
 
+// Windows file attribute constants
+#ifndef FILE_ATTRIBUTE_NORMAL
+#define FILE_ATTRIBUTE_NORMAL 0x00000080
+#endif
+
+#ifndef FILE_ATTRIBUTE_READONLY
+#define FILE_ATTRIBUTE_READONLY 0x00000001
+#endif
+
+#ifndef FILE_ATTRIBUTE_SYSTEM
+#define FILE_ATTRIBUTE_SYSTEM 0x00000004
+#endif
+
+#ifndef FILE_ATTRIBUTE_DIRECTORY
+#define FILE_ATTRIBUTE_DIRECTORY 0x00000010
+#endif
+
+#ifndef FILE_ATTRIBUTE_EXECUTABLE
+#define FILE_ATTRIBUTE_EXECUTABLE 0x00000040
+#endif
+
+inline BOOL SetFileAttributes(LPCSTR lpFileName, DWORD dwFileAttributes) {
+    // macOS implementation using chmod for basic file attributes
+    if (!lpFileName) return FALSE;
+    
+    // Convert Windows file attributes to POSIX permissions
+    mode_t mode = 0;
+    
+    // Basic permissions - most files should be readable/writable by owner
+    mode = S_IRUSR | S_IWUSR;
+    
+    // Add group and other permissions if not system-only
+    if (!(dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)) {
+        mode |= S_IRGRP | S_IROTH;
+        if (!(dwFileAttributes & FILE_ATTRIBUTE_READONLY)) {
+            mode |= S_IWGRP | S_IWOTH;
+        }
+    }
+    
+    // Set executable permission for certain file types
+    if (dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY || 
+        dwFileAttributes & FILE_ATTRIBUTE_EXECUTABLE) {
+        mode |= S_IXUSR | S_IXGRP | S_IXOTH;
+    }
+    
+    return chmod(lpFileName, mode) == 0;
+}
+
 // Windows compatibility macros
 #define ILINE inline
 #define _inline inline
 #define APIENTRY
+
+// Windows four-character code macro
+#ifndef MAKEFOURCC
+#define MAKEFOURCC(ch0, ch1, ch2, ch3) \
+    ((DWORD)(BYTE)(ch0) | ((DWORD)(BYTE)(ch1) << 8) | \
+     ((DWORD)(BYTE)(ch2) << 16) | ((DWORD)(BYTE)(ch3) << 24))
+#endif
 #define WINAPI
 #define _ACCESS_POOL   // Empty macro for macOS
 #define __forceinline inline
@@ -1185,6 +1247,12 @@ inline BOOL MakeSureDirectoryPathExists(LPCSTR lpPath) {
 inline char* itoa(int value, char* str, int base) {
     // POSIX implementation using sprintf
     sprintf(str, "%d", value);
+    return str;
+}
+
+inline char* ltoa(long value, char* str, int base) {
+    // POSIX implementation using sprintf for long integers
+    sprintf(str, "%ld", value);
     return str;
 }
 
