@@ -1281,6 +1281,37 @@ inline char* strupr(char* str) {
     return str;
 }
 
+inline int strnicoll(const char* s1, const char* s2, size_t n) {
+    // POSIX implementation using strncasecmp
+    return strncasecmp(s1, s2, n);
+}
+
+inline int stricoll(const char* s1, const char* s2) {
+    // POSIX implementation using strcasecmp
+    return strcasecmp(s1, s2);
+}
+
+// Windows path constants
+#ifndef _MAX_PATH
+#define _MAX_PATH 260
+#endif
+
+#ifndef _MAX_DRIVE
+#define _MAX_DRIVE 3
+#endif
+
+#ifndef _MAX_DIR
+#define _MAX_DIR 256
+#endif
+
+#ifndef _MAX_FNAME
+#define _MAX_FNAME 256
+#endif
+
+#ifndef _MAX_EXT
+#define _MAX_EXT 256
+#endif
+
 // Windows command line functions
 extern char** __argv;
 extern int __argc;

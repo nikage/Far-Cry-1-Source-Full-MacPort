@@ -3,7 +3,7 @@
 #else
 #ifdef _XBOX
 #ifdef __cplusplus
-extern "C" void portable_makepath (
+void portable_makepath (
         char *path,
         const char *drive,
         const char *dir,
@@ -20,7 +20,7 @@ void portable_makepath (
 		);
 #endif // _CPP
 #else // _XBOX
-extern "C" void portable_makepath (
+void portable_makepath (
         char *path,
         const char *drive,
         const char *dir,

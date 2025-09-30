@@ -328,7 +328,7 @@ void CAnimObject::AddAnimation( Animation* anim )
 void CAnimObject::RemoveAnimation( Animation* anim )
 {
 	m_animations.erase( std::remove(m_animations.begin(),m_animations.end(),anim),m_animations.end() );
-	if (m_currAnimation = anim)
+        if ((m_currAnimation = anim))
 	{
 		if (!m_animations.empty())
 			m_currAnimation = m_animations[0];
