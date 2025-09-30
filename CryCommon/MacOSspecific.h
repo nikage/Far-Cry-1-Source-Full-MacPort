@@ -467,13 +467,7 @@ inline uint32_t Win32GetCurrentThreadId() {
 #define GetCurrentThreadId Win32GetCurrentThreadId
 #endif
 
-inline uint32_t GetPriorityClass(void* hProcess) {
-    return 0x00000020;  // NORMAL_PRIORITY_CLASS
-}
-
-inline int GetThreadPriority(void* hThread) {
-    return 0;  // THREAD_PRIORITY_NORMAL
-}
+// Old stub implementations removed - replaced with proper implementations below
 
 // Windows priority constants
 #define REALTIME_PRIORITY_CLASS     0x00000100
@@ -640,18 +634,7 @@ inline int SetPriorityClass(void* hProcess, uint32_t dwPriorityClass) {
     return 1;
 }
 
-inline int SetThreadPriority(void* hThread, int nPriority) {
-    // macOS thread priority setting would be complex, stub for now
-    return 1;
-}
-
-// Windows process affinity functions
-inline int GetProcessAffinityMask(void* hProcess, uintptr_t* lpProcessAffinityMask, uintptr_t* lpSystemAffinityMask) {
-    // macOS doesn't have direct process affinity, return all CPUs available
-    if (lpProcessAffinityMask) *lpProcessAffinityMask = 0xFFFFFFFF;
-    if (lpSystemAffinityMask) *lpSystemAffinityMask = 0xFFFFFFFF;
-    return 1;
-}
+// Old stub implementations removed - replaced with proper implementations below
 
 // Windows thread creation function - use proper function pointer type
 typedef unsigned long (*LPTHREAD_START_ROUTINE)(void*);
@@ -1832,6 +1815,154 @@ F GetLength( const Vec3_tpl<F>& v );
 // Quaternion from matrix conversion
 template<class F,int SI,int SJ> 
 Quaternion_tpl<F> GetQuatFromMat33(const Matrix33_tpl<F,SI,SJ>& m);
+
+// Process and thread functions for CPUDetect.cpp
+#include <pthread.h>
+#include <sys/resource.h>
+#include <unistd.h>
+#include <sched.h>
+#include <errno.h>
+
+// CPU affinity types and constants
+#ifndef CPU_SETSIZE
+#define CPU_SETSIZE 1024
+#endif
+
+#ifndef cpu_set_t
+typedef struct {
+    unsigned long __bits[CPU_SETSIZE / (8 * sizeof(unsigned long))];
+} cpu_set_t;
+#endif
+
+#ifndef CPU_ISSET
+#define CPU_ISSET(cpu, cpusetp) \
+    (((cpusetp)->__bits[(cpu) / (8 * sizeof(unsigned long))] & \
+      (1UL << ((cpu) % (8 * sizeof(unsigned long))))) != 0)
+#endif
+
+// Windows priority class constants
+#define NORMAL_PRIORITY_CLASS       0x20
+#define HIGH_PRIORITY_CLASS         0x40
+#define REALTIME_PRIORITY_CLASS     0x80
+#define BELOW_NORMAL_PRIORITY_CLASS 0x10
+#define IDLE_PRIORITY_CLASS         0x08
+
+// Windows thread priority constants
+#define THREAD_PRIORITY_TIME_CRITICAL 15
+#define THREAD_PRIORITY_HIGHEST       2
+#define THREAD_PRIORITY_ABOVE_NORMAL  1
+#define THREAD_PRIORITY_NORMAL        0
+#define THREAD_PRIORITY_BELOW_NORMAL  -1
+#define THREAD_PRIORITY_LOWEST        -2
+#define THREAD_PRIORITY_IDLE          -15
+
+inline void* GetCurrentProcess() {
+    // Return process ID as handle for macOS
+    return (void*)(uintptr_t)getpid();
+}
+
+inline void* GetCurrentThread() {
+    // Return current thread handle using pthread
+    return (void*)pthread_self();
+}
+
+inline int GetThreadPriority(void* hThread) {
+    // Get thread priority using pthread scheduling
+    if (hThread == NULL) {
+        hThread = pthread_self();
+    }
+    
+    int policy;
+    struct sched_param param;
+    if (pthread_getschedparam((pthread_t)hThread, &policy, &param) == 0) {
+        return param.sched_priority;
+    }
+    return 0;
+}
+
+inline int SetThreadPriority(void* hThread, int nPriority) {
+    // Set thread priority using pthread scheduling
+    if (hThread == NULL) {
+        hThread = pthread_self();
+    }
+    
+    struct sched_param param;
+    param.sched_priority = nPriority;
+    
+    // Use SCHED_OTHER policy for normal threads
+    return pthread_setschedparam((pthread_t)hThread, SCHED_OTHER, &param) == 0 ? 1 : 0;
+}
+
+inline uint32_t GetPriorityClass(void* hProcess) {
+    // Get process priority class using getpriority
+    int priority = getpriority(PRIO_PROCESS, 0);
+    if (priority == -1 && errno != 0) {
+        return 0x20; // NORMAL_PRIORITY_CLASS on error
+    }
+    
+    // Map POSIX nice values to Windows priority classes
+    if (priority <= -10) return 0x80; // REALTIME_PRIORITY_CLASS
+    if (priority <= -5) return 0x40;  // HIGH_PRIORITY_CLASS
+    if (priority <= 0) return 0x20;   // NORMAL_PRIORITY_CLASS
+    if (priority <= 5) return 0x10;   // BELOW_NORMAL_PRIORITY_CLASS
+    return 0x08; // IDLE_PRIORITY_CLASS
+}
+
+inline int SetPriorityClass(void* hProcess, int dwPriorityClass) {
+    // Set process priority class using setpriority
+    int nice_value;
+    
+    switch (dwPriorityClass) {
+        case 0x80: // REALTIME_PRIORITY_CLASS
+            nice_value = -10;
+            break;
+        case 0x40: // HIGH_PRIORITY_CLASS
+            nice_value = -5;
+            break;
+        case 0x20: // NORMAL_PRIORITY_CLASS
+            nice_value = 0;
+            break;
+        case 0x10: // BELOW_NORMAL_PRIORITY_CLASS
+            nice_value = 5;
+            break;
+        case 0x08: // IDLE_PRIORITY_CLASS
+            nice_value = 10;
+            break;
+        default:
+            nice_value = 0;
+            break;
+    }
+    
+    return setpriority(PRIO_PROCESS, 0, nice_value) == 0 ? 1 : 0;
+}
+
+inline int GetProcessAffinityMask(void* hProcess, void* lpProcessAffinityMask, void* lpSystemAffinityMask) {
+    // macOS doesn't have process affinity, but we can get the number of CPUs
+    int numCPUs = sysconf(_SC_NPROCESSORS_ONLN);
+    
+    if (numCPUs > 0) {
+        // Create a mask with all available CPUs
+        DWORD mask = (1 << numCPUs) - 1;
+        
+        if (lpProcessAffinityMask) {
+            *(DWORD*)lpProcessAffinityMask = mask;
+        }
+        if (lpSystemAffinityMask) {
+            *(DWORD*)lpSystemAffinityMask = mask;
+        }
+        return 1;
+    }
+    
+    // Fallback: assume single CPU
+    if (lpProcessAffinityMask) {
+        *(DWORD*)lpProcessAffinityMask = 0x1;
+    }
+    if (lpSystemAffinityMask) {
+        *(DWORD*)lpSystemAffinityMask = 0x1;
+    }
+    return 1;
+}
+
 #endif
 
 #endif //_CRY_COMMON_MACOS_SPECIFIC_HDR_

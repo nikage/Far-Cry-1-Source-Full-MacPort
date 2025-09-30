@@ -38,7 +38,7 @@
 #include "luadebugger/LuaDbg.h"
 #endif
 
-#if !defined(LINUX) && !defined(__APPLE__)
+#if !defined(LINUX) && !defined(__APPLE__) && !defined(__APPLE__)
 #include <ddraw.h>
 extern HRESULT GetDXVersion( DWORD* pdwDirectXVersion, TCHAR* strDirectXVersion, int cchDirectXVersion );
 #elif defined(__APPLE__)
@@ -55,7 +55,7 @@ HRESULT GetDXVersion( DWORD* pdwDirectXVersion, TCHAR* strDirectXVersion, int cc
 
 extern int g_nPrecaution;
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 /////////////////////////////////////////////////////////////////////////////////
 int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
 {
@@ -794,6 +794,20 @@ int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
 }
 #endif
 
+#if defined(__APPLE__)
+/////////////////////////////////////////////////////////////////////////////////
+int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
+{
+  // macOS implementation - use OpenGL renderer by default
+  strcpy(Vendor, "Apple");
+  strcpy(Device, "Metal/OpenGL");
+  
+  GetILog()->LogToFile("System: INFO: Using OpenGL renderer on macOS\n");
+  
+  return R_GL_RENDERER;
+}
+#endif
+
 /////////////////////////////////////////////////////////////////////////////////
 void CSystem::CreateRendererVars()
 {
@@ -1053,7 +1067,7 @@ void CSystem::Render()
     GetWindowText( (HWND)hRendWnd,sBuff,128);
     if(hActiveWnd != hRendWnd && strncmp(sBuff,"- Far Cry -",11)==0)
     {
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
       Sleep(50);
 #endif      
 //      if(!bSleep)

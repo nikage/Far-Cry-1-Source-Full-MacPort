@@ -334,7 +334,7 @@ int CScriptObjectSystem::CreateDownload(IFunctionHandler *pH)
 {
 	// this cast is a hack, because i don't want to change the ISystem interface at this point
 	CSystem *pSystem = static_cast<CSystem *>(m_pSystem);
-//#if !defined(LINUX)
+//#if !defined(LINUX) && !defined(__APPLE__)
 	if (pSystem)
 	{
 		CHTTPDownloader *pDL = pSystem->m_pDownloadManager->CreateDownload();
@@ -725,7 +725,7 @@ int CScriptObjectSystem::GetEntities(IFunctionHandler *pH)
 */
 
 #if !defined(XBOX) && !defined(PS2) && (defined(WIN32) || defined(LINUX) || defined(__APPLE__))
-	#if !defined(LINUX) && !defined(__APPLE__)
+	#if !defined(LINUX) && !defined(__APPLE__) && !defined(__APPLE__)
 		#include <io.h>
 	#endif
 	inline bool Filter(struct __finddata64_t& fd, int nScanMode)
@@ -1519,7 +1519,7 @@ int CScriptObjectSystem::DrawImageColorCoords(IFunctionHandler *pH)
 /////////////////////////////////////////////////////////////////////////////////
 int CScriptObjectSystem::DrawTriStrip(IFunctionHandler *pH)
 {
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 #define _MAX_VTXS 10
 	USER_DATA nTid;
 	int nCookie=0;
@@ -2697,7 +2697,7 @@ int CScriptObjectSystem::GetGPUQuality( IFunctionHandler* pH )
 {
 	CHECK_PARAMETERS( 0 );
 	static int s_iGPUQuality( -1 );
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 	if( -1 == s_iGPUQuality )
 	{
 		HMODULE hDDraw( LoadLibrary( "ddraw.dll" ) );
@@ -2913,7 +2913,7 @@ int CScriptObjectSystem::GetVideoMem( IFunctionHandler* pH )
 {
 	CHECK_PARAMETERS( 0 );
 	static DWORD s_dwTotalVideoMemory( 0xFFFFFFFF );
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 	if( 0xFFFFFFFF == s_dwTotalVideoMemory )
 	{
 		s_dwTotalVideoMemory = 0;

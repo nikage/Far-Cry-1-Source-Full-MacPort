@@ -197,7 +197,7 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
 //////////////////////////////////////////////////////////////////////
 C3DEngine::~C3DEngine()
 {
-	assert(IsHeapValid());
+	assert(CryIsHeapValid());
 
 	ShutDown();
 
@@ -2417,7 +2417,7 @@ void C3DEngine::CheckPhysicalized(const Vec3d & vBoxMin, const Vec3d & vBoxMax)
 
 void C3DEngine::CheckMemoryHeap()
 {
-	assert (IsHeapValid());
+	assert (CryIsHeapValid());
 }
 
 void C3DEngine::RecompileBeaches()

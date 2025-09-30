@@ -1192,9 +1192,9 @@ void CMusicSystem::MixStreams(void *pBuffer, int nSamples)
 /**/
   
      /*assert (arrBuffer[nSize-1] == 0xCECECECE);
-			assert (IsHeapValid());
+			assert (CryIsHeapValid());
 			memcpy (pBuffer, arrBuffer, nSamplesToRead*4);
-			assert (IsHeapValid());*/
+			assert (CryIsHeapValid());*/
 		}
 		if (bStreamEnd)
 		{

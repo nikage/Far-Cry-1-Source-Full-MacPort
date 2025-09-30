@@ -49,7 +49,7 @@ inline void ValidateHeap()
 #if defined(WIN64) && defined(_DEBUG) // on AMD64, heap validation is extremely slow
 	if (g_nValidateHeapCounter > 1000*1000 || !((++g_nValidateHeapCounter)&0xFF))
 #endif
-		assert(IsHeapValid());
+		assert(CryIsHeapValid());
 }
 */
 
@@ -6419,7 +6419,7 @@ void CPlayer::HoldWeapon(void)
 
 void CPlayer::SetWeaponPositionState(EWeaponPositionState weaponPositionState)
 {
-	assert (IsHeapValid());
+	assert (CryIsHeapValid());
 
 	// attach to bone ?
 	if (m_nSelectedWeaponID != -1 && m_weaponPositionState != weaponPositionState)
@@ -6429,7 +6429,7 @@ void CPlayer::SetWeaponPositionState(EWeaponPositionState weaponPositionState)
 		ICryCharInstance *character = m_pEntity->GetCharInterface()->GetCharacter(PLAYER_MODEL_IDX);
 		WeaponInfo &wi = GetWeaponInfo();
 
-		assert (IsHeapValid());
+		assert (CryIsHeapValid());
 		if (character)
 		{
 			wi.DetachBindingHandles(character);

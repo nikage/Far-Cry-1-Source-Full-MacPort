@@ -376,13 +376,13 @@ CryCharInstanceBase::ObjectBindingHandle CryCharInstanceBase::AttachToBone (IBin
 // the binding becomes invalid immediately after detach
 bool CryCharInstanceBase::Detach (ObjectBindingHandle nHandle)
 {
-	assert (IsHeapValid());
+	assert (CryIsHeapValid());
 	for (BindArray::iterator it = m_arrBinds.begin(); it != m_arrBinds.end(); )
 		if (nHandle == (ObjectBindingHandle)*it)
 		{
 			delete *it;
 			it = m_arrBinds.erase (it);
-			assert (IsHeapValid());
+			assert (CryIsHeapValid());
 			return true;
 		}
 		else
