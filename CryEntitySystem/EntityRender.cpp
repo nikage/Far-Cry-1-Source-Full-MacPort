@@ -32,7 +32,7 @@ bool CEntity::DrawEntity(const SRendParams & _EntDrawParams)
 {
 	FUNCTION_PROFILER( m_pISystem,PROFILE_3DENGINE );
 
-  int nRecursionLevel = (int)m_pISystem->GetIRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
+  int nRecursionLevel = (int)(intptr_t)m_pISystem->GetIRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
 
 	if(nRecursionLevel==0)
 	{ // movement detection (if no recursion)
@@ -308,7 +308,7 @@ void CEntity::DrawEntityDebugInfo(const SRendParams & rParms)
 				//CryQuat	qRot;
 				int idx=0;
 				char* name;
-					while( name=(char*)eo.object->GetHelperById(idx++, pos) )
+                                        while( (name=(char*)eo.object->GetHelperById(idx++, pos)) )
 					{
 						Vec3d	hSize = Vec3d( .5f, .5f, .5f );
 

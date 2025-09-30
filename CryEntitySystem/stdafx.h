@@ -77,7 +77,7 @@ extern bool g_bProfilerEnabled;
 #endif //PS2
 
 // Windows defines
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 typedef unsigned long       DWORD;
 typedef int                 BOOL;
 typedef unsigned char       BYTE;

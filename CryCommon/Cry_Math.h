@@ -17,6 +17,11 @@
 # pragma once
 #endif
 
+// Forward declarations
+inline int isneg(float x);
+inline int isneg(int x);
+inline int isneg(double x);
+
 //========================================================================================
 
 #include <math.h>
