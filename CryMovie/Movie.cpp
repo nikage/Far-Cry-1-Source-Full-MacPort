@@ -26,7 +26,11 @@
 #include "MaterialNode.h"
 
 #include <ISystem.h>
+#if !defined(__APPLE__)
 #include <io.h>
+#else
+#include <unistd.h>
+#endif
 #include <ILog.h>
 #include <IConsole.h>
 #include <ITimer.h>
@@ -59,7 +63,7 @@ bool CMovieSystem::Load(const char *pszFile, const char *pszMission)
 	XmlNodeRef rootNode = m_system->LoadXmlFile(pszFile);
 	if (!rootNode)
 		return false;
-	XmlNodeRef Node=NULL;
+	XmlNodeRef Node;
 	for (int i=0;i<rootNode->getChildCount();i++)
 	{
 		XmlNodeRef missionNode=rootNode->getChild(i);
@@ -661,11 +665,12 @@ void CMovieSystem::Serialize( XmlNodeRef &xmlNode,bool bLoading,bool bRemoveOldN
 		XmlNodeRef seqNode=xmlNode->findChild("SequenceData");
 		if (seqNode)
 		{
-			for (int i=0;i<seqNode->getChildCount();i++)
-			{
-				if (!LoadSequence(seqNode->getChild(i), bLoadEmpty))
-					return;
-			}
+		for (int i=0;i<seqNode->getChildCount();i++)
+		{
+			XmlNodeRef childNode = seqNode->getChild(i);
+			if (!LoadSequence(childNode, bLoadEmpty))
+				return;
+		}
 		}
 		//Reset();
 	}else

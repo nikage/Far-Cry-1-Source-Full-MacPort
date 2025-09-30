@@ -171,7 +171,7 @@ public:
 		{
 			//@FIXME: check if this is correct?
 			//m_rangeStart = time(0);
-			//m_rangeEnd = time(num_keys()-1);
+			//m_rangeEnd = time(this->num_keys()-1);
 		}
 	}
 
@@ -210,12 +210,12 @@ inline	TSpline<T,Basis>::TSpline()	{
 
 template <class T,class Basis>
 inline	int	TSpline<T,Basis>::seek_key( float t )	{
-	if ((m_curr == num_keys()) || (time(m_curr) > t))	{
+	if ((m_curr == this->num_keys()) || (time(m_curr) > t))	{
 		// Search from begining.
 		m_curr = 0;
 	}
-	if (m_curr < num_keys())	{
-		int last = num_keys() - 1;
+	if (m_curr < this->num_keys())	{
+		int last = this->num_keys() - 1;
 		while ((m_curr != last)&&(time(m_curr+1) <= t)) ++m_curr;
 	}
 	return m_curr;
@@ -226,7 +226,7 @@ inline	void	TSpline<T,Basis>::interpolate( float tm,value_type& val )	{
 	if (empty()) return;
 
 	float t = tm;
-	int last = num_keys() - 1;
+	int last = this->num_keys() - 1;
 
 	if (m_flags&MODIFIED)
 		sort_keys();
@@ -264,8 +264,8 @@ Archive&	operator << ( Archive& ar,TSpline<T,Basis> &curve )	{
 	curve.interpolate( 0,val );	// Calc derivs if not calced yet. (for quat)
 	ar << curve.flag( 0xFFFFFFFF );
 	ar << curve.ORT();	// Save Out-Of-Range type.
-	ar << curve.num_keys();	// Save num keys.
-	for (int i = 0; i < curve.num_keys(); ++i)	{
+	ar << curve.this->num_keys();	// Save num keys.
+	for (int i = 0; i < curve.this->num_keys(); ++i)	{
 		ar << curve.key(i);	// Save keys.
 	}
 	return ar;
@@ -294,6 +294,22 @@ Archive&	operator >> ( Archive& ar,TSpline<T,Basis> &curve )	{
 ****************************************************************************/
 template <class T>
 class	TCBSpline : public TSpline< TCBSplineKey<T>,HermitBasis >	{
+public:
+	using typename TSpline<TCBSplineKey<T>,HermitBasis>::key_type;
+	using typename TSpline<TCBSplineKey<T>,HermitBasis>::value_type;
+	using typename TSpline<TCBSplineKey<T>,HermitBasis>::basis_type;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::num_keys;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::key;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::time;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::value;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::ds;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::dd;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::GetRangeStart;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::GetRangeEnd;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::m_flags;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::m_curr;
+	using TSpline<TCBSplineKey<T>,HermitBasis>::closed;
+
 protected:
 	virtual	void interp_keys( int key1,int key2,float u,T& val );
 	virtual void comp_deriv();
@@ -338,7 +354,7 @@ template	<class T>
 inline	void TCBSpline<T>::compMiddleDeriv( int curr )	{
 	float	dsA,dsB,ddA,ddB;
 	float	A,B,cont1,cont2;
-	int last = num_keys() - 1;
+	int last = this->num_keys() - 1;
 
 	// dsAdjust,ddAdjust apply speed correction when continuity is 0.
 	// Middle key.
@@ -397,9 +413,9 @@ inline	void TCBSpline<T>::compFirstDeriv()	{
 
 template	<class T>
 inline	void TCBSpline<T>::compLastDeriv()	{
-	int last = num_keys() - 1;
+	int last = this->num_keys() - 1;
 	key_type &k = key(last);
-	k.ds = -0.5f*(1.0f - k.tens)*( 3.0f*(value(last-1) - k.value) + dd(last-1) );
+	k.ds = -0.5f*(1.0f - k.tens)*( 3.0f*(value(last-1) - k.value) + this->dd(last-1) );
 	Zero(k.dd);
 }
 
@@ -417,17 +433,17 @@ inline	void TCBSpline<T>::comp2KeyDeriv()	{
 
 template	<class T>
 inline	void	TCBSpline<T>::comp_deriv() 	{
-	if (num_keys() > 1)	{
-		if ((num_keys() == 2) && !closed())	{
+	if (this->num_keys() > 1)	{
+		if ((this->num_keys() == 2) && !closed())	{
 			comp2KeyDeriv();
 			return;
 		}
 		if (closed()) {
-			for (int i = 0; i < num_keys(); ++i)	{
+			for (int i = 0; i < this->num_keys(); ++i)	{
 				compMiddleDeriv( i );
 			}
 		}	else	{
-			for (int i = 1; i < (num_keys()-1); ++i)	{
+			for (int i = 1; i < (this->num_keys()-1); ++i)	{
 				compMiddleDeriv( i );
 			}
 			compFirstDeriv();
@@ -435,7 +451,7 @@ inline	void	TCBSpline<T>::comp_deriv() 	{
 		}
 	}
 	m_curr = 0;
-	m_flags &= ~MODIFIED;	// clear MODIFIED flag.
+	m_flags &= ~TSpline<TCBSplineKey<T>,HermitBasis>::MODIFIED;	// clear MODIFIED flag.
 }
 
 template	<class T>
@@ -470,8 +486,8 @@ inline	void	TCBSpline<T>::interp_keys( int from,int to,float u,T& val )
 	basis_type basis( u );
 
 	// Changed by Sergiy&Ivo
-	//val = (basis[0]*value(from)) + (basis[1]*value(to)) + (basis[2]*dd(from)) + (basis[3]*ds(to));
-	val = Concatenate( Concatenate( Concatenate( (basis[0]*value(from)) , (basis[1]*value(to))) , (basis[2]*dd(from))) , (basis[3]*ds(to)));
+	//val = (basis[0]*value(from)) + (basis[1]*value(to)) + (basis[2]*this->dd(from)) + (basis[3]*ds(to));
+	val = Concatenate( Concatenate( Concatenate( (basis[0]*value(from)) , (basis[1]*value(to))) , (basis[2]*this->dd(from))) , (basis[3]*ds(to)));
 
 }
 
@@ -519,9 +535,9 @@ inline	void	TCBQuatSpline::interpolate( float tm,value_type& val )
 	if (empty()) return;
 
 	float t = tm;
-	int last = num_keys() - 1;
+	int last = this->num_keys() - 1;
 
-	if (m_flags&MODIFIED)	comp_deriv();
+	if (m_flags&TCBSpline<Quat>::MODIFIED)	comp_deriv();
 
 	if (t < time(0))	{	// Before first key.
 		val = value(0);
@@ -549,21 +565,21 @@ inline	void	TCBQuatSpline::interpolate( float tm,value_type& val )
 inline	void	TCBQuatSpline::interp_keys( int from,int to,float u,value_type& val ) {
 	u = calc_ease( u,key(from).easefrom,key(to).easeto );
 	basis_type basis( u );
-	//val = SquadRev( angle(to),axis(to), value(from), dd(from), ds(to), value(to), u );
-	val = Squad( value(from), dd(from), ds(to), value(to), u );
+	//val = SquadRev( angle(to),axis(to), value(from), this->dd(from), ds(to), value(to), u );
+	val = Squad( value(from), this->dd(from), ds(to), value(to), u );
 	val = GetNormalized(val);	// Normalize quaternion.
 }
 
 inline	void TCBQuatSpline::comp_deriv()
 {
-	if (num_keys() > 1)
+	if (this->num_keys() > 1)
 	{
-		for (int i = 0; i < num_keys(); ++i)	{
+		for (int i = 0; i < this->num_keys(); ++i)	{
 			compMiddleDeriv( i );
 		}
 	}
 	m_curr = 0;
-	m_flags &= ~MODIFIED;	// clear MODIFIED flag.
+	m_flags &= ~TCBSpline<Quat>::MODIFIED;	// clear MODIFIED flag.
 }
 
 #define	M_2PI		(2.0f*3.14159f - 0.00001f)
@@ -571,7 +587,7 @@ inline	void TCBQuatSpline::compMiddleDeriv( int curr )
 {
 	Quat  qp,qm;	
 	float fp,fn;
-	int last = num_keys() - 1;
+	int last = this->num_keys() - 1;
 	
 	if (curr > 0 || closed())
 	{

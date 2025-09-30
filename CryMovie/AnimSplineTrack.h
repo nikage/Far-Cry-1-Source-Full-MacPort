@@ -61,7 +61,7 @@ public:
 	{
 		assert( index >= 0 && index < GetNumKeys() );
 		assert( key != 0 );
-		Spline::key_type &k = m_spline->key(index);
+		typename Spline::key_type &k = m_spline->key(index);
 		ITcbKey *tcbkey = (ITcbKey*)key;
 		tcbkey->time = k.time;
 		tcbkey->flags = k.flags;
@@ -79,7 +79,7 @@ public:
 	{
 		assert( index >= 0 && index < GetNumKeys() );
 		assert( key != 0 );
-		Spline::key_type &k = m_spline->key(index);
+		typename Spline::key_type &k = m_spline->key(index);
 		ITcbKey *tcbkey = (ITcbKey*)key;
 		k.time = tcbkey->time;
 		k.flags = tcbkey->flags;
@@ -114,8 +114,8 @@ public:
 		m_spline->key(index).flags = flags;
 	}
 
-	virtual EAnimTrackType GetType() { assert(0); return 0; }
-	virtual EAnimValue GetValueType() { assert(0); return 0; }
+	virtual EAnimTrackType GetType() { assert(0); return (EAnimTrackType)0; }
+	virtual EAnimValue GetValueType() { assert(0); return (EAnimValue)0; }
 
 	virtual void GetValue( float time,float &value ) { assert(0); }
 	virtual void GetValue( float time,Vec3 &value ) { assert(0); }
@@ -346,7 +346,7 @@ bool TAnimTcbTrack<T>::Serialize( XmlNodeRef &xmlNode,bool bLoading, bool bLoadE
 
 //////////////////////////////////////////////////////////////////////////
 //! Specialize for single float track.
-template <> TAnimTcbTrack<float>::TAnimTcbTrack<float>()
+template <> TAnimTcbTrack<float>::TAnimTcbTrack()
 {
 	AllocSpline();
 	m_flags = 0;
@@ -375,13 +375,13 @@ template<> void TAnimTcbTrack<float>::GetKeyInfo( int index,const char* &descrip
 	static char str[64];
 	description = str;
 	assert( index >= 0 && index < GetNumKeys() );
-	Spline::key_type &k = m_spline->key(index);
+	typename Spline::key_type &k = m_spline->key(index);
 	sprintf( str,"%g",k.value );
 }
 
 //////////////////////////////////////////////////////////////////////////
 //! Specialize for Vector track.
-template <> TAnimTcbTrack<Vec3>::TAnimTcbTrack<Vec3>()
+template <> TAnimTcbTrack<Vec3>::TAnimTcbTrack()
 {
 	AllocSpline();
 	m_flags = 0;
@@ -411,14 +411,14 @@ template <> void TAnimTcbTrack<Vec3>::GetKeyInfo( int index,const char* &descrip
 	description = str;
 
 	assert( index >= 0 && index < GetNumKeys() );
-	Spline::key_type &k = m_spline->key(index);
+	typename Spline::key_type &k = m_spline->key(index);
 	sprintf( str,"%g,%g,%g",k.value[0],k.value[1],k.value[2] );
 }
 
 //////////////////////////////////////////////////////////////////////////
 //! Specialize for Quaternion track.
 //! Spezialize spline creation for quaternion.
-template <> TAnimTcbTrack<Quat>::TAnimTcbTrack<Quat>()
+template <> TAnimTcbTrack<Quat>::TAnimTcbTrack()
 {
 	m_spline = new TCBQuatSpline;
 	m_flags = 0;
@@ -449,7 +449,7 @@ template <> void TAnimTcbTrack<Quat>::GetKeyInfo( int index,const char* &descrip
 	description = str;
 
 	assert( index >= 0 && index < GetNumKeys() );
-	Spline::key_type &k = m_spline->key(index);
+	typename Spline::key_type &k = m_spline->key(index);
 	Vec3 Angles=RAD2DEG(Ang3::GetAnglesXYZ(Matrix33(k.value)));
 	sprintf( str,"%g,%g,%g",Angles.x, Angles.y, Angles.z );
 }
