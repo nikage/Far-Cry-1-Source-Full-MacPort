@@ -170,8 +170,8 @@ public:
 		if (!m_keys.empty())
 		{
 			//@FIXME: check if this is correct?
-			//m_rangeStart = time(0);
-			//m_rangeEnd = time(this->num_keys()-1);
+			m_rangeStart = time(0);
+			m_rangeEnd = time(this->num_keys()-1);
 		}
 	}
 

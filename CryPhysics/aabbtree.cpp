@@ -13,6 +13,11 @@ struct BBoxExt : BBox {
 BBoxExt g_BBoxExtBuf[64];
 int g_BBoxExtBufPos;
 
+// Missing minmax function
+inline float minmax(float a, float b, int mode) {
+	return mode ? max(a, b) : min(a, b);
+}
+
 
 void CAABBTree::SetParams(int nMinTrisPerNode, int nMaxTrisPerNode, float skipdim, const matrix3x3f &Basis)
 {

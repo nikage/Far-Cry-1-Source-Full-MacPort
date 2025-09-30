@@ -7,6 +7,10 @@
 #include "obbtree.h"
 #include "trimesh.h"
 
+// Missing minmax function
+inline float minmax(float a, float b, int mode) {
+	return mode ? max(a, b) : min(a, b);
+}
 
 void COBBTree::SetParams(int nMinTrisPerNode, int nMaxTrisPerNode, float skipdim)
 {

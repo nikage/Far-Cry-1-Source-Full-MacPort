@@ -537,7 +537,9 @@ int CPhysicalEntity::AddCollider(CPhysicalEntity *pCollider)
 	if (i==m_nColliders) {
 		if (m_nColliders==m_nCollidersAlloc) {
 			CPhysicalEntity **pColliders = m_pColliders;
-			memcpy(m_pColliders = new (CPhysicalEntity*[m_nCollidersAlloc+=8]), pColliders, sizeof(CPhysicalEntity*)*m_nColliders);
+			m_nCollidersAlloc += 8;
+			m_pColliders = new CPhysicalEntity*[m_nCollidersAlloc];
+			memcpy(m_pColliders, pColliders, sizeof(CPhysicalEntity*)*m_nColliders);
 			if (pColliders) delete[] pColliders;
 		}
 		for(i=0;i<m_nColliders && pCollider->GetMassInv()>m_pColliders[i]->GetMassInv();i++);
@@ -594,7 +596,7 @@ int CPhysicalEntity::GetStateSnapshotTxt(char *txtbuf,int szbuf, float time_back
 {
 	CStream stm;
 	GetStateSnapshot(stm,time_back);
-	int size=bin2ascii(stm.GetPtr(),(stm.GetSize()-1>>3)+1,(unsigned char*)txtbuf);
+	int size=bin2ascii(stm.GetPtr(),((stm.GetSize()-1)>>3)+1,(unsigned char*)txtbuf);
 /*
 	// debugging
 	static char test[1024*16];

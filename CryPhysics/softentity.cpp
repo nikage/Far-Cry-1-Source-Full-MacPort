@@ -352,7 +352,7 @@ int CSoftEntity::GetParams(pe_params *_params)
 int CSoftEntity::GetStatus(pe_status *_status)
 {
 	int res;
-	if (res = CPhysicalEntity::GetStatus(_status)) {
+	if ((res = CPhysicalEntity::GetStatus(_status))) {
 		if (_status->type==pe_status_caps::type_id) {
 			pe_status_caps *status = (pe_status_caps*)_status;
 			status->bCanAlterOrientation = 1;
@@ -449,7 +449,7 @@ int CSoftEntity::Action(pe_action *_action)
 		pe_action_attach_points *action = (pe_action_attach_points*)_action;
 		CPhysicalEntity* pent = action->pEntity==WORLD_ENTITY ? &g_StaticPhysicalEntity : 
 			action->pEntity ? ((CPhysicalPlaceholder*)action->pEntity)->GetEntity() : 0;
-		int ipart=0, bAttached=iszero((intptr_t)pent)^1;
+		int ipart=0, bAttached=iszero((int)(intptr_t)pent)^1;
 		if (bAttached && is_unused(action->points))
 			bAttached = 2;
 		float rvtxmass = pent ? 0 : m_nVtx/m_parts[0].mass;
@@ -465,11 +465,11 @@ int CSoftEntity::Action(pe_action *_action)
 
 		for(int i=0;i<action->nPoints;i++) {
 			if (m_vtx[action->piVtx[i]].pContactEnt)	m_vtx[action->piVtx[i]].pContactEnt->Release();
-			if (m_vtx[action->piVtx[i]].pContactEnt = pent)
+			if ((m_vtx[action->piVtx[i]].pContactEnt = pent))
 				pent->AddRef();
 			m_vtx[action->piVtx[i]].massinv = rvtxmass;
 			m_vtx[action->piVtx[i]].iContactPart = ipart;
-			if (m_vtx[action->piVtx[i]].bAttached = bAttached) {
+			if ((m_vtx[action->piVtx[i]].bAttached = bAttached)) {
 				if (!is_unused(action->points))
 					m_vtx[action->piVtx[i]].ptAttach = action->points[i];
 				else
@@ -604,7 +604,7 @@ int CSoftEntity::Step(float time_interval)
 	for(i=nContactVtx=0; i<m_nVtx; i++) if (!m_vtx[i].bAttached) { // detect collisions for free vertices
 		// calculate normal
 		for(j=m_vtx[i].iStartEdge,m_vtx[i].n.zero(); j<m_vtx[i].iEndEdge+m_vtx[i].bFullFan; j++) {
-			imask = j-m_vtx[i].iEndEdge>>31; j1 = j+1&imask | m_vtx[i].iStartEdge&~imask;
+			imask = (j-m_vtx[i].iEndEdge)>>31; j1 = j+1&imask | m_vtx[i].iStartEdge&~imask;
 			m_vtx[i].n += 
 				(m_vtx[m_edges[m_pVtxEdges[j]].ivtx[1]].pos-m_vtx[m_edges[m_pVtxEdges[j]].ivtx[0]].pos)*(iszero(i^m_edges[m_pVtxEdges[j]].ivtx[0])*2-1) ^
 				(m_vtx[m_edges[m_pVtxEdges[j1]].ivtx[1]].pos-m_vtx[m_edges[m_pVtxEdges[j1]].ivtx[0]].pos)*(iszero(i^m_edges[m_pVtxEdges[j1]].ivtx[0])*2-1);
@@ -614,7 +614,7 @@ int CSoftEntity::Step(float time_interval)
 		m_vtx[i].pos0 = m_vtx[i].pos;
 
 		rsep = m_thickness;
-		if (pent = m_vtx[i].pContactEnt) {
+		if ((pent = m_vtx[i].pContactEnt)) {
 			pbody = m_vtx[i].pContactEnt->GetRigidBody(m_vtx[i].iContactPart);
 			m_vtx[i].vcontact = pbody->v+(pbody->w^m_vtx[i].pos+m_pos+m_offs0-pbody->pos);
 			if (pent->m_bProcessed && (!m_vtx[i].bSeparating || (m_vtx[i].vel-m_vtx[i].vcontact)*m_vtx[i].ncontact<0.1f)) {
