@@ -13,6 +13,7 @@
 
 #include "stdafx.h"
 #include "System.h"
+#include "CryLibrary.h"
 
 #ifndef _XBOX
 #ifdef WIN32
@@ -37,9 +38,19 @@
 #include "luadebugger/LuaDbg.h"
 #endif
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 #include <ddraw.h>
 extern HRESULT GetDXVersion( DWORD* pdwDirectXVersion, TCHAR* strDirectXVersion, int cchDirectXVersion );
+#elif defined(__APPLE__)
+// macOS stub for DirectX version detection
+HRESULT GetDXVersion( DWORD* pdwDirectXVersion, TCHAR* strDirectXVersion, int cchDirectXVersion ) {
+    if (pdwDirectXVersion) *pdwDirectXVersion = 0;
+    if (strDirectXVersion && cchDirectXVersion > 0) {
+        strncpy(strDirectXVersion, "macOS Graphics", cchDirectXVersion - 1);
+        strDirectXVersion[cchDirectXVersion - 1] = '\0';
+    }
+    return S_OK;
+}
 #endif
 
 extern int g_nPrecaution;
@@ -883,7 +894,7 @@ void CSystem::UpdateLoadingScreen()
 {
 	if (!m_bEditor)
 	{
-		if (GetIRenderer()->EF_Query(EFQ_RecurseLevel) <= 0)
+		if ((intptr_t)GetIRenderer()->EF_Query(EFQ_RecurseLevel) <= 0)
 		{
 			RenderBegin();
 			GetIConsole()->Draw();

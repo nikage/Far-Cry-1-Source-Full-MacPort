@@ -24,11 +24,11 @@ if(APPLE)
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*HTTPDownloader.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*DownloadManager.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*LuaDebugger.*")
-    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*ScriptObjectEntity.*")
-    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*ScriptObjectSystem.*")
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*XML.*")
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*getdxver.*")
     # Temporarily exclude MacOSFileSystem due to Carbon framework conflicts
     # TODO: Fix Foundation.h include conflict with GetCurrentThread
-    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*MacOSFileSystem.*")
+    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX "MacOSFileSystem.cpp$")
 endif()
 
 if(NOT UNIX OR APPLE)

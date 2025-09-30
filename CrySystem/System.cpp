@@ -48,7 +48,7 @@
 #include "CrySizerImpl.h"
 #include "DownloadManager.h"
 
-#include "XML\Xml.h"
+#include "XML/xml.h"
 #include "DataProbe.h"
 #include "ApplicationHelper.h"			// CApplicationHelper
 
@@ -693,7 +693,7 @@ bool CSystem::CreateGame( const SGameInitParams &params )
 	else
 	{
 		m_pGame = CreateGameInstance();
-		m_pGame->Init(this, m_bEditor);
+		m_pGame->Init(this, false, m_bEditor, NULL);
 	}
 
 	if (m_pIPhysicalWorld)

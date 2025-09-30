@@ -171,7 +171,8 @@ void CSystemConfiguration::ParseSystemConfig()
 				string s( strLine, 0, posEq );
 				string strKey( RemoveWhiteSpaces(s) );
 #else
-				string strKey( RemoveWhiteSpaces( string( strLine, 0, posEq ) ) );
+				string s( strLine, 0, posEq );
+				string strKey( RemoveWhiteSpaces(s) );
 #endif
 				if (!strKey.empty())
 				{

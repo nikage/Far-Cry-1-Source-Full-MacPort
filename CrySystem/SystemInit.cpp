@@ -41,7 +41,7 @@
 #include "ScriptSink.h"
 #include "Font.h"
 #include "Log.h"
-#include "XML\Xml.h"
+#include "XML/xml.h"
 #include "DataProbe.h"
 #include "ApplicationHelper.h"				// CApplicationHelper
 
@@ -748,7 +748,8 @@ bool CSystem::InitMovieSystem()
 
 	m_pIMovieSystem = pfnCreateMovieSystem(this);
 #else
-	m_pIMovieSystem = CreateMovieSystem( this );
+	// Stub implementation for macOS
+	m_pIMovieSystem = nullptr;
 #endif
 
 	if (!m_pIMovieSystem)

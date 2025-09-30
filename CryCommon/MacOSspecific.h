@@ -78,6 +78,7 @@ typedef void*           HDC;
 typedef void*           HGLRC;
 typedef void*           LPVOID;
 typedef char*           LPSTR;
+typedef const char*     LPCSTR;
 typedef uint8_t         BYTE;
 typedef uint16_t        WORD;
 typedef uintptr_t       WPARAM;
@@ -352,9 +353,12 @@ inline void* GetCurrentProcess() {
 // Windows thread functions - avoid conflicts with Carbon framework
 // Only define if not already defined by system headers
 #ifndef GetCurrentThread
+#ifndef WIN32GETCURRENTTHREAD_DEFINED
+#define WIN32GETCURRENTTHREAD_DEFINED
 inline void* Win32GetCurrentThread() {
     return (void*)pthread_self();
 }
+#endif
 #define GetCurrentThread Win32GetCurrentThread
 #endif
 
@@ -890,6 +894,302 @@ extern int _fmode;  // Global file mode variable
 #define ERROR_NO_SYSTEM_RESOURCES 1450
 #define FILE_BEGIN 0
 #define INVALID_SET_FILE_POINTER 0xFFFFFFFF
+
+// Additional Windows API functions for file operations
+inline int DeleteFile(const char* lpFileName) {
+    return unlink(lpFileName) == 0 ? 1 : 0;
+}
+
+inline int RemoveDirectory(const char* lpPathName) {
+    return rmdir(lpPathName) == 0 ? 1 : 0;
+}
+
+inline void* GetFocus() {
+    // Simplified implementation - just return a dummy window handle
+    return (void*)1;
+}
+
+// Version info functions - simplified implementations
+typedef struct {
+    uint32_t dwSignature;
+    uint32_t dwStrucVersion;
+    uint32_t dwFileVersionMS;
+    uint32_t dwFileVersionLS;
+    uint32_t dwProductVersionMS;
+    uint32_t dwProductVersionLS;
+    uint32_t dwFileFlagsMask;
+    uint32_t dwFileFlags;
+    uint32_t dwFileOS;
+    uint32_t dwFileType;
+    uint32_t dwFileSubtype;
+    uint32_t dwFileDateMS;
+    uint32_t dwFileDateLS;
+} VS_FIXEDFILEINFO;
+
+inline int VerQueryValue(void* pBlock, const char* lpSubBlock, void** lplpBuffer, uint32_t* puLen) {
+    // Simplified implementation - just return failure
+    return 0;
+}
+
+inline int GetFileVersionInfoSize(const char* lptstrFilename, uint32_t* lpdwHandle) {
+    // Simplified implementation - return 0 (no version info)
+    return 0;
+}
+
+inline int GetFileVersionInfo(const char* lptstrFilename, uint32_t dwHandle, uint32_t dwLen, void* lpData) {
+    // Simplified implementation - return failure
+    return 0;
+}
+
+inline void SetLastError(uint32_t dwErrCode) {
+    // Simplified implementation - just store the error code
+    extern int errno;
+    errno = dwErrCode;
+}
+
+// DirectX stubs for macOS
+struct IDirectDraw7 {
+    virtual void Release() = 0;
+    virtual int GetDeviceIdentifier(void* pIdentifier, uint32_t dwFlags) = 0;
+    virtual HRESULT GetAvailableVidMem(void* lpDDSCaps, uint32_t* lpdwTotal, uint32_t* lpdwFree) = 0;
+};
+
+typedef IDirectDraw7* LPDIRECTDRAW7;
+typedef void* LPDIRECTDRAWSURFACE7;
+typedef struct {
+    uint32_t dwSize;
+    char szDriver[512];
+    char szDescription[512];
+    char szName[512];
+    char szComment[512];
+    uint32_t dwVersion;
+    uint32_t dwVersion2;
+    char szDate[512];
+    char szVDD[512];
+    uint32_t dwDeviceId;
+    uint32_t dwRevision;
+    uint32_t dwSubSysId;
+    uint32_t dwVendorId;
+} DDDEVICEIDENTIFIER2;
+
+typedef struct {
+    uint32_t dwLength;
+    uint32_t dwMemoryLoad;
+    uint32_t dwTotalPhys;
+    uint32_t dwAvailPhys;
+    uint32_t dwTotalPageFile;
+    uint32_t dwAvailPageFile;
+    uint32_t dwTotalVirtual;
+    uint32_t dwAvailVirtual;
+} MEMORYSTATUS;
+
+// DirectX function stubs
+#define IID_IDirectDraw7 {0x15e65ec0, 0x3b9c, 0x11d2, {0xb9, 0x2f, 0x00, 0x60, 0x97, 0x97, 0xea, 0x5b}}
+#define SUCCEEDED(hr) ((hr) >= 0)
+#define FAILED(hr) ((hr) < 0)
+
+inline int FreeLibrary(void* hModule) {
+    // Simplified implementation - just return success
+    return 1;
+}
+
+// Additional Windows types
+typedef struct {
+    uint32_t Data1;
+    uint16_t Data2;
+    uint16_t Data3;
+    uint8_t Data4[8];
+} GUID;
+
+typedef GUID IID;
+typedef GUID REFIID;
+typedef void* IUnknown;
+
+// Time types
+typedef time_t __time64_t;
+
+// Additional Windows types
+typedef char TCHAR;
+typedef uint32_t DWORD;
+
+typedef struct {
+    uint16_t wYear;
+    uint16_t wMonth;
+    uint16_t wDayOfWeek;
+    uint16_t wDay;
+    uint16_t wHour;
+    uint16_t wMinute;
+    uint16_t wSecond;
+    uint16_t wMilliseconds;
+} SYSTEMTIME;
+
+// FILETIME already defined above
+
+// DirectX callback types
+typedef int (*LPDDENUMCALLBACKEXA)(void*, void*, void*, void*, void*);
+
+// Windows string macros
+#define _T(x) x
+#define TEXT(x) x
+
+// Time functions
+inline __time64_t _time64(__time64_t* timer) {
+    if (timer) {
+        *timer = time(NULL);
+        return *timer;
+    }
+    return time(NULL);
+}
+
+inline struct tm* _localtime64(const __time64_t* timer) {
+    return localtime(timer);
+}
+
+// Windows timing functions
+inline uint32_t timeGetTime() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
+// Clipboard constants and functions
+#define CF_TEXT 1
+typedef void* HGLOBAL;
+
+inline int OpenClipboard(void* hWnd) {
+    // Simplified implementation - just return success
+    return 1;
+}
+
+inline int IsClipboardFormatAvailable(uint32_t format) {
+    // Simplified implementation - just return success
+    return 1;
+}
+
+inline void* GetClipboardData(uint32_t uFormat) {
+    // Simplified implementation - return dummy data
+    return (void*)1;
+}
+
+inline int CloseClipboard() {
+    // Simplified implementation - just return success
+    return 1;
+}
+
+inline int EmptyClipboard() {
+    // Simplified implementation - just return success
+    return 1;
+}
+
+inline HGLOBAL SetClipboardData(uint32_t uFormat, HGLOBAL hMem) {
+    // Simplified implementation - just return the handle
+    return hMem;
+}
+
+// Memory management constants
+#define GHND 0x0042
+
+// Memory management functions
+inline HGLOBAL GlobalAlloc(uint32_t uFlags, size_t dwBytes) {
+    // Simplified implementation - allocate memory using malloc
+    return (HGLOBAL)malloc(dwBytes);
+}
+
+inline void* GlobalLock(HGLOBAL hMem) {
+    // Simplified implementation - just return the handle
+    return hMem;
+}
+
+inline int GlobalUnlock(HGLOBAL hMem) {
+    // Simplified implementation - just return success
+    return 1;
+}
+
+// Windows time functions
+inline int SystemTimeToFileTime(const SYSTEMTIME* lpSystemTime, FILETIME* lpFileTime) {
+    // Simplified implementation - just fill with dummy values
+    if (lpFileTime) {
+        lpFileTime->dwLowDateTime = 0;
+        lpFileTime->dwHighDateTime = 0;
+    }
+    return 1;
+}
+
+// Additional DirectX types
+typedef struct {
+    uint32_t dwCaps;
+    uint32_t dwCaps2;
+    uint32_t dwCaps3;
+    uint32_t dwCaps4;
+} DDSCAPS2;
+
+#define DDSCAPS_LOCALVIDMEM 0x10000000
+#define S_OK 0
+
+// Memory functions
+inline void ZeroMemory(void* dest, size_t count) {
+    memset(dest, 0, count);
+}
+
+// Filter functions are defined in ScriptObjectSystem.cpp
+
+#define WINAPI
+#define WINAPIV
+
+// Memory status function
+inline void GlobalMemoryStatus(MEMORYSTATUS* lpBuffer) {
+    // Simplified implementation - fill with dummy values
+    lpBuffer->dwLength = sizeof(MEMORYSTATUS);
+    lpBuffer->dwMemoryLoad = 50;
+    lpBuffer->dwTotalPhys = 8ULL * 1024 * 1024 * 1024; // 8GB
+    lpBuffer->dwAvailPhys = 4ULL * 1024 * 1024 * 1024;  // 4GB
+    lpBuffer->dwTotalPageFile = 16ULL * 1024 * 1024 * 1024; // 16GB
+    lpBuffer->dwAvailPageFile = 12ULL * 1024 * 1024 * 1024; // 12GB
+    lpBuffer->dwTotalVirtual = 8ULL * 1024 * 1024 * 1024;   // 8GB
+    lpBuffer->dwAvailVirtual = (uint32_t)(6ULL * 1024 * 1024 * 1024);   // 6GB
+}
+
+// DirectX stub implementations
+class StubDirectDraw7 : public IDirectDraw7 {
+public:
+    virtual void Release() override {}
+    virtual int GetDeviceIdentifier(void* pIdentifier, uint32_t dwFlags) override {
+        if (pIdentifier) {
+            DDDEVICEIDENTIFIER2* id = (DDDEVICEIDENTIFIER2*)pIdentifier;
+            memset(id, 0, sizeof(DDDEVICEIDENTIFIER2));
+            id->dwSize = sizeof(DDDEVICEIDENTIFIER2);
+            strcpy(id->szDescription, "macOS Graphics");
+            strcpy(id->szDriver, "macOS Driver");
+            id->dwDeviceId = 0x1234;
+            id->dwVendorId = 0x8086;
+        }
+        return 0;
+    }
+    virtual HRESULT GetAvailableVidMem(void* lpDDSCaps, uint32_t* lpdwTotal, uint32_t* lpdwFree) override {
+        if (lpdwTotal) *lpdwTotal = 1024 * 1024 * 1024; // 1GB
+        if (lpdwFree) *lpdwFree = 512 * 1024 * 1024;    // 512MB
+        return S_OK;
+    }
+};
+
+// Function stubs
+inline HRESULT DirectDrawCreateEx(GUID* lpGUID, void* lplpDD, REFIID iid, IUnknown* pUnkOuter) {
+    if (lplpDD) {
+        *(LPDIRECTDRAW7*)lplpDD = new StubDirectDraw7();
+    }
+    return 0; // S_OK
+}
+
+// LoadLibrary already defined above
+
+inline void* GetProcAddress(void* hModule, const char* lpProcName) {
+    if (strcmp(lpProcName, "DirectDrawCreateEx") == 0) {
+        return (void*)DirectDrawCreateEx;
+    }
+    return nullptr;
+}
+
+// CryLoadLibrary is already defined in CryLibrary.h
 
 // Event functions
 inline void* CreateEvent(void* lpEventAttributes, int bManualReset, int bInitialState, const char* lpName) {
