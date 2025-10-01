@@ -803,25 +803,33 @@ bool CSystem::InitScriptSystem()
 	m_dll.hScript = LoadDLL("CryScriptSystem.dll");
 #endif
 	if(m_dll.hScript==NULL)
+	{
+		Error( "Failed to load CryScriptSystem library" );
 		return (false);
+	}
+	GetILog()->LogToFile( "CryScriptSystem library loaded successfully at %p", m_dll.hScript );
 
 	CREATESCRIPTSYSTEM_FNCPTR fncCreateScriptSystem;
 	fncCreateScriptSystem = (CREATESCRIPTSYSTEM_FNCPTR) CryGetProcAddress(m_dll.hScript,"CreateScriptSystem");
 	if(fncCreateScriptSystem==NULL)
 	{
-		Error( "Error initializeing ScriptSystem" );
+		Error( "Error initializeing ScriptSystem - function not found" );
 		return (false);
 	}
+	
+	GetILog()->LogToFile( "CreateScriptSystem function found at %p", fncCreateScriptSystem );
 
 	m_pScriptSink = new CScriptSink(this,m_pConsole);
+	GetILog()->LogToFile( "Calling CreateScriptSystem function..." );
 	m_pScriptSystem=fncCreateScriptSystem(this,m_pScriptSink,NULL,true);
 	if(m_pScriptSystem==NULL)
 	{
-		Error( "Error initializeing ScriptSystem" );
+		Error( "Error initializeing ScriptSystem - CreateScriptSystem returned NULL" );
 		delete m_pScriptSink;
 		m_pScriptSink = NULL;
 		return (false);
 	}
+	GetILog()->LogToFile( "CreateScriptSystem succeeded, script system created" );
 #else
 	m_pScriptSink = new CScriptSink(this,m_pConsole);
 	m_pScriptSystem=CreateScriptSystem(m_pScriptSink,NULL,true);

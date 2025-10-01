@@ -131,7 +131,11 @@
 #else
 		newLibName += libName;
 #endif
-		return ::dlopen(newLibName.c_str(), cLoadLazy?(RTLD_LAZY | RTLD_GLOBAL):(RTLD_NOW | RTLD_GLOBAL));
+		void* result = ::dlopen(newLibName.c_str(), cLoadLazy?(RTLD_LAZY | RTLD_GLOBAL):(RTLD_NOW | RTLD_GLOBAL));
+		if (!result) {
+			printf("dlopen failed: %s\n", dlerror());
+		}
+		return result;
 	}
 
 #else
