@@ -85,8 +85,8 @@ typedef struct CTextureSlot
 typedef std::vector<CTextureSlot *>							CTextureSlotList;
 typedef std::vector<CTextureSlot *>::iterator				CTextureSlotListItor;
 
-typedef std::hash_map<wchar_t, CTextureSlot *>				CTextureSlotTable;
-typedef std::hash_map<wchar_t, CTextureSlot *>::iterator	CTextureSlotTableItor;
+typedef hash_map<wchar_t, CTextureSlot *>				CTextureSlotTable;
+typedef hash_map<wchar_t, CTextureSlot *>::iterator	CTextureSlotTableItor;
 
 #ifdef WIN64
 #undef GetCharWidth

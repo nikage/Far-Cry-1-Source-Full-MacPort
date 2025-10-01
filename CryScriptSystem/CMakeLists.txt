@@ -10,12 +10,21 @@ target_link_libraries(CryScriptSystem PUBLIC CryCommon)
 
 target_include_directories(CryScriptSystem PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/LUA
     ${CMAKE_SOURCE_DIR}/CryCommon
 )
 
 target_compile_definitions(CryScriptSystem PRIVATE
     CRYSCRIPTSYSTEM_EXPORTS=1
+    DONT_USE_CRY_MEMORY_MANAGER=1
 )
+
+# Fix Microsoft-specific keywords for cross-platform compatibility
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_definitions(CryScriptSystem PRIVATE
+        __forceinline=inline
+    )
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(CryScriptSystem PRIVATE

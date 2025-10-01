@@ -467,7 +467,7 @@ template<class F> int unite_lists(F *pSrc0,INT_PTR nSrc0, F *pSrc1,INT_PTR nSrc1
 	INT_PTR pDummy( (INT_PTR) &dummy );
 	pSrc0 = (F*)((INT_PTR)pSrc0&inrange0 | pDummy&~inrange0); // make pSrc point to valid data even if nSrc is zero	//AMD Port
 	pSrc1 = (F*)((INT_PTR)pSrc1&inrange1 | pDummy&~inrange1);									//AMD Port
-	for(n=i0=i1=0; (inrange0 | inrange1) & n-szdst>>31; inrange0=(i0+=isneg(a0-ares-1))-nSrc0>>31, inrange1=(i1+=isneg(a1-ares-1))-nSrc1>>31)
+	for(n=i0=i1=0; (inrange0 | inrange1) & (n-szdst)>>31; inrange0=(i0+=isneg(a0-ares-1))-nSrc0>>31, inrange1=(i1+=isneg(a1-ares-1))-nSrc1>>31)
 	{
 		a0 = pSrc0[i0&inrange0] + _condmax(pSrc0[0],inrange0); //(1<<(sizeof(index)*8-2)&~inrange0);
 		a1 = pSrc1[i1&inrange1] + _condmax(pSrc1[0],inrange1); //(1<<(sizeof(index)*8-2)&~inrange1);

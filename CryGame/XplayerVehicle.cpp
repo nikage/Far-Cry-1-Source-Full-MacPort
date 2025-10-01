@@ -1171,7 +1171,7 @@ GetEntity()->GetHelperPosition("gun",m_vWpnPos);
 		IEntity *pEnt;
 		ray_hit RayHit;
 		IEntity *pLocal=m_pGame->GetMyPlayer();
-		while (pEnt=It->Next())
+		while ((pEnt=It->Next()) != NULL)
 		{
 			if (pEnt==m_pEntity)
 				continue;
@@ -1206,7 +1206,7 @@ GetEntity()->GetHelperPosition("gun",m_vWpnPos);
 
 							Matrix44 m;
 							m.SetIdentity();
-							m=GetTranslationMat(pEnt->GetPos())*m;
+							m.SetTranslationMat(pEnt->GetPos());
 							m=Matrix44::CreateRotationZYX(-pEnt->GetAngles()*gf_DEGTORAD)*m; //NOTE: angles in radians and negated 
 							Center=m.TransformPointOLD(Center);
 						}

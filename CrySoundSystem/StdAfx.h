@@ -101,7 +101,7 @@ _inline void __cdecl __CRYTEKDLL_TRACE(const char *sFormat, ... )
 
 class CHeapGuardian
 {
-public: CHeapGuardian() {assert (IsHeapValid());} ~CHeapGuardian() {assert (IsHeapValid());}
+public: CHeapGuardian() {assert (CryIsHeapValid());} ~CHeapGuardian() {assert (CryIsHeapValid());}
 };
 
 #ifdef _DEBUG

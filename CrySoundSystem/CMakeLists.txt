@@ -35,12 +35,20 @@ target_include_directories(CrySoundSystem PUBLIC
 
 # Platform-specific linking
 if(APPLE)
+    # Find Vorbis library
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(VORBIS REQUIRED vorbisfile)
+    
     target_link_libraries(CrySoundSystem PRIVATE
         ${CORE_AUDIO_FRAMEWORK}
         ${AUDIO_TOOLBOX_FRAMEWORK}
         "-framework AVFoundation"
         "-framework AudioUnit"
+        ${VORBIS_LIBRARIES}
     )
+    
+    target_include_directories(CrySoundSystem PRIVATE ${VORBIS_INCLUDE_DIRS})
+    target_compile_definitions(CrySoundSystem PRIVATE ${VORBIS_CFLAGS_OTHER})
     
     # Set source files that need Objective-C++ compilation
     set_source_files_properties(MacOSSound.cpp PROPERTIES

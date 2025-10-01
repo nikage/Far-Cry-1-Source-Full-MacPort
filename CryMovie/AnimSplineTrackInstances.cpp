@@ -1,8 +1,6 @@
 #include "StdAfx.h"
 #include "AnimSplineTrack.h"
 
-// Explicit template instantiations to prevent duplicate symbols
-template class TAnimTcbTrack<float>;
-template class TAnimTcbTrack<Vec3>;
-template class TAnimTcbTrack<Quat>;
+// This file is intentionally empty - template instantiations are handled by the compiler
+// when the templates are used in other source files
 

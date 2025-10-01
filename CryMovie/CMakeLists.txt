@@ -13,12 +13,12 @@ list(REMOVE_ITEM CRYMOVIE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/xml/Expat/xmltok_ns.c"
 )
 
-# Temporarily exclude files with template instantiation conflicts
-list(REMOVE_ITEM CRYMOVIE_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/EntityNode.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/AnimNode.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/AnimCameraNode.cpp"
-)
+# Include all source files - template conflicts resolved
+# list(REMOVE_ITEM CRYMOVIE_SOURCES
+#     "${CMAKE_CURRENT_SOURCE_DIR}/EntityNode.cpp"
+#     "${CMAKE_CURRENT_SOURCE_DIR}/AnimNode.cpp"
+#     "${CMAKE_CURRENT_SOURCE_DIR}/AnimCameraNode.cpp"
+# )
 
 add_library(CryMovie SHARED ${CRYMOVIE_SOURCES} ${CRYMOVIE_HEADERS})
 

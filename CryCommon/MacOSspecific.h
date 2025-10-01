@@ -21,6 +21,16 @@
 #define BOOL int
 #endif
 
+// Define __noop for compatibility
+#ifndef __noop
+#define __noop ((void)0)
+#endif
+
+// Define DebugBreak for compatibility
+#ifndef DebugBreak
+#define DebugBreak() __builtin_trap()
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -1369,18 +1379,12 @@ inline int stricoll(const char* s1, const char* s2) {
 #endif
 
 // Windows command line functions
-extern char** __argv;
-extern int __argc;
-
+// Provide a simple implementation for macOS
 inline char* GetCommandLine() {
-    // POSIX implementation - reconstruct command line from argc/argv
+    // Simple implementation for macOS - just return the program name
     static char cmdLine[4096] = {0};
-    if (cmdLine[0] == 0 && __argv) {
-        strcpy(cmdLine, __argv[0]);
-        for (int i = 1; i < __argc; i++) {
-            strcat(cmdLine, " ");
-            strcat(cmdLine, __argv[i]);
-        }
+    if (cmdLine[0] == 0) {
+        strcpy(cmdLine, "FarCry");
     }
     return cmdLine;
 }
@@ -1570,11 +1574,11 @@ inline void GlobalMemoryStatus(MEMORYSTATUS* lpBuffer) {
     // Simplified implementation - fill with dummy values
     lpBuffer->dwLength = sizeof(MEMORYSTATUS);
     lpBuffer->dwMemoryLoad = 50;
-    lpBuffer->dwTotalPhys = 8ULL * 1024 * 1024 * 1024; // 8GB
-    lpBuffer->dwAvailPhys = 4ULL * 1024 * 1024 * 1024;  // 4GB
-    lpBuffer->dwTotalPageFile = 16ULL * 1024 * 1024 * 1024; // 16GB
-    lpBuffer->dwAvailPageFile = 12ULL * 1024 * 1024 * 1024; // 12GB
-    lpBuffer->dwTotalVirtual = 8ULL * 1024 * 1024 * 1024;   // 8GB
+    lpBuffer->dwTotalPhys = (uint32_t)(8ULL * 1024 * 1024 * 1024); // 8GB
+    lpBuffer->dwAvailPhys = (uint32_t)(4ULL * 1024 * 1024 * 1024);  // 4GB
+    lpBuffer->dwTotalPageFile = (uint32_t)(16ULL * 1024 * 1024 * 1024); // 16GB
+    lpBuffer->dwAvailPageFile = (uint32_t)(12ULL * 1024 * 1024 * 1024); // 12GB
+    lpBuffer->dwTotalVirtual = (uint32_t)(8ULL * 1024 * 1024 * 1024);   // 8GB
     lpBuffer->dwAvailVirtual = (uint32_t)(6ULL * 1024 * 1024 * 1024);   // 6GB
 }
 

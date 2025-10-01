@@ -69,7 +69,7 @@ struct WeaponInfo
 
 	void DetachBindingHandles(ICryCharInstance *pCharacter)
 	{
-		assert (IsHeapValid());
+		assert (CryIsHeapValid());
 		if (hBindInfo)
 		{
 			pCharacter->Detach(hBindInfo);
@@ -80,7 +80,7 @@ struct WeaponInfo
 			pCharacter->Detach(hAuxBindInfo);
 			hAuxBindInfo = ICryCharInstance::nInvalidObjectBindingHandle;
 		}
-		assert (IsHeapValid());
+		assert (CryIsHeapValid());
 	}
 };
 

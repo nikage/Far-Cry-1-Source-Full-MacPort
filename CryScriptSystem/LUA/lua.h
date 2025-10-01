@@ -11,6 +11,34 @@
 #ifndef lua_h
 #define lua_h
 
+/* Cross-platform debug output replacement */
+#ifndef OutputDebugString
+#ifdef _WIN32
+#define OutputDebugString(x) OutputDebugStringA(x)
+#else
+#define OutputDebugString(x) fprintf(stderr, "%s", x)
+#endif
+#endif
+
+/* Cross-platform type definitions */
+#ifndef INT_PTR
+#ifdef _WIN64
+typedef __int64 INT_PTR;
+#elif defined(__APPLE__) && defined(__LP64__)
+typedef long INT_PTR;
+#else
+typedef int INT_PTR;
+#endif
+#endif
+
+/* Cross-platform debug break replacement */
+#ifndef DebugBreak
+#ifdef _WIN32
+#define DebugBreak() __debugbreak()
+#else
+#define DebugBreak() __builtin_trap()
+#endif
+#endif
 
 /* definition of `size_t' */
 #include <stddef.h>

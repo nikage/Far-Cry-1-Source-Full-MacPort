@@ -346,16 +346,16 @@ bool TAnimTcbTrack<T>::Serialize( XmlNodeRef &xmlNode,bool bLoading, bool bLoadE
 
 //////////////////////////////////////////////////////////////////////////
 //! Specialize for single float track.
-template <> TAnimTcbTrack<float>::TAnimTcbTrack()
+template <> inline TAnimTcbTrack<float>::TAnimTcbTrack()
 {
 	AllocSpline();
 	m_flags = 0;
 	m_defaultValue = 0;
 }
-template <> void TAnimTcbTrack<float>::GetValue( float time,float &value ) { m_spline->interpolate(time,value); }
-template <> EAnimTrackType TAnimTcbTrack<float>::GetType() { return ATRACK_TCB_FLOAT; }
-template <> EAnimValue TAnimTcbTrack<float>::GetValueType() { return AVALUE_FLOAT; }
-template <> void TAnimTcbTrack<float>::SetValue( float time,const float &value,bool bDefault )
+template <> inline void TAnimTcbTrack<float>::GetValue( float time,float &value ) { m_spline->interpolate(time,value); }
+template <> inline EAnimTrackType TAnimTcbTrack<float>::GetType() { return ATRACK_TCB_FLOAT; }
+template <> inline EAnimValue TAnimTcbTrack<float>::GetValueType() { return AVALUE_FLOAT; }
+template <> inline void TAnimTcbTrack<float>::SetValue( float time,const float &value,bool bDefault )
 {
 	if (!bDefault)
 	{
@@ -368,10 +368,9 @@ template <> void TAnimTcbTrack<float>::SetValue( float time,const float &value,b
 }
 
 //////////////////////////////////////////////////////////////////////////
-template<> void TAnimTcbTrack<float>::GetKeyInfo( int index,const char* &description,float &duration )
+template<> inline void TAnimTcbTrack<float>::GetKeyInfo( int index,const char* &description,float &duration )
 {
 	duration = 0;
-
 	static char str[64];
 	description = str;
 	assert( index >= 0 && index < GetNumKeys() );
@@ -381,16 +380,16 @@ template<> void TAnimTcbTrack<float>::GetKeyInfo( int index,const char* &descrip
 
 //////////////////////////////////////////////////////////////////////////
 //! Specialize for Vector track.
-template <> TAnimTcbTrack<Vec3>::TAnimTcbTrack()
+template <> inline TAnimTcbTrack<Vec3>::TAnimTcbTrack()
 {
 	AllocSpline();
 	m_flags = 0;
 	m_defaultValue = Vec3(0,0,0);
 }
-template <> void TAnimTcbTrack<Vec3>::GetValue( float time,Vec3 &value ) { m_spline->interpolate(time,value); }
-template <> EAnimTrackType TAnimTcbTrack<Vec3>::GetType() { return ATRACK_TCB_VECTOR; }
-template <> EAnimValue TAnimTcbTrack<Vec3>::GetValueType() { return AVALUE_VECTOR; }
-template <> void TAnimTcbTrack<Vec3>::SetValue( float time,const Vec3 &value,bool bDefault )
+template <> inline void TAnimTcbTrack<Vec3>::GetValue( float time,Vec3 &value ) { m_spline->interpolate(time,value); }
+template <> inline EAnimTrackType TAnimTcbTrack<Vec3>::GetType() { return ATRACK_TCB_VECTOR; }
+template <> inline EAnimValue TAnimTcbTrack<Vec3>::GetValueType() { return AVALUE_VECTOR; }
+template <> inline void TAnimTcbTrack<Vec3>::SetValue( float time,const Vec3 &value,bool bDefault )
 {
 	if (!bDefault)
 	{
@@ -403,13 +402,11 @@ template <> void TAnimTcbTrack<Vec3>::SetValue( float time,const Vec3 &value,boo
 }
 
 //////////////////////////////////////////////////////////////////////////
-template <> void TAnimTcbTrack<Vec3>::GetKeyInfo( int index,const char* &description,float &duration )
+template <> inline void TAnimTcbTrack<Vec3>::GetKeyInfo( int index,const char* &description,float &duration )
 {
 	duration = 0;
-
 	static char str[64];
 	description = str;
-
 	assert( index >= 0 && index < GetNumKeys() );
 	typename Spline::key_type &k = m_spline->key(index);
 	sprintf( str,"%g,%g,%g",k.value[0],k.value[1],k.value[2] );
@@ -418,17 +415,17 @@ template <> void TAnimTcbTrack<Vec3>::GetKeyInfo( int index,const char* &descrip
 //////////////////////////////////////////////////////////////////////////
 //! Specialize for Quaternion track.
 //! Spezialize spline creation for quaternion.
-template <> TAnimTcbTrack<Quat>::TAnimTcbTrack()
+template <> inline TAnimTcbTrack<Quat>::TAnimTcbTrack()
 {
 	m_spline = new TCBQuatSpline;
 	m_flags = 0;
 	m_defaultValue.SetIdentity();
 }
 
-template <> void TAnimTcbTrack<Quat>::GetValue( float time,Quat &value ) { m_spline->interpolate(time,value); }
-template <> EAnimTrackType TAnimTcbTrack<Quat>::GetType() { return ATRACK_TCB_QUAT; }
-template <> EAnimValue TAnimTcbTrack<Quat>::GetValueType() { return AVALUE_QUAT; }
-template <> void TAnimTcbTrack<Quat>::SetValue( float time,const Quat &value,bool bDefault )
+template <> inline void TAnimTcbTrack<Quat>::GetValue( float time,Quat &value ) { m_spline->interpolate(time,value); }
+template <> inline EAnimTrackType TAnimTcbTrack<Quat>::GetType() { return ATRACK_TCB_QUAT; }
+template <> inline EAnimValue TAnimTcbTrack<Quat>::GetValueType() { return AVALUE_QUAT; }
+template <> inline void TAnimTcbTrack<Quat>::SetValue( float time,const Quat &value,bool bDefault )
 {
 	if (!bDefault)
 	{
@@ -441,13 +438,11 @@ template <> void TAnimTcbTrack<Quat>::SetValue( float time,const Quat &value,boo
 }
 
 //////////////////////////////////////////////////////////////////////////
-template <> void TAnimTcbTrack<Quat>::GetKeyInfo( int index,const char* &description,float &duration )
+template <> inline void TAnimTcbTrack<Quat>::GetKeyInfo( int index,const char* &description,float &duration )
 {
 	duration = 0;
-
 	static char str[64];
 	description = str;
-
 	assert( index >= 0 && index < GetNumKeys() );
 	typename Spline::key_type &k = m_spline->key(index);
 	Vec3 Angles=RAD2DEG(Ang3::GetAnglesXYZ(Matrix33(k.value)));

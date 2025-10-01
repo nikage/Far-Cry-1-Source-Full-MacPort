@@ -3375,7 +3375,7 @@ int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidge
 	}
 	else if (CHECKATTRIBUTE("fontcolor", svtString))
 	{
-		RetrieveColor(&pWidget->m_pFont.cColor, szValue);
+		RetrieveColor(&pWidget->m_pFont.cColor, const_cast<char*>(szValue));
 	}
 
 	// border attributes
@@ -3389,7 +3389,7 @@ int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidge
 	}
 	else if (CHECKATTRIBUTE("bordercolor", svtString))
 	{
-		RetrieveColor(&pWidget->m_pBorder.cColor, szValue);
+		RetrieveColor(&pWidget->m_pBorder.cColor, const_cast<char*>(szValue));
 	}
 	else if (CHECKATTRIBUTE("bordersides", svtString))
 	{
@@ -3425,7 +3425,7 @@ int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidge
 	// position properties
 	else if (CHECKATTRIBUTE("rect", svtString))
 	{
-		RetrieveRect(&pWidget->m_pRect, szValue);
+		RetrieveRect(&pWidget->m_pRect, const_cast<char*>(szValue));
 	}
 	else if (CHECKATTRIBUTE("left", svtNumber))
 	{
@@ -3457,11 +3457,11 @@ int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidge
 	// color
 	else if (CHECKATTRIBUTE("color", svtString))
 	{
-		RetrieveColor(&pWidget->m_cColor, szValue);
+		RetrieveColor(&pWidget->m_cColor, const_cast<char*>(szValue));
 	}
 	else if (CHECKATTRIBUTE("greyedcolor", svtString))
 	{
-		RetrieveColor(&pWidget->m_cGreyedColor, szValue);
+		RetrieveColor(&pWidget->m_cGreyedColor, const_cast<char*>(szValue));
 	}
 	else if (CHECKATTRIBUTE("greyedblend", svtNumber))
 	{

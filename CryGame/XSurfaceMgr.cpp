@@ -91,7 +91,7 @@ bool CXSurfaceMgr::IsCollidable(int nMatId)
 	return !Props.bNoCollide;
 }
 
-#if !defined(PS2) && !defined(LINUX)
+#if !defined(PS2) && !defined(LINUX) && !defined(__APPLE__)
 #include <io.h>
 #endif
 //////////////////////////////////////////////////////////////////////////

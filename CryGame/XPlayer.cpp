@@ -795,7 +795,7 @@ void CPlayer::AutoAiming()
 
 						Matrix44 m;
 						m.SetIdentity();
-						m=GetTranslationMat(pEnt->GetPos())*m;
+						m.SetTranslationMat(pEnt->GetPos());
 						m=Matrix44::CreateRotationZYX(-pEnt->GetAngles()*gf_DEGTORAD)*m; //NOTE: angles in radians and negated 
 						Center=m.TransformPointOLD(Center);
 					}
@@ -5076,7 +5076,7 @@ void CPlayer::OnDraw(const SRendParams & _RendParams)
 	OnDrawMountedWeapon( _RendParams );
 
 	// if nRecursionLevel is not 0 - use only 3tp person view ( for reflections )
-	int nRecursionLevel = (int)m_pGame->GetSystem()->GetIRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
+	int nRecursionLevel = (int)(intptr_t)m_pGame->GetSystem()->GetIRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
 
 	// draw first person weapon
 	if(m_bFirstPerson && !nRecursionLevel && m_stats.drawfpweapon	&& m_nSelectedWeaponID != -1)
@@ -5774,7 +5774,7 @@ bool	CPlayer::GoStand(bool ignoreSpam)
 #if defined(LINUX64)
 			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, 0);
 #else
-			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, NULL);
+			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, (IScriptObject*)NULL);
 #endif
 			m_bStayCrouch = false;
 
@@ -5833,7 +5833,7 @@ bool	CPlayer::GoStealth( )
 #if defined(LINUX64)
 			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, 0);
 #else
-			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, NULL);
+			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, (IScriptObject*)NULL);
 #endif
 			return true;
 		}
@@ -5888,7 +5888,7 @@ bool	CPlayer::GoCrouch( )
 #if defined(LINUX64)
 			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, 0);
 #else
-			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, NULL);
+			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, (IScriptObject*)NULL);
 #endif
 			return true;
 		}
@@ -5955,7 +5955,7 @@ bool	CPlayer::GoProne( )
 #if defined(LINUX64)
 		m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, 0);
 #else
-		m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, NULL);
+		m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, (IScriptObject*)NULL);
 #endif
 	}
 
@@ -6010,7 +6010,7 @@ bool	CPlayer::GoSwim( )
 #if defined(LINUX64)
 			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, 0);
 #else
-			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, NULL);
+			m_pEntity->SendScriptEvent(ScriptEvent_StanceChange, (IScriptObject*)NULL);
 #endif
 			m_bStayCrouch = false;
 
@@ -6736,7 +6736,7 @@ void	CPlayer::GiveBinoculars(bool val)
 
 void CPlayer::PreloadInstanceResources(Vec3d vPrevPortalPos, float fPrevPortalDistance, float fTime)
 {
-	int nRecursionLevel = (int)m_pGame->GetSystem()->GetIRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
+	int nRecursionLevel = (int)(intptr_t)m_pGame->GetSystem()->GetIRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
 	if(m_bFirstPerson && !nRecursionLevel && m_stats.drawfpweapon	&& m_nSelectedWeaponID != -1)
 		return;
 

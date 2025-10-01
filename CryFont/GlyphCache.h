@@ -58,8 +58,8 @@ typedef struct CCacheSlot
 } CCacheSlot;
 
 
-typedef std::hash_map<wchar_t, CCacheSlot *>			CCacheTable;
-typedef std::hash_map<wchar_t, CCacheSlot *>::iterator	CCacheTableItor;
+typedef hash_map<wchar_t, CCacheSlot *>			CCacheTable;
+typedef hash_map<wchar_t, CCacheSlot *>::iterator	CCacheTableItor;
 
 typedef std::vector<CCacheSlot *>						CCacheSlotList;
 typedef std::vector<CCacheSlot *>::iterator				CCacheSlotListItor;

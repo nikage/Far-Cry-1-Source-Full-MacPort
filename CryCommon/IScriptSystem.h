@@ -507,7 +507,7 @@ struct IScriptObject
 	virtual bool GetCurrentFuncData(unsigned int * &pCode, int &iSize) = 0;
 	virtual bool GetCurrentKey(const char* &sVal) = 0;
 
-#if defined(WIN64) || defined(LINUX)
+#if defined(WIN64) || defined(LINUX) || defined(__APPLE__)
 	inline bool GetCurrentKey(char* &sVal) {return GetCurrentKey((const char*&)sVal);}
 	inline bool GetCurrent(char* &sVal) {return GetCurrent ((const char*&)sVal);}
 	inline bool GetAt(int nIdx,char* &sVal) {return GetAt(nIdx, (const char*&)sVal);}

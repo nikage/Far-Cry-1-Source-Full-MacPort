@@ -20,6 +20,10 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "ISound.h"
+// Undefine BOOL to avoid conflict with macOS definition
+#ifdef BOOL
+#undef BOOL
+#endif
 #include <CoreAudio/CoreAudio.h>
 #include <AudioToolbox/AudioToolbox.h>
 #include <AVFoundation/AVFoundation.h>

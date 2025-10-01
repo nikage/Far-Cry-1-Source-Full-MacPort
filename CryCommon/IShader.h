@@ -597,7 +597,7 @@ public:
   {
     int Id = m_Id;
     int VisId = m_VisId;
-    memcpy(this, srcObj, sizeof(*srcObj));
+    memcpy((void*)this, (void*)srcObj, sizeof(*srcObj));
     m_Id = Id;
     m_VisId = VisId;
   }
@@ -2104,7 +2104,7 @@ struct CMatInfo : public IMatInfo
 
   CMatInfo& operator=(const CMatInfo& src)
   {
-    memcpy(this, &src, sizeof(CMatInfo));
+    memcpy((void*)this, (void*)&src, sizeof(CMatInfo));
     if (shaderItem.m_pShader)
       shaderItem.m_pShader->AddRef();
     if (shaderItem.m_pShaderResources)
