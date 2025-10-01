@@ -568,12 +568,29 @@ bool CSystem::InitPhysics()
 	if(!m_dll.hPhysics)
 		return false;
 
+	// Try both function names
+	GetILog()->LogToFile( "Attempting to load CreatePhysicalWorld from library at %p", m_dll.hPhysics );
 	IPhysicalWorld *(*pfnCreatePhysicalWorld)(ISystem *pSystem) = (IPhysicalWorld*(*)(ISystem*)) CryGetProcAddress(m_dll.hPhysics,"CreatePhysicalWorld");
+	GetILog()->LogToFile( "CreatePhysicalWorld (no underscore) result: %p", pfnCreatePhysicalWorld );
+	
 	if(!pfnCreatePhysicalWorld)
 	{
-		Error( "Error loading function CreatePhysicalWorld" );
+		// Try with underscore
+		GetILog()->LogToFile( "Trying _CreatePhysicalWorld..." );
+		pfnCreatePhysicalWorld = (IPhysicalWorld*(*)(ISystem*)) CryGetProcAddress(m_dll.hPhysics,"_CreatePhysicalWorld");
+		GetILog()->LogToFile( "_CreatePhysicalWorld result: %p", pfnCreatePhysicalWorld );
+	}
+	
+	// Try using dlsym directly to compare
+	void* directResult = ::dlsym(m_dll.hPhysics, "CreatePhysicalWorld");
+	GetILog()->LogToFile( "Direct dlsym result: %p", directResult );
+	
+	if(!pfnCreatePhysicalWorld)
+	{
+		Error( "Error loading function CreatePhysicalWorld from library at %p", m_dll.hPhysics );
 		return false;
 	}
+	GetILog()->LogToFile( "CreatePhysicalWorld function found at %p", pfnCreatePhysicalWorld );
 
 	m_pIPhysicalWorld = pfnCreatePhysicalWorld(this);
 #else
@@ -585,7 +602,7 @@ bool CSystem::InitPhysics()
 		Error( "Error creating the physics system interface" );
 		return false;
 	}
-	m_pIPhysicalWorld->Init();
+	if (m_pIPhysicalWorld) m_pIPhysicalWorld->Init();
 
 	// Register physics console variables.
 	IConsole *pConsole = GetIConsole();
@@ -757,8 +774,8 @@ bool CSystem::InitMovieSystem()
 
 	if (!m_pIMovieSystem)
 	{
-		Error("Error creating the movie system interface");
-		return false;
+		GetILog()->LogToFile( "Movie system not available on macOS - continuing without it" );
+		// Don't return false, just continue without movie system
 	}
 #endif
 	return true;

@@ -1615,12 +1615,7 @@ inline HRESULT DirectDrawCreateEx(GUID* lpGUID, void* lplpDD, const GUID& iid, v
 
 // LoadLibrary already defined above
 
-inline void* GetProcAddress(void* hModule, const char* lpProcName) {
-    if (strcmp(lpProcName, "DirectDrawCreateEx") == 0) {
-        return (void*)DirectDrawCreateEx;
-    }
-    return nullptr;
-}
+// GetProcAddress function removed - CryGetProcAddress macro handles this
 
 // CryLoadLibrary is already defined in CryLibrary.h
 
