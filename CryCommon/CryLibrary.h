@@ -63,7 +63,8 @@
 
 	static const char* GetModulePath()
 	{
-		return getenv(gEnvName);
+		const char* path = getenv(gEnvName);
+		return path ? path : "";
 	}
 
 	static void SetModulePath(const char* pModulePath)
@@ -104,7 +105,8 @@
 
 	static const char* GetModulePath()
 	{
-		return getenv(gEnvName);
+		const char* path = getenv(gEnvName);
+		return path ? path : "";
 	}
 
 	static void SetModulePath(const char* pModulePath)
@@ -114,13 +116,17 @@
 
 	static HMODULE CryLoadLibrary(const char* libName, const bool cAppend = true, const bool cLoadLazy = false)
 	{
+		if (!libName) {
+			printf("CryLoadLibrary: libName is null\n");
+			return NULL;
+		}
 		string newLibName(GetModulePath());
+		if (!newLibName.empty() && newLibName.back() != '/') {
+			newLibName += '/';
+		}
 #if !defined(NDEBUG)
-		string t(libName);
-		string c("_debug.dylib");
-		if(cAppend)
-			t.replace(t.size()-6, c.size(), c.c_str());
-		newLibName += t;
+		// Temporarily disable debug suffix for macOS
+		newLibName += libName;
 		printf("loading library  %s...\n",newLibName.c_str());
 #else
 		newLibName += libName;

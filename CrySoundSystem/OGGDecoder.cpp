@@ -24,6 +24,9 @@ void getTicks(int64* pnTime)
 {
 #ifdef WIN64
 	*pnTime = __rdtsc();
+#elif defined(__APPLE__) && defined(__MACH__)
+	// Use mach_absolute_time() for macOS
+	*pnTime = (unsigned long)mach_absolute_time();
 #else
 	__asm {
 		mov ebx, pnTime

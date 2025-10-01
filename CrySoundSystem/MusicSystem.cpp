@@ -128,7 +128,7 @@ bool CMusicSystem::Init()
 #elif  defined CS_VERSION_361
 	m_pStream=CS_Stream_Create(_StreamingCallback, (int)((float)m_nSampleRate*m_fLatency)*m_nBytesPerSample, CS_STEREO | CS_16BITS | CS_SIGNED | CS_2D, 44100, (int)this);
 #else
-  m_pStream=CS_Stream_Create(_StreamingCallback, (int)((float)m_nSampleRate*m_fLatency)*m_nBytesPerSample, CS_STEREO | CS_16BITS | CS_SIGNED | CS_2D, 44100, (INT_PTR)this);
+  m_pStream=CS_Stream_Create((CS_STREAMCALLBACK)_StreamingCallback, (int)((float)m_nSampleRate*m_fLatency)*m_nBytesPerSample, CS_STEREO | CS_16BITS | CS_SIGNED | CS_2D, 44100, (int)(INT_PTR)this);
 #endif
   if (!m_pStream)
 		return false;;

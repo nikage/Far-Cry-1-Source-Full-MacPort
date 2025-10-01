@@ -47,6 +47,8 @@ if(APPLE)
         ${VORBIS_LIBRARIES}
     )
     
+    target_link_directories(CrySoundSystem PRIVATE ${VORBIS_LIBRARY_DIRS})
+    
     target_include_directories(CrySoundSystem PRIVATE ${VORBIS_INCLUDE_DIRS})
     target_compile_definitions(CrySoundSystem PRIVATE ${VORBIS_CFLAGS_OTHER})
     

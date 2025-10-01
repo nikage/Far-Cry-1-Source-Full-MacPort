@@ -314,7 +314,7 @@ CSoundSystem::CSoundSystem(ISystem* pSystem, HWND hWnd) : CSoundSystemCommon(pSy
 	CS_SetHWND(hWnd);	
 
 	// Assign file access callbacks to fmod to our pak file system.
-	CS_File_SetCallbacks( (CS_OPENCALLBACK)CrySound_fopen,CrySound_fclose,CrySound_fread,CrySound_fseek,CrySound_ftell );
+	CS_File_SetCallbacks( (CS_OPENCALLBACK)CrySound_fopen,(CS_CLOSECALLBACK)CrySound_fclose,(CS_READCALLBACK)CrySound_fread,(CS_SEEKCALLBACK)CrySound_fseek,(CS_TELLCALLBACK)CrySound_ftell );
  
 	for (int i=0; i < CS_GetNumDrivers(); i++) 
 	{

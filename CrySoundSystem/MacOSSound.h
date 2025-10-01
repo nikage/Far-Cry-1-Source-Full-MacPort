@@ -20,6 +20,8 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "ISound.h"
+#include "SoundBuffer.h"
+#include "SoundSystemCommon.h"
 // Undefine BOOL to avoid conflict with macOS definition
 #ifdef BOOL
 #undef BOOL
@@ -44,31 +46,36 @@ public:
     virtual ~CMacOSSoundBuffer();
     
     // ISoundBuffer interface
-    virtual bool LoadWave(const char* sFileName, int nFlags = 0) override;
-    virtual bool LoadOGG(const char* sFileName, int nFlags = 0) override;
-    virtual void Release() override;
-    virtual int GetLength() override;
-    virtual int GetCurrentPos() override;
-    virtual void SetCurrentPos(int nPos) override;
-    virtual bool IsPlaying() override;
-    virtual bool IsLooping() override;
-    virtual void Play(bool bLoop = false, bool bLocked = false) override;
-    virtual void Stop() override;
-    virtual void Pause(bool bPause) override;
-    virtual void SetVolume(int nVolume) override;
-    virtual int GetVolume() override;
-    virtual void SetPan(int nPan) override;
-    virtual int GetPan() override;
-    virtual void SetFrequency(int nFreq) override;
-    virtual int GetFrequency() override;
-    virtual void Set3DBuffer(bool b3D) override;
-    virtual bool Is3DBuffer() override;
-    virtual void SetPosition(const Vec3& pos) override;
-    virtual void SetVelocity(const Vec3& vel) override;
-    virtual void SetMinMaxDistance(float fMin, float fMax) override;
-    virtual void SetCone(int nInnerAngle, int nOuterAngle, int nOuterVolume) override;
+    virtual bool LoadWave(const char* sFileName, int nFlags = 0);
+    virtual bool LoadOGG(const char* sFileName, int nFlags = 0);
+    virtual void Release();
+    virtual int GetLength();
+    virtual int GetCurrentPos();
+    virtual void SetCurrentPos(int nPos);
+    virtual bool IsPlaying();
+    virtual bool IsLooping();
+    virtual void Play(bool bLoop = false, bool bLocked = false);
+    virtual void Stop();
+    virtual void Pause(bool bPause);
+    virtual void SetVolume(int nVolume);
+    virtual int GetVolume();
+    virtual void SetPan(int nPan);
+    virtual int GetPan();
+    virtual void SetFrequency(int nFreq);
+    virtual int GetFrequency();
+    virtual void Set3DBuffer(bool b3D);
+    virtual bool Is3DBuffer();
+    virtual void SetPosition(const Vec3& pos);
+    virtual void SetVelocity(const Vec3& vel);
+    virtual void SetMinMaxDistance(float fMin, float fMax);
+    virtual void SetCone(int nInnerAngle, int nOuterAngle, int nOuterVolume);
+    
+    // Getter and setter for internal use
+    AVAudioPlayerNode* GetPlayerNode() const { return m_playerNode; }
+    void SetPlayerNode(AVAudioPlayerNode* node) { m_playerNode = node; }
     
 protected:
+    SSoundBufferProps m_props;
     AVAudioPlayerNode* m_playerNode;
     AVAudioPCMBuffer* m_audioBuffer;
     AudioStreamBasicDescription m_format;
@@ -98,44 +105,102 @@ private:
     int m_currentPos;
 };
 
-// macOS sound system implementation
+// macOS sound implementation
 class CMacOSSound : public ISound
 {
 public:
-    CMacOSSound();
+    CMacOSSound(CMacOSSoundBuffer* pBuffer);
     virtual ~CMacOSSound();
     
-    // ISound interface
-    virtual bool Init(ISystem* pSystem) override;
-    virtual void Release() override;
+    // ISound interface implementation
+    virtual void AddEventListener(ISoundEventListener* pListener) override;
+    virtual void RemoveEventListener(ISoundEventListener* pListener) override;
+    virtual bool IsPlaying() override;
+    virtual bool IsPlayingVirtual() override;
+    virtual bool IsLoading() override;
+    virtual bool IsLoaded() override;
+    virtual void Play(float fVolumeScale = 1.0f, bool bForceActiveState = true, bool bSetRatio = true) override;
+    virtual void PlayFadeUnderwater(float fVolumeScale = 1.0f, bool bForceActiveState = true, bool bSetRatio = true) override;
+    virtual void Stop() override;
+    virtual const char* GetName() override;
+    virtual const int GetId() override;
+    virtual void SetLoopMode(bool bLoop) override;
+    virtual bool Preload() override;
+    virtual unsigned int GetCurrentSamplePos(bool bMilliSeconds = false) override;
+    virtual void SetCurrentSamplePos(unsigned int nPos, bool bMilliSeconds) override;
+    virtual void SetPitching(float fPitching) override;
+    virtual void SetRatio(float fRatio) override;
+    virtual int GetFrequency() override;
+    virtual void SetPitch(int nPitch) override;
+    virtual void SetPan(int nPan) override;
+    virtual void SetMinMaxDistance(float fMinDist, float fMaxDist) override;
+    virtual void SetConeAngles(float fInnerAngle, float fOuterAngle) override;
+    virtual void AddToScaleGroup(int nGroup) override;
+    virtual void RemoveFromScaleGroup(int nGroup) override;
+    virtual void SetScaleGroup(unsigned int nGroupBits) override;
+    virtual void SetVolume(int nVolume) override;
+    virtual int GetVolume() override;
+    virtual void SetPosition(const Vec3& pos) override;
+    virtual const bool GetPosition(Vec3& vPos) override;
+    virtual void SetVelocity(const Vec3& vel) override;
+    virtual Vec3 GetVelocity() override;
+    virtual void SetDirection(const Vec3& dir) override;
+    virtual Vec3 GetDirection() override;
+    virtual void SetLoopPoints(const int iLoopStart, const int iLoopEnd) override;
+    virtual bool IsRelative() const override;
+    virtual int AddRef() override;
+    virtual int Release() override;
+
+private:
+    CMacOSSoundBuffer* m_pBuffer;
+    int m_nRefCount;
+    std::string m_sName;
+    int m_nId;
+    Vec3 m_position;
+    Vec3 m_velocity;
+    Vec3 m_direction;
+    bool m_bLoop;
+    int m_nVolume;
+    float m_fPitch;
+    float m_fPan;
+    float m_fMinDistance;
+    float m_fMaxDistance;
+    float m_fInnerAngle;
+    float m_fOuterAngle;
+    bool m_bIsRelative;
+};
+
+// macOS sound system implementation
+class CMacOSSoundSystem : public CSoundSystemCommon
+{
+public:
+    CMacOSSoundSystem(ISystem* pSystem);
+    virtual ~CMacOSSoundSystem();
+    
+    // ISoundSystem interface
     virtual void Update() override;
     virtual void SetListener(const CCamera& camera, const Vec3& vel) override;
-    virtual ISoundBuffer* LoadSound(const char* sFileName, int nFlags = 0) override;
-    virtual void UnloadSound(ISoundBuffer* pBuffer) override;
-    virtual ISoundBuffer* CreateSoundBuffer() override;
-    virtual bool PlaySound(ISoundBuffer* pBuffer, const Vec3* pos = NULL, int nFlags = 0) override;
-    virtual void StopSound(ISoundBuffer* pBuffer) override;
-    virtual void PauseSound(ISoundBuffer* pBuffer, bool bPause) override;
-    virtual void SetSoundVolume(int nVolume) override;
-    virtual int GetSoundVolume() override;
-    virtual void SetMusicVolume(int nVolume) override;
-    virtual int GetMusicVolume() override;
+    virtual ISound* LoadSound(const char* sFileName, int nFlags = 0) override;
     virtual void Silence() override;
-    virtual void SetMasterVolume(int nVolume) override;
-    virtual int GetMasterVolume() override;
-    virtual void SetDeafness(bool bDeaf) override;
-    virtual bool IsDeaf() override;
-    virtual void SetDopplerFactor(float fFactor) override;
-    virtual float GetDopplerFactor() override;
-    virtual void SetDistanceFactor(float fFactor) override;
-    virtual float GetDistanceFactor() override;
-    virtual void SetRolloffFactor(float fFactor) override;
-    virtual float GetRolloffFactor() override;
-    virtual bool SetEAX(int nPreset) override;
-    virtual int GetEAX() override;
-    virtual void LoadSoundBuffers() override;
-    virtual void FreeSoundBuffers() override;
-    virtual void CalcSoundMood(IMusicMood* pMood, float fRadius) override;
+    virtual void Pause(bool bPause, bool bResetVolume = false) override;
+    virtual void Mute(bool bMute) override;
+    virtual void SetMasterVolume(unsigned char nVol) override;
+    virtual void SetMasterVolumeScale(float fScale, bool bForceRecalc = false) override;
+    virtual void SetGroupScale(int nGroup, float fScale) override;
+    virtual void RecomputeSoundOcclusion(bool bRecomputeListener, bool bForceRecompute, bool bReset = false) override;
+    virtual bool IsEAX(int version) override;
+    virtual bool SetEaxListenerEnvironment(int nPreset, CS_REVERB_PROPERTIES* pProps = NULL, int nFlags = 0) override;
+    virtual bool GetCurrentEaxEnvironment(int& nPreset, CS_REVERB_PROPERTIES& Props) override;
+    virtual void GetSoundMemoryUsageInfo(size_t& nCurrentMemory, size_t& nMaxMemory) override;
+    virtual int GetUsedVoices() override;
+    virtual float GetCPUUsage() override;
+    virtual float GetMusicVolume() override;
+    virtual void CalcDirectionalAttenuation(Vec3& Pos, Vec3& Dir, float fConeInRadians) override;
+    virtual float GetDirectionalAttenuationMaxScale() override;
+    virtual bool UsingDirectionalAttenuation() override;
+    virtual void GetMemoryUsage(ICrySizer* pSizer) override;
+    virtual IVisArea* GetListenerArea() override;
+    virtual Vec3 GetListenerPos() override;
     
 protected:
     AVAudioEngine* m_audioEngine;
@@ -162,6 +227,7 @@ protected:
     // Sound buffer management
     std::vector<CMacOSSoundBuffer*> m_soundBuffers;
     std::map<std::string, CMacOSSoundBuffer*> m_loadedSounds;
+    bool m_isInitialized;
     
     // Internal methods
     bool InitializeAudioEngine();

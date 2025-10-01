@@ -22,7 +22,9 @@
 
 // CMacOSSoundBuffer implementation
 CMacOSSoundBuffer::CMacOSSoundBuffer()
-    : m_playerNode(nil)
+    : m_props("MacOSSoundBuffer", 0)
+    , CSoundBuffer(nullptr, m_props)
+    , m_playerNode(nil)
     , m_audioBuffer(nil)
     , m_volume(1.0f)
     , m_pan(0.0f)
@@ -143,7 +145,7 @@ void CMacOSSoundBuffer::Play(bool bLoop, bool bLocked)
     else
     {
         [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil options:0 completionHandler:^{
-            self->m_isPlaying = false;
+            this->m_isPlaying = false;
         }];
     }
     
@@ -207,8 +209,112 @@ void CMacOSSoundBuffer::UpdateSpatialAudio()
 }
 
 // CMacOSSound implementation
-CMacOSSound::CMacOSSound()
-    : m_audioEngine(nil)
+CMacOSSound::CMacOSSound(CMacOSSoundBuffer* pBuffer)
+    : m_pBuffer(pBuffer)
+    , m_nRefCount(1)
+    , m_sName("")
+    , m_nId(0)
+    , m_position(0, 0, 0)
+    , m_velocity(0, 0, 0)
+    , m_direction(0, 0, 1)
+    , m_bLoop(false)
+    , m_nVolume(100)
+    , m_fPitch(1.0f)
+    , m_fPan(0.0f)
+    , m_fMinDistance(1.0f)
+    , m_fMaxDistance(100.0f)
+    , m_fInnerAngle(360.0f)
+    , m_fOuterAngle(360.0f)
+    , m_bIsRelative(false)
+{
+    if (m_pBuffer)
+    {
+        m_pBuffer->AddRef();
+    }
+}
+
+CMacOSSound::~CMacOSSound()
+{
+    if (m_pBuffer)
+    {
+        m_pBuffer->Release();
+    }
+}
+
+// ISound interface implementation
+void CMacOSSound::AddEventListener(ISoundEventListener* pListener) { /* TODO */ }
+void CMacOSSound::RemoveEventListener(ISoundEventListener* pListener) { /* TODO */ }
+bool CMacOSSound::IsPlaying() { return m_pBuffer ? m_pBuffer->IsPlaying() : false; }
+bool CMacOSSound::IsPlayingVirtual() { return false; }
+bool CMacOSSound::IsLoading() { return false; }
+bool CMacOSSound::IsLoaded() { return m_pBuffer != nullptr; }
+void CMacOSSound::Play(float fVolumeScale, bool bForceActiveState, bool bSetRatio) 
+{ 
+    if (m_pBuffer) 
+    {
+        m_pBuffer->Play(m_bLoop, false);
+    }
+}
+void CMacOSSound::PlayFadeUnderwater(float fVolumeScale, bool bForceActiveState, bool bSetRatio) 
+{ 
+    Play(fVolumeScale, bForceActiveState, bSetRatio);
+}
+void CMacOSSound::Stop() 
+{ 
+    if (m_pBuffer) 
+    {
+        m_pBuffer->Stop();
+    }
+}
+const char* CMacOSSound::GetName() { return m_sName.c_str(); }
+const int CMacOSSound::GetId() { return m_nId; }
+void CMacOSSound::SetLoopMode(bool bLoop) { m_bLoop = bLoop; }
+bool CMacOSSound::Preload() { return true; }
+unsigned int CMacOSSound::GetCurrentSamplePos(bool bMilliSeconds) { return 0; }
+void CMacOSSound::SetCurrentSamplePos(unsigned int nPos, bool bMilliSeconds) { /* TODO */ }
+void CMacOSSound::SetPitching(float fPitching) { /* TODO */ }
+void CMacOSSound::SetRatio(float fRatio) { /* TODO */ }
+int CMacOSSound::GetFrequency() { return 44100; }
+void CMacOSSound::SetPitch(int nPitch) { m_fPitch = nPitch / 1000.0f; }
+void CMacOSSound::SetPan(int nPan) { m_fPan = nPan / 100.0f; }
+void CMacOSSound::SetMinMaxDistance(float fMinDist, float fMaxDist) 
+{ 
+    m_fMinDistance = fMinDist; 
+    m_fMaxDistance = fMaxDist; 
+}
+void CMacOSSound::SetConeAngles(float fInnerAngle, float fOuterAngle) 
+{ 
+    m_fInnerAngle = fInnerAngle; 
+    m_fOuterAngle = fOuterAngle; 
+}
+void CMacOSSound::AddToScaleGroup(int nGroup) { /* TODO */ }
+void CMacOSSound::RemoveFromScaleGroup(int nGroup) { /* TODO */ }
+void CMacOSSound::SetScaleGroup(unsigned int nGroupBits) { /* TODO */ }
+void CMacOSSound::SetVolume(int nVolume) { m_nVolume = nVolume; }
+int CMacOSSound::GetVolume() { return m_nVolume; }
+void CMacOSSound::SetPosition(const Vec3& pos) { m_position = pos; }
+const bool CMacOSSound::GetPosition(Vec3& vPos) { vPos = m_position; return true; }
+void CMacOSSound::SetVelocity(const Vec3& vel) { m_velocity = vel; }
+Vec3 CMacOSSound::GetVelocity() { return m_velocity; }
+void CMacOSSound::SetDirection(const Vec3& dir) { m_direction = dir; }
+Vec3 CMacOSSound::GetDirection() { return m_direction; }
+void CMacOSSound::SetLoopPoints(const int iLoopStart, const int iLoopEnd) { /* TODO */ }
+bool CMacOSSound::IsRelative() const { return m_bIsRelative; }
+int CMacOSSound::AddRef() { return ++m_nRefCount; }
+int CMacOSSound::Release() 
+{ 
+    int nRef = --m_nRefCount;
+    if (nRef <= 0)
+    {
+        delete this;
+    }
+    return nRef;
+}
+
+// CMacOSSoundSystem implementation
+CMacOSSoundSystem::CMacOSSoundSystem(ISystem* pSystem)
+    : CSoundSystemCommon(pSystem)
+    , m_audioEngine(nil)
     , m_mixerNode(nil)
     , m_reverbUnit(nil)
     , m_masterVolume(100)
@@ -311,7 +417,7 @@ void CMacOSSound::Release()
     m_isInitialized = false;
 }
 
-ISoundBuffer* CMacOSSound::LoadSound(const char* sFileName, int nFlags)
+ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
 {
     if (!sFileName || !m_isInitialized)
         return nullptr;
@@ -320,7 +426,7 @@ ISoundBuffer* CMacOSSound::LoadSound(const char* sFileName, int nFlags)
     auto it = m_loadedSounds.find(sFileName);
     if (it != m_loadedSounds.end())
     {
-        return it->second;
+        return new CMacOSSound(it->second);
     }
     
     // Create new sound buffer
@@ -337,22 +443,22 @@ ISoundBuffer* CMacOSSound::LoadSound(const char* sFileName, int nFlags)
     [m_audioEngine attachNode:playerNode];
     [m_audioEngine connect:playerNode to:m_mixerNode format:nil];
     
-    buffer->m_playerNode = playerNode;
+    buffer->SetPlayerNode(playerNode);
     
     // Store in collections
     m_soundBuffers.push_back(buffer);
     m_loadedSounds[sFileName] = buffer;
     
-    return buffer;
+    return new CMacOSSound(buffer);
 }
 
-void CMacOSSound::SetListener(const CCamera& camera, const Vec3& vel)
+void CMacOSSoundSystem::SetListener(const CCamera& camera, const Vec3& vel)
 {
-    m_listenerPos = camera.GetPos();
-    m_listenerForward = camera.GetVCMatrixD3D9().GetColumn(1); // Forward vector
-    m_listenerUp = camera.GetVCMatrixD3D9().GetColumn(2);      // Up vector
+    // For now, just store the velocity - we can implement proper 3D audio later
     m_listenerVel = vel;
     
+    // TODO: Extract position and orientation from camera and update AVAudio3DMixerNode
+    // This would require proper 3D audio implementation
     Update3DAudio();
 }
 
@@ -374,15 +480,15 @@ void CMacOSSound::Update()
 }
 
 // Stub implementations for remaining interface methods
-void CMacOSSound::UnloadSound(ISoundBuffer* pBuffer) { /* TODO */ }
-ISoundBuffer* CMacOSSound::CreateSoundBuffer() { return new CMacOSSoundBuffer(); }
-bool CMacOSSound::PlaySound(ISoundBuffer* pBuffer, const Vec3* pos, int nFlags) { return false; }
-void CMacOSSound::StopSound(ISoundBuffer* pBuffer) { /* TODO */ }
-void CMacOSSound::PauseSound(ISoundBuffer* pBuffer, bool bPause) { /* TODO */ }
+void CMacOSSound::UnloadSound(ISound* pSound) { /* TODO */ }
+ISound* CMacOSSound::CreateSound() { return nullptr; }
+bool CMacOSSound::PlaySound(ISound* pSound, const Vec3* pos, int nFlags) { return false; }
+void CMacOSSound::StopSound(ISound* pSound) { /* TODO */ }
+void CMacOSSound::PauseSound(ISound* pSound, bool bPause) { /* TODO */ }
 void CMacOSSound::SetSoundVolume(int nVolume) { m_soundVolume = nVolume; }
 int CMacOSSound::GetSoundVolume() { return m_soundVolume; }
 void CMacOSSound::SetMusicVolume(int nVolume) { m_musicVolume = nVolume; }
-int CMacOSSound::GetMusicVolume() { return m_musicVolume; }
+float CMacOSSound::GetMusicVolume() { return m_musicVolume; }
 void CMacOSSound::Silence() { /* TODO */ }
 void CMacOSSound::SetMasterVolume(int nVolume) { m_masterVolume = nVolume; }
 int CMacOSSound::GetMasterVolume() { return m_masterVolume; }
@@ -398,7 +504,7 @@ bool CMacOSSound::SetEAX(int nPreset) { return false; }
 int CMacOSSound::GetEAX() { return 0; }
 void CMacOSSound::LoadSoundBuffers() { /* TODO */ }
 void CMacOSSound::FreeSoundBuffers() { /* TODO */ }
-void CMacOSSound::CalcSoundMood(IMusicMood* pMood, float fRadius) { /* TODO */ }
+void CMacOSSound::CalcSoundMood(SMusicMood* pMood, float fRadius) { /* TODO */ }
 
 // Utility functions
 AudioStreamBasicDescription CreateStandardFormat(int sampleRate, int channels, int bitsPerSample)

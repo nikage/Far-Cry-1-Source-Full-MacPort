@@ -12,7 +12,7 @@
 #ifdef TRACE_MUSIC
 #define MTRACE TRACE
 #else
-#define MTRACE __noop
+#define MTRACE(...) ((void)0)
 #endif
 
 #define PATTERNSET_CHANGE_FADETIME	2.0

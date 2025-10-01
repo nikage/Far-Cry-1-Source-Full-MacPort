@@ -216,6 +216,11 @@ struct _CryMemoryManagerPoolHelper
 #elif defined(__APPLE__)
 		// macOS doesn't use dynamic library loading for memory manager
 		// Use standard malloc/free instead
+		_CryMalloc = malloc;
+		_CryRealloc = realloc;
+		_CryReallocSize = [](void *memblock, size_t oldsize, size_t size) -> void* { return realloc(memblock, size); };
+		_CryFree = free;
+		_CryFreeSize = [](void *p, size_t size) -> void { free(p); };
 #else
 		if(!hSystem || !_CryMalloc || !_CryRealloc || !_CryReallocSize || !_CryFree || !_CryFreeSize)
 		{

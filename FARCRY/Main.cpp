@@ -907,7 +907,7 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 }
 
 #if defined(__APPLE__) && defined(__MACH__)
-// macOS entry point - call WinMain with appropriate parameters
+// macOS entry point - use statically linked libraries
 int main(int argc, char* argv[]) {
     // Convert command line arguments to single string like Windows
     char cmdLine[1024] = "";
@@ -916,7 +916,55 @@ int main(int argc, char* argv[]) {
         strcat(cmdLine, argv[i]);
     }
     
-    // Call WinMain with dummy parameters
-    return WinMain((HINSTANCE)1, (HINSTANCE)0, cmdLine, 1);
+    // Initialize system parameters
+    SSystemInitParams sip;
+    sip.sLogFileName = "log.txt";
+    if (cmdLine[0]) {
+        strncpy(sip.szSystemCmdLine, cmdLine, sizeof(sip.szSystemCmdLine) - 1);
+        sip.szSystemCmdLine[sizeof(sip.szSystemCmdLine) - 1] = '\0';
+    }
+    
+    // Initialize with macOS-specific parameters
+    sip.hInstance = (HINSTANCE)1;
+    sip.hWnd = NULL;  // No window handle on macOS
+    sip.pSystem = NULL;
+    sip.pCheckFunc = AuthCheckFunction;
+    
+    // Create system interface directly (statically linked)
+    g_pISystem = CreateSystemInterface(sip);
+    if (!g_pISystem) {
+        printf("CreateSystemInterface Failed\n");
+        return -1;
+    }
+    
+    // Enable Log verbosity
+    g_pISystem->GetILog()->EnableVerbosity(true);
+    
+    // Initialize console
+    g_pISystem->GetIConsole()->ShowConsole(false);
+    g_pISystem->GetIConsole()->SetScrollMax(600/2);
+    
+    // Create game (statically linked)
+    SGameInitParams gip;
+    if (!g_pISystem->CreateGame(gip)) {
+        printf("CreateGame Failed\n");
+        g_pISystem->Release();
+        return -1;
+    }
+    
+    // Get game interface and run
+    IGame *pGame = g_pISystem->GetIGame();
+    if (pGame) {
+        bool bRelaunch = false;
+        pGame->Run(bRelaunch);
+    }
+    
+    // Cleanup
+    if (g_pISystem) {
+        g_pISystem->Release();
+        g_pISystem = NULL;
+    }
+    
+    return 0;
 }
 #endif

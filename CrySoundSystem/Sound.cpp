@@ -614,7 +614,7 @@ void CSound::SetName(const char *szName)
 const char *CSound::GetName()
 {
 	//return (m_strName.c_str());
-	if (m_pSound!=NULL)
+	if (m_pSound != 0)
 		return (m_pSound->GetName());
 	return (m_pSSys->m_szEmptyName);
 }
