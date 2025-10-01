@@ -1,5 +1,54 @@
 # FarCry Mac Silicon Port - Changelog
 
+## 🔧 2025-01-29 - Metal Renderer Architecture Refactoring
+
+### [Renderer][Architecture] Implemented modular Metal renderer with specialized manager classes
+
+- **✅ Class Hierarchy Design**: Split massive IRenderer interface into focused, maintainable classes following SOLID principles
+- **✅ CMetalBaseRenderer**: Core renderer class with essential IRenderer methods and Metal device management
+- **✅ CMetalTextureManager**: Specialized class for all texture operations (loading, binding, format conversion)
+- **✅ CMetalShaderManager**: Dedicated shader system implementation (EF_ methods, pipeline state management)
+- **✅ CMetalUtilityRenderer**: Debug, UI, and utility rendering methods (text, sprites, debug primitives)
+- **✅ CMetalRenderer**: Main coordinator class that delegates to specialized managers
+- **✅ CMake Integration**: Updated build system to include all new Metal renderer classes
+- **⚠️ Compilation Issues**: Header conflicts and access control issues need resolution for successful build
+
+### Technical Architecture Improvements
+
+- **Single Responsibility Principle**: Each class has a focused, well-defined purpose
+- **Dependency Injection**: Managers receive references to base renderer and other managers
+- **Interface Segregation**: Complex IRenderer interface split into logical groupings
+- **Open/Closed Principle**: Easy to extend individual managers without affecting others
+- **Resource Management**: Proper RAII with smart pointers and Metal resource lifecycle
+
+### Implementation Status
+
+- **✅ Base Renderer**: Core Metal device, command queue, and pipeline management
+- **✅ Texture Manager**: Complete texture lifecycle (create, load, bind, remove)
+- **✅ Shader Manager**: Shader loading, compilation, and pipeline state creation
+- **✅ Utility Renderer**: Debug drawing, text rendering, and UI components
+- **⚠️ Integration**: Header conflicts and protected member access need resolution
+- **⏳ Testing**: Compilation and runtime testing pending header fixes
+
+### Files Created
+
+- `RenderDll/XRenderMetal/MetalBaseRenderer.h/cpp` - Core Metal renderer functionality
+- `RenderDll/XRenderMetal/MetalTextureManager.h/cpp` - Texture management system
+- `RenderDll/XRenderMetal/MetalShaderManager.h/cpp` - Shader system implementation
+- `RenderDll/XRenderMetal/MetalUtilityRenderer.h/cpp` - Debug and utility rendering
+- `RenderDll/XRenderMetal/MetalRenderer.h/cpp` - Main coordinator class
+- `RenderDll/XRenderMetal/CMakeLists.txt` - Updated build configuration
+
+### Next Steps
+
+- **🔧 Header Resolution**: Fix IRenderer.h conflicts with macOS headers (BOOL, HRESULT, DWORD)
+- **🔧 Access Control**: Resolve protected member access issues between managers and base renderer
+- **🔧 Method Signatures**: Align method signatures between interface and implementation
+- **✅ Compilation**: Achieve successful build of modular Metal renderer
+- **✅ Integration Testing**: Verify renderer works with existing FarCry systems
+
+---
+
 ## 🎮 2025-01-27 - SUCCESS: FarCry Game Successfully Running on Mac Silicon
 
 ### [Game][Execution] FarCry Mac Silicon version successfully executed and running

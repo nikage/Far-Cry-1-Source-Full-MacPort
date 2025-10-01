@@ -826,9 +826,9 @@ void CSystem::CreateRendererVars()
 	m_rDepthBits = GetIConsole()->CreateVariable("r_DepthBits", "32", VF_DUMPTODISK);
 	m_rStencilBits = GetIConsole()->CreateVariable("r_StencilBits", "8", VF_DUMPTODISK);	
 #ifdef __APPLE__
-	m_rDriver= GetIConsole()->CreateVariable("r_Driver", "OpenGL", VF_DUMPTODISK,
-		"Sets the renderer driver. Default is 'OpenGL' on macOS.\n"
-		"Usage: r_Driver OpenGL");
+	m_rDriver= GetIConsole()->CreateVariable("r_Driver", "Metal", VF_DUMPTODISK,
+		"Sets the renderer driver. Default is 'Metal' on macOS.\n"
+		"Usage: r_Driver Metal");
 #else
 	m_rDriver= GetIConsole()->CreateVariable("r_Driver", "Direct3D9", VF_DUMPTODISK,
 		"Sets the renderer driver. Default is 'Direct3D9'.\n"

@@ -6,8 +6,8 @@ if(APPLE)
     message(STATUS "Building Metal renderer for macOS")
     add_subdirectory(XRenderMetal)
     
-    # Also build NULL renderer for fallback
-    add_subdirectory(XRenderNULL)
+    # NULL renderer disabled - too many dependencies
+    # add_subdirectory(XRenderNULL)
     
 elseif(WIN32)
     message(STATUS "Building DirectX renderers for Windows")
@@ -29,7 +29,7 @@ elseif(UNIX)
     add_subdirectory(XRenderNULL)
 endif()
 
-# Common render dll components (if any)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Common")
+# Common render dll components (if any) - disabled for macOS due to Windows dependencies
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Common" AND NOT APPLE)
     add_subdirectory(Common)
 endif()

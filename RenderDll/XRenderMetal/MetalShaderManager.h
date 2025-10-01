@@ -7,8 +7,8 @@
 //  Version:     v1.00
 //  Created:     29/09/2025 by Mac Silicon Port Team.
 //  Compilers:   Clang/LLVM for macOS
-//  Description: Metal shader management system
-//               Handles Metal shader compilation and pipeline state creation
+//  Description: Metal shader manager class
+//               Handles all shader operations for Metal API
 // -------------------------------------------------------------------------
 //  History:
 //
@@ -20,117 +20,166 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include <Metal/Metal.h>
-#include <map>
+#include <MetalKit/MetalKit.h>
+#include <vector>
+#include <unordered_map>
 #include <string>
 
-// Shader types supported by the Metal renderer
-enum class MetalShaderType
-{
-    Vertex,
-    Fragment,
-    Compute
-};
+// Include CryEngine interfaces
+#include "IRenderer.h"
+#include "IShader.h"
+#include "Cry_Math.h"
 
-// Pipeline state cache entry
-struct MetalPipelineState
-{
-    id<MTLRenderPipelineState> pipelineState;
-    id<MTLFunction> vertexFunction;
-    id<MTLFunction> fragmentFunction;
-    std::string vertexShaderName;
-    std::string fragmentShaderName;
-    
-    MetalPipelineState() : pipelineState(nil), vertexFunction(nil), fragmentFunction(nil) {}
-    
-    ~MetalPipelineState()
-    {
-        if (pipelineState) [pipelineState release];
-        if (vertexFunction) [vertexFunction release];
-        if (fragmentFunction) [fragmentFunction release];
-    }
-};
+// Forward declarations
+class CMetalBaseRenderer;
+class CMetalTextureManager;
 
-// Uniform buffer structure for shaders
-struct MetalUniforms
-{
-    matrix_float4x4 modelViewProjectionMatrix;
-    matrix_float4x4 modelMatrix;
-    matrix_float4x4 normalMatrix;
-    vector_float3 lightPos;
-    vector_float3 viewPos;
-    vector_float4 lightColor;
-    vector_float4 materialColor;
-};
-
+// Metal shader manager class
 class CMetalShaderManager
 {
 public:
-    CMetalShaderManager();
-    ~CMetalShaderManager();
+    CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTextureManager* textureManager);
+    virtual ~CMetalShaderManager();
+
+    // Shader System Interface (EF_ methods)
+    bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags);
+    bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags);
+    bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags);
+    bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags);
+    void EF_EnableHeatVision(bool bEnable);
+    bool EF_GetHeatVision();
+    void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits);
+    void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert* verts, CCObject* obj = NULL, int nFogID = 0);
+    CCObject* EF_AddSpriteToScene(int Ef, int numPts, SColorVert* verts, CCObject* obj, 
+                                 byte* inds = NULL, int ninds = 0, int nFogID = 0);
+    void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D* verts);
+    void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D* verts);
     
-    // Initialization
-    bool Initialize(id<MTLDevice> device);
-    void Shutdown();
+    // Shader Management
+    IShader* EF_LoadShader(const char* name, EShClass Class, int flags = 0, uint64 nMaskGen = 0);
+    SShaderItem EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, 
+                                 const char* templName, int flags = 0, 
+                                 SInputShaderResources* Res = NULL, uint64 nMaskGen = 0);
+    bool EF_ReloadFile(const char* szFileName);
+    void EF_ReloadShaderFiles(int nCategory);
+    void EF_ReloadTextures();
+    IShader* EF_CopyShader(IShader* ef);
+    char** EF_GetShadersForFile(const char* File, int num);
+    SLightMaterial* EF_GetLightMaterial(char* Str);
+    bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace);
+    void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id = -1);
+    bool EF_HideTemplate(const char* name);
+    bool EF_UnhideTemplate(const char* name);
+    bool EF_UnhideAllTemplates();
+    bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale = 1.0f, bool bAdditive = true);
     
-    // Shader loading and compilation
-    id<MTLFunction> LoadShaderFunction(const std::string& functionName, MetalShaderType type);
-    bool CompileShaderLibrary(const std::string& source);
-    bool LoadShaderLibraryFromFile(const std::string& filename);
+    // Render Elements
+    CRendElement* EF_CreateRE(EDataType edt);
+    void EF_StartEf();
+    CCObject* EF_GetObject(bool bTemp = false, int num = -1);
+    void EF_AddEf(int NumFog, CRendElement* re, IShader* ef, 
+                 SRenderShaderResources* sr, CCObject* obj, int nTempl, 
+                 IShader* efState = 0, int nSort = 0);
+    void EF_EndEf3D(int nFlags);
     
-    // Pipeline state management
-    id<MTLRenderPipelineState> GetPipelineState(const std::string& vertexShader, 
-                                               const std::string& fragmentShader,
-                                               MTLPixelFormat colorFormat = MTLPixelFormatBGRA8Unorm,
-                                               MTLPixelFormat depthFormat = MTLPixelFormatDepth32Float);
+    // Dynamic Lights
+    bool EF_IsFakeDLight(CDLight* Source);
+    void EF_ADDDlight(CDLight* Source);
+    void EF_ClearLightsList();
+    bool EF_UpdateDLight(CDLight* pDL);
     
-    id<MTLRenderPipelineState> CreatePipelineState(const std::string& vertexShader,
-                                                   const std::string& fragmentShader,
-                                                   MTLPixelFormat colorFormat,
-                                                   MTLPixelFormat depthFormat);
+    // 2D Effects
+    void EF_EndEf2D(bool bSort);
+    bool EF_DrawEfForName(char* name, float x, float y, float width, float height, 
+                         CFColor& col, int nTempl = -1);
+    bool EF_DrawEfForNum(int num, float x, float y, float width, float height, 
+                        CFColor& col, int nTempl = -1);
+    bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, 
+                  CFColor& col, int nTempl = -1);
+    bool EF_DrawEf(SShaderItem si, float x, float y, float width, float height, 
+                  CFColor& col, int nTempl = -1);
+    bool EF_DrawPartialEfForName(char* name, SVrect* vr, SVrect* pr, CFColor& col);
+    bool EF_DrawPartialEfForNum(int num, SVrect* vr, SVrect* pr, CFColor& col);
+    bool EF_DrawPartialEf(IShader* ef, SVrect* vr, SVrect* pr, CFColor& col, 
+                         float iwdt = 0, float ihgt = 0);
     
-    // Predefined shader functions
-    id<MTLFunction> GetBasicVertexShader() { return LoadShaderFunction("basic_vertex", MetalShaderType::Vertex); }
-    id<MTLFunction> GetBasicFragmentShader() { return LoadShaderFunction("basic_fragment", MetalShaderType::Fragment); }
-    id<MTLFunction> GetUnlitFragmentShader() { return LoadShaderFunction("unlit_fragment", MetalShaderType::Fragment); }
-    id<MTLFunction> GetSolidColorFragmentShader() { return LoadShaderFunction("solid_color_fragment", MetalShaderType::Fragment); }
+    // Shader Utilities
+    void* EF_Query(int Query, int Param = 0);
+    void EF_ConstructEf(IShader* Ef);
+    void EF_SetWorldColor(float r, float g, float b, float a = 1.0f);
+    int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, 
+                            int nIndex = -1, bool bCaustics = false);
     
-    // Uniform buffer management
-    id<MTLBuffer> CreateUniformBuffer(const MetalUniforms& uniforms);
-    void UpdateUniformBuffer(id<MTLBuffer> buffer, const MetalUniforms& uniforms);
+    // LeafBuffer Management
+    CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char* szSource = "Unknown", 
+                                 class CIndexedMesh* pIndexedMesh = 0);
+    CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, 
+                                            int nVertFormat, ushort* pIndices, 
+                                            int nIndices, int nPrimetiveType, 
+                                            const char* szSource, 
+                                            EBufferType eBufType = eBT_Dynamic, 
+                                            int nMatInfoCount = 1, 
+                                            int nClientTextureBindID = 0, 
+                                            bool (*PrepareBufferCallback)(CLeafBuffer*, bool) = NULL, 
+                                            void* CustomData = NULL, 
+                                            bool bOnlyVideoBuffer = false, 
+                                            bool bPrecache = true);
+    void DeleteLeafBuffer(CLeafBuffer* pLBuffer);
     
     // Utility methods
-    bool IsInitialized() const { return m_device != nil && m_library != nil; }
-    id<MTLDevice> GetDevice() const { return m_device; }
-    
+    void ClearAllShaders();
+    int GetShaderCount() const;
+    void SetGlobalShaderTemplateId(int nTemplateId);
+    int GetGlobalShaderTemplateId();
+
 protected:
-    id<MTLDevice> m_device;
-    id<MTLLibrary> m_library;
+    // Metal-specific shader management
+    id<MTLFunction> LoadMetalShader(const char* name, const char* source);
+    id<MTLRenderPipelineState> CreatePipelineState(id<MTLFunction> vertexFunction, 
+                                                   id<MTLFunction> fragmentFunction,
+                                                   MTLVertexDescriptor* vertexDescriptor);
+    void SetShaderUniforms(id<MTLRenderCommandEncoder> encoder, const SShaderParam& params);
     
-    // Cache for compiled functions and pipeline states
-    std::map<std::string, id<MTLFunction>> m_functionCache;
-    std::map<std::string, MetalPipelineState*> m_pipelineCache;
+    // Shader caching and management
+    struct ShaderInfo
+    {
+        id<MTLFunction> vertexFunction;
+        id<MTLFunction> fragmentFunction;
+        id<MTLRenderPipelineState> pipelineState;
+        std::string name;
+        EShClass shaderClass;
+        bool isLoaded;
+    };
+    
+    std::unordered_map<int, ShaderInfo> m_shaders;
+    std::unordered_map<std::string, int> m_shaderNameMap;
+    int m_nextShaderId;
+    
+    // Current shader state
+    int m_currentShaderId;
+    id<MTLRenderPipelineState> m_currentPipelineState;
+    
+    // Global shader template
+    int m_globalShaderTemplateId;
+    
+    // Heat vision effect
+    bool m_heatVisionEnabled;
+    
+    // Fog volumes
+    std::vector<struct FogVolume> m_fogVolumes;
+    
+    // Reference to base renderer and texture manager
+    CMetalBaseRenderer* m_renderer;
+    CMetalTextureManager* m_textureManager;
     
     // Internal methods
-    std::string GeneratePipelineCacheKey(const std::string& vertexShader,
-                                        const std::string& fragmentShader,
-                                        MTLPixelFormat colorFormat,
-                                        MTLPixelFormat depthFormat);
-    
-    void ClearCaches();
-    
-private:
-    bool m_initialized;
+    int AllocateShaderId();
+    void ReleaseShaderId(int id);
+    bool LoadShaderFromFile(const char* filename, std::string& source);
+    bool CompileShader(const std::string& source, id<MTLFunction>& function);
+    void SetShaderParameters(id<MTLRenderCommandEncoder> encoder, IShader* shader);
+    void BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader);
 };
-
-// Utility functions for matrix operations
-matrix_float4x4 CreateMatrix4x4(float m[16]);
-matrix_float4x4 CreateIdentityMatrix();
-matrix_float4x4 CreatePerspectiveMatrix(float fov, float aspect, float nearZ, float farZ);
-matrix_float4x4 CreateLookAtMatrix(vector_float3 eye, vector_float3 center, vector_float3 up);
-matrix_float4x4 CreateTranslationMatrix(vector_float3 translation);
-matrix_float4x4 CreateRotationMatrix(vector_float3 axis, float angle);
-matrix_float4x4 CreateScaleMatrix(vector_float3 scale);
-matrix_float4x4 MultiplyMatrices(const matrix_float4x4& a, const matrix_float4x4& b);
 
 #endif // __APPLE__ && __MACH__
 

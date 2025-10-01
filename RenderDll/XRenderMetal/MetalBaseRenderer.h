@@ -3,19 +3,19 @@
 //  Crytek Engine Source File - Mac Silicon Port
 //  Copyright (C), Crytek Studios, 2002.
 // -------------------------------------------------------------------------
-//  File name:   MetalRenderer.h
+//  File name:   MetalBaseRenderer.h
 //  Version:     v1.00
 //  Created:     29/09/2025 by Mac Silicon Port Team.
 //  Compilers:   Clang/LLVM for macOS
-//  Description: Main Metal renderer class that combines specialized managers
-//               Apple's Metal graphics API provides low-level GPU access
+//  Description: Base Metal renderer class with core functionality
+//               Implements essential IRenderer methods for Metal API
 // -------------------------------------------------------------------------
 //  History:
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef METAL_RENDERER_H
-#define METAL_RENDERER_H
+#ifndef METAL_BASE_RENDERER_H
+#define METAL_BASE_RENDERER_H
 
 #if defined(__APPLE__) && defined(__MACH__)
 
@@ -31,12 +31,6 @@
 #include "IShader.h"
 #include "Cry_Math.h"
 
-// Include specialized manager classes
-#include "MetalBaseRenderer.h"
-#include "MetalTextureManager.h"
-#include "MetalShaderManager.h"
-#include "MetalUtilityRenderer.h"
-
 // Forward declarations
 struct SSystemInitParams;
 struct SCryRenderInterface;
@@ -47,14 +41,14 @@ class SShader;
 class SMaterial;
 class STexPic;
 
-// Main Metal renderer class that combines all specialized managers
-class CMetalRenderer : public CMetalBaseRenderer
+// Metal base renderer class that implements core IRenderer functionality
+class CMetalBaseRenderer : public IRenderer
 {
 public:
-    CMetalRenderer();
-    virtual ~CMetalRenderer();
+    CMetalBaseRenderer();
+    virtual ~CMetalBaseRenderer();
 
-    // IRenderer interface implementation - Core Methods
+    // Core IRenderer interface implementation
     virtual WIN_HWND Init(int x, int y, int width, int height, unsigned int cbpp, int zbpp, int sbits, 
                          bool fullscreen, WIN_HINSTANCE hinst, WIN_HWND Glhwnd = 0, 
                          WIN_HDC Glhdc = 0, WIN_HGLRC hGLrc = 0, bool bReInit = false);
@@ -140,30 +134,6 @@ public:
     virtual bool SaveTga(unsigned char* sourcedata, int sourceformat, int w, int h, 
                         const char* filename, bool flip);
     
-    // Texture Management
-    virtual void SetTexture(int tnum, ETexType Type = eTT_Base);
-    virtual void SetWhiteTexture();
-    virtual unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 
-                                             ETEX_Format eTFSrc, ETEX_Format eTFDst, 
-                                             int nummipmap, bool repeat = true, 
-                                             int filter = FILTER_BILINEAR, int Id = 0, 
-                                             char* szCacheName = NULL, int flags = 0);
-    virtual void UpdateTextureInVideoMemory(uint tnum, unsigned char* newdata, int posx, int posy, 
-                                           int w, int h, ETEX_Format eTF = eTF_0888);
-    virtual unsigned int LoadTexture(const char* filename, int* tex_type = NULL, 
-                                    unsigned int def_tid = 0, bool compresstodisk = true, 
-                                    bool bWarn = true);
-    virtual bool DXTCompress(byte* raw_data, int nWidth, int nHeight, ETEX_Format eTF, 
-                            bool bUseHW, bool bGenMips, int nSrcBytesPerPix, 
-                            MIPDXTcallback callback = 0);
-    virtual bool DXTDecompress(byte* srcData, byte* dstData, int nWidth, int nHeight, 
-                              ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix);
-    virtual void RemoveTexture(unsigned int TextureId);
-    virtual void RemoveTexture(ITexPic* pTexPic);
-    
-    // Gamma and Color
-    virtual bool SetGammaDelta(const float fGamma);
-    
     // Screen Information
     virtual int GetWidth();
     virtual int GetHeight();
@@ -173,17 +143,7 @@ public:
     virtual int GetDepthBpp();
     virtual int GetStencilBpp();
     
-    // Additional essential methods (stubs for now)
-    virtual void WriteXY(CXFont* currfont, int x, int y, float xscale, float yscale, 
-                        float r, float g, float b, float a, const char* message, ...);
-    virtual void Draw2dText(float posX, float posY, const char* szText, SDrawTextInfo& info);
-    virtual void Draw2dImage(float xpos, float ypos, float w, float h, int texture_id, 
-                            float s0 = 0, float t0 = 0, float s1 = 1, float t1 = 1, 
-                            float angle = 0, float r = 1, float g = 1, float b = 1, 
-                            float a = 1, float z = 1);
-    virtual void DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
-                          float s0, float t0, float s1, float t1, float r, float g, float b, float a);
-    virtual int SetPolygonMode(int mode);
+    // Projection and Unprojection
     virtual void ProjectToScreen(float ptx, float pty, float ptz, float* sx, float* sy, float* sz);
     virtual int UnProject(float sx, float sy, float sz, float* px, float* py, float* pz,
                          const float modelMatrix[16], const float projMatrix[16], 
@@ -196,18 +156,67 @@ public:
     virtual Vec3 GetUnProject(const Vec3& WindowCoords, const CCamera& cam);
     virtual void RenderToViewport(const CCamera& cam, float x, float y, float width, float height);
     
-    // Stub implementations for complex shader system methods
-    virtual bool FontUploadTexture(class CFBitmap*, ETEX_Format eTF = eTF_8888) { return false; }
-    virtual int FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF = eTF_8888) { return 0; }
-    virtual bool FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData) { return false; }
-    virtual void FontReleaseTexture(class CFBitmap* pBmp) {}
-    virtual void FontSetTexture(class CFBitmap*, int nFilterMode) {}
-    virtual void FontSetTexture(int nTexId, int nFilterMode) {}
-    virtual void FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight) {}
-    virtual void FontSetBlending(int src, int dst) {}
-    virtual void FontRestoreRenderingState() {}
+    // Basic utility methods
+    virtual char GetType() { return R_METAL_RENDERER; }
+    virtual char* GetVertexProfile(bool bSupportedProfile) { return nullptr; }
+    virtual char* GetPixelProfile(bool bSupportedProfile) { return nullptr; }
+    virtual void SetType(char type) {}
+    virtual float ScaleCoordX(float value) { return value; }
+    virtual float ScaleCoordY(float value) { return value; }
+    virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) {}
+    virtual void EnableSwapBuffers(bool bEnable) {}
+    virtual WIN_HWND GetHWND() { return nullptr; }
+    virtual void OnEntityDeleted(IEntityRender* pEntityRender) {}
+    virtual void SetGlobalShaderTemplateId(int nTemplateId) {}
+    virtual int GetGlobalShaderTemplateId() { return 0; }
+    virtual int EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset) { return 0; }
+    virtual int CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) { return 0; }
+    virtual bool DestroyRenderTarget(int nHandle) { return false; }
+    virtual bool SetRenderTarget(int nHandle) { return false; }
+    virtual float EF_GetWaterZElevation(float fX, float fY) { return 0.0f; }
     
-    // Shader system stubs
+    // Statistics
+    virtual int GetPolyCount() { return 0; }
+    virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { nPolygons = 0; nShadowVolPolys = 0; }
+    virtual void SetClearColor(const Vec3& vColor) {}
+    virtual int GetFrameID(bool bIncludeRecursiveCalls = true) { return 0; }
+    virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) {}
+    
+    // Stub implementations for complex methods (to be implemented by specialized classes)
+    virtual void SetTexture(int tnum, ETexType Type = eTT_Base) {}
+    virtual void SetWhiteTexture() {}
+    virtual unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 
+                                             ETEX_Format eTFSrc, ETEX_Format eTFDst, 
+                                             int nummipmap, bool repeat = true, 
+                                             int filter = FILTER_BILINEAR, int Id = 0, 
+                                             char* szCacheName = NULL, int flags = 0) { return 0; }
+    virtual void UpdateTextureInVideoMemory(uint tnum, unsigned char* newdata, int posx, int posy, 
+                                           int w, int h, ETEX_Format eTF = eTF_0888) {}
+    virtual unsigned int LoadTexture(const char* filename, int* tex_type = NULL, 
+                                    unsigned int def_tid = 0, bool compresstodisk = true, 
+                                    bool bWarn = true) { return 0; }
+    virtual bool DXTCompress(byte* raw_data, int nWidth, int nHeight, ETEX_Format eTF, 
+                            bool bUseHW, bool bGenMips, int nSrcBytesPerPix, 
+                            MIPDXTcallback callback = 0) { return false; }
+    virtual bool DXTDecompress(byte* srcData, byte* dstData, int nWidth, int nHeight, 
+                              ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix) { return false; }
+    virtual void RemoveTexture(unsigned int TextureId) {}
+    virtual void RemoveTexture(ITexPic* pTexPic) {}
+    virtual bool SetGammaDelta(const float fGamma) { return false; }
+    
+    // Text and UI Rendering stubs
+    virtual void WriteXY(CXFont* currfont, int x, int y, float xscale, float yscale, 
+                        float r, float g, float b, float a, const char* message, ...) {}
+    virtual void Draw2dText(float posX, float posY, const char* szText, SDrawTextInfo& info) {}
+    virtual void Draw2dImage(float xpos, float ypos, float w, float h, int texture_id, 
+                            float s0 = 0, float t0 = 0, float s1 = 1, float t1 = 1, 
+                            float angle = 0, float r = 1, float g = 1, float b = 1, 
+                            float a = 1, float z = 1) {}
+    virtual void DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
+                          float s0, float t0, float s1, float t1, float r, float g, float b, float a) {}
+    virtual int SetPolygonMode(int mode) { return 0; }
+    
+    // All EF_ (shader system) methods as stubs
     virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags) { return false; }
     virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags) { return false; }
     virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags) { return false; }
@@ -219,8 +228,6 @@ public:
     virtual CCObject* EF_AddSpriteToScene(int Ef, int numPts, SColorVert* verts, CCObject* obj, byte* inds = NULL, int ninds = 0, int nFogID = 0) { return nullptr; }
     virtual void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D* verts) {}
     virtual void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D* verts) {}
-    
-    // Additional stub methods for compilation
     virtual IShader* EF_LoadShader(const char* name, EShClass Class, int flags = 0, uint64 nMaskGen = 0) { return nullptr; }
     virtual SShaderItem EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags = 0, SInputShaderResources* Res = NULL, uint64 nMaskGen = 0) { return SShaderItem(); }
     virtual bool EF_ReloadFile(const char* szFileName) { return false; }
@@ -262,32 +269,21 @@ public:
     virtual void EF_SetWorldColor(float r, float g, float b, float a = 1.0f) {}
     virtual int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, int nIndex = -1, bool bCaustics = false) { return 0; }
     
-    // Statistics and utility stubs
-    virtual int GetPolyCount() { return 0; }
-    virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { nPolygons = 0; nShadowVolPolys = 0; }
-    virtual void SetClearColor(const Vec3& vColor) {}
+    // Font system stubs
+    virtual bool FontUploadTexture(class CFBitmap*, ETEX_Format eTF = eTF_8888) { return false; }
+    virtual int FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF = eTF_8888) { return 0; }
+    virtual bool FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData) { return false; }
+    virtual void FontReleaseTexture(class CFBitmap* pBmp) {}
+    virtual void FontSetTexture(class CFBitmap*, int nFilterMode) {}
+    virtual void FontSetTexture(int nTexId, int nFilterMode) {}
+    virtual void FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight) {}
+    virtual void FontSetBlending(int src, int dst) {}
+    virtual void FontRestoreRenderingState() {}
+    
+    // LeafBuffer stubs
     virtual CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char* szSource = "Unknown", class CIndexedMesh* pIndexedMesh = 0) { return nullptr; }
     virtual CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, int nVertFormat, ushort* pIndices, int nIndices, int nPrimetiveType, const char* szSource, EBufferType eBufType = eBT_Dynamic, int nMatInfoCount = 1, int nClientTextureBindID = 0, bool (*PrepareBufferCallback)(CLeafBuffer*, bool) = NULL, void* CustomData = NULL, bool bOnlyVideoBuffer = false, bool bPrecache = true) { return nullptr; }
     virtual void DeleteLeafBuffer(CLeafBuffer* pLBuffer) {}
-    virtual int GetFrameID(bool bIncludeRecursiveCalls = true) { return 0; }
-    virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) {}
-    virtual void DrawLabelImage(const Vec3& vPos, float fSize, int nTextureId) {}
-    virtual void DrawLabel(Vec3 pos, float font_size, const char* label_text, ...) {}
-    virtual void DrawLabelEx(Vec3 pos, float font_size, float* pfColor, bool bFixedSize, bool bCenter, const char* label_text, ...) {}
-    virtual void Draw2dLabel(float x, float y, float font_size, float* pfColor, bool bCenter, const char* label_text, ...) {}
-    virtual float ScaleCoordX(float value) { return value; }
-    virtual float ScaleCoordY(float value) { return value; }
-    virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) {}
-    virtual void EnableSwapBuffers(bool bEnable) {}
-    virtual WIN_HWND GetHWND() { return nullptr; }
-    virtual void OnEntityDeleted(IEntityRender* pEntityRender) {}
-    virtual void SetGlobalShaderTemplateId(int nTemplateId) {}
-    virtual int GetGlobalShaderTemplateId() { return 0; }
-    virtual int EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset) { return 0; }
-    virtual int CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) { return 0; }
-    virtual bool DestroyRenderTarget(int nHandle) { return false; }
-    virtual bool SetRenderTarget(int nHandle) { return false; }
-    virtual float EF_GetWaterZElevation(float fX, float fY) { return 0.0f; }
     
     // Additional utility stubs
     virtual void TextToScreen(float x, float y, const char* format, ...) {}
@@ -316,38 +312,54 @@ public:
     virtual void SetFogColor(float* color) {}
     virtual void TransformTextureMatrix(float x, float y, float angle, float scale) {}
     virtual void ResetTextureMatrix() {}
-    virtual char GetType() { return R_METAL_RENDERER; }
-    virtual char* GetVertexProfile(bool bSupportedProfile) { return nullptr; }
-    virtual char* GetPixelProfile(bool bSupportedProfile) { return nullptr; }
-    virtual void SetType(char type) {}
     virtual unsigned int MakeSprite(float object_scale, int tex_size, float angle, IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid) { return 0; }
     virtual unsigned int Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj) { return 0; }
     virtual ShadowMapFrustum* MakeShadowMapFrustum(ShadowMapFrustum* lof, ShadowMapLightSource* pLs, const Vec3& obj_pos, list2<IStatObj*>* pStatObjects, int shadow_type) { return nullptr; }
     virtual void Set2DMode(bool enable, int ortox, int ortoy) {}
     virtual int ScreenToTexture() { return 0; }
     virtual void SetTexClampMode(bool clamp) {}
+    virtual void DrawLabelImage(const Vec3& vPos, float fSize, int nTextureId) {}
+    virtual void DrawLabel(Vec3 pos, float font_size, const char* label_text, ...) {}
+    virtual void DrawLabelEx(Vec3 pos, float font_size, float* pfColor, bool bFixedSize, bool bCenter, const char* label_text, ...) {}
+    virtual void Draw2dLabel(float x, float y, float font_size, float* pfColor, bool bCenter, const char* label_text, ...) {}
     
     // File I/O stubs
     virtual void WriteDDS(byte* dat, int wdt, int hgt, int Size, const char* name, EImFormat eF, int NumMips) {}
     virtual void WriteTGA(byte* dat, int wdt, int hgt, const char* name, int bits) {}
     virtual void WriteJPG(byte* dat, int wdt, int hgt, char* name) {}
-    
-protected:
-    // Specialized manager instances
-    std::unique_ptr<CMetalTextureManager> m_textureManager;
-    std::unique_ptr<CMetalShaderManager> m_shaderManager;
-    std::unique_ptr<CMetalUtilityRenderer> m_utilityRenderer;
-    
-    // Initialization methods
-    bool InitializeManagers();
-    void ShutdownManagers();
-};
 
-// Metal utility functions
-MTLPixelFormat ConvertToMetalFormat(ETEX_Format format);
-MTLPrimitiveType ConvertToMetalPrimitive(eRenderPrimitiveType type);
-MTLCompareFunction ConvertToMetalDepthFunc(int func);
+protected:
+    // Metal-specific members
+    id<MTLDevice> m_device;
+    id<MTLCommandQueue> m_commandQueue;
+    id<MTLRenderCommandEncoder> m_renderEncoder;
+    MTKView* m_metalView;
+    CAMetalLayer* m_metalLayer;
+    
+    // Current frame resources
+    id<MTLCommandBuffer> m_currentCommandBuffer;
+    MTLRenderPassDescriptor* m_renderPassDescriptor;
+    
+    // Render state
+    id<MTLRenderPipelineState> m_currentPipelineState;
+    id<MTLDepthStencilState> m_currentDepthStencilState;
+    
+    // Basic renderer state
+    bool m_isInitialized;
+    int m_width, m_height;
+    int m_cbpp, m_zbpp, m_sbpp;
+    bool m_fullscreen;
+    void* m_camera; // CCamera* - forward declaration to avoid include issues
+    
+    // Internal methods
+    bool InitializeDevice();
+    bool InitializeCommandQueue();
+    bool InitializeRenderPipeline();
+    void UpdateRenderPassDescriptor();
+    id<MTLTexture> CreateMetalTexture(int width, int height, MTLPixelFormat format);
+    id<MTLBuffer> CreateMetalBuffer(void* data, size_t size, MTLResourceOptions options);
+};
 
 #endif // __APPLE__ && __MACH__
 
-#endif // METAL_RENDERER_H
+#endif // METAL_BASE_RENDERER_H

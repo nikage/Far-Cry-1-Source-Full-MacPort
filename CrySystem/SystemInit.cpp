@@ -153,6 +153,9 @@ bool CSystem::OpenRenderLibrary(const char *t_rend)
   if (stricmp(t_rend, "Direct3D9") == 0)
     return OpenRenderLibrary(R_DX9_RENDERER);
   else
+  if (stricmp(t_rend, "Metal") == 0)
+    return OpenRenderLibrary(R_METAL_RENDERER);
+  else
   if (stricmp(t_rend, "NULL") == 0)
     return OpenRenderLibrary(R_NULL_RENDERER);
 
@@ -193,6 +196,9 @@ bool CSystem::OpenRenderLibrary(int type)
   else
   if (type == R_DX9_RENDERER)
     strcpy(libname, "XRenderD3D9.dll");
+  else
+  if (type == R_METAL_RENDERER)
+    strcpy(libname, "libXRenderMetal.dylib");
   else
   if (type == R_NULL_RENDERER)
     strcpy(libname, DLL_NULLRENDERER);
@@ -461,6 +467,16 @@ ICVar* CSystem::attachVariable (const char* szVarName, int* pContainer, const ch
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitRenderer(WIN_HINSTANCE hinst, WIN_HWND hwnd,const char *szCmdLine)
 {
+#ifdef __APPLE__
+	// Enable renderer system for macOS with Metal implementation
+	GetILog()->LogToFile( "Initializing Metal renderer for macOS" );
+	CreateRendererVars();
+	
+	if (!OpenRenderLibrary(m_rDriver->GetString()))
+		return false;
+	
+	return true;
+#else
   CreateRendererVars();
 
 	if(m_bDedicatedServer)
@@ -471,6 +487,7 @@ bool CSystem::InitRenderer(WIN_HINSTANCE hinst, WIN_HWND hwnd,const char *szCmdL
 
 	if (!OpenRenderLibrary(m_rDriver->GetString()))
 		return false;
+#endif
 
 #ifdef WIN32
 

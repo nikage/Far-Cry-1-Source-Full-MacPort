@@ -74,6 +74,7 @@ add_subdirectory(CryFont)
 # add_subdirectory(CryNetwork)
 add_subdirectory(CryScriptSystem)
 # add_subdirectory(CrySoundSystem)  # Disabled for macOS - Windows-specific CrySound API not available
+add_subdirectory(RenderDll)
 add_subdirectory(CryGame)
 
 # Just compile the Main.cpp which we know works
@@ -130,4 +131,23 @@ endif()
 # Install
 if(APPLE)
     install(TARGETS FarCryWorking BUNDLE DESTINATION .)
+    
+    # Copy all dylibs to the app bundle automatically
+    add_custom_command(TARGET FarCryWorking POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:CrySystem>
+            $<TARGET_FILE:Cry3DEngine>
+            $<TARGET_FILE:CryEntitySystem>
+            $<TARGET_FILE:CryAnimation>
+            $<TARGET_FILE:CryInput>
+            $<TARGET_FILE:CryMovie>
+            $<TARGET_FILE:CryPhysics>
+            $<TARGET_FILE:CryAISystem>
+            $<TARGET_FILE:CryFont>
+            $<TARGET_FILE:CryScriptSystem>
+            $<TARGET_FILE:XRenderMetal>
+            ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
+        COMMENT "Copying all dylibs to app bundle"
+    )
 endif()
