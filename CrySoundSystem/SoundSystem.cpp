@@ -282,7 +282,7 @@ CSoundSystem::CSoundSystem(ISystem* pSystem, HWND hWnd) : CSoundSystemCommon(pSy
 	}
 
 #if !defined(_DEBUG)// || defined(WIN64)
-	CS_SetMemorySystem(NULL,NULL,CrySound_Alloc,CrySound_Realloc,CrySound_Free);
+	CS_SetMemorySystem(0,0,CrySound_Alloc,CrySound_Realloc,CrySound_Free);
 #endif
 
 	m_pILog->Log("------------------------------------------CRYSOUND VERSION=%f\n",CS_GetVersion());
@@ -314,7 +314,7 @@ CSoundSystem::CSoundSystem(ISystem* pSystem, HWND hWnd) : CSoundSystemCommon(pSy
 	CS_SetHWND(hWnd);	
 
 	// Assign file access callbacks to fmod to our pak file system.
-	CS_File_SetCallbacks( CrySound_fopen,CrySound_fclose,CrySound_fread,CrySound_fseek,CrySound_ftell );
+	CS_File_SetCallbacks( (CS_OPENCALLBACK)CrySound_fopen,CrySound_fclose,CrySound_fread,CrySound_fseek,CrySound_ftell );
  
 	for (int i=0; i < CS_GetNumDrivers(); i++) 
 	{
@@ -1877,7 +1877,10 @@ void	CSoundSystem::GetSoundMemoryUsageInfo(size_t &nCurrentMemory,size_t &nMaxMe
   nCurrentMemory = tmpnCurrentMemory;
   nMaxMemory = tmpnMaxMemory;
 #else
-  CS_GetMemoryStats(&nCurrentMemory,&nMaxMemory);
+  unsigned int tmpCurrent, tmpMax;
+  CS_GetMemoryStats(&tmpCurrent, &tmpMax);
+  nCurrentMemory = tmpCurrent;
+  nMaxMemory = tmpMax;
 #endif
 }
 
@@ -1953,11 +1956,14 @@ void CSoundSystem::GetMemoryUsage(class ICrySizer* pSizer)
     nCurrentAlloced = tmpnCurrentMemory;
     nMaxAlloced = tmpnMaxMemory;
 #else
- 		CS_GetMemoryStats(&nCurrentAlloced, &nMaxAlloced);
+ 		unsigned int tmpCurrent, tmpMax;
+ 		CS_GetMemoryStats(&tmpCurrent, &tmpMax);
+ 		nCurrentAlloced = tmpCurrent;
+ 		nMaxAlloced = tmpMax;
 #endif
 
 		//CS_GetMemoryStats(&nCurrentAlloced, &nMaxAlloced);
-		if (!pSizer->AddObject(&CS_Init, nCurrentAlloced))
+		if (!pSizer->AddObject((const void*)&CS_Init, nCurrentAlloced))
 			return;
 	}
 }

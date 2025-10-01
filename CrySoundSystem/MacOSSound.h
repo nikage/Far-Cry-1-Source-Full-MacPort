@@ -37,7 +37,7 @@
 @class AVAudioUnitReverb;
 
 // macOS-specific sound implementation
-class CMacOSSoundBuffer : public ISoundBuffer
+class CMacOSSoundBuffer : public CSoundBuffer
 {
 public:
     CMacOSSoundBuffer();

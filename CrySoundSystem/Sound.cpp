@@ -922,7 +922,7 @@ void CSound::SetPitch(int nValue)
 //////////////////////////////////////////////////////////////////////
 void CSound::SetLoopPoints(const int iLoopStart, const int iLoopEnd)
 {
-	CHECK_LOADED(SetLoopPoints);
+	CHECK_LOADED(SetLoopPoints, );
 	if (m_pSound->GetSample())
 	{
 		GUARD_HEAP;

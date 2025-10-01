@@ -73,7 +73,7 @@ add_subdirectory(CryFont)
 # CryNetwork excluded as requested - multiplayer functionality
 # add_subdirectory(CryNetwork)
 add_subdirectory(CryScriptSystem)
-add_subdirectory(CrySoundSystem)
+# add_subdirectory(CrySoundSystem)  # Temporarily disabled due to compilation issues
 add_subdirectory(CryGame)
 
 # Just compile the Main.cpp which we know works
@@ -96,7 +96,7 @@ target_link_libraries(FarCryWorking PRIVATE
     CryAISystem
     CryFont
     CryScriptSystem
-    CrySoundSystem
+    # CrySoundSystem  # Temporarily disabled
     # CryNetwork excluded as requested - multiplayer functionality
     CryGame
 )
