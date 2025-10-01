@@ -94,20 +94,14 @@ target_link_libraries(FarCryWorking PRIVATE
     Cry3DEngine
     CryEntitySystem
     CryAnimation
-    # CryInput temporarily excluded due to interface mismatch issues
     CryInput
     CryMovie
     CryPhysics
     CryAISystem
-    # CryFont temporarily excluded due to missing FreeType dependency
     # CryFont
-    # CryNetwork temporarily excluded due to socket compatibility issues
     # CryNetwork
-    # CryScriptSystem temporarily excluded due to missing Lua dependency
     # CryScriptSystem
-    # CrySoundSystem temporarily excluded due to interface mismatch issues
     # CrySoundSystem
-    # CryGame temporarily excluded due to complex Windows-specific UI issues
     # CryGame
 )
 

@@ -3,13 +3,28 @@
 #include <stdlib.h>
 
 #define XMLPARSEAPI(type) type
-#include "expat\expat.h"
+#include <expat.h>
 #include "xml.h"
 #include <string>
 
 // needed for crypak
 #include <ISystem.h>
 #include <ICryPak.h>
+
+// Memory management functions for macOS
+extern "C" {
+    void* CryModuleMalloc(size_t size) throw() {
+        return malloc(size);
+    }
+    
+    void* CryModuleRealloc(void* ptr, size_t size) throw() {
+        return realloc(ptr, size);
+    }
+    
+    void CryModuleFree(void* ptr) throw() {
+        free(ptr);
+    }
+}
 
 /**
  ******************************************************************************

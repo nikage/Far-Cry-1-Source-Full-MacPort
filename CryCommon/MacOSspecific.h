@@ -1963,6 +1963,8 @@ inline int GetProcessAffinityMask(void* hProcess, void* lpProcessAffinityMask, v
     return 1;
 }
 
+// Memory management functions are handled by _ACCESS_POOL macro in CryAISystem
+
 #endif
 
 #endif //_CRY_COMMON_MACOS_SPECIFIC_HDR_
