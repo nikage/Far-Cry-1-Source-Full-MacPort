@@ -300,6 +300,9 @@ IRenderer* CSystem::CreateRenderer(bool fullscreen, void* hinst, void* hWndAttac
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitNetwork()
 {
+	// Network functionality disabled for macOS build
+	GetILog()->LogToFile( "Network system disabled for macOS" );
+	return true;
 
 #ifndef _XBOX
 	PFNCREATENETWORK pfnCreateNetwork;
@@ -795,41 +798,11 @@ bool CSystem::InitAISystem()
 bool CSystem::InitScriptSystem()
 {
 #ifndef _XBOX
-#if defined(LINUX)
-	m_dll.hScript = LoadDLL("cryscriptsystem.so");
-#elif defined(__APPLE__) && defined(__MACH__)
-	m_dll.hScript = LoadDLL("libCryScriptSystem.dylib");
-#else
-	m_dll.hScript = LoadDLL("CryScriptSystem.dll");
-#endif
-	if(m_dll.hScript==NULL)
-	{
-		Error( "Failed to load CryScriptSystem library" );
-		return (false);
-	}
-	GetILog()->LogToFile( "CryScriptSystem library loaded successfully at %p", m_dll.hScript );
-
-	CREATESCRIPTSYSTEM_FNCPTR fncCreateScriptSystem;
-	fncCreateScriptSystem = (CREATESCRIPTSYSTEM_FNCPTR) CryGetProcAddress(m_dll.hScript,"CreateScriptSystem");
-	if(fncCreateScriptSystem==NULL)
-	{
-		Error( "Error initializeing ScriptSystem - function not found" );
-		return (false);
-	}
-	
-	GetILog()->LogToFile( "CreateScriptSystem function found at %p", fncCreateScriptSystem );
-
-	m_pScriptSink = new CScriptSink(this,m_pConsole);
-	GetILog()->LogToFile( "Calling CreateScriptSystem function..." );
-	m_pScriptSystem=fncCreateScriptSystem(this,m_pScriptSink,NULL,true);
-	if(m_pScriptSystem==NULL)
-	{
-		Error( "Error initializeing ScriptSystem - CreateScriptSystem returned NULL" );
-		delete m_pScriptSink;
-		m_pScriptSink = NULL;
-		return (false);
-	}
-	GetILog()->LogToFile( "CreateScriptSystem succeeded, script system created" );
+	// Temporarily disable script system for macOS to isolate other issues
+	GetILog()->LogToFile( "Script system temporarily disabled for macOS" );
+	m_pScriptSystem = NULL;
+	m_pScriptSink = NULL;
+	return true;
 #else
 	m_pScriptSink = new CScriptSink(this,m_pConsole);
 	m_pScriptSystem=CreateScriptSystem(m_pScriptSink,NULL,true);
@@ -847,9 +820,10 @@ bool CSystem::InitScriptSystem()
 
 	assert( m_pConsole );
 	//@HACK!
-	((CXConsole*)m_pConsole)->SetScriptSystem(m_pScriptSystem);
+	// Temporarily disabled for macOS
+	// ((CXConsole*)m_pConsole)->SetScriptSystem(m_pScriptSystem);
 
-	m_pScriptSystem->PostInit();
+	// m_pScriptSystem->PostInit();
 
 	return (true);
 }
@@ -1257,7 +1231,7 @@ bool CSystem::Init( const SSystemInitParams &params )
 		CryLogAlways("Network initialization");
 		InitNetwork();
 
-		m_pNetwork->SetLocalIP((char *)(CmdlineSink.m_sLocalIP.c_str()));
+		if (m_pNetwork) m_pNetwork->SetLocalIP((char *)(CmdlineSink.m_sLocalIP.c_str()));
 	}
 	//////////////////////////////////////////////////////////////////////////
 	// PHYSICS

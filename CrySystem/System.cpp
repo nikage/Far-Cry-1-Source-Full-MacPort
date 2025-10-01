@@ -1365,7 +1365,7 @@ void CSystem::OpenBasicPaks()
 {
 
 	const char *szLanguage = NULL;
-	m_pScriptSystem->GetGlobalValue("g_language", szLanguage);
+	if (m_pScriptSystem) m_pScriptSystem->GetGlobalValue("g_language", szLanguage);
 	//////////////////////////////////////////////////////////////////////////
 	// load language pak
 	if (!szLanguage)
