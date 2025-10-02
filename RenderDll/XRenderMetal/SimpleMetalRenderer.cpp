@@ -194,10 +194,10 @@ const CCamera& CSimpleMetalRenderer::GetCamera()
     return *m_camera;
 }
 
-void CSimpleMetalRenderer::SetTexture(int tnum, int Type)
+void CSimpleMetalRenderer::SetTexture(int tnum, ETexType Type)
 {
     // Basic texture binding - for now just log the call
-    printf("SetTexture: tex=%d type=%d\n", tnum, Type);
+    printf("SetTexture: tex=%d type=%d\n", tnum, (int)Type);
     // TODO: Implement actual texture binding with Metal
 }
 
@@ -263,14 +263,14 @@ int CSimpleMetalRenderer::GetStencilBpp()
     return m_stencilBpp;
 }
 
-int CSimpleMetalRenderer::GetType()
+char CSimpleMetalRenderer::GetType()
 {
-    return m_type;
+    return (char)m_type;
 }
 
-void CSimpleMetalRenderer::SetType(int type)
+void CSimpleMetalRenderer::SetType(char type)
 {
-    m_type = type;
+    m_type = (int)type;
 }
 
 void CSimpleMetalRenderer::Release()
@@ -464,17 +464,19 @@ void CSimpleMetalRenderer::TextToScreenColor(int x, int y, float r, float g, flo
     printf("TextToScreenColor: %s\n", buffer);
 }
 
-int CSimpleMetalRenderer::GetFrameID()
+int CSimpleMetalRenderer::GetFrameID(bool bIncludeRecursiveCalls)
 {
     return m_frameID;
 }
 
 
 // Create a simple renderer that can be cast to IRenderer
-void* CreateSimpleRenderer(int argc, char* argv[], SCryRenderInterface* sp)
+IRenderer* CreateSimpleRenderer(int argc, char* argv[], SCryRenderInterface* sp)
 {
+    printf("CreateSimpleRenderer called\n");
     CSimpleMetalRenderer* renderer = new CSimpleMetalRenderer();
-    return (void*)renderer;
+    printf("CreateSimpleRenderer created renderer=%p\n", renderer);
+    return (IRenderer*)renderer;
 }
 
 // Export the function that the system expects
@@ -482,7 +484,9 @@ extern "C" {
     __attribute__((visibility("default")))
     IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
     {
-        return (IRenderer*)CreateSimpleRenderer(argc, argv, sp);
+        printf("PackageRenderConstructor START\n");
+        fflush(stdout);
+        return nullptr;
     }
 }
 
@@ -490,9 +494,30 @@ extern "C" {
 IRenderer* (*g_PackageRenderConstructor)(int, char*[], SCryRenderInterface*) = PackageRenderConstructor;
 
 // Missing implementation for EnumDisplayFormats
-int CSimpleMetalRenderer::EnumDisplayFormats(void* Formats, bool bReset)
+int CSimpleMetalRenderer::EnumDisplayFormats(TArray<SDispFormat>& Formats, bool bReset)
 {
     // TODO: Implement display format enumeration
     printf("EnumDisplayFormats called\n");
     return 0;
+}
+
+// Implementation for FlushTextMessages
+void CSimpleMetalRenderer::FlushTextMessages()
+{
+    // TODO: Implement text message flushing
+}
+
+// Implementation for EF_LoadTexture
+ITexPic* CSimpleMetalRenderer::EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1, float fAmount2, int Id, int BindId)
+{
+    // TODO: Implement texture loading
+    printf("EF_LoadTexture called: %s\n", nameTex);
+    return nullptr;
+}
+
+// Implementation for EF_GetTextureByID
+ITexPic* CSimpleMetalRenderer::EF_GetTextureByID(int texture_id)
+{
+    // TODO: Implement texture retrieval by ID
+    return nullptr;
 }
