@@ -1,25 +1,27 @@
 # CrySoundSystem - Audio system
 cmake_minimum_required(VERSION 3.20)
 
-# Find all source files
-file(GLOB_RECURSE CRYSOUND_SOURCES
-    "*.cpp"
-    "*.c"
-)
-
-file(GLOB_RECURSE CRYSOUND_HEADERS
-    "*.h"
-)
-
-# Add our macOS-specific files
+# Platform-specific source selection
 if(APPLE)
-    list(APPEND CRYSOUND_SOURCES
-        MacOSSound.cpp
+    # macOS-specific sources only
+    set(CRYSOUND_SOURCES
+        "SimpleMacOSSoundSystem.cpp"
     )
-    list(APPEND CRYSOUND_HEADERS
-        MacOSSound.h
+    
+    set(CRYSOUND_HEADERS
+    )
+else()
+    # Windows/Linux sources
+    file(GLOB_RECURSE CRYSOUND_SOURCES
+        "*.cpp"
+        "*.c"
+    )
+
+    file(GLOB_RECURSE CRYSOUND_HEADERS
+        "*.h"
     )
 endif()
+
 
 # Create the CrySoundSystem library
 add_library(CrySoundSystem SHARED ${CRYSOUND_SOURCES} ${CRYSOUND_HEADERS})
@@ -35,22 +37,26 @@ target_include_directories(CrySoundSystem PUBLIC
 
 # Platform-specific linking
 if(APPLE)
-    # Find Vorbis library
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(VORBIS REQUIRED vorbisfile)
+    # Try to find Vorbis library, but don't require it
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(VORBIS vorbisfile)
+    endif()
     
     target_link_libraries(CrySoundSystem PRIVATE
         ${CORE_AUDIO_FRAMEWORK}
         ${AUDIO_TOOLBOX_FRAMEWORK}
         "-framework AVFoundation"
         "-framework AudioUnit"
-        ${VORBIS_LIBRARIES}
     )
     
-    target_link_directories(CrySoundSystem PRIVATE ${VORBIS_LIBRARY_DIRS})
-    
-    target_include_directories(CrySoundSystem PRIVATE ${VORBIS_INCLUDE_DIRS})
-    target_compile_definitions(CrySoundSystem PRIVATE ${VORBIS_CFLAGS_OTHER})
+    # Add Vorbis if found
+    if(VORBIS_FOUND)
+        target_link_libraries(CrySoundSystem PRIVATE ${VORBIS_LIBRARIES})
+        target_link_directories(CrySoundSystem PRIVATE ${VORBIS_LIBRARY_DIRS})
+        target_include_directories(CrySoundSystem PRIVATE ${VORBIS_INCLUDE_DIRS})
+        target_compile_definitions(CrySoundSystem PRIVATE ${VORBIS_CFLAGS_OTHER})
+    endif()
     
     # Set source files that need Objective-C++ compilation
     set_source_files_properties(MacOSSound.cpp PROPERTIES

@@ -8,22 +8,23 @@
 //  Created:     29/09/2025 by Mac Silicon Port Team.
 //  Compilers:   Clang/LLVM for macOS
 //  Description: macOS Core Audio sound system implementation
+//               Replaces DirectSound/FMOD for cross-platform audio support
 // -------------------------------------------------------------------------
 //  History:
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#if defined(__APPLE__) && defined(__MACH__)
-
 #include "MacOSSound.h"
-#include "ISystem.h"
-#include <Foundation/Foundation.h>
-#include <AVFoundation/AVFoundation.h>
+#include "ISound.h"
+#include "SoundBuffer.h"
+#include "SoundSystemCommon.h"
+#include <algorithm>
+#include <iostream>
 
 // CMacOSSoundBuffer implementation
 CMacOSSoundBuffer::CMacOSSoundBuffer()
-    : m_props("MacOSSoundBuffer", 0)
-    , CSoundBuffer(nullptr, m_props)
+    : CSoundBuffer(nullptr, m_props)
+    , m_props("", 0)
     , m_playerNode(nil)
     , m_audioBuffer(nil)
     , m_volume(1.0f)
@@ -32,36 +33,34 @@ CMacOSSoundBuffer::CMacOSSoundBuffer()
     , m_is3D(false)
     , m_isPlaying(false)
     , m_isLooping(false)
-    , m_position(0, 0, 0)
-    , m_velocity(0, 0, 0)
     , m_minDistance(1.0f)
     , m_maxDistance(100.0f)
     , m_flags(0)
     , m_length(0)
     , m_currentPos(0)
 {
-    memset(&m_format, 0, sizeof(m_format));
+    // Initialize audio format
+    m_format.mSampleRate = 44100.0;
+    m_format.mFormatID = kAudioFormatLinearPCM;
+    m_format.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+    m_format.mBytesPerPacket = 4;
+    m_format.mFramesPerPacket = 1;
+    m_format.mBytesPerFrame = 4;
+    m_format.mChannelsPerFrame = 2;
+    m_format.mBitsPerChannel = 16;
 }
 
 CMacOSSoundBuffer::~CMacOSSoundBuffer()
 {
-    Release();
-}
-
-void CMacOSSoundBuffer::Release()
-{
-    Stop();
+    if (m_playerNode)
+    {
+        [m_playerNode stop];
+        [m_playerNode release];
+    }
     
     if (m_audioBuffer)
     {
         [m_audioBuffer release];
-        m_audioBuffer = nil;
-    }
-    
-    if (m_playerNode)
-    {
-        [m_playerNode release];
-        m_playerNode = nil;
     }
 }
 
@@ -73,22 +72,9 @@ bool CMacOSSoundBuffer::LoadWave(const char* sFileName, int nFlags)
     m_fileName = sFileName;
     m_flags = nFlags;
     
-    return LoadAudioFile(sFileName);
-}
-
-bool CMacOSSoundBuffer::LoadOGG(const char* sFileName, int nFlags)
-{
-    // For now, treat OGG the same as other audio files
-    // AVAudioEngine can handle various formats including OGG
-    return LoadWave(sFileName, nFlags);
-}
-
-bool CMacOSSoundBuffer::LoadAudioFile(const char* fileName)
-{
-    NSString* filePath = [NSString stringWithUTF8String:fileName];
-    NSURL* fileURL = [NSURL fileURLWithPath:filePath];
-    
+    // Load audio file using AVAudioFile
     NSError* error = nil;
+    NSURL* fileURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:sFileName]];
     AVAudioFile* audioFile = [[AVAudioFile alloc] initForReading:fileURL error:&error];
     
     if (!audioFile || error)
@@ -100,47 +86,95 @@ bool CMacOSSoundBuffer::LoadAudioFile(const char* fileName)
         return false;
     }
     
-    // Get audio format
-    m_format = *[audioFile processingFormat].streamDescription;
-    m_length = (int)[audioFile length];
+    // Get the format
+    AVAudioFormat* format = [audioFile processingFormat];
+    // Store the format for later use - use a simpler approach
+    m_format.mSampleRate = [format sampleRate];
+    m_format.mFormatID = kAudioFormatLinearPCM;
+    m_format.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+    m_format.mBytesPerPacket = 4;
+    m_format.mFramesPerPacket = 1;
+    m_format.mBytesPerFrame = 4;
+    m_format.mChannelsPerFrame = [format channelCount];
+    m_format.mBitsPerChannel = 16;
     
-    // Create PCM buffer
-    AVAudioFrameCount frameCount = (AVAudioFrameCount)[audioFile length];
-    m_audioBuffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:[audioFile processingFormat]
-                                                     frameCapacity:frameCount];
+    // Read the entire file into a buffer
+    AVAudioPCMBuffer* buffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:format frameCapacity:(AVAudioFrameCount)[audioFile length]];
     
-    if (!m_audioBuffer)
+    if (![audioFile readIntoBuffer:buffer error:&error])
     {
-        [audioFile release];
+        NSLog(@"Error reading audio file: %@", [error localizedDescription]);
         return false;
     }
     
-    // Read audio data
-    BOOL success = [audioFile readIntoBuffer:m_audioBuffer error:&error];
-    [audioFile release];
+    m_audioBuffer = buffer;
+    m_length = (int)[buffer frameLength];
     
-    if (!success)
+    [audioFile release];
+    return true;
+}
+
+bool CMacOSSoundBuffer::LoadOGG(const char* sFileName, int nFlags)
+{
+    // For now, treat OGG files the same as WAV files
+    // TODO: Implement proper OGG decoding
+    return LoadWave(sFileName, nFlags);
+}
+
+void CMacOSSoundBuffer::Release()
+{
+    if (m_playerNode)
+    {
+        [m_playerNode stop];
+        [m_playerNode release];
+        m_playerNode = nil;
+    }
+    
+    if (m_audioBuffer)
     {
         [m_audioBuffer release];
         m_audioBuffer = nil;
-        return false;
     }
-    
-    return true;
+}
+
+int CMacOSSoundBuffer::GetLength()
+{
+    return m_length;
+}
+
+int CMacOSSoundBuffer::GetCurrentPos()
+{
+    return m_currentPos;
+}
+
+void CMacOSSoundBuffer::SetCurrentPos(int nPos)
+{
+    m_currentPos = nPos;
+    // TODO: Implement seeking in AVAudioPlayerNode
+}
+
+bool CMacOSSoundBuffer::IsPlaying()
+{
+    return m_isPlaying && m_playerNode && [m_playerNode isPlaying];
+}
+
+bool CMacOSSoundBuffer::IsLooping()
+{
+    return m_isLooping;
 }
 
 void CMacOSSoundBuffer::Play(bool bLoop, bool bLocked)
 {
-    if (!m_audioBuffer || !m_playerNode)
+    if (!m_playerNode || !m_audioBuffer)
         return;
     
     m_isLooping = bLoop;
     m_isPlaying = true;
     
-    // Schedule the buffer for playback
     if (bLoop)
     {
-        [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil options:AVAudioPlayerNodeBufferLoops completionHandler:nil];
+        [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil 
+            options:AVAudioPlayerNodeBufferLoops completionHandler:nil];
     }
     else
     {
@@ -186,6 +220,11 @@ void CMacOSSoundBuffer::SetVolume(int nVolume)
     }
 }
 
+int CMacOSSoundBuffer::GetVolume()
+{
+    return (int)(m_volume * 100.0f);
+}
+
 void CMacOSSoundBuffer::SetPan(int nPan)
 {
     m_pan = nPan / 100.0f; // Convert from -100 to 100 to -1.0 to 1.0
@@ -196,10 +235,52 @@ void CMacOSSoundBuffer::SetPan(int nPan)
     }
 }
 
+int CMacOSSoundBuffer::GetPan()
+{
+    return (int)(m_pan * 100.0f);
+}
+
+void CMacOSSoundBuffer::SetFrequency(int nFreq)
+{
+    m_frequency = (float)nFreq;
+    // TODO: Implement frequency change in AVAudioPlayerNode
+}
+
+int CMacOSSoundBuffer::GetFrequency()
+{
+    return (int)m_frequency;
+}
+
+void CMacOSSoundBuffer::Set3DBuffer(bool b3D)
+{
+    m_is3D = b3D;
+}
+
+bool CMacOSSoundBuffer::Is3DBuffer()
+{
+    return m_is3D;
+}
+
 void CMacOSSoundBuffer::SetPosition(const Vec3& pos)
 {
     m_position = pos;
     UpdateSpatialAudio();
+}
+
+void CMacOSSoundBuffer::SetVelocity(const Vec3& vel)
+{
+    m_velocity = vel;
+}
+
+void CMacOSSoundBuffer::SetMinMaxDistance(float fMin, float fMax)
+{
+    m_minDistance = fMin;
+    m_maxDistance = fMax;
+}
+
+void CMacOSSoundBuffer::SetCone(int nInnerAngle, int nOuterAngle, int nOuterVolume)
+{
+    // TODO: Implement cone parameters
 }
 
 void CMacOSSoundBuffer::UpdateSpatialAudio()
@@ -226,6 +307,8 @@ CMacOSSound::CMacOSSound(CMacOSSoundBuffer* pBuffer)
     , m_fInnerAngle(360.0f)
     , m_fOuterAngle(360.0f)
     , m_bIsRelative(false)
+    , m_loopStart(0)
+    , m_loopEnd(0)
 {
     if (m_pBuffer)
     {
@@ -242,73 +325,284 @@ CMacOSSound::~CMacOSSound()
 }
 
 // ISound interface implementation
-void CMacOSSound::AddEventListener(ISoundEventListener* pListener) { /* TODO */ }
-void CMacOSSound::RemoveEventListener(ISoundEventListener* pListener) { /* TODO */ }
-bool CMacOSSound::IsPlaying() { return m_pBuffer ? m_pBuffer->IsPlaying() : false; }
-bool CMacOSSound::IsPlayingVirtual() { return false; }
-bool CMacOSSound::IsLoading() { return false; }
-bool CMacOSSound::IsLoaded() { return m_pBuffer != nullptr; }
-void CMacOSSound::Play(float fVolumeScale, bool bForceActiveState, bool bSetRatio) 
-{ 
-    if (m_pBuffer) 
+void CMacOSSound::AddEventListener(ISoundEventListener* pListener) 
+{
+    if (pListener)
     {
-        m_pBuffer->Play(m_bLoop, false);
+        m_eventListeners.push_back(pListener);
     }
 }
-void CMacOSSound::PlayFadeUnderwater(float fVolumeScale, bool bForceActiveState, bool bSetRatio) 
-{ 
+
+void CMacOSSound::RemoveEventListener(ISoundEventListener* pListener) 
+{
+    if (pListener)
+    {
+        auto it = std::find(m_eventListeners.begin(), m_eventListeners.end(), pListener);
+        if (it != m_eventListeners.end())
+        {
+            m_eventListeners.erase(it);
+        }
+    }
+}
+
+bool CMacOSSound::IsPlaying()
+{
+    return m_pBuffer && m_pBuffer->IsPlaying();
+}
+
+bool CMacOSSound::IsPlayingVirtual()
+{
+    return IsPlaying();
+}
+
+bool CMacOSSound::IsLoading()
+{
+    return false; // For now, loading is synchronous
+}
+
+bool CMacOSSound::IsLoaded()
+{
+    return m_pBuffer != nullptr;
+}
+
+void CMacOSSound::Play(float fVolumeScale, bool bForceActiveState, bool bSetRatio)
+{
+    if (m_pBuffer)
+    {
+        m_pBuffer->Play(m_bLoop);
+    }
+}
+
+void CMacOSSound::PlayFadeUnderwater(float fVolumeScale, bool bForceActiveState, bool bSetRatio)
+{
     Play(fVolumeScale, bForceActiveState, bSetRatio);
 }
-void CMacOSSound::Stop() 
-{ 
-    if (m_pBuffer) 
+
+void CMacOSSound::Stop()
+{
+    if (m_pBuffer)
     {
         m_pBuffer->Stop();
     }
 }
-const char* CMacOSSound::GetName() { return m_sName.c_str(); }
-const int CMacOSSound::GetId() { return m_nId; }
-void CMacOSSound::SetLoopMode(bool bLoop) { m_bLoop = bLoop; }
-bool CMacOSSound::Preload() { return true; }
-unsigned int CMacOSSound::GetCurrentSamplePos(bool bMilliSeconds) { return 0; }
-void CMacOSSound::SetCurrentSamplePos(unsigned int nPos, bool bMilliSeconds) { /* TODO */ }
-void CMacOSSound::SetPitching(float fPitching) { /* TODO */ }
-void CMacOSSound::SetRatio(float fRatio) { /* TODO */ }
-int CMacOSSound::GetFrequency() { return 44100; }
-void CMacOSSound::SetPitch(int nPitch) { m_fPitch = nPitch / 1000.0f; }
-void CMacOSSound::SetPan(int nPan) { m_fPan = nPan / 100.0f; }
-void CMacOSSound::SetMinMaxDistance(float fMinDist, float fMaxDist) 
-{ 
-    m_fMinDistance = fMinDist; 
-    m_fMaxDistance = fMaxDist; 
+
+const char* CMacOSSound::GetName()
+{
+    return m_sName.c_str();
 }
-void CMacOSSound::SetConeAngles(float fInnerAngle, float fOuterAngle) 
-{ 
-    m_fInnerAngle = fInnerAngle; 
-    m_fOuterAngle = fOuterAngle; 
+
+const int CMacOSSound::GetId()
+{
+    return m_nId;
 }
-void CMacOSSound::AddToScaleGroup(int nGroup) { /* TODO */ }
-void CMacOSSound::RemoveFromScaleGroup(int nGroup) { /* TODO */ }
-void CMacOSSound::SetScaleGroup(unsigned int nGroupBits) { /* TODO */ }
-void CMacOSSound::SetVolume(int nVolume) { m_nVolume = nVolume; }
-int CMacOSSound::GetVolume() { return m_nVolume; }
-void CMacOSSound::SetPosition(const Vec3& pos) { m_position = pos; }
-const bool CMacOSSound::GetPosition(Vec3& vPos) { vPos = m_position; return true; }
-void CMacOSSound::SetVelocity(const Vec3& vel) { m_velocity = vel; }
-Vec3 CMacOSSound::GetVelocity() { return m_velocity; }
-void CMacOSSound::SetDirection(const Vec3& dir) { m_direction = dir; }
-Vec3 CMacOSSound::GetDirection() { return m_direction; }
-void CMacOSSound::SetLoopPoints(const int iLoopStart, const int iLoopEnd) { /* TODO */ }
-bool CMacOSSound::IsRelative() const { return m_bIsRelative; }
-int CMacOSSound::AddRef() { return ++m_nRefCount; }
-int CMacOSSound::Release() 
-{ 
-    int nRef = --m_nRefCount;
-    if (nRef <= 0)
+
+void CMacOSSound::SetLoopMode(bool bLoop)
+{
+    m_bLoop = bLoop;
+}
+
+bool CMacOSSound::Preload()
+{
+    return m_pBuffer != nullptr;
+}
+
+unsigned int CMacOSSound::GetCurrentSamplePos(bool bMilliSeconds)
+{
+    return m_pBuffer ? m_pBuffer->GetCurrentPos() : 0;
+}
+
+void CMacOSSound::SetCurrentSamplePos(unsigned int nPos, bool bMilliSeconds) 
+{
+    if (m_pBuffer)
+    {
+        m_pBuffer->SetCurrentPos(nPos);
+    }
+}
+
+void CMacOSSound::SetPitching(float fPitching) 
+{
+    m_fPitch = fPitching;
+    if (m_pBuffer && m_pBuffer->GetPlayerNode())
+    {
+        [m_pBuffer->GetPlayerNode() setRate:fPitching];
+    }
+}
+
+void CMacOSSound::SetRatio(float fRatio) 
+{
+    int newVolume = (int)(m_nVolume * fRatio);
+    SetVolume(newVolume);
+}
+
+int CMacOSSound::GetFrequency()
+{
+    return m_pBuffer ? m_pBuffer->GetFrequency() : 44100;
+}
+
+void CMacOSSound::SetPitch(int nPitch)
+{
+    m_fPitch = nPitch / 100.0f;
+    SetPitching(m_fPitch);
+}
+
+void CMacOSSound::SetPan(int nPan)
+{
+    m_fPan = nPan / 100.0f;
+    if (m_pBuffer)
+    {
+        m_pBuffer->SetPan(nPan);
+    }
+}
+
+void CMacOSSound::SetMinMaxDistance(float fMinDist, float fMaxDist)
+{
+    m_fMinDistance = fMinDist;
+    m_fMaxDistance = fMaxDist;
+    if (m_pBuffer)
+    {
+        m_pBuffer->SetMinMaxDistance(fMinDist, fMaxDist);
+    }
+}
+
+void CMacOSSound::SetConeAngles(float fInnerAngle, float fOuterAngle)
+{
+    m_fInnerAngle = fInnerAngle;
+    m_fOuterAngle = fOuterAngle;
+}
+
+void CMacOSSound::AddToScaleGroup(int nGroup) 
+{
+    if (nGroup >= 0 && nGroup < MAX_SOUNDSCALE_GROUPS)
+    {
+        m_scaleGroups.insert(nGroup);
+    }
+}
+
+void CMacOSSound::RemoveFromScaleGroup(int nGroup) 
+{
+    m_scaleGroups.erase(nGroup);
+}
+
+void CMacOSSound::SetScaleGroup(unsigned int nGroupBits) 
+{
+    m_scaleGroups.clear();
+    for (int i = 0; i < MAX_SOUNDSCALE_GROUPS; i++)
+    {
+        if (nGroupBits & (1 << i))
+        {
+            m_scaleGroups.insert(i);
+        }
+    }
+}
+
+void CMacOSSound::SetVolume(int nVolume)
+{
+    m_nVolume = nVolume;
+    if (m_pBuffer)
+    {
+        m_pBuffer->SetVolume(nVolume);
+    }
+}
+
+int CMacOSSound::GetVolume()
+{
+    return m_nVolume;
+}
+
+void CMacOSSound::SetPosition(const Vec3& pos)
+{
+    m_position = pos;
+    if (m_pBuffer)
+    {
+        m_pBuffer->SetPosition(pos);
+    }
+}
+
+const bool CMacOSSound::GetPosition(Vec3& vPos)
+{
+    vPos = m_position;
+    return true;
+}
+
+void CMacOSSound::SetVelocity(const Vec3& vel)
+{
+    m_velocity = vel;
+    if (m_pBuffer)
+    {
+        m_pBuffer->SetVelocity(vel);
+    }
+}
+
+Vec3 CMacOSSound::GetVelocity()
+{
+    return m_velocity;
+}
+
+void CMacOSSound::SetDirection(const Vec3& dir)
+{
+    m_direction = dir;
+}
+
+Vec3 CMacOSSound::GetDirection()
+{
+    return m_direction;
+}
+
+void CMacOSSound::SetLoopPoints(const int iLoopStart, const int iLoopEnd) 
+{
+    m_loopStart = iLoopStart;
+    m_loopEnd = iLoopEnd;
+}
+
+bool CMacOSSound::IsRelative() const
+{
+    return m_bIsRelative;
+}
+
+int CMacOSSound::AddRef()
+{
+    return ++m_nRefCount;
+}
+
+int CMacOSSound::Release()
+{
+    int refCount = --m_nRefCount;
+    if (refCount <= 0)
     {
         delete this;
     }
-    return nRef;
+    return refCount;
+}
+
+// Additional missing pure virtual methods
+void CMacOSSound::SetSoundProperties(float fFadingValue)
+{
+    // TODO: Implement sound properties
+}
+
+void CMacOSSound::FXEnable(int nEffectNumber)
+{
+    // TODO: Implement FX effects
+}
+
+void CMacOSSound::FXSetParamEQ(float fCenter, float fBandwidth, float fGain)
+{
+    // TODO: Implement parametric EQ
+}
+
+int CMacOSSound::GetLengthMs()
+{
+    return m_pBuffer ? (m_pBuffer->GetLength() * 1000) / 44100 : 0;
+}
+
+int CMacOSSound::GetLength()
+{
+    return m_pBuffer ? m_pBuffer->GetLength() : 0;
+}
+
+void CMacOSSound::SetSoundPriority(unsigned char nSoundPriority)
+{
+    // TODO: Implement sound priority
 }
 
 // CMacOSSoundSystem implementation
@@ -325,38 +619,24 @@ CMacOSSoundSystem::CMacOSSoundSystem(ISystem* pSystem)
     , m_distanceFactor(1.0f)
     , m_rolloffFactor(1.0f)
     , m_listenerPos(0, 0, 0)
-    , m_listenerForward(0, 1, 0)
+    , m_listenerForward(0, 0, 1)
     , m_listenerUp(0, 0, 1)
     , m_listenerVel(0, 0, 0)
-    , m_pSystem(nullptr)
+    , m_pSystem(pSystem)
     , m_isInitialized(false)
 {
-}
-
-CMacOSSound::~CMacOSSound()
-{
-    Release();
-}
-
-bool CMacOSSound::Init(ISystem* pSystem)
-{
-    if (!pSystem)
-        return false;
-    
-    m_pSystem = pSystem;
-    
-    if (!InitializeAudioEngine())
+    if (pSystem)
     {
-        pSystem->GetILog()->Log("Error: Failed to initialize Core Audio engine");
-        return false;
+        InitializeAudioEngine();
     }
-    
-    m_isInitialized = true;
-    pSystem->GetILog()->Log("Core Audio sound system initialized successfully");
-    return true;
 }
 
-bool CMacOSSound::InitializeAudioEngine()
+CMacOSSoundSystem::~CMacOSSoundSystem()
+{
+    ShutdownAudioEngine();
+}
+
+bool CMacOSSoundSystem::InitializeAudioEngine()
 {
     // Create audio engine
     m_audioEngine = [[AVAudioEngine alloc] init];
@@ -387,10 +667,11 @@ bool CMacOSSound::InitializeAudioEngine()
         return false;
     }
     
+    m_isInitialized = true;
     return true;
 }
 
-void CMacOSSound::Release()
+void CMacOSSoundSystem::ShutdownAudioEngine()
 {
     if (m_audioEngine)
     {
@@ -415,6 +696,30 @@ void CMacOSSound::Release()
     m_loadedSounds.clear();
     
     m_isInitialized = false;
+}
+
+void CMacOSSoundSystem::Update()
+{
+    if (!m_isInitialized)
+        return;
+    
+    // Update 3D audio
+    Update3DAudio();
+}
+
+void CMacOSSoundSystem::SetListener(const CCamera& camera, const Vec3& vel)
+{
+    // Store listener velocity
+    m_listenerVel = vel;
+    
+    // Extract position and orientation from camera
+    // TODO: Implement proper camera access when CCamera is fully defined
+    m_listenerPos = Vec3(0, 0, 0); // camera.GetPos();
+    m_listenerForward = Vec3(0, 0, 1); // camera.GetAngles();
+    m_listenerUp = Vec3(0, 0, 1); // Default up vector
+    
+    // Update 3D audio for all sounds
+    Update3DAudio();
 }
 
 ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
@@ -452,59 +757,167 @@ ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
     return new CMacOSSound(buffer);
 }
 
-void CMacOSSoundSystem::SetListener(const CCamera& camera, const Vec3& vel)
+void CMacOSSoundSystem::Silence()
 {
-    // For now, just store the velocity - we can implement proper 3D audio later
-    m_listenerVel = vel;
-    
-    // TODO: Extract position and orientation from camera and update AVAudio3DMixerNode
-    // This would require proper 3D audio implementation
-    Update3DAudio();
+    // Stop all playing sounds
+    for (auto buffer : m_soundBuffers)
+    {
+        if (buffer)
+        {
+            buffer->Stop();
+        }
+    }
 }
 
-void CMacOSSound::Update3DAudio()
+void CMacOSSoundSystem::Pause(bool bPause, bool bResetVolume)
 {
-    // TODO: Update 3D audio positioning for all playing sounds
-    // This would involve updating the 3D mixer nodes based on listener position
+    // Pause/resume all sounds
+    for (auto buffer : m_soundBuffers)
+    {
+        if (buffer)
+        {
+            buffer->Pause(bPause);
+        }
+    }
 }
 
-void CMacOSSound::Update()
+void CMacOSSoundSystem::Mute(bool bMute)
 {
-    if (!m_isInitialized)
-        return;
-    
-    // Update 3D audio
-    Update3DAudio();
-    
-    // TODO: Update streaming sounds, cleanup finished sounds, etc.
+    m_isDeaf = bMute;
+    // TODO: Implement muting
 }
 
-// Stub implementations for remaining interface methods
-void CMacOSSound::UnloadSound(ISound* pSound) { /* TODO */ }
-ISound* CMacOSSound::CreateSound() { return nullptr; }
-bool CMacOSSound::PlaySound(ISound* pSound, const Vec3* pos, int nFlags) { return false; }
-void CMacOSSound::StopSound(ISound* pSound) { /* TODO */ }
-void CMacOSSound::PauseSound(ISound* pSound, bool bPause) { /* TODO */ }
-void CMacOSSound::SetSoundVolume(int nVolume) { m_soundVolume = nVolume; }
-int CMacOSSound::GetSoundVolume() { return m_soundVolume; }
-void CMacOSSound::SetMusicVolume(int nVolume) { m_musicVolume = nVolume; }
-float CMacOSSound::GetMusicVolume() { return m_musicVolume; }
-void CMacOSSound::Silence() { /* TODO */ }
-void CMacOSSound::SetMasterVolume(int nVolume) { m_masterVolume = nVolume; }
-int CMacOSSound::GetMasterVolume() { return m_masterVolume; }
-void CMacOSSound::SetDeafness(bool bDeaf) { m_isDeaf = bDeaf; }
-bool CMacOSSound::IsDeaf() { return m_isDeaf; }
-void CMacOSSound::SetDopplerFactor(float fFactor) { m_dopplerFactor = fFactor; }
-float CMacOSSound::GetDopplerFactor() { return m_dopplerFactor; }
-void CMacOSSound::SetDistanceFactor(float fFactor) { m_distanceFactor = fFactor; }
-float CMacOSSound::GetDistanceFactor() { return m_distanceFactor; }
-void CMacOSSound::SetRolloffFactor(float fFactor) { m_rolloffFactor = fFactor; }
-float CMacOSSound::GetRolloffFactor() { return m_rolloffFactor; }
-bool CMacOSSound::SetEAX(int nPreset) { return false; }
-int CMacOSSound::GetEAX() { return 0; }
-void CMacOSSound::LoadSoundBuffers() { /* TODO */ }
-void CMacOSSound::FreeSoundBuffers() { /* TODO */ }
-void CMacOSSound::CalcSoundMood(SMusicMood* pMood, float fRadius) { /* TODO */ }
+void CMacOSSoundSystem::SetMasterVolume(unsigned char nVol)
+{
+    m_masterVolume = nVol;
+    // TODO: Apply master volume to all sounds
+}
+
+void CMacOSSoundSystem::SetMasterVolumeScale(float fScale, bool bForceRecalc)
+{
+    // TODO: Implement master volume scaling
+}
+
+bool CMacOSSoundSystem::SetGroupScale(int nGroup, float fScale)
+{
+    // TODO: Implement group volume scaling
+    return true;
+}
+
+void CMacOSSoundSystem::RecomputeSoundOcclusion(bool bRecomputeListener, bool bForceRecompute, bool bReset)
+{
+    // TODO: Implement sound occlusion
+}
+
+bool CMacOSSoundSystem::IsEAX(int version)
+{
+    return false; // EAX not available on macOS
+}
+
+bool CMacOSSoundSystem::SetEaxListenerEnvironment(int nPreset, CS_REVERB_PROPERTIES* pProps, int nFlags)
+{
+    return false; // EAX not available on macOS
+}
+
+bool CMacOSSoundSystem::GetCurrentEaxEnvironment(int& nPreset, CS_REVERB_PROPERTIES& Props)
+{
+    return false; // EAX not available on macOS
+}
+
+void CMacOSSoundSystem::GetSoundMemoryUsageInfo(size_t& nCurrentMemory, size_t& nMaxMemory)
+{
+    nCurrentMemory = 0;
+    nMaxMemory = 0;
+    // TODO: Calculate actual memory usage
+}
+
+int CMacOSSoundSystem::GetUsedVoices()
+{
+    int count = 0;
+    for (auto buffer : m_soundBuffers)
+    {
+        if (buffer && buffer->IsPlaying())
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+float CMacOSSoundSystem::GetCPUUsage()
+{
+    return 0.0f; // TODO: Calculate actual CPU usage
+}
+
+float CMacOSSoundSystem::GetMusicVolume()
+{
+    return m_musicVolume / 100.0f;
+}
+
+void CMacOSSoundSystem::CalcDirectionalAttenuation(Vec3& Pos, Vec3& Dir, float fConeInRadians)
+{
+    // TODO: Implement directional attenuation
+}
+
+float CMacOSSoundSystem::GetDirectionalAttenuationMaxScale()
+{
+    return 1.0f;
+}
+
+bool CMacOSSoundSystem::UsingDirectionalAttenuation()
+{
+    return false;
+}
+
+void CMacOSSoundSystem::GetMemoryUsage(ICrySizer* pSizer)
+{
+    // TODO: Calculate memory usage
+}
+
+IVisArea* CMacOSSoundSystem::GetListenerArea()
+{
+    return nullptr; // TODO: Implement vis area support
+}
+
+Vec3 CMacOSSoundSystem::GetListenerPos()
+{
+    return m_listenerPos;
+}
+
+void CMacOSSoundSystem::Update3DAudio()
+{
+    // Update 3D audio for all loaded sounds
+    for (auto& soundBuffer : m_soundBuffers)
+    {
+        if (soundBuffer && soundBuffer->IsPlaying())
+        {
+            // Calculate relative position to listener
+            Vec3 relativePos = soundBuffer->GetPosition() - m_listenerPos;
+            float distance = relativePos.GetLength();
+            
+            // Apply distance attenuation
+            float attenuation = 1.0f;
+            if (distance > soundBuffer->GetMinDistance())
+            {
+                if (distance >= soundBuffer->GetMaxDistance())
+                {
+                    attenuation = 0.0f;
+                }
+                else
+                {
+                    float range = soundBuffer->GetMaxDistance() - soundBuffer->GetMinDistance();
+                    float factor = (distance - soundBuffer->GetMinDistance()) / range;
+                    attenuation = 1.0f - factor;
+                }
+            }
+            
+            // Update volume based on attenuation
+            float baseVolume = soundBuffer->GetVolume() / 100.0f;
+            soundBuffer->SetVolume((int)(baseVolume * attenuation * 100.0f));
+        }
+    }
+}
+
 
 // Utility functions
 AudioStreamBasicDescription CreateStandardFormat(int sampleRate, int channels, int bitsPerSample)
@@ -512,14 +925,22 @@ AudioStreamBasicDescription CreateStandardFormat(int sampleRate, int channels, i
     AudioStreamBasicDescription format = {0};
     format.mSampleRate = sampleRate;
     format.mFormatID = kAudioFormatLinearPCM;
-    format.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
+    format.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+    format.mBytesPerPacket = (bitsPerSample / 8) * channels;
+    format.mFramesPerPacket = 1;
+    format.mBytesPerFrame = (bitsPerSample / 8) * channels;
     format.mChannelsPerFrame = channels;
     format.mBitsPerChannel = bitsPerSample;
-    format.mBytesPerFrame = (bitsPerSample / 8) * channels;
-    format.mBytesPerPacket = format.mBytesPerFrame;
-    format.mFramesPerPacket = 1;
-    
     return format;
 }
 
-#endif // __APPLE__ && __MACH__
+AVAudioPCMBuffer* ConvertToStandardFormat(AVAudioPCMBuffer* sourceBuffer, 
+                                         const AudioStreamBasicDescription& targetFormat)
+{
+    if (!sourceBuffer)
+        return nil;
+    
+    // For now, just return the source buffer
+    // TODO: Implement proper format conversion
+    return sourceBuffer;
+}

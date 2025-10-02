@@ -73,7 +73,7 @@ add_subdirectory(CryFont)
 # CryNetwork excluded as requested - multiplayer functionality
 # add_subdirectory(CryNetwork)
 add_subdirectory(CryScriptSystem)
-# add_subdirectory(CrySoundSystem)  # Disabled for macOS - Windows-specific CrySound API not available
+add_subdirectory(CrySoundSystem)  # Enabled for macOS - Core Audio implementation available
 add_subdirectory(RenderDll)
 add_subdirectory(CryGame)
 
@@ -97,7 +97,7 @@ target_link_libraries(FarCryWorking PRIVATE
     CryAISystem
     CryFont
     CryScriptSystem
-    # CrySoundSystem  # Disabled for macOS - Windows-specific CrySound API not available
+    CrySoundSystem  # Enabled for macOS - Core Audio implementation available
     # CryNetwork excluded as requested - multiplayer functionality
     CryGame
 )

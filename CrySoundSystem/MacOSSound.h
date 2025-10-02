@@ -31,6 +31,8 @@
 #include <AVFoundation/AVFoundation.h>
 #include <map>
 #include <vector>
+#include <set>
+#include <algorithm>
 
 // Forward declarations
 @class AVAudioEngine;
@@ -73,6 +75,11 @@ public:
     // Getter and setter for internal use
     AVAudioPlayerNode* GetPlayerNode() const { return m_playerNode; }
     void SetPlayerNode(AVAudioPlayerNode* node) { m_playerNode = node; }
+    AVAudioPCMBuffer* GetAudioBuffer() const { return m_audioBuffer; }
+    bool IsLoaded() const { return m_audioBuffer != nullptr; }
+    float GetMinDistance() const { return m_minDistance; }
+    float GetMaxDistance() const { return m_maxDistance; }
+    Vec3 GetPosition() const { return m_position; }
     
 protected:
     SSoundBufferProps m_props;
@@ -150,6 +157,14 @@ public:
     virtual bool IsRelative() const override;
     virtual int AddRef() override;
     virtual int Release() override;
+    
+    // Additional pure virtual methods from ISound interface
+    virtual void SetSoundProperties(float fFadingValue) override;
+    virtual void FXEnable(int nEffectNumber) override;
+    virtual void FXSetParamEQ(float fCenter, float fBandwidth, float fGain) override;
+    virtual int GetLengthMs() override;
+    virtual int GetLength() override;
+    virtual void SetSoundPriority(unsigned char nSoundPriority) override;
 
 private:
     CMacOSSoundBuffer* m_pBuffer;
@@ -168,6 +183,12 @@ private:
     float m_fInnerAngle;
     float m_fOuterAngle;
     bool m_bIsRelative;
+    
+    // Additional member variables for missing functionality
+    std::vector<ISoundEventListener*> m_eventListeners;
+    std::set<int> m_scaleGroups;
+    int m_loopStart;
+    int m_loopEnd;
 };
 
 // macOS sound system implementation
@@ -186,7 +207,7 @@ public:
     virtual void Mute(bool bMute) override;
     virtual void SetMasterVolume(unsigned char nVol) override;
     virtual void SetMasterVolumeScale(float fScale, bool bForceRecalc = false) override;
-    virtual void SetGroupScale(int nGroup, float fScale) override;
+    virtual bool SetGroupScale(int nGroup, float fScale) override;
     virtual void RecomputeSoundOcclusion(bool bRecomputeListener, bool bForceRecompute, bool bReset = false) override;
     virtual bool IsEAX(int version) override;
     virtual bool SetEaxListenerEnvironment(int nPreset, CS_REVERB_PROPERTIES* pProps = NULL, int nFlags = 0) override;
@@ -237,7 +258,6 @@ protected:
     
 private:
     ISystem* m_pSystem;
-    bool m_isInitialized;
 };
 
 // Utility functions for audio format conversion
