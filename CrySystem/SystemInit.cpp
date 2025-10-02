@@ -998,6 +998,8 @@ bool CSystem::InitAnimationSystem()
 {
 #if defined(LINUX)
 	m_dll.hAnimation = LoadDLL("cryanimation.so");
+#elif defined(__APPLE__) && defined(__MACH__)
+	m_dll.hAnimation = LoadDLL("libCryAnimation.dylib");
 #else
 	m_dll.hAnimation = LoadDLL("CryAnimation.dll");
 #endif

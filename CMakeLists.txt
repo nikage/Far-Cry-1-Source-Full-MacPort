@@ -146,6 +146,8 @@ if(APPLE)
             $<TARGET_FILE:CryAISystem>
             $<TARGET_FILE:CryFont>
             $<TARGET_FILE:CryScriptSystem>
+            $<TARGET_FILE:CrySoundSystem>
+            $<TARGET_FILE:CryGame>
             $<TARGET_FILE:XRenderMetal>
             ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
         COMMENT "Copying all dylibs to app bundle"

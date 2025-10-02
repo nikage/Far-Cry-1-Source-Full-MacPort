@@ -91,6 +91,8 @@
 #elif defined(__APPLE__) && defined(__MACH__)
 	#include <dlfcn.h>
 	#include <stdlib.h>
+	#include <unistd.h>
+	#include <mach-o/dyld.h>
 	#include "platform.h"
 
 	// macOS dylib support
@@ -105,8 +107,27 @@
 
 	static const char* GetModulePath()
 	{
-		const char* path = getenv(gEnvName);
-		return path ? path : "";
+		// Use a more robust approach to avoid getenv hangs on macOS
+		static char modulePath[1024] = {0};
+		if (modulePath[0] == 0) {
+			// Try to get the executable directory (app bundle)
+			char exePath[1024];
+			uint32_t size = sizeof(exePath);
+			if (_NSGetExecutablePath(exePath, &size) == 0) {
+				// Find the last slash and truncate to get the directory
+				char* lastSlash = strrchr(exePath, '/');
+				if (lastSlash) {
+					*lastSlash = '\0';
+					strcpy(modulePath, exePath);
+					strcat(modulePath, "/");
+				}
+			}
+			// Fallback to current working directory
+			if (modulePath[0] == 0 && getcwd(modulePath, sizeof(modulePath) - 1) != NULL) {
+				strcat(modulePath, "/");
+			}
+		}
+		return modulePath;
 	}
 
 	static void SetModulePath(const char* pModulePath)
