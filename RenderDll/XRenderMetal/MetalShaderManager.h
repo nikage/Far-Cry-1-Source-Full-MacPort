@@ -166,7 +166,7 @@ protected:
     bool m_heatVisionEnabled;
     
     // Fog volumes
-    std::vector<struct FogVolume> m_fogVolumes;
+    std::vector<void*> m_fogVolumes; // FogVolume* - forward declaration to avoid include issues
     
     // Reference to base renderer and texture manager
     CMetalBaseRenderer* m_renderer;

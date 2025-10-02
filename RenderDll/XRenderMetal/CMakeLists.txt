@@ -5,8 +5,6 @@ endif()
 
 # Metal renderer source files
 set(XRENDER_METAL_SOURCES
-    SimpleStubRenderer.cpp
-    SimpleStubRenderer.h
     MetalRenderer.cpp
     MetalRenderer.h
     MetalBaseRenderer.cpp
@@ -17,6 +15,7 @@ set(XRENDER_METAL_SOURCES
     MetalShaderManager.h
     MetalUtilityRenderer.cpp
     MetalUtilityRenderer.h
+    SimpleMetalRenderer.cpp
 )
 
 # Create the Metal renderer library
@@ -42,10 +41,6 @@ target_link_libraries(XRenderMetal PRIVATE
 )
 
 # Compiler settings for Objective-C++
-set_source_files_properties(SimpleStubRenderer.cpp PROPERTIES
-    COMPILE_FLAGS "-x objective-c++"
-)
-
 set_source_files_properties(MetalRenderer.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
@@ -63,6 +58,10 @@ set_source_files_properties(MetalShaderManager.cpp PROPERTIES
 )
 
 set_source_files_properties(MetalUtilityRenderer.cpp PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(SimpleMetalRenderer.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 

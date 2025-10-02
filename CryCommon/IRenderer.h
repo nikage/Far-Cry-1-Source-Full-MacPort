@@ -24,6 +24,19 @@
 #endif
 
 
+// macOS compatibility - use system definitions
+#if defined(__APPLE__) && defined(__MACH__)
+    // Use system definitions from macOS headers
+    #include <stdint.h>
+    #ifndef HRESULT
+    typedef int HRESULT;
+    #endif
+    #ifndef DWORD
+    typedef uint32_t DWORD;
+    #endif
+    // BOOL is already defined by macOS headers
+#endif
+
 typedef HRESULT (*MIPDXTcallback)(void * data, int miplevel, DWORD size, int width, int height, void * user_data);
 
 // Global typedefs.
@@ -32,8 +45,10 @@ typedef const char*			cstr;
 #if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 typedef unsigned long       DWORD;
 #endif //LINUX
+#if !defined(__APPLE__) || !defined(__MACH__)
 #ifndef BOOL
 typedef int                 BOOL;
+#endif
 #endif
 typedef unsigned char       BYTE;
 typedef unsigned short      WORD;

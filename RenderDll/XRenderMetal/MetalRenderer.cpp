@@ -87,7 +87,7 @@ bool CMetalRenderer::DXTDecompress(byte* srcData, byte* dstData, int nWidth, int
 {
     if (m_textureManager)
         return m_textureManager->DXTDecompress(srcData, dstData, nWidth, nHeight, eSrcTF, bUseHW, nDstBytesPerPix);
-    return false;
+        return false;
 }
 
 void CMetalRenderer::RemoveTexture(unsigned int TextureId)
@@ -106,17 +106,17 @@ bool CMetalRenderer::SetGammaDelta(const float fGamma)
 {
     if (m_textureManager)
         return m_textureManager->SetGammaDelta(fGamma);
-    return false;
-}
-
+        return false;
+    }
+    
 // Font system delegation
 bool CMetalRenderer::FontUploadTexture(class CFBitmap* bitmap, ETEX_Format eTF)
-{
+    {
     if (m_textureManager)
         return m_textureManager->FontUploadTexture(bitmap, eTF);
-    return false;
-}
-
+        return false;
+    }
+    
 int CMetalRenderer::FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF)
 {
     if (m_textureManager)
@@ -128,9 +128,9 @@ bool CMetalRenderer::FontUpdateTexture(int nTexId, int X, int Y, int USize, int 
 {
     if (m_textureManager)
         return m_textureManager->FontUpdateTexture(nTexId, X, Y, USize, VSize, pData);
-    return false;
-}
-
+        return false;
+    }
+    
 void CMetalRenderer::FontReleaseTexture(class CFBitmap* pBmp)
 {
     if (m_textureManager)
@@ -445,9 +445,9 @@ bool CMetalRenderer::EF_DrawEfForNum(int num, float x, float y, float width, flo
 {
     if (m_shaderManager)
         return m_shaderManager->EF_DrawEfForNum(num, x, y, width, height, col, nTempl);
-    return false;
-}
-
+        return false;
+    }
+    
 bool CMetalRenderer::EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl)
 {
     if (m_shaderManager)
@@ -459,16 +459,16 @@ bool CMetalRenderer::EF_DrawEf(SShaderItem si, float x, float y, float width, fl
 {
     if (m_shaderManager)
         return m_shaderManager->EF_DrawEf(si, x, y, width, height, col, nTempl);
-    return false;
+        return false;
 }
-
+        
 bool CMetalRenderer::EF_DrawPartialEfForName(char* name, SVrect* vr, SVrect* pr, CFColor& col)
-{
+    {
     if (m_shaderManager)
         return m_shaderManager->EF_DrawPartialEfForName(name, vr, pr, col);
-    return false;
-}
-
+        return false;
+    }
+    
 bool CMetalRenderer::EF_DrawPartialEfForNum(int num, SVrect* vr, SVrect* pr, CFColor& col)
 {
     if (m_shaderManager)
@@ -480,7 +480,7 @@ bool CMetalRenderer::EF_DrawPartialEf(IShader* ef, SVrect* vr, SVrect* pr, CFCol
 {
     if (m_shaderManager)
         return m_shaderManager->EF_DrawPartialEf(ef, vr, pr, col, iwdt, ihgt);
-    return false;
+        return false;
 }
 
 void* CMetalRenderer::EF_Query(int Query, int Param)
@@ -575,7 +575,7 @@ bool CMetalRenderer::InitializeManagers()
     m_textureManager = std::make_unique<CMetalTextureManager>(this);
     if (!m_textureManager)
     {
-        iLog->Log("Error: Failed to create Metal texture manager");
+        printf("Error: Failed to create Metal texture manager");
         return false;
     }
     
@@ -583,7 +583,7 @@ bool CMetalRenderer::InitializeManagers()
     m_shaderManager = std::make_unique<CMetalShaderManager>(this, m_textureManager.get());
     if (!m_shaderManager)
     {
-        iLog->Log("Error: Failed to create Metal shader manager");
+        printf("Error: Failed to create Metal shader manager");
         return false;
     }
     
@@ -591,7 +591,7 @@ bool CMetalRenderer::InitializeManagers()
     m_utilityRenderer = std::make_unique<CMetalUtilityRenderer>(this, m_textureManager.get(), m_shaderManager.get());
     if (!m_utilityRenderer)
     {
-        iLog->Log("Error: Failed to create Metal utility renderer");
+        printf("Error: Failed to create Metal utility renderer");
         return false;
     }
     
@@ -625,6 +625,680 @@ extern "C" {
         }
         return nullptr;
     }
+}
+
+void CMetalRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indicies, int numindices, 
+                               int offsindex, int prmode, int vert_start, int vert_stop, 
+                               CMatInfo* mi)
+{
+    if (!src || !m_renderEncoder)
+        return;
+        
+    // Get Metal vertex buffer from CVertexBuffer
+    // In a real implementation, we would need to create Metal buffers
+    // from the CryEngine vertex data and cache them
+    id<MTLBuffer> vertexBuffer = nil;
+    
+    // TODO: Create Metal vertex buffer from CVertexBuffer data
+    // This would involve:
+    // 1. Getting vertex data from CVertexBuffer
+    // 2. Creating Metal buffer with the data
+    // 3. Caching the buffer for reuse
+    
+    if (!vertexBuffer)
+    {
+        printf("Warning: Vertex buffer not implemented yet\n");
+        return;
+    }
+    
+    // Set vertex buffer
+    [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    
+    // Set up index buffer if provided
+    if (indicies && numindices > 0)
+    {
+        // TODO: Create Metal index buffer from SVertexStream data
+        id<MTLBuffer> indexBuffer = nil;
+        
+        if (indexBuffer)
+        {
+            // Convert primitive mode to Metal primitive type
+            MTLPrimitiveType primitiveType = MTLPrimitiveTypeTriangle;
+            switch (prmode)
+            {
+                case 0: primitiveType = MTLPrimitiveTypeTriangle; break;
+                case 1: primitiveType = MTLPrimitiveTypeLine; break;
+                case 2: primitiveType = MTLPrimitiveTypePoint; break;
+                default: primitiveType = MTLPrimitiveTypeTriangle; break;
+            }
+            
+            // Draw indexed primitives
+            [m_renderEncoder drawIndexedPrimitives:primitiveType
+                                        indexCount:numindices
+                                         indexType:MTLIndexTypeUInt16
+                                       indexBuffer:indexBuffer
+                                 indexBufferOffset:offsindex];
+        }
+    }
+    else
+    {
+        // Draw without indices
+        MTLPrimitiveType primitiveType = MTLPrimitiveTypeTriangle;
+        switch (prmode)
+        {
+            case 0: primitiveType = MTLPrimitiveTypeTriangle; break;
+            case 1: primitiveType = MTLPrimitiveTypeLine; break;
+            case 2: primitiveType = MTLPrimitiveTypePoint; break;
+            default: primitiveType = MTLPrimitiveTypeTriangle; break;
+        }
+        
+        int vertexCount = (vert_stop > vert_start) ? (vert_stop - vert_start) : 0;
+        [m_renderEncoder drawPrimitives:primitiveType
+                            vertexStart:vert_start
+                            vertexCount:vertexCount];
+    }
+}
+
+// Buffer Management Implementation
+CVertexBuffer* CMetalRenderer::CreateBuffer(int vertexcount, int vertexformat, const char* szSource, bool bDynamic)
+{
+    if (!m_device)
+        return nullptr;
+        
+    // Create a new CVertexBuffer (assuming it exists in CryEngine)
+    // In a real implementation, this would create a CryEngine vertex buffer
+    // and associate it with a Metal buffer
+    printf("Creating vertex buffer: %d vertices, format %d, source: %s\n", 
+           vertexcount, vertexformat, szSource ? szSource : "Unknown");
+    
+    // TODO: Create actual CVertexBuffer and associate with Metal buffer
+    return nullptr; // Placeholder
+}
+
+void CMetalRenderer::ReleaseBuffer(CVertexBuffer* bufptr)
+{
+    if (!bufptr)
+        return;
+        
+    // TODO: Release Metal buffer associated with CVertexBuffer
+    printf("Releasing vertex buffer\n");
+}
+
+void CMetalRenderer::UpdateBuffer(CVertexBuffer* dest, const void* src, int vertexcount, 
+                                 bool bUnLock, int nOffs, int Type)
+{
+    if (!dest || !src)
+        return;
+        
+    // TODO: Update Metal buffer with new vertex data
+    printf("Updating vertex buffer: %d vertices, offset %d, type %d\n", 
+           vertexcount, nOffs, Type);
+}
+
+void CMetalRenderer::CreateIndexBuffer(SVertexStream* dest, const void* src, int indexcount)
+{
+    if (!dest || !src)
+        return;
+        
+    // TODO: Create Metal index buffer from source data
+    printf("Creating index buffer: %d indices\n", indexcount);
+}
+
+void CMetalRenderer::UpdateIndexBuffer(SVertexStream* dest, const void* src, int indexcount, bool bUnLock)
+{
+    if (!dest || !src)
+        return;
+        
+    // TODO: Update Metal index buffer with new data
+    printf("Updating index buffer: %d indices\n", indexcount);
+}
+
+void CMetalRenderer::ReleaseIndexBuffer(SVertexStream* dest)
+{
+    if (!dest)
+        return;
+        
+    // TODO: Release Metal index buffer
+    printf("Releasing index buffer\n");
+}
+
+// Drawing Methods Implementation
+void CMetalRenderer::DrawTriStrip(CVertexBuffer* src, int vert_num)
+{
+    if (!src || !m_renderEncoder)
+        return;
+        
+    // TODO: Set up vertex buffer and draw triangle strip
+    printf("Drawing triangle strip: %d vertices\n", vert_num);
+    
+    // Set up vertex buffer
+    // [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    
+    // Draw triangle strip
+    // [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip 
+    //                      vertexStart:0 
+    //                      vertexCount:vert_num];
+}
+
+void* CMetalRenderer::GetDynVBPtr(int nVerts, int& nOffs, int Pool)
+{
+    // TODO: Get pointer to dynamic vertex buffer
+    printf("Getting dynamic VB pointer: %d vertices, pool %d\n", nVerts, Pool);
+    nOffs = 0; // Placeholder offset
+    return nullptr; // Placeholder
+}
+
+void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
+{
+    if (!m_renderEncoder)
+        return;
+        
+    // TODO: Draw from dynamic vertex buffer
+    printf("Drawing dynamic VB: offset %d, pool %d, vertices %d\n", nOffs, Pool, nVerts);
+}
+
+void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf, ushort* pInds, 
+                              int nVerts, int nInds, int nPrimType)
+{
+    if (!pBuf || !m_renderEncoder)
+        return;
+        
+    // TODO: Draw from vertex buffer with indices
+    printf("Drawing dynamic VB with indices: %d vertices, %d indices, prim type %d\n", 
+           nVerts, nInds, nPrimType);
+}
+
+void CMetalRenderer::SetFenceCompleted(CVertexBuffer* buffer)
+{
+    if (!buffer)
+        return;
+        
+    // TODO: Set fence for buffer completion
+    printf("Setting fence completed for buffer\n");
+}
+
+// Debug and Utility Drawing Implementation
+void CMetalRenderer::CheckError(const char* comment)
+{
+    // Metal doesn't have the same error checking as OpenGL
+    // Errors are typically handled through Metal's error reporting system
+    if (comment)
+    {
+        printf("Metal renderer check: %s\n", comment);
+    }
+}
+
+void CMetalRenderer::Draw3dBBox(const Vec3& mins, const Vec3& maxs, int nPrimType)
+{
+    if (!m_renderEncoder)
+        return;
+        
+    // TODO: Draw 3D bounding box using Metal API
+    printf("Drawing 3D bbox: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
+           mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
+}
+
+void CMetalRenderer::Draw3dPrim(const Vec3& mins, const Vec3& maxs, int nPrimType, const float* fRGBA)
+{
+    if (!m_renderEncoder)
+        return;
+        
+    // TODO: Draw 3D primitive using Metal API
+    printf("Drawing 3D prim: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
+           mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
+}
+
+// State Management Implementation
+void CMetalRenderer::SetState(int State)
+{
+    if (!m_renderEncoder)
+        return;
+        
+    // TODO: Set Metal render state based on CryEngine state
+    printf("Setting render state: %d\n", State);
+}
+
+void CMetalRenderer::SetCullMode(int mode)
+{
+    if (!m_renderEncoder)
+        return;
+        
+    // TODO: Set Metal cull mode
+    printf("Setting cull mode: %d\n", mode);
+}
+
+bool CMetalRenderer::EnableFog(bool enable)
+{
+    // TODO: Enable/disable fog in Metal
+    printf("Fog %s\n", enable ? "enabled" : "disabled");
+    return true;
+}
+
+void CMetalRenderer::SetFog(float density, float fogstart, float fogend, const float* color, int fogmode)
+{
+    // TODO: Set fog parameters in Metal
+    printf("Setting fog: density %.2f, start %.2f, end %.2f, mode %d\n",
+           density, fogstart, fogend, fogmode);
+}
+
+void CMetalRenderer::EnableTexGen(bool enable)
+{
+    // TODO: Enable texture generation in Metal
+    printf("Texture generation %s\n", enable ? "enabled" : "disabled");
+}
+
+void CMetalRenderer::SetTexgen(float scaleX, float scaleY, float translateX, float translateY)
+{
+    // TODO: Set texture generation parameters in Metal
+    printf("Setting texgen: scale(%.2f,%.2f) translate(%.2f,%.2f)\n",
+           scaleX, scaleY, translateX, translateY);
+}
+
+void CMetalRenderer::SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2)
+{
+    // TODO: Set 3D texture generation in Metal
+    printf("Setting 3D texgen: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n",
+           x1, y1, z1, x2, y2, z2);
+}
+
+void CMetalRenderer::SetLodBias(float value)
+{
+    // TODO: Set LOD bias in Metal
+    printf("Setting LOD bias: %.2f\n", value);
+}
+
+void CMetalRenderer::EnableVSync(bool enable)
+{
+    // TODO: Enable VSync in Metal
+    printf("VSync %s\n", enable ? "enabled" : "disabled");
+}
+
+// Matrix Management Implementation
+void CMetalRenderer::PushMatrix()
+{
+    // TODO: Push matrix onto stack
+    printf("Pushing matrix\n");
+}
+
+void CMetalRenderer::RotateMatrix(float a, float x, float y, float z)
+{
+    // TODO: Rotate current matrix
+    printf("Rotating matrix: angle %.2f axis(%.2f,%.2f,%.2f)\n", a, x, y, z);
+}
+
+void CMetalRenderer::RotateMatrix(const Vec3& angels)
+{
+    // TODO: Rotate current matrix by angles
+    printf("Rotating matrix by angles: (%.2f,%.2f,%.2f)\n", angels.x, angels.y, angels.z);
+}
+
+void CMetalRenderer::TranslateMatrix(float x, float y, float z)
+{
+    // TODO: Translate current matrix
+    printf("Translating matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
+}
+
+void CMetalRenderer::ScaleMatrix(float x, float y, float z)
+{
+    // TODO: Scale current matrix
+    printf("Scaling matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
+}
+
+void CMetalRenderer::TranslateMatrix(const Vec3& pos)
+{
+    // TODO: Translate current matrix by position
+    printf("Translating matrix by pos: (%.2f,%.2f,%.2f)\n", pos.x, pos.y, pos.z);
+}
+
+void CMetalRenderer::MultMatrix(float* mat)
+{
+    // TODO: Multiply current matrix
+    printf("Multiplying matrix\n");
+}
+
+void CMetalRenderer::LoadMatrix(const Matrix44* src)
+{
+    // TODO: Load matrix
+    printf("Loading matrix\n");
+}
+
+void CMetalRenderer::PopMatrix()
+{
+    // TODO: Pop matrix from stack
+    printf("Popping matrix\n");
+}
+
+void CMetalRenderer::EnableTMU(bool enable)
+{
+    // TODO: Enable texture mapping unit
+    printf("TMU %s\n", enable ? "enabled" : "disabled");
+}
+
+void CMetalRenderer::SelectTMU(int tnum)
+{
+    // TODO: Select texture mapping unit
+    printf("Selecting TMU: %d\n", tnum);
+}
+
+// Display and Resolution Implementation
+bool CMetalRenderer::ChangeDisplay(unsigned int width, unsigned int height, unsigned int cbpp)
+{
+    // TODO: Change Metal display resolution
+    printf("Changing display: %dx%d, %d bpp\n", width, height, cbpp);
+    return true;
+}
+
+void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y, unsigned int width, unsigned int height)
+{
+    // TODO: Change Metal viewport
+    printf("Changing viewport: (%d,%d) %dx%d\n", x, y, width, height);
+    SetViewport(x, y, width, height);
+}
+
+bool CMetalRenderer::SaveTga(unsigned char* sourcedata, int sourceformat, int w, int h, 
+                            const char* filename, bool flip)
+{
+    // TODO: Save TGA using Metal
+    printf("Saving TGA: %dx%d, format %d, file %s\n", w, h, sourceformat, filename ? filename : "NULL");
+    return true;
+}
+
+// Screen Information Implementation
+int CMetalRenderer::GetWidth()
+{
+    return m_width;
+}
+
+int CMetalRenderer::GetHeight()
+{
+    return m_height;
+}
+
+void CMetalRenderer::GetMemoryUsage(ICrySizer* Sizer)
+{
+    // TODO: Get Metal memory usage
+    printf("Getting memory usage\n");
+}
+
+void CMetalRenderer::ScreenShot(const char* filename)
+{
+    // TODO: Take screenshot using Metal
+    printf("Taking screenshot: %s\n", filename ? filename : "default");
+}
+
+int CMetalRenderer::GetColorBpp()
+{
+    return m_cbpp;
+}
+
+int CMetalRenderer::GetDepthBpp()
+{
+    return m_zbpp;
+}
+
+int CMetalRenderer::GetStencilBpp()
+{
+    return m_sbpp;
+}
+
+// Additional Essential Methods Implementation
+
+void CMetalRenderer::ProjectToScreen(float ptx, float pty, float ptz, float* sx, float* sy, float* sz)
+{
+    // TODO: Project 3D point to screen coordinates
+    printf("Projecting to screen: (%.2f,%.2f,%.2f)\n", ptx, pty, ptz);
+    if (sx) *sx = ptx;
+    if (sy) *sy = pty;
+    if (sz) *sz = ptz;
+}
+
+int CMetalRenderer::UnProject(float sx, float sy, float sz, float* px, float* py, float* pz,
+                             const float modelMatrix[16], const float projMatrix[16], 
+                             const int viewport[4])
+{
+    // TODO: Unproject screen coordinates to 3D
+    printf("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
+    if (px) *px = sx;
+    if (py) *py = sy;
+    if (pz) *pz = sz;
+    return 1;
+}
+
+int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float* px, float* py, float* pz)
+{
+    // TODO: Unproject from screen coordinates
+    printf("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
+    if (px) *px = sx;
+    if (py) *py = sy;
+    if (pz) *pz = sz;
+    return 1;
+}
+
+void CMetalRenderer::GetModelViewMatrix(float* mat)
+{
+    // TODO: Get model-view matrix
+    printf("Getting model-view matrix\n");
+    if (mat)
+    {
+        // Return identity matrix
+        for (int i = 0; i < 16; i++)
+            mat[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+    }
+}
+
+void CMetalRenderer::GetModelViewMatrix(double* mat)
+{
+    // TODO: Get model-view matrix as double
+    printf("Getting model-view matrix (double)\n");
+    if (mat)
+    {
+        // Return identity matrix
+        for (int i = 0; i < 16; i++)
+            mat[i] = (i % 5 == 0) ? 1.0 : 0.0;
+    }
+}
+
+void CMetalRenderer::GetProjectionMatrix(double* mat)
+{
+    // TODO: Get projection matrix as double
+    printf("Getting projection matrix (double)\n");
+    if (mat)
+    {
+        // Return identity matrix
+        for (int i = 0; i < 16; i++)
+            mat[i] = (i % 5 == 0) ? 1.0 : 0.0;
+    }
+}
+
+void CMetalRenderer::GetProjectionMatrix(float* mat)
+{
+    // TODO: Get projection matrix
+    printf("Getting projection matrix\n");
+    if (mat)
+    {
+        // Return identity matrix
+        for (int i = 0; i < 16; i++)
+            mat[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+    }
+}
+
+Vec3 CMetalRenderer::GetUnProject(const Vec3& WindowCoords, const CCamera& cam)
+{
+    // TODO: Unproject window coordinates
+    printf("Getting unproject: (%.2f,%.2f,%.2f)\n", WindowCoords.x, WindowCoords.y, WindowCoords.z);
+    return WindowCoords;
+}
+
+void CMetalRenderer::RenderToViewport(const CCamera& cam, float x, float y, float width, float height)
+{
+    // TODO: Render to viewport
+    printf("Rendering to viewport: (%.2f,%.2f) %fx%f\n", x, y, width, height);
+}
+
+// Missing IRenderer method implementations
+void CMetalRenderer::BeginFrame()
+{
+    // Call base class BeginFrame
+    CMetalBaseRenderer::BeginFrame();
+}
+
+void CMetalRenderer::Update()
+{
+    // Call base class Update
+    CMetalBaseRenderer::Update();
+}
+
+void CMetalRenderer::SetScissor(int x, int y, int width, int height)
+{
+    if (!m_renderEncoder)
+        return;
+        
+    // TODO: Set Metal scissor rect
+    printf("Setting scissor: (%d,%d) %dx%d\n", x, y, width, height);
+}
+
+int CMetalRenderer::GetFeatures()
+{
+    // TODO: Return Metal-specific features
+    return 0;
+}
+
+void CMetalRenderer::GetViewport(int* x, int* y, int* width, int* height)
+{
+    if (x) *x = m_viewportX;
+    if (y) *y = m_viewportY;
+    if (width) *width = m_viewportWidth;
+    if (height) *height = m_viewportHeight;
+}
+
+void CMetalRenderer::MakeCurrent()
+{
+    // Metal doesn't require context switching
+}
+
+void CMetalRenderer::SetViewport(int x, int y, int width, int height)
+{
+    if (!m_isInitialized)
+        return;
+        
+    // Update internal viewport state
+    m_viewportX = x;
+    m_viewportY = y;
+    m_viewportWidth = width;
+    m_viewportHeight = height;
+    
+    // Set Metal viewport
+    MTLViewport viewport = {(double)x, (double)y, (double)width, (double)height, 0.0, 1.0};
+    if (m_renderEncoder)
+    {
+        [m_renderEncoder setViewport:viewport];
+    }
+}
+
+bool CMetalRenderer::CreateContext(WIN_HWND hWnd, bool bAllowFSAA)
+{
+    // TODO: Create Metal context
+    printf("Creating Metal context\n");
+    return true;
+}
+
+bool CMetalRenderer::DeleteContext(WIN_HWND hWnd)
+{
+    // TODO: Delete Metal context
+    printf("Deleting Metal context\n");
+    return true;
+}
+
+void CMetalRenderer::FreeResources(int nFlags)
+{
+    // TODO: Free Metal resources
+    printf("Freeing Metal resources: flags %d\n", nFlags);
+}
+
+void CMetalRenderer::ShareResources(IRenderer* renderer)
+{
+    // TODO: Share Metal resources
+    printf("Sharing Metal resources\n");
+}
+
+bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight, int nNewColDepth, 
+                                     int nNewRefreshHZ, bool bFullScreen)
+{
+    // TODO: Change Metal resolution
+    printf("Changing resolution: %dx%d, %d bpp, %d Hz, fullscreen %s\n", 
+           nNewWidth, nNewHeight, nNewColDepth, nNewRefreshHZ, bFullScreen ? "yes" : "no");
+    return true;
+}
+
+void CMetalRenderer::RefreshResources(int nFlags)
+{
+    // TODO: Refresh Metal resources
+    printf("Refreshing Metal resources: flags %d\n", nFlags);
+}
+
+bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd)
+{
+    // TODO: Set current Metal context
+    printf("Setting current Metal context\n");
+    return true;
+}
+
+int CMetalRenderer::EnumDisplayFormats(TArray<SDispFormat>& Formats, bool bReset)
+{
+    // TODO: Enumerate Metal display formats
+    printf("Enumerating Metal display formats\n");
+    return 0;
+}
+
+int CMetalRenderer::GetMaxTextureMemory()
+{
+    // TODO: Get Metal texture memory limit
+    return 512 * 1024 * 1024; // 512MB placeholder
+}
+
+WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int cbpp, int zbpp, int sbits, 
+                             bool fullscreen, WIN_HINSTANCE hinst, WIN_HWND Glhwnd, 
+                             WIN_HDC Glhdc, WIN_HGLRC hGLrc, bool bReInit)
+{
+    // TODO: Initialize Metal renderer
+    printf("Initializing Metal renderer: %dx%d, %d bpp\n", width, height, cbpp);
+    return (WIN_HWND)1; // Placeholder
+}
+
+void CMetalRenderer::PreLoad()
+{
+    // TODO: Preload Metal resources
+    printf("Preloading Metal resources\n");
+}
+
+void CMetalRenderer::Release()
+{
+    // TODO: Release Metal resources
+    printf("Releasing Metal resources\n");
+}
+
+void CMetalRenderer::PostLoad()
+{
+    // TODO: Postload Metal resources
+    printf("Postloading Metal resources\n");
+}
+
+void CMetalRenderer::ShutDown(bool bReInit)
+{
+    // TODO: Shutdown Metal renderer
+    printf("Shutting down Metal renderer: reinit %s\n", bReInit ? "yes" : "no");
+}
+
+const CCamera& CMetalRenderer::GetCamera()
+{
+    return *(CCamera*)m_camera;
+}
+
+void CMetalRenderer::SetCamera(const CCamera& cam)
+{
+    m_camera = (void*)&cam;
+    // TODO: Update Metal camera matrices
+    printf("Setting Metal camera\n");
 }
 
 #endif // __APPLE__ && __MACH__

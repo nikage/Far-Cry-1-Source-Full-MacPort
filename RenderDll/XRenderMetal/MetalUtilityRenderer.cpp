@@ -19,6 +19,7 @@
 #include "MetalBaseRenderer.h"
 #include "MetalTextureManager.h"
 #include "MetalShaderManager.h"
+#include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 
 CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer, 
@@ -108,8 +109,46 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
                                        float angle, float r, float g, float b, 
                                        float a, float z)
 {
-    // Draw 2D image
-    // This would queue the image for rendering
+    if (!m_renderer || !m_renderer->m_renderEncoder)
+        return;
+        
+    // Get texture from texture manager
+    id<MTLTexture> texture = nil;
+    if (m_textureManager && texture_id >= 0)
+    {
+        // TODO: Get texture from texture manager by ID
+        // texture = m_textureManager->GetTexture(texture_id);
+    }
+    
+    if (!texture)
+        return;
+        
+    // Set up 2D rendering state
+    if (m_spritePipelineState)
+    {
+        [m_renderer->m_renderEncoder setRenderPipelineState:m_spritePipelineState];
+    }
+    
+    // Bind texture
+    [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
+    
+    // Create quad vertices for 2D image
+    struct QuadVertex {
+        float position[2];
+        float texCoord[2];
+        float color[4];
+    };
+    
+    QuadVertex vertices[4] = {
+        {{xpos, ypos}, {s0, t0}, {r, g, b, a}},
+        {{xpos + w, ypos}, {s1, t0}, {r, g, b, a}},
+        {{xpos, ypos + h}, {s0, t1}, {r, g, b, a}},
+        {{xpos + w, ypos + h}, {s1, t1}, {r, g, b, a}}
+    };
+    
+    // TODO: Create vertex buffer and draw quad
+    // This would involve creating a vertex buffer with the quad data
+    // and calling drawPrimitives on the render encoder
 }
 
 void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
@@ -611,7 +650,7 @@ void CMetalUtilityRenderer::CreateDebugPipelineState()
     m_debugPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     if (!m_debugPipelineState)
     {
-        iLog->Log("Error: Failed to create debug pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create debug pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
     }
 }
 
@@ -629,7 +668,7 @@ void CMetalUtilityRenderer::CreateTextPipelineState()
     m_textPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     if (!m_textPipelineState)
     {
-        iLog->Log("Error: Failed to create text pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create text pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
     }
 }
 
@@ -647,7 +686,7 @@ void CMetalUtilityRenderer::CreateSpritePipelineState()
     m_spritePipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     if (!m_spritePipelineState)
     {
-        iLog->Log("Error: Failed to create sprite pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create sprite pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
     }
 }
 

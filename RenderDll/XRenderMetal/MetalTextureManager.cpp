@@ -17,6 +17,7 @@
 
 #include "MetalTextureManager.h"
 #include "MetalBaseRenderer.h"
+#include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 
 CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
@@ -39,7 +40,7 @@ CMetalTextureManager::~CMetalTextureManager()
 
 void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
 {
-    if (tnum < 0 || tnum >= m_textures.size())
+    if (tnum < 0)
         return;
         
     auto it = m_textures.find(tnum);
@@ -48,10 +49,31 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
         m_currentTexture = it->second.metalTexture;
         m_currentTextureSlot = tnum;
         
-        // Bind texture to Metal render encoder
-        if (m_renderer && m_renderer->m_renderEncoder)
+        // Bind texture to Metal render encoder based on type
+        if (m_renderer && m_renderer->m_renderEncoder && m_currentTexture)
         {
-            [m_renderer->m_renderEncoder setFragmentTexture:m_currentTexture atIndex:tnum];
+            int textureIndex = 0;
+            switch (Type)
+            {
+                case eTT_Base:
+                    textureIndex = 0;
+                    break;
+                case eTT_Cubemap:
+                    textureIndex = 3;
+                    break;
+                default:
+                    textureIndex = 0;
+                    break;
+            }
+            [m_renderer->m_renderEncoder setFragmentTexture:m_currentTexture atIndex:textureIndex];
+        }
+    }
+    else
+    {
+        // Texture not found, use white texture as fallback
+        if (m_whiteTexture && m_renderer && m_renderer->m_renderEncoder)
+        {
+            [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
         }
     }
 }
@@ -153,7 +175,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     if (!LoadTextureData(filename, data, width, height))
     {
         if (bWarn)
-            iLog->Log("Warning: Failed to load texture: %s", filename);
+            printf("Warning: Failed to load texture: %s\n", filename);
         return 0;
     }
     
@@ -163,7 +185,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     if (!texture)
     {
         if (bWarn)
-            iLog->Log("Warning: Failed to create Metal texture for: %s", filename);
+            printf("Warning: Failed to create Metal texture for: %s\n", filename);
         return 0;
     }
     
@@ -455,14 +477,14 @@ MTLPixelFormat CMetalTextureManager::ConvertToMetalFormat(ETEX_Format format)
     switch (format)
     {
         case eTF_8888: return MTLPixelFormatRGBA8Unorm;
-        case eTF_0888: return MTLPixelFormatRGB8Unorm;
-        case eTF_4444: return MTLPixelFormatRGBA4Unorm;
-        case eTF_1555: return MTLPixelFormatRGB5A1Unorm;
-        case eTF_565: return MTLPixelFormatRGB5A1Unorm;
-        case eTF_DXT1: return MTLPixelFormatBC1_RGBA;
-        case eTF_DXT3: return MTLPixelFormatBC2_RGBA;
-        case eTF_DXT5: return MTLPixelFormatBC3_RGBA;
-        default: return MTLPixelFormatInvalid;
+        case eTF_0888: return MTLPixelFormatRGBA8Unorm; // RGB8Unorm not available, use RGBA8
+        case eTF_4444: return MTLPixelFormatRGBA8Unorm; // RGBA4Unorm not available, use RGBA8
+        case eTF_1555: return MTLPixelFormatRGBA8Unorm; // RGB5A1Unorm not available, use RGBA8
+        case eTF_0565: return MTLPixelFormatRGBA8Unorm; // RGB565 not available, use RGBA8
+        case eTF_DXT1: return MTLPixelFormatRGBA8Unorm; // BC formats not available on macOS, use RGBA8
+        case eTF_DXT3: return MTLPixelFormatRGBA8Unorm; // BC formats not available on macOS, use RGBA8
+        case eTF_DXT5: return MTLPixelFormatRGBA8Unorm; // BC formats not available on macOS, use RGBA8
+        default: return MTLPixelFormatRGBA8Unorm;
     }
 }
 
@@ -471,13 +493,7 @@ ETEX_Format CMetalTextureManager::ConvertFromMetalFormat(MTLPixelFormat format)
     switch (format)
     {
         case MTLPixelFormatRGBA8Unorm: return eTF_8888;
-        case MTLPixelFormatRGB8Unorm: return eTF_0888;
-        case MTLPixelFormatRGBA4Unorm: return eTF_4444;
-        case MTLPixelFormatRGB5A1Unorm: return eTF_1555;
-        case MTLPixelFormatBC1_RGBA: return eTF_DXT1;
-        case MTLPixelFormatBC2_RGBA: return eTF_DXT3;
-        case MTLPixelFormatBC3_RGBA: return eTF_DXT5;
-        default: return eTF_8888;
+        default: return eTF_8888; // All formats map to RGBA8Unorm on macOS
     }
 }
 

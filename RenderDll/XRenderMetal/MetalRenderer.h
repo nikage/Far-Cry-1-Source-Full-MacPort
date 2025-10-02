@@ -197,78 +197,78 @@ public:
     virtual void RenderToViewport(const CCamera& cam, float x, float y, float width, float height);
     
     // Stub implementations for complex shader system methods
-    virtual bool FontUploadTexture(class CFBitmap*, ETEX_Format eTF = eTF_8888) { return false; }
-    virtual int FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF = eTF_8888) { return 0; }
-    virtual bool FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData) { return false; }
-    virtual void FontReleaseTexture(class CFBitmap* pBmp) {}
-    virtual void FontSetTexture(class CFBitmap*, int nFilterMode) {}
-    virtual void FontSetTexture(int nTexId, int nFilterMode) {}
-    virtual void FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight) {}
-    virtual void FontSetBlending(int src, int dst) {}
-    virtual void FontRestoreRenderingState() {}
+    virtual bool FontUploadTexture(class CFBitmap*, ETEX_Format eTF = eTF_8888);
+    virtual int FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF = eTF_8888);
+    virtual bool FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData);
+    virtual void FontReleaseTexture(class CFBitmap* pBmp);
+    virtual void FontSetTexture(class CFBitmap*, int nFilterMode);
+    virtual void FontSetTexture(int nTexId, int nFilterMode);
+    virtual void FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight);
+    virtual void FontSetBlending(int src, int dst);
+    virtual void FontRestoreRenderingState();
     
-    // Shader system stubs
-    virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual void EF_EnableHeatVision(bool bEnable) {}
-    virtual bool EF_GetHeatVision() { return false; }
-    virtual void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits) {}
-    virtual void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert* verts, CCObject* obj = NULL, int nFogID = 0) {}
-    virtual CCObject* EF_AddSpriteToScene(int Ef, int numPts, SColorVert* verts, CCObject* obj, byte* inds = NULL, int ninds = 0, int nFogID = 0) { return nullptr; }
-    virtual void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D* verts) {}
-    virtual void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D* verts) {}
+    // Shader system delegation
+    virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags);
+    virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags);
+    virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags);
+    virtual bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags);
+    virtual void EF_EnableHeatVision(bool bEnable);
+    virtual bool EF_GetHeatVision();
+    virtual void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits);
+    virtual void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert* verts, CCObject* obj = NULL, int nFogID = 0);
+    virtual CCObject* EF_AddSpriteToScene(int Ef, int numPts, SColorVert* verts, CCObject* obj, byte* inds = NULL, int ninds = 0, int nFogID = 0);
+    virtual void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D* verts);
+    virtual void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D* verts);
     
-    // Additional stub methods for compilation
-    virtual IShader* EF_LoadShader(const char* name, EShClass Class, int flags = 0, uint64 nMaskGen = 0) { return nullptr; }
-    virtual SShaderItem EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags = 0, SInputShaderResources* Res = NULL, uint64 nMaskGen = 0) { return SShaderItem(); }
-    virtual bool EF_ReloadFile(const char* szFileName) { return false; }
-    virtual void EF_ReloadShaderFiles(int nCategory) {}
-    virtual void EF_ReloadTextures() {}
-    virtual IShader* EF_CopyShader(IShader* ef) { return nullptr; }
-    virtual ITexPic* EF_GetTextureByID(int Id) { return nullptr; }
-    virtual ITexPic* EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1 = -1.0f, float fAmount2 = -1.0f, int Id = -1, int BindId = 0) { return nullptr; }
-    virtual int EF_LoadLightmap(const char* name) { return 0; }
-    virtual bool EF_ScanEnvironmentCM(const char* name, int size, Vec3& Pos) { return false; }
-    virtual int EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, STexAnim* ta, char* name) { return 0; }
-    virtual char** EF_GetShadersForFile(const char* File, int num) { return nullptr; }
-    virtual SLightMaterial* EF_GetLightMaterial(char* Str) { return nullptr; }
-    virtual bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace) { return false; }
-    virtual void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id = -1) {}
-    virtual bool EF_HideTemplate(const char* name) { return false; }
-    virtual bool EF_UnhideTemplate(const char* name) { return false; }
-    virtual bool EF_UnhideAllTemplates() { return false; }
-    virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale = 1.0f, bool bAdditive = true) { return false; }
-    virtual CRendElement* EF_CreateRE(EDataType edt) { return nullptr; }
-    virtual void EF_StartEf() {}
-    virtual CCObject* EF_GetObject(bool bTemp = false, int num = -1) { return nullptr; }
-    virtual void EF_AddEf(int NumFog, CRendElement* re, IShader* ef, SRenderShaderResources* sr, CCObject* obj, int nTempl, IShader* efState = 0, int nSort = 0) {}
-    virtual void EF_EndEf3D(int nFlags) {}
-    virtual bool EF_IsFakeDLight(CDLight* Source) { return false; }
-    virtual void EF_ADDDlight(CDLight* Source) {}
-    virtual void EF_ClearLightsList() {}
-    virtual bool EF_UpdateDLight(CDLight* pDL) { return false; }
-    virtual void EF_EndEf2D(bool bSort) {}
-    virtual bool EF_DrawEfForName(char* name, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawEfForNum(int num, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawEf(SShaderItem si, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawPartialEfForName(char* name, SVrect* vr, SVrect* pr, CFColor& col) { return false; }
-    virtual bool EF_DrawPartialEfForNum(int num, SVrect* vr, SVrect* pr, CFColor& col) { return false; }
-    virtual bool EF_DrawPartialEf(IShader* ef, SVrect* vr, SVrect* pr, CFColor& col, float iwdt = 0, float ihgt = 0) { return false; }
-    virtual void* EF_Query(int Query, int Param = 0) { return nullptr; }
-    virtual void EF_ConstructEf(IShader* Ef) {}
-    virtual void EF_SetWorldColor(float r, float g, float b, float a = 1.0f) {}
-    virtual int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, int nIndex = -1, bool bCaustics = false) { return 0; }
+    // Shader management delegation
+    virtual IShader* EF_LoadShader(const char* name, EShClass Class, int flags = 0, uint64 nMaskGen = 0);
+    virtual SShaderItem EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags = 0, SInputShaderResources* Res = NULL, uint64 nMaskGen = 0);
+    virtual bool EF_ReloadFile(const char* szFileName);
+    virtual void EF_ReloadShaderFiles(int nCategory);
+    virtual void EF_ReloadTextures();
+    virtual IShader* EF_CopyShader(IShader* ef);
+    virtual ITexPic* EF_GetTextureByID(int Id);
+    virtual ITexPic* EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1 = -1.0f, float fAmount2 = -1.0f, int Id = -1, int BindId = 0);
+    virtual int EF_LoadLightmap(const char* name);
+    virtual bool EF_ScanEnvironmentCM(const char* name, int size, Vec3& Pos);
+    virtual int EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, STexAnim* ta, char* name);
+    virtual char** EF_GetShadersForFile(const char* File, int num);
+    virtual SLightMaterial* EF_GetLightMaterial(char* Str);
+    virtual bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace);
+    virtual void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id = -1);
+    virtual bool EF_HideTemplate(const char* name);
+    virtual bool EF_UnhideTemplate(const char* name);
+    virtual bool EF_UnhideAllTemplates();
+    virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale = 1.0f, bool bAdditive = true);
+    virtual CRendElement* EF_CreateRE(EDataType edt);
+    virtual void EF_StartEf();
+    virtual CCObject* EF_GetObject(bool bTemp = false, int num = -1);
+    virtual void EF_AddEf(int NumFog, CRendElement* re, IShader* ef, SRenderShaderResources* sr, CCObject* obj, int nTempl, IShader* efState = 0, int nSort = 0);
+    virtual void EF_EndEf3D(int nFlags);
+    virtual bool EF_IsFakeDLight(CDLight* Source);
+    virtual void EF_ADDDlight(CDLight* Source);
+    virtual void EF_ClearLightsList();
+    virtual bool EF_UpdateDLight(CDLight* pDL);
+    virtual void EF_EndEf2D(bool bSort);
+    virtual bool EF_DrawEfForName(char* name, float x, float y, float width, float height, CFColor& col, int nTempl = -1);
+    virtual bool EF_DrawEfForNum(int num, float x, float y, float width, float height, CFColor& col, int nTempl = -1);
+    virtual bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl = -1);
+    virtual bool EF_DrawEf(SShaderItem si, float x, float y, float width, float height, CFColor& col, int nTempl = -1);
+    virtual bool EF_DrawPartialEfForName(char* name, SVrect* vr, SVrect* pr, CFColor& col);
+    virtual bool EF_DrawPartialEfForNum(int num, SVrect* vr, SVrect* pr, CFColor& col);
+    virtual bool EF_DrawPartialEf(IShader* ef, SVrect* vr, SVrect* pr, CFColor& col, float iwdt = 0, float ihgt = 0);
+    virtual void* EF_Query(int Query, int Param = 0);
+    virtual void EF_ConstructEf(IShader* Ef);
+    virtual void EF_SetWorldColor(float r, float g, float b, float a = 1.0f);
+    virtual int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, int nIndex = -1, bool bCaustics = false);
     
     // Statistics and utility stubs
     virtual int GetPolyCount() { return 0; }
     virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { nPolygons = 0; nShadowVolPolys = 0; }
     virtual void SetClearColor(const Vec3& vColor) {}
-    virtual CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char* szSource = "Unknown", class CIndexedMesh* pIndexedMesh = 0) { return nullptr; }
-    virtual CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, int nVertFormat, ushort* pIndices, int nIndices, int nPrimetiveType, const char* szSource, EBufferType eBufType = eBT_Dynamic, int nMatInfoCount = 1, int nClientTextureBindID = 0, bool (*PrepareBufferCallback)(CLeafBuffer*, bool) = NULL, void* CustomData = NULL, bool bOnlyVideoBuffer = false, bool bPrecache = true) { return nullptr; }
-    virtual void DeleteLeafBuffer(CLeafBuffer* pLBuffer) {}
+    virtual CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char* szSource = "Unknown", class CIndexedMesh* pIndexedMesh = 0);
+    virtual CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, int nVertFormat, ushort* pIndices, int nIndices, int nPrimetiveType, const char* szSource, EBufferType eBufType = eBT_Dynamic, int nMatInfoCount = 1, int nClientTextureBindID = 0, bool (*PrepareBufferCallback)(CLeafBuffer*, bool) = NULL, void* CustomData = NULL, bool bOnlyVideoBuffer = false, bool bPrecache = true);
+    virtual void DeleteLeafBuffer(CLeafBuffer* pLBuffer);
     virtual int GetFrameID(bool bIncludeRecursiveCalls = true) { return 0; }
     virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) {}
     virtual void DrawLabelImage(const Vec3& vPos, float fSize, int nTextureId) {}
@@ -345,7 +345,7 @@ protected:
 
 // Metal utility functions
 MTLPixelFormat ConvertToMetalFormat(ETEX_Format format);
-MTLPrimitiveType ConvertToMetalPrimitive(eRenderPrimitiveType type);
+MTLPrimitiveType ConvertToMetalPrimitive(int type);
 MTLCompareFunction ConvertToMetalDepthFunc(int func);
 
 #endif // __APPLE__ && __MACH__

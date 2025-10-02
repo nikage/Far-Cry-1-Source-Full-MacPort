@@ -15,9 +15,9 @@
 
 //=========================================================
 
-///#include "CryHeaders.h"
+#include "CryHeaders.h"
 
-_inline float FClamp( float X, float Min, float Max )
+inline float FClamp( float X, float Min, float Max )
 {
   return X<Min ? Min : X<Max ? X : Max;
 }
@@ -165,9 +165,9 @@ public:
     return *this;
   }
 
-  _inline const float& operator[](int i) const { return (&r)[i]; }
+  inline const float& operator[](int i) const { return (&r)[i]; }
 
-  _inline float& operator[](int i) { return (&r)[i]; }
+  inline float& operator[](int i) { return (&r)[i]; }
 
   float* operator * ()                 { return (&r); }
 

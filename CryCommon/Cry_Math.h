@@ -61,7 +61,13 @@ const float gf_RADTODEG = 57.29577951308232286465f; // Radians to Degrees
 
 // the check for compatibility with Max SDK: Max gfx.h header defines its own pi
 #if !defined(_GFX_H_)
+// On macOS, avoid conflict with system pi by using a different name
+#ifdef __APPLE__
+const real cry_pi		= (real)3.1415926535897932384626433832795;
+#define pi cry_pi
+#else
 const real pi			= (real)3.1415926535897932384626433832795;
+#endif
 #endif
 const real sqrt2	= (real)1.4142135623730950488016887242097;
 const real sqrt3	= (real)1.7320508075688772935274463415059;

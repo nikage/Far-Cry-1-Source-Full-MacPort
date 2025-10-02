@@ -139,7 +139,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     std::string source;
     if (!LoadShaderFromFile(name, source))
     {
-        iLog->Log("Error: Failed to load shader: %s", name);
+        printf("Error: Failed to load shader: %s", name);
         return nullptr;
     }
     
@@ -149,7 +149,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     
     if (!CompileShader(source, vertexFunction) || !CompileShader(source, fragmentFunction))
     {
-        iLog->Log("Error: Failed to compile shader: %s", name);
+        printf("Error: Failed to compile shader: %s", name);
         return nullptr;
     }
     
@@ -157,7 +157,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     id<MTLRenderPipelineState> pipelineState = CreatePipelineState(vertexFunction, fragmentFunction, nil);
     if (!pipelineState)
     {
-        iLog->Log("Error: Failed to create pipeline state for shader: %s", name);
+        printf("Error: Failed to create pipeline state for shader: %s", name);
         return nullptr;
     }
     
@@ -480,7 +480,7 @@ id<MTLFunction> CMetalShaderManager::LoadMetalShader(const char* name, const cha
     id<MTLLibrary> library = [m_renderer->m_device newLibraryWithSource:@(source) options:nil error:&error];
     if (!library)
     {
-        iLog->Log("Error: Failed to create Metal library: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create Metal library: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return nil;
     }
     
@@ -506,7 +506,7 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineState(id<MTLFuncti
     id<MTLRenderPipelineState> pipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     if (!pipelineState)
     {
-        iLog->Log("Error: Failed to create Metal render pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create Metal render pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return nil;
     }
     
@@ -533,9 +533,55 @@ void CMetalShaderManager::ReleaseShaderId(int id)
 
 bool CMetalShaderManager::LoadShaderFromFile(const char* filename, std::string& source)
 {
-    // Load shader source from file
-    // This would need to be implemented based on the file format
-    return false;
+    if (!filename)
+        return false;
+        
+    // Try to load shader source from file
+    // For now, we'll create a basic Metal shader template
+    // In a real implementation, this would load from .metal files or other formats
+    
+    std::string shaderName = filename;
+    if (shaderName.find(".metal") == std::string::npos)
+    {
+        shaderName += ".metal";
+    }
+    
+    // Create a basic Metal shader template
+    source = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    float2 texCoord [[attribute(2)]];
+};
+
+struct VertexOut {
+    float4 position [[position]];
+    float3 normal;
+    float2 texCoord;
+};
+
+vertex VertexOut vertex_main(VertexIn in [[stage_in]])
+{
+    VertexOut out;
+    out.position = float4(in.position, 1.0);
+    out.normal = in.normal;
+    out.texCoord = in.texCoord;
+    return out;
+}
+
+fragment float4 fragment_main(VertexOut in [[stage_in]],
+                             texture2d<float> baseTexture [[texture(0)]])
+{
+    constexpr sampler textureSampler(mag_filter::linear, min_filter::linear);
+    float4 color = baseTexture.sample(textureSampler, in.texCoord);
+    return color;
+}
+)";
+    
+    return true;
 }
 
 bool CMetalShaderManager::CompileShader(const std::string& source, id<MTLFunction>& function)
@@ -547,7 +593,7 @@ bool CMetalShaderManager::CompileShader(const std::string& source, id<MTLFunctio
     id<MTLLibrary> library = [m_renderer->m_device newLibraryWithSource:@(source.c_str()) options:nil error:&error];
     if (!library)
     {
-        iLog->Log("Error: Failed to create Metal library: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create Metal library: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return false;
     }
     

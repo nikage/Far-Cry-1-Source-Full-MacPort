@@ -1,17 +1,16 @@
 #include "SimpleMetalRenderer.h"
+#include "IRenderer.h"
 #include <Cocoa/Cocoa.h>
 #include <cstdarg>
 #include <cstdio>
 
+// Define DLL_EXPORT for macOS
+#ifndef DLL_EXPORT
+#define DLL_EXPORT
+#endif
+
 // Forward declarations for missing types
 class CCamera { public: CCamera() {} };
-class CVertexBuffer { public: CVertexBuffer() {} };
-class SVertexStream { public: SVertexStream() {} };
-class CMatInfo { public: CMatInfo() {} };
-class CXFont { public: CXFont() {} };
-struct SDrawTextInfo { public: SDrawTextInfo() {} };
-struct SDispFormat { public: SDispFormat() {} };
-class ICrySizer { public: ICrySizer() {} };
 
 CSimpleMetalRenderer::CSimpleMetalRenderer()
     : m_device(nil)
@@ -471,18 +470,29 @@ int CSimpleMetalRenderer::GetFrameID()
 }
 
 
-// Export function for the renderer
+// Create a simple renderer that can be cast to IRenderer
+void* CreateSimpleRenderer(int argc, char* argv[], SCryRenderInterface* sp)
+{
+    CSimpleMetalRenderer* renderer = new CSimpleMetalRenderer();
+    return (void*)renderer;
+}
+
+// Export the function that the system expects
 extern "C" {
-    // Create a simple renderer that can be cast to IRenderer
-    void* CreateRenderer(int argc, char* argv[], SCryRenderInterface* sp)
+    __attribute__((visibility("default")))
+    IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
     {
-        CSimpleMetalRenderer* renderer = new CSimpleMetalRenderer();
-        return (void*)renderer;
+        return (IRenderer*)CreateSimpleRenderer(argc, argv, sp);
     }
-    
-    // Export the function that the system expects
-    void* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
-    {
-        return CreateRenderer(argc, argv, sp);
-    }
+}
+
+// Force the function to be exported by referencing it
+IRenderer* (*g_PackageRenderConstructor)(int, char*[], SCryRenderInterface*) = PackageRenderConstructor;
+
+// Missing implementation for EnumDisplayFormats
+int CSimpleMetalRenderer::EnumDisplayFormats(void* Formats, bool bReset)
+{
+    // TODO: Implement display format enumeration
+    printf("EnumDisplayFormats called\n");
+    return 0;
 }

@@ -9,6 +9,7 @@
 #include <Cocoa/Cocoa.h>
 #include <vector>
 #include <cassert>
+#include "IRenderer.h"
 
 // Forward declarations for CryEngine types
 
@@ -23,12 +24,7 @@ struct SDrawTextInfo;
 struct SDispFormat;
 class ICrySizer;
 
-// Simple Vec3 definition for Metal renderer
-struct Vec3 { 
-    float x, y, z; 
-    Vec3() : x(0), y(0), z(0) {}
-    Vec3(float x_, float y_, float z_) : x(x_), y(y_), z(z_) {}
-};
+// Use CryEngine's Vec3 type
 
 // Simple Metal renderer that provides essential rendering functionality
 class CSimpleMetalRenderer

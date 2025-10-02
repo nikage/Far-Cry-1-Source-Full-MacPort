@@ -68,6 +68,7 @@ public:
     virtual void PostLoad();
     virtual void BeginFrame();
     virtual void Update();
+    virtual void EndFrame();
     virtual void ShareResources(IRenderer* renderer);
     
     // Viewport and Camera
@@ -328,8 +329,8 @@ public:
     virtual void WriteTGA(byte* dat, int wdt, int hgt, const char* name, int bits) {}
     virtual void WriteJPG(byte* dat, int wdt, int hgt, char* name) {}
 
-protected:
-    // Metal-specific members
+public:
+    // Metal-specific members (public for manager access)
     id<MTLDevice> m_device;
     id<MTLCommandQueue> m_commandQueue;
     id<MTLRenderCommandEncoder> m_renderEncoder;
@@ -344,6 +345,21 @@ protected:
     id<MTLRenderPipelineState> m_currentPipelineState;
     id<MTLDepthStencilState> m_currentDepthStencilState;
     
+    // Render state management
+    bool m_depthTestEnabled;
+    bool m_depthWriteEnabled;
+    MTLCompareFunction m_depthFunction;
+    bool m_blendingEnabled;
+    MTLBlendFactor m_sourceBlendFactor;
+    MTLBlendFactor m_destBlendFactor;
+    MTLBlendOperation m_blendOperation;
+    
+    // Vertex buffer management
+    std::vector<id<MTLBuffer>> m_vertexBuffers;
+    std::vector<id<MTLBuffer>> m_indexBuffers;
+    int m_nextVertexBufferId;
+    int m_nextIndexBufferId;
+    
     // Basic renderer state
     bool m_isInitialized;
     int m_width, m_height;
@@ -351,13 +367,34 @@ protected:
     bool m_fullscreen;
     void* m_camera; // CCamera* - forward declaration to avoid include issues
     
+    // Viewport state
+    int m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight;
+    
     // Internal methods
     bool InitializeDevice();
     bool InitializeCommandQueue();
     bool InitializeRenderPipeline();
     void UpdateRenderPassDescriptor();
+    
+    // Vertex buffer management
+    int CreateVertexBuffer(const void* data, size_t size);
+    int CreateIndexBuffer(const void* data, size_t size);
+    void UpdateVertexBuffer(int bufferId, const void* data, size_t size);
+    void UpdateIndexBuffer(int bufferId, const void* data, size_t size);
+    void ReleaseVertexBuffer(int bufferId);
+    void ReleaseIndexBuffer(int bufferId);
+    id<MTLBuffer> GetVertexBuffer(int bufferId);
+    id<MTLBuffer> GetIndexBuffer(int bufferId);
     id<MTLTexture> CreateMetalTexture(int width, int height, MTLPixelFormat format);
     id<MTLBuffer> CreateMetalBuffer(void* data, size_t size, MTLResourceOptions options);
+    
+    // Render state management
+    void SetDepthTest(bool enabled);
+    void SetDepthWrite(bool enabled);
+    void SetDepthFunction(MTLCompareFunction function);
+    void SetBlending(bool enabled);
+    void SetBlendFactors(MTLBlendFactor source, MTLBlendFactor dest, MTLBlendOperation operation);
+    void ApplyRenderState();
 };
 
 #endif // __APPLE__ && __MACH__
