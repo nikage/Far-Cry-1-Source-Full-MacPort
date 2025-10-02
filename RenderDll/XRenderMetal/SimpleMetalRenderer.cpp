@@ -270,7 +270,12 @@ char CSimpleMetalRenderer::GetType()
 
 void CSimpleMetalRenderer::SetType(char type)
 {
+    printf("SetType called with type=%d\n", (int)type);
+    printf("Renderer object: %p\n", this);
+    printf("m_type before: %d\n", m_type);
     m_type = (int)type;
+    printf("m_type after: %d\n", m_type);
+    printf("SetType completed successfully\n");
 }
 
 void CSimpleMetalRenderer::Release()
@@ -473,21 +478,83 @@ int CSimpleMetalRenderer::GetFrameID(bool bIncludeRecursiveCalls)
 // Create a simple renderer that can be cast to IRenderer
 IRenderer* CreateSimpleRenderer(int argc, char* argv[], SCryRenderInterface* sp)
 {
+    FILE* f = fopen("/tmp/farcry_create.log", "w");
+    if (f) {
+        fprintf(f, "CreateSimpleRenderer called\n");
+        fflush(f);
+        fclose(f);
+    }
+    
     printf("CreateSimpleRenderer called\n");
     CSimpleMetalRenderer* renderer = new CSimpleMetalRenderer();
     printf("CreateSimpleRenderer created renderer=%p\n", renderer);
+    
+    f = fopen("/tmp/farcry_create_done.log", "w");
+    if (f) {
+        fprintf(f, "CreateSimpleRenderer done: renderer=%p\n", renderer);
+        fflush(f);
+        fclose(f);
+    }
+    
     return (IRenderer*)renderer;
 }
 
-// Export the function that the system expects
-extern "C" {
-    __attribute__((visibility("default")))
-    IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
-    {
-        printf("PackageRenderConstructor START\n");
-        fflush(stdout);
-        return nullptr;
+// Test function with minimal signature
+extern "C" void* TestFunction(int a, void* b, void* c)
+{
+    FILE* f = fopen("/tmp/farcry_test.log", "w");
+    if (f) {
+        fprintf(f, "TestFunction called: a=%d, b=%p, c=%p\n", a, b, c);
+        fclose(f);
     }
+    return nullptr;
+}
+
+// Test function with different signature
+extern "C" DLL_EXPORT void* TestPackageRenderConstructor()
+{
+    FILE* f = fopen("/tmp/farcry_test.log", "w");
+    if (f) {
+        fprintf(f, "TestPackageRenderConstructor called successfully\n");
+        fclose(f);
+    }
+    return nullptr;
+}
+
+// Add a constructor attribute to ensure initialization
+__attribute__((constructor))
+static void InitializeRenderer() {
+    FILE* f = fopen("/tmp/farcry_init.log", "w");
+    if (f) {
+        fprintf(f, "Metal renderer library initialized\n");
+        fflush(f);
+        fclose(f);
+    }
+}
+
+// Export the function that the system expects
+extern "C" DLL_EXPORT IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface *sp)
+{
+    // Write to file to confirm function is called
+    FILE* f = fopen("/tmp/farcry_render_constructor.log", "w");
+    if (f) {
+        fprintf(f, "PackageRenderConstructor called successfully\n");
+        fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+        fflush(f);
+        fclose(f);
+    }
+    
+    // Create and return the renderer
+    IRenderer* renderer = CreateSimpleRenderer(argc, argv, sp);
+    
+    f = fopen("/tmp/farcry_render_created.log", "w");
+    if (f) {
+        fprintf(f, "Renderer created: %p\n", renderer);
+        fflush(f);
+        fclose(f);
+    }
+    
+    return renderer;
 }
 
 // Force the function to be exported by referencing it

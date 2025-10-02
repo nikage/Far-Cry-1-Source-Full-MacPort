@@ -70,11 +70,6 @@ target_compile_definitions(XRenderMetal PRIVATE
     XRENDERMETAL_EXPORTS=1
 )
 
-# Linker flags to force export of PackageRenderConstructor
-set_target_properties(XRenderMetal PROPERTIES
-    LINK_FLAGS "-Wl,-exported_symbol,_PackageRenderConstructor"
-)
-
 # Install target
 install(TARGETS XRenderMetal 
     LIBRARY DESTINATION lib
