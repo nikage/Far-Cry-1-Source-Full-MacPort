@@ -1,5 +1,53 @@
 # FarCry Mac Silicon Port - Changelog
 
+## 📚 2025-01-29 - Comprehensive Documentation Added
+
+### [Documentation][CodeSigning] Added comprehensive code signing documentation and developer guides
+
+- **✅ Documentation Structure**: Created organized documentation system in `/docs/` directory
+- **✅ Code Signing Guide**: Comprehensive documentation covering the code signing issue and solutions
+- **✅ Developer Guide**: Technical documentation for Metal renderer architecture and implementation
+- **✅ Quick Reference**: Easy-to-use reference card for code signing solutions
+- **✅ User Guide**: Complete user documentation with troubleshooting and setup instructions
+
+### Technical Documentation Added
+
+- **Code Signing Issue Documentation**:
+  - Root cause analysis of macOS code signing validation failures
+  - Environment variable solution (`DYLD_DISABLE_CODE_SIGNING=1`) explanation
+  - Security considerations and production signing alternatives
+  - Verification commands and troubleshooting steps
+
+- **Developer Guide**:
+  - Complete Metal renderer architecture overview
+  - IRenderer interface compliance documentation
+  - Dynamic library integration details
+  - Build system integration and CMake configuration
+  - Performance considerations and future enhancements
+
+- **Quick Reference Card**:
+  - Immediate solutions for code signing issues
+  - Command-line examples for verification
+  - Security notes and production considerations
+  - Step-by-step troubleshooting guide
+
+### Files Created
+
+- `docs/README.md` - Main documentation index
+- `docs/FarCry_Metal_Renderer_README.md` - Complete user guide
+- `docs/CODE_SIGNING_QUICK_REFERENCE.md` - Quick reference card
+- `docs/DEVELOPER_GUIDE.md` - Technical developer documentation
+
+### Documentation Features
+
+- **Comprehensive Coverage**: All aspects of the Metal renderer and code signing issues
+- **User-Friendly**: Clear instructions for both technical and non-technical users
+- **Developer-Focused**: Detailed technical information for contributors
+- **Troubleshooting**: Complete problem-solving guides with solutions
+- **Future-Proof**: Documentation structure for ongoing development
+
+---
+
 ## 🔧 2025-01-29 - Metal Renderer Architecture Refactoring
 
 ### [Renderer][Architecture] Implemented modular Metal renderer with specialized manager classes
