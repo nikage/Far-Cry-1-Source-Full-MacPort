@@ -3,11 +3,13 @@ cmake_minimum_required(VERSION 3.20)
 
 # Platform-specific source selection
 if(APPLE)
-    # macOS-specific sources only
+    # macOS-specific sources - only use the simple macOS implementation
     set(CRYSOUND_SOURCES
         "SimpleMacOSSoundSystem.cpp"
     )
     
+    # Headers are included automatically via GLOB_RECURSE for other platforms
+    # For macOS, we only need the source files
     set(CRYSOUND_HEADERS
     )
 else()
@@ -59,7 +61,10 @@ if(APPLE)
     endif()
     
     # Set source files that need Objective-C++ compilation
-    set_source_files_properties(MacOSSound.cpp PROPERTIES
+    set_source_files_properties(SimpleMacOSSoundSystem.cpp PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
+    set_source_files_properties(MacOSSoundSystemFactory.cpp PROPERTIES
         COMPILE_FLAGS "-x objective-c++"
     )
     

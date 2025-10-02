@@ -302,12 +302,90 @@ private:
     // Current render state
     int m_currentState;
     
+    // Texture management
+    std::map<int, id<MTLTexture>> m_textureCache;
+    int m_nextTextureId;
+    
+    // Vertex buffer management
+    std::map<CVertexBuffer*, id<MTLBuffer>> m_vertexBufferCache;
+    std::map<SVertexStream*, id<MTLBuffer>> m_indexBufferCache;
+    
+    // Shader management
+    std::map<std::string, id<MTLFunction>> m_vertexShaders;
+    std::map<std::string, id<MTLFunction>> m_fragmentShaders;
+    std::map<std::string, id<MTLRenderPipelineState>> m_pipelineStates;
+    
+    // Matrix management
+    float m_projectionMatrix[16];
+    float m_viewMatrix[16];
+    float m_modelMatrix[16];
+    id<MTLBuffer> m_uniformBuffer;
+    
+    // Optimization state
+    bool m_performanceMode;
+    bool m_gpuProfilingEnabled;
+    int m_frameCounter;
+    double m_lastCleanupTime;
+    
     // Helper methods
     bool InitializeDevice();
     bool InitializeCommandQueue();
     bool InitializeRenderPipeline();
     MTLPixelFormat ConvertToMetalFormat(int format);
     MTLPrimitiveType ConvertToMetalPrimitive(int type);
+    
+    // Texture management methods
+    id<MTLTexture> CreateMetalTexture(int width, int height, MTLPixelFormat format, const void* data);
+    void BindTexture(int textureId, int slot);
+    void ReleaseTexture(int textureId);
+    
+    // Vertex buffer management methods
+    id<MTLBuffer> GetOrCreateVertexBuffer(CVertexBuffer* src);
+    id<MTLBuffer> GetOrCreateIndexBuffer(SVertexStream* indices);
+    void ReleaseVertexBuffer(CVertexBuffer* src);
+    void ReleaseIndexBuffer(SVertexStream* indices);
+    
+    // Shader management methods
+    id<MTLFunction> LoadVertexShader(const std::string& name, const std::string& source);
+    id<MTLFunction> LoadFragmentShader(const std::string& name, const std::string& source);
+    id<MTLRenderPipelineState> CreatePipelineState(const std::string& name, 
+                                                   id<MTLFunction> vertexShader, 
+                                                   id<MTLFunction> fragmentShader);
+    void SetShader(const std::string& shaderName);
+    
+    // Primitive rendering methods
+    void DrawLine(const Vec3& start, const Vec3& end, const Vec3& color);
+    void DrawPoint(const Vec3& position, float size, const Vec3& color);
+    void DrawTriangle(const Vec3& v0, const Vec3& v1, const Vec3& v2, const Vec3& color);
+    
+    // 2D rendering methods
+    void Draw2DLine(float x1, float y1, float x2, float y2, const Vec3& color);
+    void Draw2DRectangle(float x, float y, float width, float height, const Vec3& color);
+    void Draw2DRectangleFilled(float x, float y, float width, float height, const Vec3& color);
+    
+    // Render state management methods
+    void SetBlendState(bool enable, MTLBlendOperation operation = MTLBlendOperationAdd);
+    void SetDepthState(bool enable, bool writeEnable = true, MTLCompareFunction compareFunction = MTLCompareFunctionLess);
+    void SetCullState(bool enable, MTLCullMode cullMode = MTLCullModeBack);
+    void SetFillMode(MTLTriangleFillMode fillMode = MTLTriangleFillModeFill);
+    
+    // Camera and matrix management methods
+    void SetProjectionMatrix(const float* matrix);
+    void SetViewMatrix(const float* matrix);
+    void SetModelMatrix(const float* matrix);
+    void UpdateUniformBuffers();
+    
+    // Debug rendering methods
+    void DrawWireframe(CVertexBuffer* src, SVertexStream* indices, int numindices);
+    void DrawDebugText(const char* text, float x, float y, const Vec3& color);
+    void DrawDebugGrid(int size, float spacing, const Vec3& color);
+    void DrawDebugAxis(const Vec3& position, float length);
+    
+    // Optimization methods
+    void OptimizeForPerformance();
+    void CleanupUnusedResources();
+    void SetPerformanceMode(bool enable);
+    void EnableGPUProfiling(bool enable);
 };
 
 

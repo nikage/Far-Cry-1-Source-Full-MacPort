@@ -156,45 +156,77 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
 
 	ITexPic * pPicSpot = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("spot_shadow.tga",0,0,eTT_Base);
 	m_nShadowSpotTexId = pPicSpot->GetTextureID();
+	printf("C3DEngine constructor: loaded all textures successfully\n");
 
   // create components
   m_pObjManager   = 0;//new CObjManager (m_pSystem);
+  printf("C3DEngine constructor: created obj manager\n");
 	
   m_pPartManager = 0;
+  printf("C3DEngine constructor: set part manager\n");
 
   m_pDecalManager     = 0;//new CDecalManager   (m_pSystem, this);
+  printf("C3DEngine constructor: set decal manager\n");
 //  m_pBFManager        = new CBFManager      ();
   m_pRainManager      = new CRainManager    ();
+  printf("C3DEngine constructor: created rain manager\n");
   m_pVisAreaManager   = 0;
-  m_pCVars            = new CVars();
+  printf("C3DEngine constructor: set vis area manager\n");
+  // Temporarily disable CVars creation to avoid hang
+  // m_pCVars            = new CVars();
+  m_pCVars = nullptr;
+  printf("C3DEngine constructor: skipped CVars creation (temporary workaround)\n");
   Cry3DEngineBase::m_pCVars = m_pCVars;
+  printf("C3DEngine constructor: set CVars in base\n");
 
   // create REs
-  m_pRESky              = (CRESky*)             GetRenderer()->EF_CreateRE(eDATA_Sky); m_pRESky->m_fAlpha = 1.f;
+  printf("C3DEngine constructor: creating REs\n");
+  m_pRESky              = (CRESky*)             Cry3DEngineBase::m_pRenderer->EF_CreateRE(eDATA_Sky); m_pRESky->m_fAlpha = 1.f;
+  printf("C3DEngine constructor: created RESky\n");
   //m_pREOutSpace         = (CREOutSpace * )      GetRenderer()->EF_CreateRE(eDATA_OutSpace);
-  m_pREDummy            = (CREDummy*)           GetRenderer()->EF_CreateRE(eDATA_Dummy);
-  m_pRETerrainParticles = (CRETerrainParticles*)GetRenderer()->EF_CreateRE(eDATA_TerrainParticles);
-  m_pRE2DQuad           = (CRE2DQuad*)          GetRenderer()->EF_CreateRE(eDATA_2DQuad);
-  m_pREScreenProcess    = (CREScreenProcess*)   GetRenderer()->EF_CreateRE(eDATA_ScreenProcess);
+  m_pREDummy            = (CREDummy*)           Cry3DEngineBase::m_pRenderer->EF_CreateRE(eDATA_Dummy);
+  printf("C3DEngine constructor: created REDummy\n");
+  m_pRETerrainParticles = (CRETerrainParticles*)Cry3DEngineBase::m_pRenderer->EF_CreateRE(eDATA_TerrainParticles);
+  printf("C3DEngine constructor: created RETerrainParticles\n");
+  m_pRE2DQuad           = (CRE2DQuad*)          Cry3DEngineBase::m_pRenderer->EF_CreateRE(eDATA_2DQuad);
+  printf("C3DEngine constructor: created RE2DQuad\n");
+  m_pREScreenProcess    = (CREScreenProcess*)   Cry3DEngineBase::m_pRenderer->EF_CreateRE(eDATA_ScreenProcess);
+  printf("C3DEngine constructor: created REScreenProcess\n");
 
-  m_pSHScreenTexMap     = GetRenderer()->EF_LoadShader("ScreenTexMap", eSH_World, EF_SYSTEM);
-  m_pSHScreenProcess    = GetRenderer()->EF_LoadShader("ScreenProcess", eSH_World, EF_SYSTEM);
-  m_pSHOutSpace         = GetRenderer()->EF_LoadShader("OutSpace", eSH_World, EF_SYSTEM);
-  m_pSHFarTreeSprites   = GetRenderer()->EF_LoadShader("FarTreeSprites", eSH_World, EF_SYSTEM);
-  m_pSHClearStencil     = GetRenderer()->EF_LoadShader("ClearStencil", eSH_World, EF_SYSTEM);
-  m_pSHShadowMapGen     = GetRenderer()->EF_LoadShader("ShadowMapGen", eSH_World, EF_SYSTEM);
-  m_pSHBinocularDistortMask = GetRenderer()->EF_LoadShader("BinocularDistortMask", eSH_World, EF_SYSTEM);
-  m_pSHScreenDistort = GetRenderer()->EF_LoadShader("ScreenDistort", eSH_World, EF_SYSTEM);
-  m_pSHSniperDistortMask = GetRenderer()->EF_LoadShader("SniperDistortMask", eSH_World, EF_SYSTEM);
-  m_pSHRainMap          = GetRenderer()->EF_LoadShader("RainMap", eSH_World, EF_SYSTEM);
+  m_pSHScreenTexMap     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ScreenTexMap", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded ScreenTexMap shader\n");
+  m_pSHScreenProcess    = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ScreenProcess", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded ScreenProcess shader\n");
+  m_pSHOutSpace         = Cry3DEngineBase::m_pRenderer->EF_LoadShader("OutSpace", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded OutSpace shader\n");
+  m_pSHFarTreeSprites   = Cry3DEngineBase::m_pRenderer->EF_LoadShader("FarTreeSprites", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded FarTreeSprites shader\n");
+  m_pSHClearStencil     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ClearStencil", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded ClearStencil shader\n");
+  m_pSHShadowMapGen     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ShadowMapGen", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded ShadowMapGen shader\n");
+  m_pSHBinocularDistortMask = Cry3DEngineBase::m_pRenderer->EF_LoadShader("BinocularDistortMask", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded BinocularDistortMask shader\n");
+  m_pSHScreenDistort = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ScreenDistort", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded ScreenDistort shader\n");
+  m_pSHSniperDistortMask = Cry3DEngineBase::m_pRenderer->EF_LoadShader("SniperDistortMask", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded SniperDistortMask shader\n");
+  m_pSHRainMap          = Cry3DEngineBase::m_pRenderer->EF_LoadShader("RainMap", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded RainMap shader\n");
 
-  m_pSHStencil          = GetRenderer()->EF_LoadShader("<Stencil>", eSH_World, EF_SYSTEM);
-  m_pSHStencilState     = GetRenderer()->EF_LoadShader("StencilState", eSH_World, EF_SYSTEM);
-  m_pSHStencilStateInv  = GetRenderer()->EF_LoadShader("StencilStateInv", eSH_World, EF_SYSTEM);
+  m_pSHStencil          = Cry3DEngineBase::m_pRenderer->EF_LoadShader("<Stencil>", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded Stencil shader\n");
+  m_pSHStencilState     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("StencilState", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded StencilState shader\n");
+  m_pSHStencilStateInv  = Cry3DEngineBase::m_pRenderer->EF_LoadShader("StencilStateInv", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded StencilStateInv shader\n");
 
-	m_pSHTerrainParticles = GetRenderer()->EF_LoadShader("TerrainParticles", eSH_World, EF_SYSTEM);
+	m_pSHTerrainParticles = Cry3DEngineBase::m_pRenderer->EF_LoadShader("TerrainParticles", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: loaded TerrainParticles shader\n");
 
   m_pPhysMaterialEnumerator=0;
+  printf("C3DEngine constructor: set phys material enumerator\n");
+  printf("C3DEngine constructor: COMPLETED SUCCESSFULLY!\n");
 
   m_fMaxViewDist = 1024;
 

@@ -984,6 +984,7 @@ bool CSystem::Init3DEngine()
 	printf("CSystem::Init3DEngine() calling CreateCry3DEngine\n");
 	printf("CSystem::Init3DEngine() GetIRenderer() returns %p\n", GetIRenderer());
 	m_pI3DEngine = (*pfnCreateCry3DEngine)(this,g3deInterfaceVersion);
+	printf("CSystem::Init3DEngine() CreateCry3DEngine returned, m_pI3DEngine = %p\n", m_pI3DEngine);
 
   if (!m_pI3DEngine )
 	{
