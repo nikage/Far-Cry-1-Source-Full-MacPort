@@ -97,8 +97,14 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   memset(m_SunObject, 0, sizeof(m_SunObject));  
   m_pBlurObj=0;
   printf("C3DEngine constructor: calling GetRenderer()->EF_GetObject for blur object\n");
-  if (GetRenderer()) {
-    m_pBlurObj=GetRenderer()->EF_GetObject(false, -1);
+  printf("C3DEngine constructor: Cry3DEngineBase::m_pRenderer is %p\n", Cry3DEngineBase::m_pRenderer);
+  printf("C3DEngine constructor: Cry3DEngineBase::GetRenderer() returns %p\n", Cry3DEngineBase::GetRenderer());
+  printf("C3DEngine constructor: Direct access to m_pRenderer: %p\n", Cry3DEngineBase::m_pRenderer);
+  printf("C3DEngine constructor: Testing static method call...\n");
+  IRenderer* testRenderer = Cry3DEngineBase::GetRenderer();
+  printf("C3DEngine constructor: testRenderer = %p\n", testRenderer);
+  if (Cry3DEngineBase::m_pRenderer) {
+    m_pBlurObj=Cry3DEngineBase::m_pRenderer->EF_GetObject(false, -1);
     printf("C3DEngine constructor: blur object created\n");
   } else {
     printf("WARNING: GetRenderer() returned nullptr in C3DEngine constructor!\n");
@@ -106,8 +112,8 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   }
   m_pScreenObj=0;
   printf("C3DEngine constructor: calling GetRenderer()->EF_GetObject for screen object\n");
-  if (GetRenderer()) {
-    m_pScreenObj=GetRenderer()->EF_GetObject(false, -1);
+  if (Cry3DEngineBase::m_pRenderer) {
+    m_pScreenObj=Cry3DEngineBase::m_pRenderer->EF_GetObject(false, -1);
     printf("C3DEngine constructor: screen object created\n");
   } else {
     printf("WARNING: GetRenderer() returned nullptr for screen object!\n");
@@ -122,8 +128,8 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   m_pTerrainWaterShader = m_pSunRoadShader = 0;
 	m_nWaterBottomTexId=0;
   printf("C3DEngine constructor: calling GetRenderer()->EF_LoadShader for CryLight\n");
-  if (GetRenderer()) {
-    m_pSHLensFlares = GetRenderer()->EF_LoadShader("CryLight", eSH_World, EF_SYSTEM);
+  if (Cry3DEngineBase::m_pRenderer) {
+    m_pSHLensFlares = Cry3DEngineBase::m_pRenderer->EF_LoadShader("CryLight", eSH_World, EF_SYSTEM);
     printf("C3DEngine constructor: CryLight shader loaded\n");
   } else {
     printf("WARNING: GetRenderer() returned nullptr for CryLight shader!\n");
@@ -131,8 +137,8 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   }
   m_vSunPosition = Vec3d(0, -10000.0f, 10000.0f);
   printf("C3DEngine constructor: calling GetRenderer()->EF_LoadShader for Default\n");
-  if (GetRenderer()) {
-    m_pSHDefault = GetRenderer()->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
+  if (Cry3DEngineBase::m_pRenderer) {
+    m_pSHDefault = Cry3DEngineBase::m_pRenderer->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
     printf("C3DEngine constructor: Default shader loaded\n");
   } else {
     printf("WARNING: GetRenderer() returned nullptr for Default shader!\n");
@@ -142,13 +148,13 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   m_pTerrain=0;	
 	m_bEnabled=1;
 
-	ITexPic * pPic = GetRenderer()->EF_LoadTexture("diskette.tga",0,0,eTT_Base);
+	ITexPic * pPic = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("diskette.tga",0,0,eTT_Base);
   m_nStreamingIconTexID = pPic->GetTextureID();
 
-	pPic = GetRenderer()->EF_LoadTexture("black.tga",0,0,eTT_Base);
+	pPic = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("black.tga",0,0,eTT_Base);
   m_nBlackTexID = pPic->GetTextureID();
 
-	ITexPic * pPicSpot = GetRenderer()->EF_LoadTexture("spot_shadow.tga",0,0,eTT_Base);
+	ITexPic * pPicSpot = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("spot_shadow.tga",0,0,eTT_Base);
 	m_nShadowSpotTexId = pPicSpot->GetTextureID();
 
   // create components
@@ -445,8 +451,8 @@ void C3DEngine::ShutDown(bool bEditorMode)
   m_pObjManager=0;
 
   printf("C3DEngine::ShutDown() deleting fog top plane\n");
-  if (GetRenderer()) {
-    GetRenderer()->DeleteLeafBuffer(m_pFogTopPlane);
+  if (Cry3DEngineBase::m_pRenderer) {
+    Cry3DEngineBase::m_pRenderer->DeleteLeafBuffer(m_pFogTopPlane);
   } else {
     printf("WARNING: GetRenderer() returned nullptr!\n");
   }
