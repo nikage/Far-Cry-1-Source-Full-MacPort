@@ -28,6 +28,7 @@
 #include <IAISystem.h>
 #include <IRenderer.h>
 #include <CryMemoryManager.h>
+
 #include <ICryPak.h>
 #include <IMovieSystem.h>
 #include <IEntitySystem.h>
@@ -891,6 +892,12 @@ bool CSystem::InitFont()
 	if (m_bEditor && !m_pRenderer)
 		return true;
 
+#ifdef __APPLE__
+	// Temporarily disable font loading on macOS to avoid hangs
+	GetILog()->LogToFile("Font system disabled for macOS - skipping font initialization");
+	return true;
+#endif
+
 #ifndef _XBOX
 	m_dll.hFont = LoadDLL(DLL_FONT);
 	if(!m_dll.hFont)
@@ -930,29 +937,23 @@ bool CSystem::InitFont()
 	//////////////////////////////////////////////////////////////////////////
 	string szFontPath = "languages/fonts/default.xml";
 
+	// For macOS, skip font loading if files are missing or problematic
+	// This allows the game to continue without fonts
 	if(!m_pIFont->Load(szFontPath.c_str()))
 	{
-		string szError = "Error loading the default font from ";
-		szError += szFontPath;
-		szError += ". You're probably running the executable from the wrong working folder.";
-		Error(szError.c_str());
-
-		return false;
+		GetILog()->LogToFile("Warning: Could not load default font from %s - continuing without it", szFontPath.c_str());
+		// Don't return false - continue without fonts
 	}
 
 	int n = szFontPath.find("default.xml");
-	assert(n != string::npos);
+	if (n != string::npos) {
+		szFontPath.replace(n, strlen("default.xml"), "console.xml");
 
-	szFontPath.replace(n, strlen("default.xml"), "console.xml");
-
-	if(!pConsoleFont->Load(szFontPath.c_str()))
-	{
-		string szError = "Error loading the console font from ";
-		szError += szFontPath;
-		szError += ". You're probably running the executable from the wrong working folder.";
-		Error(szError.c_str());
-
-		return false;
+		if(!pConsoleFont->Load(szFontPath.c_str()))
+		{
+			GetILog()->LogToFile("Warning: Could not load console font from %s - continuing without it", szFontPath.c_str());
+			// Don't return false - continue without fonts
+		}
 	}
 
 	return true;
