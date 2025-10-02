@@ -221,14 +221,18 @@ bool CSystem::OpenRenderLibrary(int type)
 		return false;
 	}
  
+	printf("OpenRenderLibrary: calling PackageRenderConstructor\n");
 	m_pRenderer = Proc(0, NULL, &sp);
+	printf("OpenRenderLibrary: PackageRenderConstructor returned %p\n", m_pRenderer);
 	if (!m_pRenderer)
 	{
 		Error( "Error: Couldn't construct render driver '%s'", libname);
 		FreeLib(m_dll.hRenderer);
 		return false;
 	}
+	printf("OpenRenderLibrary: calling SetType(%d)\n", type);
 	m_pRenderer->SetType(type);
+	printf("OpenRenderLibrary: SetType completed\n");
 #else
   m_pRenderer = (IRenderer*)PackageRenderConstructor(0, NULL, &sp);
   m_pRenderer->SetType(type);
@@ -962,11 +966,13 @@ bool CSystem::InitFont()
 //////////////////////////////////////////////////////////////////////////
 bool CSystem::Init3DEngine()
 {
+  printf("CSystem::Init3DEngine() called\n");
   ::SetLastError(0);
   m_dll.h3DEngine = LoadDLL(DLL_3DENGINE);
 	if (!m_dll.h3DEngine)
 		return false;
 
+	printf("CSystem::Init3DEngine() DLL loaded, getting CreateCry3DEngine function\n");
 	PFNCREATECRY3DENGINE pfnCreateCry3DEngine;
 	pfnCreateCry3DEngine = (PFNCREATECRY3DENGINE) CryGetProcAddress( m_dll.h3DEngine, "CreateCry3DEngine");
 	if (!pfnCreateCry3DEngine)
@@ -975,6 +981,8 @@ bool CSystem::Init3DEngine()
 		return false;
 	} 
 
+	printf("CSystem::Init3DEngine() calling CreateCry3DEngine\n");
+	printf("CSystem::Init3DEngine() GetIRenderer() returns %p\n", GetIRenderer());
 	m_pI3DEngine = (*pfnCreateCry3DEngine)(this,g3deInterfaceVersion);
 
   if (!m_pI3DEngine )
@@ -983,11 +991,13 @@ bool CSystem::Init3DEngine()
 		return false;
 	}
 
+	printf("CSystem::Init3DEngine() calling m_pI3DEngine->Init()\n");
 	if (!m_pI3DEngine->Init())
 	{
 		Error( "Error Initializing 3D Engine" );
 		return false;
 	}
+	printf("CSystem::Init3DEngine() Init() completed successfully\n");
 	m_pProcess = m_pI3DEngine;
 	m_pProcess->SetFlags(PROC_3DENGINE);
 	return true;

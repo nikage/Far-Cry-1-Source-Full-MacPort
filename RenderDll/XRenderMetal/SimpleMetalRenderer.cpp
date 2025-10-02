@@ -3,6 +3,7 @@
 #include <Cocoa/Cocoa.h>
 #include <cstdarg>
 #include <cstdio>
+#include <string>
 
 // Define DLL_EXPORT for macOS
 #ifndef DLL_EXPORT
@@ -277,6 +278,131 @@ void CSimpleMetalRenderer::SetType(char type)
     printf("m_type after: %d\n", m_type);
     printf("SetType completed successfully\n");
 }
+
+// EF_GetObject implementation
+CCObject* CSimpleMetalRenderer::EF_GetObject(bool bTemp, int num)
+{
+    printf("EF_GetObject called: bTemp=%d, num=%d\n", bTemp, num);
+    // Return nullptr for now - CCObject needs proper implementation
+    return nullptr;
+}
+
+// Simple shader stub class that implements IShader interface
+class CSimpleShader : public IShader
+{
+public:
+    CSimpleShader(const char* name) : m_name(name ? name : "Unknown"), m_refCount(1) {}
+    
+    // IShader interface
+    virtual int GetID() { return 1; }
+    virtual void AddRef() { m_refCount++; }
+    virtual void Release(bool bForce = false) { 
+        if (--m_refCount <= 0) {
+            printf("CSimpleShader::Release called for %s\n", m_name.c_str());
+            delete this;
+        }
+    }
+    virtual int GetRefCount() { return m_refCount; }
+    virtual const char* GetName() { return m_name.c_str(); }
+    virtual EF_Sort GetSort() { return eS_Opaque; }
+    virtual int GetFlags() { return 0; }
+    virtual int GetFlags2() { return 0; }
+    virtual int GetFlags3() { return 0; }
+    virtual int GetRenderFlags() { return 0; }
+    virtual void SetRenderFlags(int nFlags) {}
+    virtual int GetLFlags() { return 0; }
+    virtual int GetCull() { return 0; }
+    virtual uint GetPreprocessFlags() { return 0; }
+    virtual void SetFlags3(int Flags) {}
+    virtual bool Reload(int nFlags) { return true; }
+    virtual TArray<CRendElement*>* GetREs() { return nullptr; }
+    virtual bool AddTemplate(SRenderShaderResources* Res, int& TemplId, const char* Name = NULL, bool bSetPreferred = false, uint64 nMaskGen = 0) { return false; }
+    virtual void RemoveTemplate(int TemplId) {}
+    virtual IShader* GetTemplate(int num) { return nullptr; }
+    virtual SEfTemplates* GetTemplates() { return nullptr; }
+    virtual TArray<SShaderParam>& GetPublicParams() { static TArray<SShaderParam> empty; return empty; }
+    virtual int GetTexId() { return 0; }
+    virtual ITexPic* GetBaseTexture(int* nPass, int* nTU) { return nullptr; }
+    virtual unsigned int GetUsedTextureTypes(void) { return 0; }
+    virtual int GetVertexFormat(void) { return 0; }
+    virtual int Size(int Flags) { return 0; }
+    virtual uint64 GetGenerationMask() { return 0; }
+    virtual SShaderGen* GetGenerationParams() { return nullptr; }
+
+private:
+    std::string m_name;
+    int m_refCount;
+};
+
+// EF_LoadShader implementation
+IShader* CSimpleMetalRenderer::EF_LoadShader(const char *name, EShClass Class, int flags, uint64 nMaskGen)
+{
+    printf("EF_LoadShader called: name=%s, Class=%d, flags=%d\n", name ? name : "NULL", Class, flags);
+    // Create a proper shader stub that can handle Release() calls
+    return new CSimpleShader(name);
+}
+
+// Simple texture stub class that implements ITexPic interface
+class CSimpleTexture : public ITexPic
+{
+public:
+    CSimpleTexture(const char* name) : m_name(name ? name : "Unknown"), m_refCount(1), m_width(256), m_height(256), m_textureID(1) {}
+    
+    // ITexPic interface
+    virtual void AddRef() { m_refCount++; }
+    virtual void Release(int bForce = false) { 
+        if (--m_refCount <= 0) {
+            printf("CSimpleTexture::Release called for %s\n", m_name.c_str());
+            delete this;
+        }
+    }
+    virtual const char* GetName() { return m_name.c_str(); }
+    virtual int GetWidth() { return m_width; }
+    virtual int GetHeight() { return m_height; }
+    virtual int GetOriginalWidth() { return m_width; }
+    virtual int GetOriginalHeight() { return m_height; }
+    virtual int GetTextureID() { return m_textureID; }
+    virtual int GetFlags() { return 0; }
+    virtual int GetFlags2() { return 0; }
+    virtual void SetClamp(bool bEnable) {}
+    virtual bool IsTextureLoaded() { return true; }
+    virtual void PrecacheAsynchronously(float fDist, int Flags) {}
+    virtual void Preload(int Flags) {}
+    virtual byte* GetData32() { return nullptr; }
+    virtual bool SetFilter(int nFilter) { return true; }
+
+private:
+    std::string m_name;
+    int m_refCount;
+    int m_width, m_height;
+    int m_textureID;
+};
+
+// EF_LoadTexture implementation
+ITexPic* CSimpleMetalRenderer::EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1, float fAmount2, int Id, int BindId)
+{
+    printf("EF_LoadTexture called: nameTex=%s, flags=%u, eTT=%d\n", nameTex ? nameTex : "NULL", flags, eTT);
+    // Create a proper texture stub that can handle Release() calls
+    return new CSimpleTexture(nameTex);
+}
+
+// DeleteLeafBuffer implementation
+void CSimpleMetalRenderer::DeleteLeafBuffer(CLeafBuffer* pLBuffer)
+{
+    printf("DeleteLeafBuffer called: pLBuffer=%p\n", pLBuffer);
+    if (pLBuffer) {
+        // In a real implementation, this would properly clean up Metal buffers
+        // For now, just log the call - the actual cleanup would happen in the CLeafBuffer destructor
+        printf("Deleting leaf buffer: %s\n", pLBuffer->m_sSource ? pLBuffer->m_sSource : "Unknown");
+    }
+}
+
+// Add more renderer methods that might be called during 3D Engine initialization
+void CSimpleMetalRenderer::RemoveTexture(int nTextureId)
+{
+    printf("RemoveTexture called: nTextureId=%d\n", nTextureId);
+}
+
 
 void CSimpleMetalRenderer::Release()
 {
@@ -574,13 +700,6 @@ void CSimpleMetalRenderer::FlushTextMessages()
     // TODO: Implement text message flushing
 }
 
-// Implementation for EF_LoadTexture
-ITexPic* CSimpleMetalRenderer::EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1, float fAmount2, int Id, int BindId)
-{
-    // TODO: Implement texture loading
-    printf("EF_LoadTexture called: %s\n", nameTex);
-    return nullptr;
-}
 
 // Implementation for EF_GetTextureByID
 ITexPic* CSimpleMetalRenderer::EF_GetTextureByID(int texture_id)

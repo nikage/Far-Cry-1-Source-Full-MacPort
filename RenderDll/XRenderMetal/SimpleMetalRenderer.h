@@ -80,6 +80,14 @@ public:
     virtual void SetType(char type);
     virtual void ShareResources(CSimpleMetalRenderer* renderer);
     
+    // EF methods needed by 3D Engine
+    virtual CCObject* EF_GetObject(bool bTemp = false, int num = -1);
+    virtual IShader* EF_LoadShader(const char *name, EShClass Class, int flags = 0, uint64 nMaskGen = 0);
+    
+    // Additional renderer methods needed by 3D Engine
+    virtual void DeleteLeafBuffer(CLeafBuffer* pLBuffer);
+    virtual void RemoveTexture(int nTextureId);
+    
     // Additional missing methods from IRenderer interface
     virtual void FlushTextMessages();
     virtual ITexPic* EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1=-1.0f, float fAmount2=-1.0f, int Id=-1, int BindId=0);
@@ -142,7 +150,6 @@ public:
     virtual CCObject *EF_AddSpriteToScene(int Ef, int numPts, SColorVert *verts, CCObject *obj, byte *inds=NULL, int ninds=0, int nFogID=0) { return nullptr; }
     virtual void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D *verts) {}
     virtual void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D *verts) {}
-    virtual IShader *EF_LoadShader (const char *name, EShClass Class, int flags=0, uint64 nMaskGen=0) { return nullptr; }
     virtual SShaderItem EF_LoadShaderItem (const char *name, EShClass Class, bool bShare, const char *templName, int flags=0, SInputShaderResources *Res=NULL, uint64 nMaskGen=0) { return SShaderItem(); }
     virtual bool EF_ReloadFile (const char *szFileName) { return false; }
     virtual void EF_ReloadShaderFiles (int nCategory) {}
@@ -161,7 +168,6 @@ public:
     virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale=1.0f, bool bAdditive=true) { return false; }
     virtual CRendElement *EF_CreateRE (EDataType edt) { return nullptr; }
     virtual void EF_StartEf () {}
-    virtual CCObject *EF_GetObject (bool bTemp=false, int num=-1) { return nullptr; }
     virtual void EF_AddEf (int NumFog, CRendElement *re, IShader *ef, SRenderShaderResources *sr,  CCObject *obj, int nTempl, IShader *efState=0, int nSort=0) {}
     virtual void EF_EndEf3D (int nFlags) {}
     virtual bool EF_IsFakeDLight (CDLight *Source) { return false; }
@@ -185,7 +191,6 @@ public:
     virtual void SetClearColor(const Vec3 & vColor) {}
     virtual CLeafBuffer * CreateLeafBuffer(bool bDynamic, const char *szSource="Unknown", class CIndexedMesh * pIndexedMesh=0) { return nullptr; }
     virtual CLeafBuffer * CreateLeafBufferInitialized(void * pVertBuffer, int nVertCount, int nVertFormat, ushort* pIndices, int nIndices, int nPrimetiveType, const char *szSource, EBufferType eBufType = eBT_Dynamic, int nMatInfoCount=1, int nClientTextureBindID=0, bool (*PrepareBufferCallback)(CLeafBuffer *, bool)=NULL, void *CustomData=NULL, bool bOnlyVideoBuffer=false, bool bPrecache=true) { return nullptr; }
-    virtual void DeleteLeafBuffer(CLeafBuffer * pLBuffer) {}
     virtual void MakeMatrix(const Vec3 & pos, const Vec3 & angles,const Vec3 & scale, Matrix44* mat) {}
     virtual void DrawLabelImage(const Vec3 &vPos,float fSize,int nTextureId) {}
     virtual void DrawLabel(Vec3 pos, float font_size, const char * label_text, ...) {}

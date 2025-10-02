@@ -66,7 +66,9 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   CXFile::SetIPack(pSystem->GetIPak());
 
   Cry3DEngineBase::m_pSys=pSystem;
+  printf("C3DEngine constructor: pSystem->GetIRenderer() returns %p\n", pSystem->GetIRenderer());
   Cry3DEngineBase::m_pRenderer=pSystem->GetIRenderer();
+  printf("C3DEngine constructor: Cry3DEngineBase::m_pRenderer set to %p\n", Cry3DEngineBase::m_pRenderer);
   Cry3DEngineBase::m_pTimer=pSystem->GetITimer();
   Cry3DEngineBase::m_pLog=pSystem->GetILog();
   Cry3DEngineBase::m_pPhysicalWorld=pSystem->GetIPhysicalWorld();
@@ -94,9 +96,23 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
 
   memset(m_SunObject, 0, sizeof(m_SunObject));  
   m_pBlurObj=0;
-  m_pBlurObj=GetRenderer()->EF_GetObject(false, -1);
+  printf("C3DEngine constructor: calling GetRenderer()->EF_GetObject for blur object\n");
+  if (GetRenderer()) {
+    m_pBlurObj=GetRenderer()->EF_GetObject(false, -1);
+    printf("C3DEngine constructor: blur object created\n");
+  } else {
+    printf("WARNING: GetRenderer() returned nullptr in C3DEngine constructor!\n");
+    m_pBlurObj = nullptr;
+  }
   m_pScreenObj=0;
-  m_pScreenObj=GetRenderer()->EF_GetObject(false, -1);
+  printf("C3DEngine constructor: calling GetRenderer()->EF_GetObject for screen object\n");
+  if (GetRenderer()) {
+    m_pScreenObj=GetRenderer()->EF_GetObject(false, -1);
+    printf("C3DEngine constructor: screen object created\n");
+  } else {
+    printf("WARNING: GetRenderer() returned nullptr for screen object!\n");
+    m_pScreenObj = nullptr;
+  }
 	m_szLevelFolder[0]=0;
 
 	m_nFlags=0;
@@ -105,9 +121,23 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   m_pSHSky = NULL;//GetRenderer()->EF_LoadShader("InfRedGal", eSH_World, EF_SYSTEM);
   m_pTerrainWaterShader = m_pSunRoadShader = 0;
 	m_nWaterBottomTexId=0;
-  m_pSHLensFlares = GetRenderer()->EF_LoadShader("CryLight", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: calling GetRenderer()->EF_LoadShader for CryLight\n");
+  if (GetRenderer()) {
+    m_pSHLensFlares = GetRenderer()->EF_LoadShader("CryLight", eSH_World, EF_SYSTEM);
+    printf("C3DEngine constructor: CryLight shader loaded\n");
+  } else {
+    printf("WARNING: GetRenderer() returned nullptr for CryLight shader!\n");
+    m_pSHLensFlares = nullptr;
+  }
   m_vSunPosition = Vec3d(0, -10000.0f, 10000.0f);
-  m_pSHDefault = GetRenderer()->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
+  printf("C3DEngine constructor: calling GetRenderer()->EF_LoadShader for Default\n");
+  if (GetRenderer()) {
+    m_pSHDefault = GetRenderer()->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
+    printf("C3DEngine constructor: Default shader loaded\n");
+  } else {
+    printf("WARNING: GetRenderer() returned nullptr for Default shader!\n");
+    m_pSHDefault = nullptr;
+  }
 
   m_pTerrain=0;	
 	m_bEnabled=1;
@@ -281,7 +311,10 @@ C3DEngine::~C3DEngine()
 //////////////////////////////////////////////////////////////////////
 bool C3DEngine::Init()
 {	  	
+  printf("C3DEngine::Init() called\n");
+  printf("C3DEngine::Init() calling ShutDown()\n");
   ShutDown();
+  printf("C3DEngine::Init() ShutDown() completed\n");
  
 	return  (true);
 }
@@ -374,6 +407,7 @@ void C3DEngine::UpdateScene(bool bAddStaticLights, bool bAlwaysAddSun)
 //////////////////////////////////////////////////////////////////////
 void C3DEngine::ShutDown(bool bEditorMode)
 {
+	printf("C3DEngine::ShutDown() called\n");
 	if(GetRenderer() != GetSystem()->GetIRenderer())
 		GetSystem()->Error("Renderer was deallocated before I3DEngine::ShutDown() call");
 
@@ -381,18 +415,23 @@ void C3DEngine::ShutDown(bool bEditorMode)
 //  delete m_pCVars;
 //  m_pCVars = new CVars(m_pSystem);
 
+  printf("C3DEngine::ShutDown() removing lights\n");
   GetLog()->Log("Removing lights ...");
+  printf("C3DEngine::ShutDown() lights count: %d\n", m_lstDynLights.Count());
   for(int i=0; i<m_lstDynLights.Count(); i++)
   {
     CDLight * pLight = &m_lstDynLights[i];
     FreeLightSourceComponents(pLight);
   }
+  printf("C3DEngine::ShutDown() deleting static light sources\n");
   DeleteAllStaticLightSources();
 
+  printf("C3DEngine::ShutDown() deleting visareas\n");
   GetLog()->Log("Deleting visareas ...");
   delete m_pVisAreaManager;
   m_pVisAreaManager = 0;
 
+  printf("C3DEngine::ShutDown() deleting terrain\n");
   GetLog()->Log("Deleting terrain ...");
 //	list2<struct IEntityRender*> lstTerrainObjects;
 //	if(m_pTerrain)
@@ -400,14 +439,21 @@ void C3DEngine::ShutDown(bool bEditorMode)
   delete m_pTerrain;
   m_pTerrain=0;
 
+  printf("C3DEngine::ShutDown() deleting obj manager\n");
   GetLog()->Log("ObjManager shutdown ...");
   delete m_pObjManager;
   m_pObjManager=0;
 
-	GetRenderer()->DeleteLeafBuffer(m_pFogTopPlane);
-	m_pFogTopPlane=0;
+  printf("C3DEngine::ShutDown() deleting fog top plane\n");
+  if (GetRenderer()) {
+    GetRenderer()->DeleteLeafBuffer(m_pFogTopPlane);
+  } else {
+    printf("WARNING: GetRenderer() returned nullptr!\n");
+  }
+  m_pFogTopPlane=0;
 
-	SAFE_RELEASE(m_pSHSky);
+  printf("C3DEngine::ShutDown() releasing sky shader\n");
+  SAFE_RELEASE(m_pSHSky);
 }
 
 //////////////////////////////////////////////////////////////////////
