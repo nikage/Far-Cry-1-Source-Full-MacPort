@@ -27,38 +27,149 @@ public:
     CSimpleMacOSMusicSystem() {}
     virtual ~CSimpleMacOSMusicSystem() {}
     
-    // Minimal IMusicSystem interface implementation
-    virtual void Release() override { delete this; }
-    virtual struct ISystem* GetSystem() override { return nullptr; }
-    virtual int GetBytesPerSample() override { return 0; }
-    virtual struct IMusicSystemSink* SetSink(struct IMusicSystemSink *pSink) override { return nullptr; }
-    virtual bool SetData(struct SMusicData *pMusicData,bool bNoRelease=false) override { return true; }
-    virtual void Unload() override {}
-    virtual void Pause(bool bPause) override {}
-    virtual void EnableEventProcessing(bool bEnable) override {}
-    virtual bool ResetThemeOverride() override { return true; }
-    virtual bool SetTheme(const char *pszTheme, bool bOverride=false) override { return true; }
-    virtual const char* GetTheme() override { return ""; }
-    virtual bool SetMood(const char *pszMood) override { return true; }
-    virtual bool SetDefaultMood(const char *pszMood) override { return true; }
-    virtual const char* GetMood() override { return ""; }
-    virtual IStringItVec* GetThemes() override { return nullptr; }
-    virtual IStringItVec* GetMoods(const char *pszTheme) override { return nullptr; }
-    virtual bool AddMusicMoodEvent(const char *pszMood, float fTimeout) override { return true; }
-    virtual void Update() override {}
-    virtual SMusicSystemStatus* GetStatus() override { return nullptr; }
-    virtual void GetMemoryUsage(class ICrySizer* pSizer) override {}
-    virtual bool LoadMusicDataFromLUA(struct IScriptSystem* pScriptSystem, const char *pszFilename) override { return true; }
-    virtual bool StreamOGG() override { return true; }
-    virtual void LogMsg( const char *pszFormat, ... ) override {}
-    virtual bool LoadFromXML( const char *sFilename,bool bAddData ) override { return true; }
-    virtual void UpdateTheme( SMusicTheme *pTheme ) override {}
-    virtual void UpdateMood( SMusicMood *pMood ) override {}
-    virtual void UpdatePattern( SPatternDef *pPattern ) override {}
-    virtual void RenamePattern( const char *sOldName,const char *sNewName ) override {}
-    virtual void PlayPattern( const char *sPattern,bool bStopPrevious ) override {}
-    virtual void DeletePattern( const char *sPattern ) override {}
-    virtual void Silence() override {}
+    // Minimal IMusicSystem interface implementation with debug output
+    virtual void Release() override { 
+        printf("CSimpleMacOSMusicSystem::Release called\n");
+        fflush(stdout);
+        delete this; 
+    }
+    virtual struct ISystem* GetSystem() override { 
+        printf("CSimpleMacOSMusicSystem::GetSystem called\n");
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual int GetBytesPerSample() override { 
+        printf("CSimpleMacOSMusicSystem::GetBytesPerSample called\n");
+        fflush(stdout);
+        return 0; 
+    }
+    virtual struct IMusicSystemSink* SetSink(struct IMusicSystemSink *pSink) override { 
+        printf("CSimpleMacOSMusicSystem::SetSink called\n");
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual bool SetData(struct SMusicData *pMusicData,bool bNoRelease=false) override { 
+        printf("CSimpleMacOSMusicSystem::SetData called\n");
+        fflush(stdout);
+        return true; 
+    }
+    virtual void Unload() override { 
+        printf("CSimpleMacOSMusicSystem::Unload called\n");
+        fflush(stdout);
+    }
+    virtual void Pause(bool bPause) override { 
+        printf("CSimpleMacOSMusicSystem::Pause called with bPause=%d\n", bPause);
+        fflush(stdout);
+    }
+    virtual void EnableEventProcessing(bool bEnable) override { 
+        printf("CSimpleMacOSMusicSystem::EnableEventProcessing called with bEnable=%d\n", bEnable);
+        fflush(stdout);
+    }
+    virtual bool ResetThemeOverride() override { 
+        printf("CSimpleMacOSMusicSystem::ResetThemeOverride called\n");
+        fflush(stdout);
+        return true; 
+    }
+    virtual bool SetTheme(const char *pszTheme, bool bOverride=false) override { 
+        printf("CSimpleMacOSMusicSystem::SetTheme called with theme=%s\n", pszTheme ? pszTheme : "NULL");
+        fflush(stdout);
+        return true; 
+    }
+    virtual const char* GetTheme() override { 
+        printf("CSimpleMacOSMusicSystem::GetTheme called\n");
+        fflush(stdout);
+        return ""; 
+    }
+    virtual bool SetMood(const char *pszMood) override { 
+        printf("CSimpleMacOSMusicSystem::SetMood called with mood=%s\n", pszMood ? pszMood : "NULL");
+        fflush(stdout);
+        return true; 
+    }
+    virtual bool SetDefaultMood(const char *pszMood) override { 
+        printf("CSimpleMacOSMusicSystem::SetDefaultMood called with mood=%s\n", pszMood ? pszMood : "NULL");
+        fflush(stdout);
+        return true; 
+    }
+    virtual const char* GetMood() override { 
+        printf("CSimpleMacOSMusicSystem::GetMood called\n");
+        fflush(stdout);
+        return ""; 
+    }
+    virtual IStringItVec* GetThemes() override { 
+        printf("CSimpleMacOSMusicSystem::GetThemes called\n");
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual IStringItVec* GetMoods(const char *pszTheme) override { 
+        printf("CSimpleMacOSMusicSystem::GetMoods called with theme=%s\n", pszTheme ? pszTheme : "NULL");
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual bool AddMusicMoodEvent(const char *pszMood, float fTimeout) override { 
+        printf("CSimpleMacOSMusicSystem::AddMusicMoodEvent called with mood=%s, timeout=%f\n", pszMood ? pszMood : "NULL", fTimeout);
+        fflush(stdout);
+        return true; 
+    }
+    virtual void Update() override { 
+        printf("CSimpleMacOSMusicSystem::Update called\n");
+        fflush(stdout);
+    }
+    virtual SMusicSystemStatus* GetStatus() override { 
+        printf("CSimpleMacOSMusicSystem::GetStatus called\n");
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual void GetMemoryUsage(class ICrySizer* pSizer) override { 
+        printf("CSimpleMacOSMusicSystem::GetMemoryUsage called\n");
+        fflush(stdout);
+    }
+    virtual bool LoadMusicDataFromLUA(struct IScriptSystem* pScriptSystem, const char *pszFilename) override { 
+        printf("CSimpleMacOSMusicSystem::LoadMusicDataFromLUA called with filename=%s\n", pszFilename ? pszFilename : "NULL");
+        fflush(stdout);
+        return true; 
+    }
+    virtual bool StreamOGG() override { 
+        printf("CSimpleMacOSMusicSystem::StreamOGG called\n");
+        fflush(stdout);
+        return true; 
+    }
+    virtual void LogMsg( const char *pszFormat, ... ) override { 
+        printf("CSimpleMacOSMusicSystem::LogMsg called\n");
+        fflush(stdout);
+    }
+    virtual bool LoadFromXML( const char *sFilename,bool bAddData ) override { 
+        printf("CSimpleMacOSMusicSystem::LoadFromXML called with filename=%s, bAddData=%d\n", sFilename ? sFilename : "NULL", bAddData);
+        fflush(stdout);
+        return true; 
+    }
+    virtual void UpdateTheme( SMusicTheme *pTheme ) override { 
+        printf("CSimpleMacOSMusicSystem::UpdateTheme called\n");
+        fflush(stdout);
+    }
+    virtual void UpdateMood( SMusicMood *pMood ) override { 
+        printf("CSimpleMacOSMusicSystem::UpdateMood called\n");
+        fflush(stdout);
+    }
+    virtual void UpdatePattern( SPatternDef *pPattern ) override { 
+        printf("CSimpleMacOSMusicSystem::UpdatePattern called\n");
+        fflush(stdout);
+    }
+    virtual void RenamePattern( const char *sOldName,const char *sNewName ) override { 
+        printf("CSimpleMacOSMusicSystem::RenamePattern called\n");
+        fflush(stdout);
+    }
+    virtual void PlayPattern( const char *sPattern,bool bStopPrevious ) override { 
+        printf("CSimpleMacOSMusicSystem::PlayPattern called with pattern=%s\n", sPattern ? sPattern : "NULL");
+        fflush(stdout);
+    }
+    virtual void DeletePattern( const char *sPattern ) override { 
+        printf("CSimpleMacOSMusicSystem::DeletePattern called with pattern=%s\n", sPattern ? sPattern : "NULL");
+        fflush(stdout);
+    }
+    virtual void Silence() override { 
+        printf("CSimpleMacOSMusicSystem::Silence called\n");
+        fflush(stdout);
+    }
 };
 
 // Simple macOS sound system that implements ISoundSystem interface
@@ -69,20 +180,52 @@ public:
     virtual ~CSimpleMacOSSoundSystem() {}
     
     // ISoundSystem interface implementation
-    virtual void Release() override { delete this; }
-    virtual void Update() override { /* TODO: Update sound system */ }
+    virtual void Release() override { 
+        printf("CSimpleMacOSSoundSystem::Release called\n");
+        fflush(stdout);
+        delete this; 
+    }
+    virtual void Update() override { 
+        printf("CSimpleMacOSSoundSystem::Update called\n");
+        fflush(stdout);
+        /* TODO: Update sound system */ 
+    }
     virtual IMusicSystem* CreateMusicSystem() override { 
         printf("CreateMusicSystem called, returning music system\n");
         fflush(stdout);
         return new CSimpleMacOSMusicSystem(); 
     }
-    virtual ISound* LoadSound(const char* szFile, int nFlags) override { return nullptr; }
-    virtual void SetMasterVolume(unsigned char nVol) override { m_masterVolume = nVol; }
-    virtual void SetMasterVolumeScale(float fScale, bool bForceRecalc = false) override {}
-    virtual ISound* GetSound(int nSoundID) override { return nullptr; }
-    virtual void PlaySound(int nSoundID) override {}
-    virtual void SetListener(const CCamera& camera, const Vec3& vel) override {}
-    virtual void RecomputeSoundOcclusion(bool bRecomputeListener, bool bForceRecompute, bool bReset = false) override {}
+    virtual ISound* LoadSound(const char* szFile, int nFlags) override { 
+        printf("CSimpleMacOSSoundSystem::LoadSound called with file=%s\n", szFile ? szFile : "NULL");
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual void SetMasterVolume(unsigned char nVol) override { 
+        printf("CSimpleMacOSSoundSystem::SetMasterVolume called with vol=%d\n", nVol);
+        fflush(stdout);
+        m_masterVolume = nVol; 
+    }
+    virtual void SetMasterVolumeScale(float fScale, bool bForceRecalc = false) override { 
+        printf("CSimpleMacOSSoundSystem::SetMasterVolumeScale called with scale=%f\n", fScale);
+        fflush(stdout);
+    }
+    virtual ISound* GetSound(int nSoundID) override { 
+        printf("CSimpleMacOSSoundSystem::GetSound called with id=%d\n", nSoundID);
+        fflush(stdout);
+        return nullptr; 
+    }
+    virtual void PlaySound(int nSoundID) override { 
+        printf("CSimpleMacOSSoundSystem::PlaySound called with id=%d\n", nSoundID);
+        fflush(stdout);
+    }
+    virtual void SetListener(const CCamera& camera, const Vec3& vel) override { 
+        printf("CSimpleMacOSSoundSystem::SetListener called\n");
+        fflush(stdout);
+    }
+    virtual void RecomputeSoundOcclusion(bool bRecomputeListener, bool bForceRecompute, bool bReset = false) override { 
+        printf("CSimpleMacOSSoundSystem::RecomputeSoundOcclusion called\n");
+        fflush(stdout);
+    }
     virtual bool IsEAX(int version) override { return false; }
     virtual bool SetEaxListenerEnvironment(int nPreset, CS_REVERB_PROPERTIES* pProps = NULL, int nFlags = 0) override { return false; }
     virtual bool GetCurrentEaxEnvironment(int& nPreset, CS_REVERB_PROPERTIES& Props) override { return false; }
