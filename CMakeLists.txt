@@ -59,12 +59,12 @@ endif()
 # Add CryCommon as interface library
 add_subdirectory(CryCommon)
 
-# Build all CryEngine components
+# Add embedded resources for macOS
+add_subdirectory(src/resources)
 add_subdirectory(CrySystem)
 add_subdirectory(Cry3DEngine)
 add_subdirectory(CryEntitySystem)
 add_subdirectory(CryAnimation)
-# CryInput temporarily excluded due to interface mismatch issues
 add_subdirectory(CryInput)
 add_subdirectory(CryMovie)
 add_subdirectory(CryPhysics)

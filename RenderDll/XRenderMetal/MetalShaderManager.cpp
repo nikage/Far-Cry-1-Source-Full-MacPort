@@ -21,6 +21,141 @@
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 
+// Minimal render element implementations for Metal renderer
+// Since Common render elements are disabled for macOS, we implement minimal versions
+
+class CMetalRESky : public CRendElement
+{
+public:
+    CMetalRESky() { mfSetType(eDATA_Sky); }
+    virtual ~CMetalRESky() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREDummy : public CRendElement
+{
+public:
+    CMetalREDummy() { mfSetType(eDATA_Dummy); }
+    virtual ~CMetalREDummy() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalRE2DQuad : public CRendElement
+{
+public:
+    CMetalRE2DQuad() { mfSetType(eDATA_2DQuad); }
+    virtual ~CMetalRE2DQuad() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREScreenProcess : public CRendElement
+{
+public:
+    CMetalREScreenProcess() { mfSetType(eDATA_ScreenProcess); }
+    virtual ~CMetalREScreenProcess() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREShadowMapGen : public CRendElement
+{
+public:
+    CMetalREShadowMapGen() { mfSetType(eDATA_ShadowMapGen); }
+    virtual ~CMetalREShadowMapGen() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalRECommon : public CRendElement
+{
+public:
+    CMetalRECommon() { mfSetType(eDATA_TerrainSector); }
+    virtual ~CMetalRECommon() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalRETriMeshShadow : public CRendElement
+{
+public:
+    CMetalRETriMeshShadow() { mfSetType(eDATA_TriMeshShadow); }
+    virtual ~CMetalRETriMeshShadow() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREFlashBang : public CRendElement
+{
+public:
+    CMetalREFlashBang() { mfSetType(eDATA_FlashBang); }
+    virtual ~CMetalREFlashBang() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREOcclusionQuery : public CRendElement
+{
+public:
+    CMetalREOcclusionQuery() { mfSetType(eDATA_OcclusionQuery); }
+    virtual ~CMetalREOcclusionQuery() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREOcLeaf : public CRendElement
+{
+public:
+    CMetalREOcLeaf() { mfSetType(eDATA_OcLeaf); }
+    virtual ~CMetalREOcLeaf() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalRETerrainParticles : public CRendElement
+{
+public:
+    CMetalRETerrainParticles() { mfSetType(eDATA_TerrainParticles); }
+    virtual ~CMetalRETerrainParticles() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+class CMetalREFarTreeSprites : public CRendElement
+{
+public:
+    CMetalREFarTreeSprites() { mfSetType(eDATA_FarTreeSprites); }
+    virtual ~CMetalREFarTreeSprites() {}
+    virtual void mfPrepare() {}
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+};
+
+// Implement missing CRendElement methods for Metal renderer
+void CRendElement::mfEndFlush() {}
+int CRendElement::mfGetMatId() { return 0; }
+void CRendElement::mfGetPlane(Plane& pl) { pl.n = Vec3d(0,0,1); pl.d = 0; }
+int CRendElement::mfTransform(Matrix44& ViewMatr, Matrix44& ProjMatr, vec4_t *verts, vec4_t *vertsp, int Num) { return 0; }
+CMatInfo* CRendElement::mfGetMatInfo() { return nullptr; }
+void* CRendElement::mfGetPointer(ESrcPointer ePT, int *Stride, int Type, ESrcPointer Dst, int Flags) { return nullptr; }
+bool CRendElement::mfIsValidTime(SShader *ef, CCObject *obj, float curtime) { return true; }
+void CRendElement::mfBuildGeometry(SShader *ef) {}
+CRendElement* CRendElement::mfCopyConstruct() { return new CRendElement; }
+CRendElement* CRendElement::mfCreateWorldRE(SShader *ef, SInpData *ds) { return nullptr; }
+list2<CMatInfo>* CRendElement::mfGetMatInfoList() { return nullptr; }
+bool CRendElement::mfCullByClipPlane(CCObject *pObj) { return false; }
+float CRendElement::mfDistanceToCameraSquared(const CCObject & thisObject) { return 0.1f; }
+bool CRendElement::mfCull(CCObject *pObj) { return false; }
+bool CRendElement::mfCull(CCObject *pObj, SShader *ef) { return false; }
+void CRendElement::Release() { delete this; }
+void CRendElement::mfReset() {}
+void CRendElement::mfCenter(Vec3d& centr, CCObject *pObj) { centr(0,0,0); }
+bool CRendElement::mfCompile(SShader *ef, char *scr) { return true; }
+
+// Define missing static member
+CRendElement CRendElement::m_RootGlobal;
+
 CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTextureManager* textureManager)
     : m_renderer(renderer)
     , m_textureManager(textureManager)
@@ -280,8 +415,77 @@ bool CMetalShaderManager::EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, fl
 
 CRendElement* CMetalShaderManager::EF_CreateRE(EDataType edt)
 {
-    // Create render element
-    return nullptr;
+    CRendElement* re = nullptr;
+    
+    switch(edt)
+    {
+        case eDATA_Sky:
+            re = new CMetalRESky;
+            break;
+            
+        case eDATA_Dummy:
+            re = new CMetalREDummy;
+            break;
+            
+        case eDATA_2DQuad:
+            re = new CMetalRE2DQuad;
+            break;
+            
+        case eDATA_ScreenProcess:
+            re = new CMetalREScreenProcess;
+            break;
+            
+        case eDATA_ShadowMapGen:
+            re = new CMetalREShadowMapGen;
+            break;
+            
+        case eDATA_TerrainSector:
+            re = new CMetalRECommon;
+            break;
+            
+        case eDATA_TriMeshShadow:
+            re = new CMetalRETriMeshShadow;
+            break;
+            
+        case eDATA_FlashBang:
+            re = new CMetalREFlashBang;
+            break;
+            
+        case eDATA_OcclusionQuery:
+            re = new CMetalREOcclusionQuery;
+            break;
+            
+        case eDATA_OcLeaf:
+            re = new CMetalREOcLeaf;
+            break;
+            
+        case eDATA_TerrainParticles:
+            re = new CMetalRETerrainParticles;
+            break;
+            
+        case eDATA_FarTreeSprites:
+            re = new CMetalREFarTreeSprites;
+            break;
+            
+        // For unsupported types, create a dummy element
+        case eDATA_Ocean:
+        case eDATA_Beam:
+        case eDATA_Glare:
+        case eDATA_Prefab:
+        case eDATA_HDRProcess:
+        default:
+            printf("CMetalShaderManager::EF_CreateRE: Using dummy element for type %d\n", (int)edt);
+            re = new CMetalREDummy;
+            break;
+    }
+    
+    if (re) {
+        printf("CMetalShaderManager::EF_CreateRE: Created render element type %d at %p\n", (int)edt, re);
+    } else {
+        printf("CMetalShaderManager::EF_CreateRE: Failed to create render element type %d\n", (int)edt);
+    }
+    
+    return re;
 }
 
 void CMetalShaderManager::EF_StartEf()

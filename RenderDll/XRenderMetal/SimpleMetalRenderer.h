@@ -343,7 +343,6 @@ private:
     id<MTLBuffer> GetOrCreateVertexBuffer(CVertexBuffer* src);
     id<MTLBuffer> GetOrCreateIndexBuffer(SVertexStream* indices);
     void ReleaseVertexBuffer(CVertexBuffer* src);
-    void ReleaseIndexBuffer(SVertexStream* indices);
     
     // Shader management methods
     id<MTLFunction> LoadVertexShader(const std::string& name, const std::string& source);

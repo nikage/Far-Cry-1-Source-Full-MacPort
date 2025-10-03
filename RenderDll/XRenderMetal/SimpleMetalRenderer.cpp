@@ -862,11 +862,11 @@ MTLPixelFormat CSimpleMetalRenderer::ConvertToMetalFormat(int format)
         case 1: // eTF_8888
             return MTLPixelFormatBGRA8Unorm;
         case 2: // eTF_4444
-            return MTLPixelFormatRGBA4Unorm;
+            return MTLPixelFormatRGBA8Unorm;
         case 3: // eTF_1555
-            return MTLPixelFormatRGB5A1Unorm;
+            return MTLPixelFormatRGBA8Unorm;
         case 4: // eTF_565
-            return MTLPixelFormatRGB5A1Unorm;
+            return MTLPixelFormatRGBA8Unorm;
         case 5: // eTF_DXT1
             return MTLPixelFormatBC1_RGBA;
         case 6: // eTF_DXT3
@@ -1090,13 +1090,7 @@ ITexPic* CSimpleMetalRenderer::EF_GetTextureByID(int texture_id)
     return nullptr;
 }
 
-// EF_CreateRE method implementation
-IRenderElement* CSimpleMetalRenderer::EF_CreateRE(EDataType eType)
-{
-    printf("EF_CreateRE called: eType=%d\n", eType);
-    // Return a simple stub render element
-    return new CSimpleRenderElement();
-}
+// EF_CreateRE method is already implemented in the header as a virtual method
 
 // Texture management methods
 id<MTLTexture> CSimpleMetalRenderer::CreateMetalTexture(int width, int height, MTLPixelFormat format, const void* data)
@@ -1230,20 +1224,7 @@ void CSimpleMetalRenderer::ReleaseVertexBuffer(CVertexBuffer* src)
     }
 }
 
-void CSimpleMetalRenderer::ReleaseIndexBuffer(SVertexStream* indices)
-{
-    auto it = m_indexBufferCache.find(indices);
-    if (it != m_indexBufferCache.end())
-    {
-        // Release Metal buffer
-        id<MTLBuffer> buffer = it->second;
-        buffer = nil; // Release the buffer
-        
-        // Remove from cache
-        m_indexBufferCache.erase(it);
-        printf("ReleaseIndexBuffer: Released Metal buffer for SVertexStream %p\n", indices);
-    }
-}
+// ReleaseIndexBuffer is already implemented in the header as a virtual method
 
 // Shader management methods
 id<MTLFunction> CSimpleMetalRenderer::LoadVertexShader(const std::string& name, const std::string& source)

@@ -1,0 +1,22 @@
+<fontshader>
+<font path="languages/fonts/lucon.ttf" w="512" h="512"/>
+<effect name="thefirst">
+	<pass>
+		<trcolor r="1" g="0" b="0" a="1"/>
+		<tlcolor r="0" g="1" b="0" a="1"/>
+		<brcolor r="0" g="0" b="1" a="1"/>
+		<blcolor r="0" g="1" b="1" a="1"/>
+		<pos x="0" y="0"/>
+	</pass>
+</effect>
+
+<effect name="thesecond">
+	<pass>
+		<color r="1" g="1" b="0" a="1"/>
+	</pass>
+	<pass>
+		<color r="0" g="0" b="0" a="1"/>
+		<pos x="4" y="4"/>
+	</pass>
+</effect>
+</fontshader>
