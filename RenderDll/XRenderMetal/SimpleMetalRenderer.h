@@ -9,6 +9,7 @@
 #include <Cocoa/Cocoa.h>
 #include <vector>
 #include <cassert>
+#include "MetalBaseRenderer.h"
 #include "IRenderer.h"
 
 // Forward declarations for CryEngine types
@@ -27,7 +28,7 @@ class ICrySizer;
 // Use CryEngine's Vec3 type
 
 // Simple Metal renderer that provides essential rendering functionality
-class CSimpleMetalRenderer : public IRenderer
+class CSimpleMetalRenderer : public CMetalBaseRenderer
 {
 public:
     CSimpleMetalRenderer();
@@ -166,7 +167,7 @@ public:
     virtual bool EF_UnhideTemplate(const char *name) { return false; }
     virtual bool EF_UnhideAllTemplates() { return false; }
     virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale=1.0f, bool bAdditive=true) { return false; }
-    virtual CRendElement *EF_CreateRE (EDataType edt) { return nullptr; }
+    virtual CRendElement *EF_CreateRE (EDataType edt);
     virtual void EF_StartEf () {}
     virtual void EF_AddEf (int NumFog, CRendElement *re, IShader *ef, SRenderShaderResources *sr,  CCObject *obj, int nTempl, IShader *efState=0, int nSort=0) {}
     virtual void EF_EndEf3D (int nFlags) {}
@@ -314,6 +315,9 @@ private:
     std::map<std::string, id<MTLFunction>> m_vertexShaders;
     std::map<std::string, id<MTLFunction>> m_fragmentShaders;
     std::map<std::string, id<MTLRenderPipelineState>> m_pipelineStates;
+    
+    // Shader manager for render elements
+    class CMetalShaderManager* m_pShaderManager;
     
     // Matrix management
     float m_projectionMatrix[16];

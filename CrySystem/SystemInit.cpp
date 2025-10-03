@@ -480,6 +480,16 @@ bool CSystem::InitRenderer(WIN_HINSTANCE hinst, WIN_HWND hwnd,const char *szCmdL
 	if (!OpenRenderLibrary(m_rDriver->GetString()))
 		return false;
 	
+	// Initialize the renderer for macOS (this was missing!)
+	if (m_pRenderer) {
+		GetILog()->LogToFile( "Calling renderer Init for macOS" );
+		m_pRenderer->Init(0, 0, 800, 600, 32, 24, 8, false, hinst, hwnd);
+		GetILog()->LogToFile( "Renderer Init completed for macOS" );
+	} else {
+		GetILog()->LogToFile( "ERROR: No renderer available for macOS" );
+		return false;
+	}
+	
 	return true;
 #else
   CreateRendererVars();
@@ -892,25 +902,20 @@ bool CSystem::InitStreamEngine()
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitFont()
 {
-	GetILog()->LogToFile("DEBUG: CSystem::InitFont() called");
 	// In Editor mode Renderer is not initialized yet, so skip InitFont.
 	if (m_bEditor && !m_pRenderer)
 		return true;
 
 #ifdef __APPLE__
-	// For macOS, we'll try to initialize fonts but handle failures gracefully
-	GetILog()->LogToFile("DEBUG: Initializing font system on macOS");
+	// Temporarily disable font loading on macOS to avoid hangs
+	GetILog()->LogToFile("Font system disabled for macOS - skipping font initialization");
+	return true;
 #endif
 
 #ifndef _XBOX
-            GetILog()->LogToFile("DEBUG: About to load font library: %s", DLL_FONT);
-            m_dll.hFont = LoadDLL(DLL_FONT);
-            GetILog()->LogToFile("DEBUG: Font library loaded, handle: %p", m_dll.hFont);
+	m_dll.hFont = LoadDLL(DLL_FONT);
 	if(!m_dll.hFont)
-	{
-		GetILog()->LogToFile("ERROR: Failed to load font library: %s", DLL_FONT);
 		return (false);
-	}
 
 	PFNCREATECRYFONTINTERFACE pfnCreateCryFontInstance = (PFNCREATECRYFONTINTERFACE) CryGetProcAddress(m_dll.hFont,"CreateCryFontInterface");
 	if(!pfnCreateCryFontInstance)
@@ -935,44 +940,25 @@ bool CSystem::InitFont()
 #endif
 
 	// Load the default font
-	GetILog()->LogToFile("DEBUG: Starting font initialization...");
-	IFFont *pConsoleFont;
-#ifdef __APPLE__
-	// For macOS, completely skip font creation to avoid critical section locks
-	GetILog()->LogToFile("DEBUG: macOS detected - skipping font creation to avoid critical section issues");
-	m_pIFont = nullptr;
-	pConsoleFont = nullptr;
-	GetILog()->LogToFile("DEBUG: Font creation skipped successfully");
-#else
-	GetILog()->LogToFile("DEBUG: Creating Console font...");
-	pConsoleFont = m_pICryFont->NewFont("Console");
-	GetILog()->LogToFile("DEBUG: Creating Default font...");
+	IFFont *pConsoleFont = m_pICryFont->NewFont("Console");
 	m_pIFont = m_pICryFont->NewFont("Default");
 	if(!m_pIFont || !pConsoleFont)
 	{
 		Error( "Error creating the default fonts" );
 		return false;
 	}
-	GetILog()->LogToFile("DEBUG: Font creation completed successfully");
-#endif
 
 	//////////////////////////////////////////////////////////////////////////
-	// For macOS, skip font loading entirely to avoid critical section locks
-	// This allows the game to continue without fonts
-#ifdef __APPLE__
-	GetILog()->LogToFile("Info: Skipping font loading on macOS to avoid critical section issues");
-#else
 	string szFontPath = "languages/fonts/default.xml";
 
-	// For other platforms, try to load fonts
+	// For macOS, skip font loading if files are missing or problematic
+	// This allows the game to continue without fonts
 	if(!m_pIFont->Load(szFontPath.c_str()))
 	{
 		GetILog()->LogToFile("Warning: Could not load default font from %s - continuing without it", szFontPath.c_str());
 		// Don't return false - continue without fonts
 	}
-#endif
 
-#ifndef __APPLE__
 	int n = szFontPath.find("default.xml");
 	if (n != string::npos) {
 		szFontPath.replace(n, strlen("default.xml"), "console.xml");
@@ -983,9 +969,7 @@ bool CSystem::InitFont()
 			// Don't return false - continue without fonts
 		}
 	}
-#endif
 
-	GetILog()->LogToFile("DEBUG: CSystem::InitFont() completed successfully");
 	return true;
 }
 

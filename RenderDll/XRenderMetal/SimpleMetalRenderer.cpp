@@ -1,4 +1,5 @@
 #include "SimpleMetalRenderer.h"
+#include "MetalShaderManager.h"
 #include "IRenderer.h"
 #include <Cocoa/Cocoa.h>
 #include <cstdarg>
@@ -45,6 +46,7 @@ CSimpleMetalRenderer::CSimpleMetalRenderer()
     , m_gpuProfilingEnabled(false)
     , m_frameCounter(0)
     , m_lastCleanupTime(0.0)
+    , m_pShaderManager(nullptr)
 {
     // Initialize matrices to identity
     for (int i = 0; i < 16; i++)
@@ -57,6 +59,12 @@ CSimpleMetalRenderer::CSimpleMetalRenderer()
 
 CSimpleMetalRenderer::~CSimpleMetalRenderer()
 {
+    // Clean up shader manager
+    if (m_pShaderManager) {
+        delete m_pShaderManager;
+        m_pShaderManager = nullptr;
+    }
+    
     ShutDown();
 }
 
@@ -82,6 +90,14 @@ void* CSimpleMetalRenderer::Init(int x, int y, int width, int height, unsigned i
     {
         return nullptr;
     }
+    
+    // Create shader manager for render elements
+    m_pShaderManager = new CMetalShaderManager(this, nullptr);
+    if (!m_pShaderManager) {
+        printf("CSimpleMetalRenderer::Init: Failed to create shader manager\n");
+        return nullptr;
+    }
+    printf("CSimpleMetalRenderer::Init: Shader manager created successfully\n");
     
     m_isInitialized = true;
     return (void*)this; // Return self as handle
@@ -1090,7 +1106,19 @@ ITexPic* CSimpleMetalRenderer::EF_GetTextureByID(int texture_id)
     return nullptr;
 }
 
-// EF_CreateRE method is already implemented in the header as a virtual method
+// EF_CreateRE method implementation
+CRendElement* CSimpleMetalRenderer::EF_CreateRE(EDataType edt)
+{
+    printf("CSimpleMetalRenderer::EF_CreateRE called with type %d\n", (int)edt);
+    
+    // Delegate to shader manager if available
+    if (m_pShaderManager) {
+        return m_pShaderManager->EF_CreateRE(edt);
+    }
+    
+    printf("CSimpleMetalRenderer::EF_CreateRE: No shader manager available, returning nullptr\n");
+    return nullptr;
+}
 
 // Texture management methods
 id<MTLTexture> CSimpleMetalRenderer::CreateMetalTexture(int width, int height, MTLPixelFormat format, const void* data)

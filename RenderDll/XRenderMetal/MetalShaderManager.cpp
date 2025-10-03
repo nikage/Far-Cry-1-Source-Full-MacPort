@@ -24,9 +24,16 @@
 #include <iostream>
 
 // Minimal render element implementations with comprehensive assertions
+// Make our classes compatible with the original CryEngine interface
 class CMetalRESky : public CRendElement
 {
 public:
+    // Add members that the 3D Engine expects to access
+    float m_fAlpha;
+    float m_fTerrainWaterLevel;
+    float m_fSkyBoxStretching;
+    int m_nSphereListId;
+    
     CMetalRESky() { 
         mfSetType(eDATA_Sky);
         printf("CMetalRESky: Constructor called\n");
@@ -35,6 +42,12 @@ public:
         m_Flags = 0;
         m_SortId = -1000; // Sky renders first (lowest sort ID)
         m_Color = CFColor(0.5f, 0.7f, 1.0f, 1.0f); // Light blue sky color
+        
+        // Initialize members that 3D Engine expects
+        m_fAlpha = 1.0f;
+        m_fTerrainWaterLevel = 0.0f;
+        m_fSkyBoxStretching = 1.0f;
+        m_nSphereListId = 0;
     }
     virtual ~CMetalRESky() { 
         printf("CMetalRESky: Destructor called\n");
