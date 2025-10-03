@@ -30,16 +30,27 @@ public:
     CMetalRESky() { 
         mfSetType(eDATA_Sky);
         printf("CMetalRESky: Constructor called\n");
+        
+        // Initialize sky-specific properties
+        m_Flags = 0;
+        m_SortId = -1000; // Sky renders first (lowest sort ID)
+        m_Color = CFColor(0.5f, 0.7f, 1.0f, 1.0f); // Light blue sky color
     }
     virtual ~CMetalRESky() { 
         printf("CMetalRESky: Destructor called\n");
     }
     virtual void mfPrepare() {
         printf("CMetalRESky::mfPrepare called\n");
+        
+        // Set up sky rendering state
+        m_Flags |= FCEF_ALLOC_CUST_FLOAT_DATA;
+        m_SortId = -1000; // Ensure sky renders first
     }
     virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
         assert(ef != nullptr && "CMetalRESky::mfDraw: ef is null");
         printf("CMetalRESky::mfDraw called\n");
+        
+        // Dummy sky rendering - would set up sky dome rendering here
         return true; 
     }
 };
@@ -70,16 +81,27 @@ public:
     CMetalRE2DQuad() { 
         mfSetType(eDATA_2DQuad);
         printf("CMetalRE2DQuad: Constructor called\n");
+        
+        // Initialize 2D quad properties
+        m_Flags = 0;
+        m_SortId = 1000; // 2D elements render last (highest sort ID)
+        m_Color = CFColor(1.0f, 1.0f, 1.0f, 1.0f); // White color
     }
     virtual ~CMetalRE2DQuad() { 
         printf("CMetalRE2DQuad: Destructor called\n");
     }
     virtual void mfPrepare() {
         printf("CMetalRE2DQuad::mfPrepare called\n");
+        
+        // Set up 2D rendering state
+        m_Flags |= FCEF_ALLOC_CUST_FLOAT_DATA;
+        m_SortId = 1000; // Ensure 2D elements render last
     }
     virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
         assert(ef != nullptr && "CMetalRE2DQuad::mfDraw: ef is null");
         printf("CMetalRE2DQuad::mfDraw called\n");
+        
+        // Dummy 2D quad rendering - would set up screen-space quad here
         return true; 
     }
 };
@@ -264,36 +286,78 @@ public:
     }
 };
 
-// CRendElement implementations for Metal renderer
+// Helper function to get render element type name
+const char* GetRenderElementTypeName(EDataType edt) {
+    switch(edt) {
+        case eDATA_Sky: return "Sky";
+        case eDATA_Dummy: return "Dummy";
+        case eDATA_2DQuad: return "2DQuad";
+        case eDATA_ShadowMapGen: return "ShadowMapGen";
+        case eDATA_TriMeshShadow: return "TriMeshShadow";
+        case eDATA_OcclusionQuery: return "OcclusionQuery";
+        case eDATA_OcLeaf: return "OcLeaf";
+        case eDATA_TerrainParticles: return "TerrainParticles";
+        case eDATA_FarTreeSprites: return "FarTreeSprites";
+        case eDATA_Beam: return "Beam";
+        case eDATA_Poly: return "Poly";
+        case eDATA_TriMesh: return "TriMesh";
+        case eDATA_Prefab: return "Prefab";
+        case eDATA_Terrain: return "Terrain";
+        case eDATA_Ocean: return "Ocean";
+        case eDATA_Glare: return "Glare";
+        default: return "Unknown";
+    }
+}
+
+// CRendElement implementations for Metal renderer - Proper dummy stubs
 void CRendElement::mfPrepare() {
     assert(this != nullptr && "CRendElement::mfPrepare: this is null");
-    printf("CRendElement::mfPrepare called\n");
+    printf("CRendElement::mfPrepare called for type %d\n", (int)m_Type);
+    
+    // Set up basic render state for dummy implementation
+    m_Flags = 0; // Clear any previous flags
+    m_SortId = 0; // Default sort order
 }
 
 void CRendElement::mfEndFlush() {
     assert(this != nullptr && "CRendElement::mfEndFlush: this is null");
-    printf("CRendElement::mfEndFlush called\n");
+    printf("CRendElement::mfEndFlush called for type %d\n", (int)m_Type);
+    
+    // Clean up any temporary state
+    m_Flags &= ~FCEF_ALLOC_CUST_FLOAT_DATA; // Clear custom data flag
 }
 
 bool CRendElement::mfDraw(SShader *ef, SShaderPass *sfm) {
     assert(this != nullptr && "CRendElement::mfDraw: this is null");
     assert(ef != nullptr && "CRendElement::mfDraw: ef is null");
     assert(sfm != nullptr && "CRendElement::mfDraw: sfm is null");
-    printf("CRendElement::mfDraw called\n");
+    printf("CRendElement::mfDraw called for type %d\n", (int)m_Type);
+    
+    // Dummy implementation - just return success
+    // In a real implementation, this would set up rendering state
     return true;
 }
 
 int CRendElement::mfGetMatId() { 
     assert(this != nullptr && "CRendElement::mfGetMatId: this is null");
-    printf("CRendElement::mfGetMatId called\n");
-    return 0; 
+    printf("CRendElement::mfGetMatId called for type %d\n", (int)m_Type);
+    
+    // Return a default material ID based on render element type
+    switch(m_Type) {
+        case eDATA_Sky: return 1;
+        case eDATA_2DQuad: return 2;
+        case eDATA_Dummy: return 0;
+        default: return 0;
+    }
 }
 
 void CRendElement::mfGetPlane(Plane& pl) { 
     assert(this != nullptr && "CRendElement::mfGetPlane: this is null");
-    printf("CRendElement::mfGetPlane called\n");
-    pl.n = Vec3d(0,0,1); 
-    pl.d = 0; 
+    printf("CRendElement::mfGetPlane called for type %d\n", (int)m_Type);
+    
+    // Set up a default plane (horizontal at origin)
+    pl.n = Vec3d(0, 0, 1); // Normal pointing up
+    pl.d = 0.0f; // Distance from origin
 }
 
 int CRendElement::mfTransform(Matrix44& ViewMatr, Matrix44& ProjMatr, vec4_t *verts, vec4_t *vertsp, int Num) { 
@@ -301,13 +365,24 @@ int CRendElement::mfTransform(Matrix44& ViewMatr, Matrix44& ProjMatr, vec4_t *ve
     assert(verts != nullptr && "CRendElement::mfTransform: verts is null");
     assert(vertsp != nullptr && "CRendElement::mfTransform: vertsp is null");
     assert(Num >= 0 && "CRendElement::mfTransform: Num is negative");
-    printf("CRendElement::mfTransform called with Num=%d\n", Num);
-    return 0; 
+    printf("CRendElement::mfTransform called with Num=%d for type %d\n", Num, (int)m_Type);
+    
+    // Dummy transform - just copy vertices without transformation
+    for(int i = 0; i < Num; i++) {
+        vertsp[i][0] = verts[i][0];
+        vertsp[i][1] = verts[i][1];
+        vertsp[i][2] = verts[i][2];
+        vertsp[i][3] = verts[i][3];
+    }
+    return Num; // Return number of transformed vertices
 }
 
 CMatInfo* CRendElement::mfGetMatInfo() { 
     assert(this != nullptr && "CRendElement::mfGetMatInfo: this is null");
-    printf("CRendElement::mfGetMatInfo called\n");
+    printf("CRendElement::mfGetMatInfo called for type %d\n", (int)m_Type);
+    
+    // Return nullptr for dummy implementation
+    // In a real implementation, this would return material information
     return nullptr; 
 }
 
@@ -358,29 +433,45 @@ list2<CMatInfo>* CRendElement::mfGetMatInfoList() {
 bool CRendElement::mfCullByClipPlane(CCObject *pObj) { 
     assert(this != nullptr && "CRendElement::mfCullByClipPlane: this is null");
     assert(pObj != nullptr && "CRendElement::mfCullByClipPlane: pObj is null");
-    printf("CRendElement::mfCullByClipPlane called\n");
-    return false; 
+    printf("CRendElement::mfCullByClipPlane called for type %d\n", (int)m_Type);
+    
+    // Dummy culling - always visible for most types
+    switch(m_Type) {
+        case eDATA_Sky: return false; // Sky is always visible
+        case eDATA_2DQuad: return false; // 2D quads are always visible
+        default: return false; // Default to visible
+    }
 }
 
 float CRendElement::mfDistanceToCameraSquared(const CCObject & thisObject) { 
     assert(this != nullptr && "CRendElement::mfDistanceToCameraSquared: this is null");
-    printf("CRendElement::mfDistanceToCameraSquared called\n");
-    return 0.1f; 
+    printf("CRendElement::mfDistanceToCameraSquared called for type %d\n", (int)m_Type);
+    
+    // Return different distances based on render element type
+    switch(m_Type) {
+        case eDATA_Sky: return 1000.0f; // Sky is far away
+        case eDATA_2DQuad: return 0.1f; // 2D quads are close
+        default: return 1.0f; // Default distance
+    }
 }
 
 bool CRendElement::mfCull(CCObject *pObj) { 
     assert(this != nullptr && "CRendElement::mfCull: this is null");
     assert(pObj != nullptr && "CRendElement::mfCull: pObj is null");
-    printf("CRendElement::mfCull called\n");
-    return false; 
+    printf("CRendElement::mfCull called for type %d\n", (int)m_Type);
+    
+    // Dummy culling logic - most elements are visible
+    return false; // Not culled (visible)
 }
 
 bool CRendElement::mfCull(CCObject *pObj, SShader *ef) { 
     assert(this != nullptr && "CRendElement::mfCull: this is null");
     assert(pObj != nullptr && "CRendElement::mfCull: pObj is null");
     assert(ef != nullptr && "CRendElement::mfCull: ef is null");
-    printf("CRendElement::mfCull called\n");
-    return false; 
+    printf("CRendElement::mfCull called for type %d with shader\n", (int)m_Type);
+    
+    // Dummy culling with shader consideration
+    return false; // Not culled (visible)
 }
 
 void CRendElement::Release() { 
@@ -693,7 +784,8 @@ CRendElement* CMetalShaderManager::EF_CreateRE(EDataType edt)
     assert(static_cast<int>(edt) >= 0 && "CMetalShaderManager::EF_CreateRE: Invalid negative EDataType");
     assert(static_cast<int>(edt) < 100 && "CMetalShaderManager::EF_CreateRE: EDataType value too large");
     
-    printf("CMetalShaderManager::EF_CreateRE: Creating render element type %d\n", (int)edt);
+    printf("CMetalShaderManager::EF_CreateRE: Creating render element type %d (%s)\n", 
+           (int)edt, GetRenderElementTypeName(edt));
     
     CRendElement* re = nullptr;
     
@@ -701,9 +793,12 @@ CRendElement* CMetalShaderManager::EF_CreateRE(EDataType edt)
         switch(edt)
         {
             case eDATA_Sky:
-                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRESky\n");
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRESky for sky rendering\n");
                 re = new CMetalRESky;
                 assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalRESky creation failed");
+                // Initialize sky-specific properties
+                re->m_SortId = -1000; // Sky renders first
+                re->m_Color = CFColor(0.5f, 0.7f, 1.0f, 1.0f); // Light blue
                 break;
                 
             case eDATA_Dummy:
