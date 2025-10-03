@@ -3,6 +3,8 @@ if(NOT APPLE)
     return()
 endif()
 
+# Render elements will be implemented directly in MetalShaderManager
+
 # Metal renderer source files
 set(XRENDER_METAL_SOURCES
     MetalRenderer.cpp

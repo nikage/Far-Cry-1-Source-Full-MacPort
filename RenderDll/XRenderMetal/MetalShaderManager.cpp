@@ -20,138 +20,394 @@
 #include "MetalTextureManager.h"
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
+#include <cassert>
+#include <iostream>
 
-// Minimal render element implementations for Metal renderer
-// Since Common render elements are disabled for macOS, we implement minimal versions
-
+// Minimal render element implementations with comprehensive assertions
 class CMetalRESky : public CRendElement
 {
 public:
-    CMetalRESky() { mfSetType(eDATA_Sky); }
-    virtual ~CMetalRESky() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalRESky() { 
+        mfSetType(eDATA_Sky);
+        printf("CMetalRESky: Constructor called\n");
+    }
+    virtual ~CMetalRESky() { 
+        printf("CMetalRESky: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalRESky::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalRESky::mfDraw: ef is null");
+        printf("CMetalRESky::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREDummy : public CRendElement
 {
 public:
-    CMetalREDummy() { mfSetType(eDATA_Dummy); }
-    virtual ~CMetalREDummy() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREDummy() { 
+        mfSetType(eDATA_Dummy);
+        printf("CMetalREDummy: Constructor called\n");
+    }
+    virtual ~CMetalREDummy() { 
+        printf("CMetalREDummy: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREDummy::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREDummy::mfDraw: ef is null");
+        printf("CMetalREDummy::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalRE2DQuad : public CRendElement
 {
 public:
-    CMetalRE2DQuad() { mfSetType(eDATA_2DQuad); }
-    virtual ~CMetalRE2DQuad() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalRE2DQuad() { 
+        mfSetType(eDATA_2DQuad);
+        printf("CMetalRE2DQuad: Constructor called\n");
+    }
+    virtual ~CMetalRE2DQuad() { 
+        printf("CMetalRE2DQuad: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalRE2DQuad::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalRE2DQuad::mfDraw: ef is null");
+        printf("CMetalRE2DQuad::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREScreenProcess : public CRendElement
 {
 public:
-    CMetalREScreenProcess() { mfSetType(eDATA_ScreenProcess); }
-    virtual ~CMetalREScreenProcess() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREScreenProcess() { 
+        mfSetType(eDATA_ScreenProcess);
+        printf("CMetalREScreenProcess: Constructor called\n");
+    }
+    virtual ~CMetalREScreenProcess() { 
+        printf("CMetalREScreenProcess: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREScreenProcess::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREScreenProcess::mfDraw: ef is null");
+        printf("CMetalREScreenProcess::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREShadowMapGen : public CRendElement
 {
 public:
-    CMetalREShadowMapGen() { mfSetType(eDATA_ShadowMapGen); }
-    virtual ~CMetalREShadowMapGen() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREShadowMapGen() { 
+        mfSetType(eDATA_ShadowMapGen);
+        printf("CMetalREShadowMapGen: Constructor called\n");
+    }
+    virtual ~CMetalREShadowMapGen() { 
+        printf("CMetalREShadowMapGen: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREShadowMapGen::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREShadowMapGen::mfDraw: ef is null");
+        printf("CMetalREShadowMapGen::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalRECommon : public CRendElement
 {
 public:
-    CMetalRECommon() { mfSetType(eDATA_TerrainSector); }
-    virtual ~CMetalRECommon() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalRECommon() { 
+        mfSetType(eDATA_TerrainSector);
+        printf("CMetalRECommon: Constructor called\n");
+    }
+    virtual ~CMetalRECommon() { 
+        printf("CMetalRECommon: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalRECommon::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalRECommon::mfDraw: ef is null");
+        printf("CMetalRECommon::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalRETriMeshShadow : public CRendElement
 {
 public:
-    CMetalRETriMeshShadow() { mfSetType(eDATA_TriMeshShadow); }
-    virtual ~CMetalRETriMeshShadow() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalRETriMeshShadow() { 
+        mfSetType(eDATA_TriMeshShadow);
+        printf("CMetalRETriMeshShadow: Constructor called\n");
+    }
+    virtual ~CMetalRETriMeshShadow() { 
+        printf("CMetalRETriMeshShadow: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalRETriMeshShadow::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalRETriMeshShadow::mfDraw: ef is null");
+        printf("CMetalRETriMeshShadow::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREFlashBang : public CRendElement
 {
 public:
-    CMetalREFlashBang() { mfSetType(eDATA_FlashBang); }
-    virtual ~CMetalREFlashBang() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREFlashBang() { 
+        mfSetType(eDATA_FlashBang);
+        printf("CMetalREFlashBang: Constructor called\n");
+    }
+    virtual ~CMetalREFlashBang() { 
+        printf("CMetalREFlashBang: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREFlashBang::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREFlashBang::mfDraw: ef is null");
+        printf("CMetalREFlashBang::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREOcclusionQuery : public CRendElement
 {
 public:
-    CMetalREOcclusionQuery() { mfSetType(eDATA_OcclusionQuery); }
-    virtual ~CMetalREOcclusionQuery() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREOcclusionQuery() { 
+        mfSetType(eDATA_OcclusionQuery);
+        printf("CMetalREOcclusionQuery: Constructor called\n");
+    }
+    virtual ~CMetalREOcclusionQuery() { 
+        printf("CMetalREOcclusionQuery: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREOcclusionQuery::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREOcclusionQuery::mfDraw: ef is null");
+        printf("CMetalREOcclusionQuery::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREOcLeaf : public CRendElement
 {
 public:
-    CMetalREOcLeaf() { mfSetType(eDATA_OcLeaf); }
-    virtual ~CMetalREOcLeaf() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREOcLeaf() { 
+        mfSetType(eDATA_OcLeaf);
+        printf("CMetalREOcLeaf: Constructor called\n");
+    }
+    virtual ~CMetalREOcLeaf() { 
+        printf("CMetalREOcLeaf: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREOcLeaf::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREOcLeaf::mfDraw: ef is null");
+        printf("CMetalREOcLeaf::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalRETerrainParticles : public CRendElement
 {
 public:
-    CMetalRETerrainParticles() { mfSetType(eDATA_TerrainParticles); }
-    virtual ~CMetalRETerrainParticles() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalRETerrainParticles() { 
+        mfSetType(eDATA_TerrainParticles);
+        printf("CMetalRETerrainParticles: Constructor called\n");
+    }
+    virtual ~CMetalRETerrainParticles() { 
+        printf("CMetalRETerrainParticles: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalRETerrainParticles::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalRETerrainParticles::mfDraw: ef is null");
+        printf("CMetalRETerrainParticles::mfDraw called\n");
+        return true; 
+    }
 };
 
 class CMetalREFarTreeSprites : public CRendElement
 {
 public:
-    CMetalREFarTreeSprites() { mfSetType(eDATA_FarTreeSprites); }
-    virtual ~CMetalREFarTreeSprites() {}
-    virtual void mfPrepare() {}
-    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { return true; }
+    CMetalREFarTreeSprites() { 
+        mfSetType(eDATA_FarTreeSprites);
+        printf("CMetalREFarTreeSprites: Constructor called\n");
+    }
+    virtual ~CMetalREFarTreeSprites() { 
+        printf("CMetalREFarTreeSprites: Destructor called\n");
+    }
+    virtual void mfPrepare() {
+        printf("CMetalREFarTreeSprites::mfPrepare called\n");
+    }
+    virtual bool mfDraw(SShader *ef, SShaderPass *sfm) { 
+        assert(ef != nullptr && "CMetalREFarTreeSprites::mfDraw: ef is null");
+        printf("CMetalREFarTreeSprites::mfDraw called\n");
+        return true; 
+    }
 };
 
-// Implement missing CRendElement methods for Metal renderer
-void CRendElement::mfEndFlush() {}
-int CRendElement::mfGetMatId() { return 0; }
-void CRendElement::mfGetPlane(Plane& pl) { pl.n = Vec3d(0,0,1); pl.d = 0; }
-int CRendElement::mfTransform(Matrix44& ViewMatr, Matrix44& ProjMatr, vec4_t *verts, vec4_t *vertsp, int Num) { return 0; }
-CMatInfo* CRendElement::mfGetMatInfo() { return nullptr; }
-void* CRendElement::mfGetPointer(ESrcPointer ePT, int *Stride, int Type, ESrcPointer Dst, int Flags) { return nullptr; }
-bool CRendElement::mfIsValidTime(SShader *ef, CCObject *obj, float curtime) { return true; }
-void CRendElement::mfBuildGeometry(SShader *ef) {}
-CRendElement* CRendElement::mfCopyConstruct() { return new CRendElement; }
-CRendElement* CRendElement::mfCreateWorldRE(SShader *ef, SInpData *ds) { return nullptr; }
-list2<CMatInfo>* CRendElement::mfGetMatInfoList() { return nullptr; }
-bool CRendElement::mfCullByClipPlane(CCObject *pObj) { return false; }
-float CRendElement::mfDistanceToCameraSquared(const CCObject & thisObject) { return 0.1f; }
-bool CRendElement::mfCull(CCObject *pObj) { return false; }
-bool CRendElement::mfCull(CCObject *pObj, SShader *ef) { return false; }
-void CRendElement::Release() { delete this; }
-void CRendElement::mfReset() {}
-void CRendElement::mfCenter(Vec3d& centr, CCObject *pObj) { centr(0,0,0); }
-bool CRendElement::mfCompile(SShader *ef, char *scr) { return true; }
+// CRendElement implementations for Metal renderer
+void CRendElement::mfPrepare() {
+    assert(this != nullptr && "CRendElement::mfPrepare: this is null");
+    printf("CRendElement::mfPrepare called\n");
+}
+
+void CRendElement::mfEndFlush() {
+    assert(this != nullptr && "CRendElement::mfEndFlush: this is null");
+    printf("CRendElement::mfEndFlush called\n");
+}
+
+bool CRendElement::mfDraw(SShader *ef, SShaderPass *sfm) {
+    assert(this != nullptr && "CRendElement::mfDraw: this is null");
+    assert(ef != nullptr && "CRendElement::mfDraw: ef is null");
+    assert(sfm != nullptr && "CRendElement::mfDraw: sfm is null");
+    printf("CRendElement::mfDraw called\n");
+    return true;
+}
+
+int CRendElement::mfGetMatId() { 
+    assert(this != nullptr && "CRendElement::mfGetMatId: this is null");
+    printf("CRendElement::mfGetMatId called\n");
+    return 0; 
+}
+
+void CRendElement::mfGetPlane(Plane& pl) { 
+    assert(this != nullptr && "CRendElement::mfGetPlane: this is null");
+    printf("CRendElement::mfGetPlane called\n");
+    pl.n = Vec3d(0,0,1); 
+    pl.d = 0; 
+}
+
+int CRendElement::mfTransform(Matrix44& ViewMatr, Matrix44& ProjMatr, vec4_t *verts, vec4_t *vertsp, int Num) { 
+    assert(this != nullptr && "CRendElement::mfTransform: this is null");
+    assert(verts != nullptr && "CRendElement::mfTransform: verts is null");
+    assert(vertsp != nullptr && "CRendElement::mfTransform: vertsp is null");
+    assert(Num >= 0 && "CRendElement::mfTransform: Num is negative");
+    printf("CRendElement::mfTransform called with Num=%d\n", Num);
+    return 0; 
+}
+
+CMatInfo* CRendElement::mfGetMatInfo() { 
+    assert(this != nullptr && "CRendElement::mfGetMatInfo: this is null");
+    printf("CRendElement::mfGetMatInfo called\n");
+    return nullptr; 
+}
+
+void* CRendElement::mfGetPointer(ESrcPointer ePT, int *Stride, int Type, ESrcPointer Dst, int Flags) { 
+    assert(this != nullptr && "CRendElement::mfGetPointer: this is null");
+    assert(Stride != nullptr && "CRendElement::mfGetPointer: Stride is null");
+    assert(static_cast<int>(ePT) >= 0 && "CRendElement::mfGetPointer: invalid ePT");
+    assert(static_cast<int>(Dst) >= 0 && "CRendElement::mfGetPointer: invalid Dst");
+    printf("CRendElement::mfGetPointer called\n");
+    return nullptr; 
+}
+
+bool CRendElement::mfIsValidTime(SShader *ef, CCObject *obj, float curtime) { 
+    assert(this != nullptr && "CRendElement::mfIsValidTime: this is null");
+    assert(ef != nullptr && "CRendElement::mfIsValidTime: ef is null");
+    assert(obj != nullptr && "CRendElement::mfIsValidTime: obj is null");
+    assert(curtime >= 0.0f && "CRendElement::mfIsValidTime: curtime is negative");
+    printf("CRendElement::mfIsValidTime called with curtime=%f\n", curtime);
+    return true; 
+}
+
+void CRendElement::mfBuildGeometry(SShader *ef) {
+    assert(this != nullptr && "CRendElement::mfBuildGeometry: this is null");
+    assert(ef != nullptr && "CRendElement::mfBuildGeometry: ef is null");
+    printf("CRendElement::mfBuildGeometry called\n");
+}
+
+CRendElement* CRendElement::mfCopyConstruct() { 
+    assert(this != nullptr && "CRendElement::mfCopyConstruct: this is null");
+    printf("CRendElement::mfCopyConstruct called\n");
+    return new CMetalREDummy; 
+}
+
+CRendElement* CRendElement::mfCreateWorldRE(SShader *ef, SInpData *ds) { 
+    assert(this != nullptr && "CRendElement::mfCreateWorldRE: this is null");
+    assert(ef != nullptr && "CRendElement::mfCreateWorldRE: ef is null");
+    assert(ds != nullptr && "CRendElement::mfCreateWorldRE: ds is null");
+    printf("CRendElement::mfCreateWorldRE called\n");
+    return nullptr; 
+}
+
+list2<CMatInfo>* CRendElement::mfGetMatInfoList() { 
+    assert(this != nullptr && "CRendElement::mfGetMatInfoList: this is null");
+    printf("CRendElement::mfGetMatInfoList called\n");
+    return nullptr; 
+}
+
+bool CRendElement::mfCullByClipPlane(CCObject *pObj) { 
+    assert(this != nullptr && "CRendElement::mfCullByClipPlane: this is null");
+    assert(pObj != nullptr && "CRendElement::mfCullByClipPlane: pObj is null");
+    printf("CRendElement::mfCullByClipPlane called\n");
+    return false; 
+}
+
+float CRendElement::mfDistanceToCameraSquared(const CCObject & thisObject) { 
+    assert(this != nullptr && "CRendElement::mfDistanceToCameraSquared: this is null");
+    printf("CRendElement::mfDistanceToCameraSquared called\n");
+    return 0.1f; 
+}
+
+bool CRendElement::mfCull(CCObject *pObj) { 
+    assert(this != nullptr && "CRendElement::mfCull: this is null");
+    assert(pObj != nullptr && "CRendElement::mfCull: pObj is null");
+    printf("CRendElement::mfCull called\n");
+    return false; 
+}
+
+bool CRendElement::mfCull(CCObject *pObj, SShader *ef) { 
+    assert(this != nullptr && "CRendElement::mfCull: this is null");
+    assert(pObj != nullptr && "CRendElement::mfCull: pObj is null");
+    assert(ef != nullptr && "CRendElement::mfCull: ef is null");
+    printf("CRendElement::mfCull called\n");
+    return false; 
+}
+
+void CRendElement::Release() { 
+    assert(this != nullptr && "CRendElement::Release: this is null");
+    printf("CRendElement::Release called\n");
+    delete this; 
+}
+
+void CRendElement::mfReset() {
+    assert(this != nullptr && "CRendElement::mfReset: this is null");
+    printf("CRendElement::mfReset called\n");
+}
+
+void CRendElement::mfCenter(Vec3d& centr, CCObject *pObj) { 
+    assert(this != nullptr && "CRendElement::mfCenter: this is null");
+    assert(pObj != nullptr && "CRendElement::mfCenter: pObj is null");
+    printf("CRendElement::mfCenter called\n");
+    centr(0,0,0); 
+}
+
+bool CRendElement::mfCompile(SShader *ef, char *scr) { 
+    assert(this != nullptr && "CRendElement::mfCompile: this is null");
+    assert(ef != nullptr && "CRendElement::mfCompile: ef is null");
+    assert(scr != nullptr && "CRendElement::mfCompile: scr is null");
+    printf("CRendElement::mfCompile called\n");
+    return true; 
+}
 
 // Define missing static member
 CRendElement CRendElement::m_RootGlobal;
@@ -163,14 +419,32 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTex
     , m_currentShaderId(-1)
     , m_currentPipelineState(nil)
     , m_globalShaderTemplateId(0)
-    , m_heatVisionEnabled(false)
 {
-    // Initialize shader manager
+    // Assert constructor parameters
+    assert(m_renderer != nullptr && "CMetalShaderManager: Renderer cannot be null");
+    assert(m_textureManager != nullptr && "CMetalShaderManager: TextureManager cannot be null");
+    assert(m_nextShaderId > 0 && "CMetalShaderManager: NextShaderId must be positive");
+    assert(m_currentShaderId == -1 && "CMetalShaderManager: CurrentShaderId should be -1 initially");
+    
+    printf("CMetalShaderManager: Constructor called with renderer=%p, textureManager=%p\n", m_renderer, m_textureManager);
+    
+    // Initialize additional members
+    m_heatVisionEnabled = false;
+    
+    printf("CMetalShaderManager: Constructor completed successfully\n");
 }
 
 CMetalShaderManager::~CMetalShaderManager()
 {
+    printf("CMetalShaderManager: Destructor called\n");
+    
+    // Assert state before cleanup
+    assert(m_renderer != nullptr && "CMetalShaderManager: Renderer should not be null in destructor");
+    assert(m_textureManager != nullptr && "CMetalShaderManager: TextureManager should not be null in destructor");
+    
     ClearAllShaders();
+    
+    printf("CMetalShaderManager: Destructor completed\n");
 }
 
 // Shader System Interface (EF_ methods)
@@ -415,75 +689,122 @@ bool CMetalShaderManager::EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, fl
 
 CRendElement* CMetalShaderManager::EF_CreateRE(EDataType edt)
 {
+    // Assert input validation
+    assert(static_cast<int>(edt) >= 0 && "CMetalShaderManager::EF_CreateRE: Invalid negative EDataType");
+    assert(static_cast<int>(edt) < 100 && "CMetalShaderManager::EF_CreateRE: EDataType value too large");
+    
+    printf("CMetalShaderManager::EF_CreateRE: Creating render element type %d\n", (int)edt);
+    
     CRendElement* re = nullptr;
     
-    switch(edt)
-    {
-        case eDATA_Sky:
-            re = new CMetalRESky;
-            break;
-            
-        case eDATA_Dummy:
-            re = new CMetalREDummy;
-            break;
-            
-        case eDATA_2DQuad:
-            re = new CMetalRE2DQuad;
-            break;
-            
-        case eDATA_ScreenProcess:
-            re = new CMetalREScreenProcess;
-            break;
-            
-        case eDATA_ShadowMapGen:
-            re = new CMetalREShadowMapGen;
-            break;
-            
-        case eDATA_TerrainSector:
-            re = new CMetalRECommon;
-            break;
-            
-        case eDATA_TriMeshShadow:
-            re = new CMetalRETriMeshShadow;
-            break;
-            
-        case eDATA_FlashBang:
-            re = new CMetalREFlashBang;
-            break;
-            
-        case eDATA_OcclusionQuery:
-            re = new CMetalREOcclusionQuery;
-            break;
-            
-        case eDATA_OcLeaf:
-            re = new CMetalREOcLeaf;
-            break;
-            
-        case eDATA_TerrainParticles:
-            re = new CMetalRETerrainParticles;
-            break;
-            
-        case eDATA_FarTreeSprites:
-            re = new CMetalREFarTreeSprites;
-            break;
-            
-        // For unsupported types, create a dummy element
-        case eDATA_Ocean:
-        case eDATA_Beam:
-        case eDATA_Glare:
-        case eDATA_Prefab:
-        case eDATA_HDRProcess:
-        default:
-            printf("CMetalShaderManager::EF_CreateRE: Using dummy element for type %d\n", (int)edt);
-            re = new CMetalREDummy;
-            break;
+    try {
+        switch(edt)
+        {
+            case eDATA_Sky:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRESky\n");
+                re = new CMetalRESky;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalRESky creation failed");
+                break;
+                
+            case eDATA_Dummy:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREDummy\n");
+                re = new CMetalREDummy;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREDummy creation failed");
+                break;
+                
+            case eDATA_2DQuad:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRE2DQuad\n");
+                re = new CMetalRE2DQuad;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalRE2DQuad creation failed");
+                break;
+                
+            case eDATA_ScreenProcess:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREScreenProcess\n");
+                re = new CMetalREScreenProcess;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREScreenProcess creation failed");
+                break;
+                
+            case eDATA_ShadowMapGen:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREShadowMapGen\n");
+                re = new CMetalREShadowMapGen;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREShadowMapGen creation failed");
+                break;
+                
+            case eDATA_TerrainSector:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRECommon\n");
+                re = new CMetalRECommon;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalRECommon creation failed");
+                break;
+                
+            case eDATA_TriMeshShadow:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRETriMeshShadow\n");
+                re = new CMetalRETriMeshShadow;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalRETriMeshShadow creation failed");
+                break;
+                
+            case eDATA_FlashBang:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREFlashBang\n");
+                re = new CMetalREFlashBang;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREFlashBang creation failed");
+                break;
+                
+            case eDATA_OcclusionQuery:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREOcclusionQuery\n");
+                re = new CMetalREOcclusionQuery;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREOcclusionQuery creation failed");
+                break;
+                
+            case eDATA_OcLeaf:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREOcLeaf\n");
+                re = new CMetalREOcLeaf;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREOcLeaf creation failed");
+                break;
+                
+            case eDATA_TerrainParticles:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalRETerrainParticles\n");
+                re = new CMetalRETerrainParticles;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalRETerrainParticles creation failed");
+                break;
+                
+            case eDATA_FarTreeSprites:
+                printf("CMetalShaderManager::EF_CreateRE: Creating CMetalREFarTreeSprites\n");
+                re = new CMetalREFarTreeSprites;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREFarTreeSprites creation failed");
+                break;
+                
+            case eDATA_Ocean:
+            case eDATA_Beam:
+            case eDATA_Glare:
+            case eDATA_Prefab:
+            case eDATA_HDRProcess:
+                printf("CMetalShaderManager::EF_CreateRE: Unsupported render element type %d, using dummy\n", (int)edt);
+                re = new CMetalREDummy;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREDummy fallback creation failed");
+                break;
+                
+            default:
+                printf("CMetalShaderManager::EF_CreateRE: Unknown render element type %d, using dummy\n", (int)edt);
+                re = new CMetalREDummy;
+                assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: CMetalREDummy fallback creation failed");
+                break;
+        }
+    }
+    catch (const std::exception& e) {
+        std::cerr << "CMetalShaderManager::EF_CreateRE: Exception creating render element type " << (int)edt << ": " << e.what() << std::endl;
+        assert(false && "CMetalShaderManager::EF_CreateRE: Exception during render element creation");
+        re = nullptr;
+    }
+    catch (...) {
+        std::cerr << "CMetalShaderManager::EF_CreateRE: Unknown exception creating render element type " << (int)edt << std::endl;
+        assert(false && "CMetalShaderManager::EF_CreateRE: Unknown exception during render element creation");
+        re = nullptr;
     }
     
-    if (re) {
-        printf("CMetalShaderManager::EF_CreateRE: Created render element type %d at %p\n", (int)edt, re);
-    } else {
-        printf("CMetalShaderManager::EF_CreateRE: Failed to create render element type %d\n", (int)edt);
-    }
+    // Final validation
+    assert(re != nullptr && "CMetalShaderManager::EF_CreateRE: Final render element validation failed");
+    assert(re->m_Type == edt && "CMetalShaderManager::EF_CreateRE: Render element type mismatch");
+    
+    printf("CMetalShaderManager::EF_CreateRE: Successfully created render element type %d at %p\n", (int)edt, re);
     
     return re;
 }
