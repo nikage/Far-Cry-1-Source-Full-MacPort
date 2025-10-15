@@ -10,6 +10,7 @@
 #include <vector>
 #include <cassert>
 #include "MetalBaseRenderer.h"
+#include "MetalTextureManager.h"
 #include "IRenderer.h"
 
 // Forward declarations for CryEngine types
@@ -318,6 +319,7 @@ private:
     
     // Shader manager for render elements
     class CMetalShaderManager* m_pShaderManager;
+    class CMetalTextureManager* m_pTextureManager;
     
     // Matrix management
     float m_projectionMatrix[16];

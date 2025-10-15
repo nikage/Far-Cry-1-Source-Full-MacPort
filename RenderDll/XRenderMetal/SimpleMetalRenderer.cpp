@@ -47,6 +47,7 @@ CSimpleMetalRenderer::CSimpleMetalRenderer()
     , m_frameCounter(0)
     , m_lastCleanupTime(0.0)
     , m_pShaderManager(nullptr)
+    , m_pTextureManager(nullptr)
 {
     // Initialize matrices to identity
     for (int i = 0; i < 16; i++)
@@ -63,6 +64,12 @@ CSimpleMetalRenderer::~CSimpleMetalRenderer()
     if (m_pShaderManager) {
         delete m_pShaderManager;
         m_pShaderManager = nullptr;
+    }
+    
+    // Clean up texture manager
+    if (m_pTextureManager) {
+        delete m_pTextureManager;
+        m_pTextureManager = nullptr;
     }
     
     ShutDown();
@@ -91,8 +98,19 @@ void* CSimpleMetalRenderer::Init(int x, int y, int width, int height, unsigned i
         return nullptr;
     }
     
+    // Create texture manager first
+    printf("CSimpleMetalRenderer::Init: Creating texture manager...\n");
+    m_pTextureManager = new CMetalTextureManager(this);
+    printf("CSimpleMetalRenderer::Init: Texture manager creation result: %p\n", m_pTextureManager);
+    if (!m_pTextureManager) {
+        printf("CSimpleMetalRenderer::Init: Failed to create texture manager\n");
+        return nullptr;
+    }
+    printf("CSimpleMetalRenderer::Init: Texture manager created successfully\n");
+    
     // Create shader manager for render elements
-    m_pShaderManager = new CMetalShaderManager(this, nullptr);
+    printf("CSimpleMetalRenderer::Init: Creating shader manager with renderer=%p, textureManager=%p\n", this, m_pTextureManager);
+    m_pShaderManager = new CMetalShaderManager(this, m_pTextureManager);
     if (!m_pShaderManager) {
         printf("CSimpleMetalRenderer::Init: Failed to create shader manager\n");
         return nullptr;
@@ -832,13 +850,63 @@ bool CSimpleMetalRenderer::InitializeRenderPipeline()
     if (!m_device)
         return false;
         
-    // Create a basic render pipeline state
+    printf("CSimpleMetalRenderer::InitializeRenderPipeline: Creating dummy pipeline with basic shaders\n");
+    
+    // Create a basic render pipeline state with dummy shaders
     MTLRenderPipelineDescriptor* pipelineDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
     
-    // Set up vertex and fragment shaders (basic triangle for now)
-    // TODO: Implement proper shader loading
-    pipelineDescriptor.vertexFunction = nil; // Will be set when shaders are loaded
-    pipelineDescriptor.fragmentFunction = nil; // Will be set when shaders are loaded
+    // Create dummy vertex shader
+    NSString* vertexShaderSource = @"#include <metal_stdlib>\n"
+                                   @"using namespace metal;\n"
+                                   @"struct VertexOut {\n"
+                                   @"    float4 position [[position]];\n"
+                                   @"    float4 color;\n"
+                                   @"};\n"
+                                   @"vertex VertexOut vertex_main(uint vertexID [[vertex_id]]) {\n"
+                                   @"    VertexOut out;\n"
+                                   @"    out.position = float4(0.0, 0.0, 0.0, 1.0);\n"
+                                   @"    out.color = float4(1.0, 1.0, 1.0, 1.0);\n"
+                                   @"    return out;\n"
+                                   @"}";
+    
+    NSError* shaderError = nil;
+    id<MTLLibrary> shaderLibrary = [m_device newLibraryWithSource:vertexShaderSource options:nil error:&shaderError];
+    if (!shaderLibrary) {
+        printf("CSimpleMetalRenderer::InitializeRenderPipeline: Failed to create shader library: %s\n", 
+               shaderError.localizedDescription.UTF8String);
+        return false;
+    }
+    
+    id<MTLFunction> vertexFunction = [shaderLibrary newFunctionWithName:@"vertex_main"];
+    id<MTLFunction> fragmentFunction = [shaderLibrary newFunctionWithName:@"fragment_main"];
+    
+    if (!vertexFunction) {
+        printf("CSimpleMetalRenderer::InitializeRenderPipeline: Failed to create vertex function\n");
+        return false;
+    }
+    
+    // Create dummy fragment shader if not found
+    if (!fragmentFunction) {
+        NSString* fragmentShaderSource = @"#include <metal_stdlib>\n"
+                                         @"using namespace metal;\n"
+                                         @"fragment float4 fragment_main() {\n"
+                                         @"    return float4(1.0, 1.0, 1.0, 1.0);\n"
+                                         @"}";
+        
+        id<MTLLibrary> fragmentLibrary = [m_device newLibraryWithSource:fragmentShaderSource options:nil error:&shaderError];
+        if (fragmentLibrary) {
+            fragmentFunction = [fragmentLibrary newFunctionWithName:@"fragment_main"];
+        }
+    }
+    
+    if (!fragmentFunction) {
+        printf("CSimpleMetalRenderer::InitializeRenderPipeline: Failed to create fragment function\n");
+        return false;
+    }
+    
+    // Set up vertex and fragment shaders
+    pipelineDescriptor.vertexFunction = vertexFunction;
+    pipelineDescriptor.fragmentFunction = fragmentFunction;
     
     // Set up vertex descriptor
     MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
