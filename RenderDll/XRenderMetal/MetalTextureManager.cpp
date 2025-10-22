@@ -49,7 +49,6 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
         m_currentTexture = it->second.metalTexture;
         m_currentTextureSlot = tnum;
         
-        // Bind texture to Metal render encoder based on type
         if (m_renderer && m_renderer->m_renderEncoder && m_currentTexture)
         {
             int textureIndex = 0;
@@ -58,8 +57,23 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
                 case eTT_Base:
                     textureIndex = 0;
                     break;
+                case eTT_Bumpmap:
+                    textureIndex = 1;
+                    break;
+                case eTT_DSDTBump:
+                    textureIndex = 2;
+                    break;
                 case eTT_Cubemap:
                     textureIndex = 3;
+                    break;
+                case eTT_AutoCubemap:
+                    textureIndex = 4;
+                    break;
+                case eTT_3D:
+                    textureIndex = 5;
+                    break;
+                case eTT_Rectangle:
+                    textureIndex = 6;
                     break;
                 default:
                     textureIndex = 0;
@@ -70,7 +84,6 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
     }
     else
     {
-        // Texture not found, use white texture as fallback
         if (m_whiteTexture && m_renderer && m_renderer->m_renderEncoder)
         {
             [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
