@@ -31,24 +31,20 @@ CMetalRenderer::~CMetalRenderer() { ShutdownManagers(); }
 
 // Texture management delegation
 void CMetalRenderer::SetTexture(int tnum, ETexType Type) {
-  if (m_textureManager)
-    m_textureManager->SetTexture(tnum, Type);
+  m_textureManager->SetTexture(tnum, Type);
 }
 
-void CMetalRenderer::SetWhiteTexture() {
-  if (m_textureManager)
-    m_textureManager->SetWhiteTexture();
-}
+void CMetalRenderer::SetWhiteTexture() { m_textureManager->SetWhiteTexture(); }
 
 unsigned int
 CMetalRenderer::DownLoadToVideoMemory(unsigned char *data, int w, int h,
                                       ETEX_Format eTFSrc, ETEX_Format eTFDst,
                                       int nummipmap, bool repeat, int filter,
                                       int Id, char *szCacheName, int flags) {
-  if (m_textureManager)
-    return m_textureManager->DownLoadToVideoMemory(data, w, h, eTFSrc, eTFDst,
-                                                   nummipmap, repeat, filter,
-                                                   Id, szCacheName, flags);
+
+  return m_textureManager->DownLoadToVideoMemory(data, w, h, eTFSrc, eTFDst,
+                                                 nummipmap, repeat, filter, Id,
+                                                 szCacheName, flags);
   return 0;
 }
 
@@ -56,107 +52,106 @@ void CMetalRenderer::UpdateTextureInVideoMemory(uint tnum,
                                                 unsigned char *newdata,
                                                 int posx, int posy, int w,
                                                 int h, ETEX_Format eTF) {
-  if (m_textureManager)
-    m_textureManager->UpdateTextureInVideoMemory(tnum, newdata, posx, posy, w,
-                                                 h, eTF);
+
+  m_textureManager->UpdateTextureInVideoMemory(tnum, newdata, posx, posy, w, h,
+                                               eTF);
 }
 
 unsigned int CMetalRenderer::LoadTexture(const char *filename, int *tex_type,
                                          unsigned int def_tid,
                                          bool compresstodisk, bool bWarn) {
-  if (m_textureManager)
-    return m_textureManager->LoadTexture(filename, tex_type, def_tid,
-                                         compresstodisk, bWarn);
+
+  return m_textureManager->LoadTexture(filename, tex_type, def_tid,
+                                       compresstodisk, bWarn);
   return 0;
 }
 
 bool CMetalRenderer::DXTCompress(byte *raw_data, int nWidth, int nHeight,
                                  ETEX_Format eTF, bool bUseHW, bool bGenMips,
                                  int nSrcBytesPerPix, MIPDXTcallback callback) {
-  if (m_textureManager)
-    return m_textureManager->DXTCompress(raw_data, nWidth, nHeight, eTF, bUseHW,
-                                         bGenMips, nSrcBytesPerPix, callback);
+
+  return m_textureManager->DXTCompress(raw_data, nWidth, nHeight, eTF, bUseHW,
+                                       bGenMips, nSrcBytesPerPix, callback);
   return false;
 }
 
 bool CMetalRenderer::DXTDecompress(byte *srcData, byte *dstData, int nWidth,
                                    int nHeight, ETEX_Format eSrcTF, bool bUseHW,
                                    int nDstBytesPerPix) {
-  if (m_textureManager)
-    return m_textureManager->DXTDecompress(srcData, dstData, nWidth, nHeight,
-                                           eSrcTF, bUseHW, nDstBytesPerPix);
+
+  return m_textureManager->DXTDecompress(srcData, dstData, nWidth, nHeight,
+                                         eSrcTF, bUseHW, nDstBytesPerPix);
   return false;
 }
 
 void CMetalRenderer::RemoveTexture(unsigned int TextureId) {
-  if (m_textureManager)
-    m_textureManager->RemoveTexture(TextureId);
+
+  m_textureManager->RemoveTexture(TextureId);
 }
 
 void CMetalRenderer::RemoveTexture(ITexPic *pTexPic) {
-  if (m_textureManager)
-    m_textureManager->RemoveTexture(pTexPic);
+
+  m_textureManager->RemoveTexture(pTexPic);
 }
 
 bool CMetalRenderer::SetGammaDelta(const float fGamma) {
-  if (m_textureManager)
-    return m_textureManager->SetGammaDelta(fGamma);
+
+  return m_textureManager->SetGammaDelta(fGamma);
   return false;
 }
 
 // Font system delegation
 bool CMetalRenderer::FontUploadTexture(class CFBitmap *bitmap,
                                        ETEX_Format eTF) {
-  if (m_textureManager)
-    return m_textureManager->FontUploadTexture(bitmap, eTF);
+
+  return m_textureManager->FontUploadTexture(bitmap, eTF);
   return false;
 }
 
 int CMetalRenderer::FontCreateTexture(int Width, int Height, byte *pData,
                                       ETEX_Format eTF) {
-  if (m_textureManager)
-    return m_textureManager->FontCreateTexture(Width, Height, pData, eTF);
+
+  return m_textureManager->FontCreateTexture(Width, Height, pData, eTF);
   return 0;
 }
 
 bool CMetalRenderer::FontUpdateTexture(int nTexId, int X, int Y, int USize,
                                        int VSize, byte *pData) {
-  if (m_textureManager)
-    return m_textureManager->FontUpdateTexture(nTexId, X, Y, USize, VSize,
-                                               pData);
+
+  return m_textureManager->FontUpdateTexture(nTexId, X, Y, USize, VSize, pData);
   return false;
 }
 
 void CMetalRenderer::FontReleaseTexture(class CFBitmap *pBmp) {
-  if (m_textureManager)
-    m_textureManager->FontReleaseTexture(pBmp);
+
+  m_textureManager->FontReleaseTexture(pBmp);
 }
 
 void CMetalRenderer::FontSetTexture(class CFBitmap *bitmap, int nFilterMode) {
-  if (m_textureManager)
-    m_textureManager->FontSetTexture(bitmap, nFilterMode);
+
+  m_textureManager->FontSetTexture(bitmap, nFilterMode);
 }
 
 void CMetalRenderer::FontSetTexture(int nTexId, int nFilterMode) {
-  if (m_textureManager)
-    m_textureManager->FontSetTexture(nTexId, nFilterMode);
+
+  m_textureManager->FontSetTexture(nTexId, nFilterMode);
 }
 
 void CMetalRenderer::FontSetRenderingState(unsigned long nVirtualScreenWidth,
                                            unsigned long nVirtualScreenHeight) {
-  if (m_textureManager)
-    m_textureManager->FontSetRenderingState(nVirtualScreenWidth,
-                                            nVirtualScreenHeight);
+
+  m_textureManager->FontSetRenderingState(nVirtualScreenWidth,
+                                          nVirtualScreenHeight);
 }
 
 void CMetalRenderer::FontSetBlending(int src, int dst) {
-  if (m_textureManager)
-    m_textureManager->FontSetBlending(src, dst);
+
+  m_textureManager->FontSetBlending(src, dst);
 }
 
 void CMetalRenderer::FontRestoreRenderingState() {
-  if (m_textureManager)
-    m_textureManager->FontRestoreRenderingState();
+
+  m_textureManager->FontRestoreRenderingState();
 }
 
 // Shader system delegation
@@ -278,37 +273,37 @@ IShader *CMetalRenderer::EF_CopyShader(IShader *ef) {
 }
 
 ITexPic *CMetalRenderer::EF_GetTextureByID(int Id) {
-  if (m_textureManager)
-    return m_textureManager->EF_GetTextureByID(Id);
+
+  return m_textureManager->EF_GetTextureByID(Id);
   return nullptr;
 }
 
 ITexPic *CMetalRenderer::EF_LoadTexture(const char *nameTex, uint flags,
                                         uint flags2, byte eTT, float fAmount1,
                                         float fAmount2, int Id, int BindId) {
-  if (m_textureManager)
-    return m_textureManager->EF_LoadTexture(nameTex, flags, flags2, eTT,
-                                            fAmount1, fAmount2, Id, BindId);
+
+  return m_textureManager->EF_LoadTexture(nameTex, flags, flags2, eTT, fAmount1,
+                                          fAmount2, Id, BindId);
   return nullptr;
 }
 
 int CMetalRenderer::EF_LoadLightmap(const char *name) {
-  if (m_textureManager)
-    return m_textureManager->EF_LoadLightmap(name);
+
+  return m_textureManager->EF_LoadLightmap(name);
   return 0;
 }
 
 bool CMetalRenderer::EF_ScanEnvironmentCM(const char *name, int size,
                                           Vec3 &Pos) {
-  if (m_textureManager)
-    return m_textureManager->EF_ScanEnvironmentCM(name, size, Pos);
+
+  return m_textureManager->EF_ScanEnvironmentCM(name, size, Pos);
   return false;
 }
 
 int CMetalRenderer::EF_ReadAllImgFiles(IShader *ef, SShaderTexUnit *tl,
                                        STexAnim *ta, char *name) {
-  if (m_textureManager)
-    return m_textureManager->EF_ReadAllImgFiles(ef, tl, ta, name);
+
+  return m_textureManager->EF_ReadAllImgFiles(ef, tl, ta, name);
   return 0;
 }
 

@@ -42,8 +42,8 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
 {
     if (tnum < 0)
         return;
-        
-    auto it = m_textures.find(tnum);
+
+    const auto it = m_textures.find(tnum);
     if (it != m_textures.end())
     {
         m_currentTexture = it->second.metalTexture;
