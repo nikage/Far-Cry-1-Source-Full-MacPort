@@ -41,16 +41,23 @@ public:
     virtual ~CMetalTextureManager();
 
     // Texture Management Interface
+    
     void SetTexture(int tnum, ETexType Type = eTT_Base);
     void SetWhiteTexture();
+    
+    // Upload texture data from memory to GPU
     unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 
                                      ETEX_Format eTFSrc, ETEX_Format eTFDst, 
                                      int nummipmap, bool repeat = true, 
                                      int filter = FILTER_BILINEAR, int Id = 0, 
                                      char* szCacheName = NULL, int flags = 0);
+    
+    // Update existing texture region with new data
     void UpdateTextureInVideoMemory(uint tnum, unsigned char* newdata, int posx, int posy, 
                                    int w, int h, ETEX_Format eTF = eTF_0888);
-    unsigned int LoadTexture(const char* filename, int* tex_type = NULL, 
+    
+    // Load texture from file (PNG, JPG, TGA, etc.)
+    unsigned int LoadTexture(const char* filename, int* tex_type = nullptr,
                             unsigned int def_tid = 0, bool compresstodisk = true, 
                             bool bWarn = true);
     bool DXTCompress(byte* raw_data, int nWidth, int nHeight, ETEX_Format eTF, 
@@ -136,6 +143,7 @@ protected:
     int AllocateTextureId();
     void ReleaseTextureId(int id);
     bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height);
+    bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format);
     void GenerateMipmaps(id<MTLTexture> texture);
     void SetTextureParameters(id<MTLTexture> texture, bool repeat, int filter);
     int GetBytesPerPixel(ETEX_Format format);

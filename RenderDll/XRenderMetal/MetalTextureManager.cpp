@@ -117,6 +117,42 @@ void CMetalTextureManager::SetWhiteTexture()
     }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// DownLoadToVideoMemory
+//
+// Uploads texture data from CPU memory to GPU video memory using Metal API.
+// Creates a Metal texture and optionally generates mipmaps.
+//
+// Parameters:
+//   data         - Pointer to texture data in CPU memory
+//   w            - Texture width in pixels
+//   h            - Texture height in pixels
+//   eTFSrc       - Source texture format (currently unused, uses eTFDst)
+//   eTFDst       - Destination texture format (converted to Metal pixel format)
+//   nummipmap    - Number of mipmap levels to generate (0 = no mipmaps, 1+ = generate mipmaps)
+//   repeat       - Texture wrapping mode (currently unused, handled by sampler state)
+//   filter       - Texture filtering mode (currently unused, handled by sampler state)
+//   Id           - Texture ID to reuse (0 = allocate new ID, >0 = reuse this ID)
+//   szCacheName  - Optional cache name for texture lookup
+//   flags        - Additional flags (currently unused)
+//
+// Returns:
+//   Texture ID on success
+//   0 on failure (invalid data, dimension errors, Metal texture creation failure)
+//
+// Notes:
+//   - Calculates bytes-per-pixel automatically based on format
+//   - Generates mipmaps using Metal blit encoder if nummipmap > 0
+//   - Properly tracks texture memory usage
+//   - Supports texture ID reuse for dynamic texture updates
+//   - Registers texture in cache if szCacheName is provided
+//   - Supports 20+ texture formats including BC/DXT compression on macOS
+//
+// Example:
+//   unsigned int texId = DownLoadToVideoMemory(
+//       textureData, 256, 256, eTF_8888, eTF_8888, 4,
+//       true, FILTER_TRILINEAR, 0, "terrain_texture", 0);
+////////////////////////////////////////////////////////////////////////////
 unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, int w, int h, 
                                                        ETEX_Format eTFSrc, ETEX_Format eTFDst, 
                                                        int nummipmap, bool repeat, 
@@ -233,57 +269,160 @@ void CMetalTextureManager::UpdateTextureInVideoMemory(uint tnum, unsigned char* 
     UpdateMetalTexture(texture, newdata, posx, posy, w, h);
 }
 
+////////////////////////////////////////////////////////////////////////////
+// LoadTexture
+//
+// Loads a texture from file using MTKTextureLoader with automatic format detection.
+// Supports PNG, JPG, TGA, KTX, PVR and other common image formats.
+//
+// Parameters:
+//   filename        - Path to texture file to load
+//   tex_type        - [out] Optional pointer to receive detected texture format (ETEX_Format)
+//                     Returns the auto-detected pixel format from the file
+//   def_tid         - Default texture ID to return on failure, or texture ID to reuse
+//                     Pass 0 or -1 to allocate a new ID
+//   compresstodisk  - If true, compress texture to disk (currently unused)
+//   bWarn           - If true, print warning messages on failure
+//
+// Returns:
+//   Texture ID on success
+//   def_tid on failure (invalid file, load error, etc.)
+//
+// Notes:
+//   - Automatically generates mipmaps for loaded textures
+//   - Caches textures by filename to prevent redundant loading
+//   - If texture is already loaded, returns cached texture ID
+//   - Uses MTKTextureLoader for hardware-accelerated image decoding
+//   - Supports automatic pixel format detection and conversion
+//   - Returns detected format via tex_type (e.g., eTF_8888 for RGBA8)
+//
+// Example:
+//   int format = 0;
+//   unsigned int texId = LoadTexture("textures/terrain.png", &format, 0, false, true);
+//   // format now contains detected ETEX_Format (e.g., eTF_8888)
+////////////////////////////////////////////////////////////////////////////
 unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_type, 
                                               unsigned int def_tid, bool compresstodisk, 
                                               bool bWarn)
 {
-    if (!filename)
-        return 0;
-        
-    // Check if texture is already loaded
+    if (!filename || !filename[0])
+        return def_tid;
+    
+    if (!m_renderer || !m_renderer->m_device)
+        return def_tid;
+    
     std::string nameStr(filename);
     auto nameIt = m_textureNameMap.find(nameStr);
     if (nameIt != m_textureNameMap.end())
     {
+        if (tex_type)
+        {
+            auto texIt = m_textures.find(nameIt->second);
+            if (texIt != m_textures.end())
+                *tex_type = (int)texIt->second.format;
+            else
+                *tex_type = (int)eTF_8888;
+        }
         return nameIt->second;
     }
     
-    // Load texture data from file
     std::vector<byte> data;
     int width, height;
-    if (!LoadTextureData(filename, data, width, height))
+    ETEX_Format detectedFormat = eTF_8888;
+    
+    if (!LoadTextureData(filename, data, width, height, detectedFormat))
     {
         if (bWarn)
+        {
             printf("Warning: Failed to load texture: %s\n", filename);
-        return 0;
+        }
+        return def_tid;
     }
     
-    // Create Metal texture
-    MTLPixelFormat format = MTLPixelFormatRGBA8Unorm; // Default format
-    id<MTLTexture> texture = CreateMetalTexture(width, height, format, data.data(), data.size());
+    if (width <= 0 || height <= 0 || data.empty())
+    {
+        if (bWarn)
+            printf("Warning: Invalid texture dimensions for: %s\n", filename);
+        return def_tid;
+    }
+    
+    MTLPixelFormat metalFormat = ConvertToMetalFormat(detectedFormat);
+    if (metalFormat == MTLPixelFormatInvalid)
+    {
+        metalFormat = MTLPixelFormatRGBA8Unorm;
+        detectedFormat = eTF_8888;
+    }
+    
+    int bytesPerPixel = GetBytesPerPixel(detectedFormat);
+    if (bytesPerPixel == 0)
+        bytesPerPixel = 4;
+    
+    MTLTextureDescriptor* descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalFormat
+                                                                                           width:width
+                                                                                          height:height
+                                                                                       mipmapped:YES];
+    
+    descriptor.usage = MTLTextureUsageShaderRead;
+    descriptor.storageMode = MTLStorageModeShared;
+    
+    id<MTLTexture> texture = [m_renderer->m_device newTextureWithDescriptor:descriptor];
     if (!texture)
     {
         if (bWarn)
             printf("Warning: Failed to create Metal texture for: %s\n", filename);
-        return 0;
+        return def_tid;
     }
     
-    int textureId = AllocateTextureId();
-    if (textureId == -1)
+    size_t bytesPerRow = width * bytesPerPixel;
+    MTLRegion region = MTLRegionMake2D(0, 0, width, height);
+    
+    [texture replaceRegion:region
+               mipmapLevel:0
+                 withBytes:data.data()
+               bytesPerRow:bytesPerRow];
+    
+    if (m_renderer->m_commandQueue)
+    {
+        id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        [blitEncoder generateMipmapsForTexture:texture];
+        [blitEncoder endEncoding];
+        [commandBuffer commit];
+    }
+    
+    int textureId = (def_tid > 0 && def_tid != (unsigned int)-1) ? def_tid : AllocateTextureId();
+    if (textureId <= 0)
         return 0;
-        
+    
+    auto existingIt = m_textures.find(textureId);
+    if (existingIt != m_textures.end())
+    {
+        m_totalTextureMemory -= existingIt->second.memorySize;
+    }
+    
     TextureInfo info;
     info.metalTexture = texture;
     info.width = width;
     info.height = height;
-    info.format = eTF_8888; // Default format
+    info.format = detectedFormat;
     info.name = filename;
     info.memorySize = data.size();
     info.isLoaded = true;
     
-    m_textures[textureId] = info;
+    if (existingIt != m_textures.end())
+    {
+        existingIt->second = info;
+    }
+    else
+    {
+        m_textures[textureId] = info;
+    }
+    
     m_textureNameMap[nameStr] = textureId;
     m_totalTextureMemory += info.memorySize;
+    
+    if (tex_type)
+        *tex_type = (int)detectedFormat;
     
     return textureId;
 }
@@ -653,9 +792,86 @@ void CMetalTextureManager::ReleaseTextureId(int id)
 
 bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height)
 {
-    // Load texture data from file
-    // This would need to be implemented based on the file format
-    return false;
+    ETEX_Format format;
+    return LoadTextureData(filename, data, width, height, format);
+}
+
+bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
+{
+    if (!filename || !filename[0])
+        return false;
+    
+    @autoreleasepool
+    {
+        NSString* filePathStr = [NSString stringWithUTF8String:filename];
+        NSURL* fileURL = [NSURL fileURLWithPath:filePathStr];
+        
+        if (!fileURL || ![[NSFileManager defaultManager] fileExistsAtPath:filePathStr])
+        {
+            return false;
+        }
+        
+        NSError* error = nil;
+        MTKTextureLoader* textureLoader = [[MTKTextureLoader alloc] initWithDevice:m_renderer->m_device];
+        
+        NSDictionary* options = @{
+            MTKTextureLoaderOptionTextureUsage: @(MTLTextureUsageShaderRead),
+            MTKTextureLoaderOptionTextureStorageMode: @(MTLStorageModeShared),
+            MTKTextureLoaderOptionSRGB: @(NO),
+            MTKTextureLoaderOptionGenerateMipmaps: @(NO)
+        };
+        
+        id<MTLTexture> loadedTexture = [textureLoader newTextureWithContentsOfURL:fileURL
+                                                                           options:options
+                                                                             error:&error];
+        
+        if (!loadedTexture || error)
+        {
+            if (error)
+            {
+                NSLog(@"Failed to load texture %s: %@", filename, [error localizedDescription]);
+            }
+            return false;
+        }
+        
+        width = (int)[loadedTexture width];
+        height = (int)[loadedTexture height];
+        MTLPixelFormat pixelFormat = [loadedTexture pixelFormat];
+        
+        format = ConvertFromMetalFormat(pixelFormat);
+        
+        int bytesPerPixel = 4;
+        switch (pixelFormat)
+        {
+            case MTLPixelFormatRGBA8Unorm:
+            case MTLPixelFormatBGRA8Unorm:
+                bytesPerPixel = 4;
+                format = eTF_8888;
+                break;
+            case MTLPixelFormatRG8Unorm:
+                bytesPerPixel = 2;
+                format = eTF_0088;
+                break;
+            case MTLPixelFormatR8Unorm:
+                bytesPerPixel = 1;
+                format = eTF_8000;
+                break;
+            default:
+                bytesPerPixel = 4;
+                format = eTF_8888;
+                break;
+        }
+        
+        size_t dataSize = width * height * bytesPerPixel;
+        data.resize(dataSize);
+        
+        [loadedTexture getBytes:data.data()
+                    bytesPerRow:width * bytesPerPixel
+                     fromRegion:MTLRegionMake2D(0, 0, width, height)
+                    mipmapLevel:0];
+        
+        return true;
+    }
 }
 
 void CMetalTextureManager::GenerateMipmaps(id<MTLTexture> texture)

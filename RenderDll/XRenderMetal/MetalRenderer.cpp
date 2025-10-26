@@ -61,8 +61,6 @@ void CMetalRenderer::UpdateTextureInVideoMemory(uint tnum,
 unsigned int CMetalRenderer::LoadTexture(const char *filename, int *tex_type,
                                          unsigned int def_tid,
                                          bool compresstodisk, bool bWarn) {
-  if (!m_textureManager)
-    return 0;
 
   return m_textureManager->LoadTexture(filename, tex_type, def_tid,
                                        compresstodisk, bWarn);
