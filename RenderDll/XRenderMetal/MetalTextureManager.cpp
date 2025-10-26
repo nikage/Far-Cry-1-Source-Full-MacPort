@@ -710,24 +710,60 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
     return true;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// RemoveTexture (unsigned int overload)
+//
+// Removes a texture by its ID and frees associated resources.
+//
+// Parameters:
+//   TextureId - ID of texture to remove
+//
+// Notes:
+//   - Updates memory tracking by subtracting texture size
+//   - Removes from texture map
+//   - Releases texture ID for potential reuse
+//   - Metal texture is automatically released via ARC
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::RemoveTexture(unsigned int TextureId)
 {
     auto it = m_textures.find(TextureId);
     if (it != m_textures.end())
     {
         m_totalTextureMemory -= it->second.memorySize;
+        
+        if (!it->second.name.empty())
+        {
+            m_textureNameMap.erase(it->second.name);
+        }
+        
         m_textures.erase(it);
         ReleaseTextureId(TextureId);
     }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// RemoveTexture (ITexPic overload)
+//
+// Removes a texture using ITexPic interface pointer.
+// Delegates to RemoveTexture(unsigned int) after extracting texture ID.
+//
+// Parameters:
+//   pTexPic - Pointer to ITexPic interface
+//
+// Notes:
+//   - Extracts texture ID via pTexPic->GetTextureID()
+//   - Delegates to RemoveTexture(unsigned int) for actual removal
+//   - Safe to call with null pointer (silently ignored)
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::RemoveTexture(ITexPic* pTexPic)
 {
-    // Find texture by ITexPic pointer and remove it
-    for (auto it = m_textures.begin(); it != m_textures.end(); ++it)
+    if (!pTexPic)
+        return;
+    
+    int textureId = pTexPic->GetTextureID();
+    if (textureId > 0)
     {
-        // This would need to be implemented based on how ITexPic relates to our texture storage
-        // For now, this is a placeholder
+        RemoveTexture((unsigned int)textureId);
     }
 }
 
