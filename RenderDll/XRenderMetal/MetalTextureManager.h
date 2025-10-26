@@ -32,6 +32,37 @@
 // Forward declarations
 class CMetalBaseRenderer;
 struct STexPic;
+class CMetalTextureManager;
+
+// Metal texture wrapper implementing ITexPic interface
+class CMetalTexture : public ITexPic
+{
+public:
+    CMetalTexture(int texId, CMetalTextureManager* manager);
+    virtual ~CMetalTexture();
+    
+    virtual void AddRef();
+    virtual void Release(int bForce = false);
+    virtual const char* GetName();
+    virtual int GetWidth();
+    virtual int GetHeight();
+    virtual int GetOriginalWidth();
+    virtual int GetOriginalHeight();
+    virtual int GetTextureID();
+    virtual int GetFlags();
+    virtual int GetFlags2();
+    virtual void SetClamp(bool bEnable);
+    virtual bool IsTextureLoaded();
+    virtual void PrecacheAsynchronously(float fDist, int Flags);
+    virtual void Preload(int Flags);
+    virtual byte* GetData32();
+    virtual bool SetFilter(int nFilter);
+    
+private:
+    int m_textureId;
+    CMetalTextureManager* m_manager;
+    int m_refCount;
+};
 
 // Metal texture manager class
 class CMetalTextureManager
@@ -104,6 +135,9 @@ public:
     // Gamma accessors for renderer
     float GetGammaValue() const { return m_gammaValue; }
     bool IsGammaEnabled() const { return m_gammaEnabled; }
+    
+    // Texture info accessors for CMetalTexture
+    const TextureInfo* GetTextureInfo(int textureId) const;
 
 protected:
     // Metal-specific texture management

@@ -20,6 +20,184 @@
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 
+////////////////////////////////////////////////////////////////////////////
+// CMetalTexture - ITexPic implementation for Metal textures
+////////////////////////////////////////////////////////////////////////////
+
+CMetalTexture::CMetalTexture(int texId, CMetalTextureManager* manager)
+    : m_textureId(texId)
+    , m_manager(manager)
+    , m_refCount(1)
+{
+}
+
+CMetalTexture::~CMetalTexture()
+{
+}
+
+void CMetalTexture::AddRef()
+{
+    assert(m_refCount > 0 && "CMetalTexture: Invalid ref count - object may be deleted!");
+    m_refCount++;
+}
+
+void CMetalTexture::Release(int bForce)
+{
+    assert(m_refCount > 0 && "CMetalTexture: Release called on object with zero ref count!");
+    
+    m_refCount--;
+    if (m_refCount <= 0 || bForce)
+    {
+        if (m_manager)
+        {
+            m_manager->RemoveTexture((unsigned int)m_textureId);
+        }
+        delete this;
+    }
+}
+
+const char* CMetalTexture::GetName()
+{
+    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
+    
+    if (!m_manager)
+        return "";
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    assert(info && "CMetalTexture: texture info not found - texture may have been deleted!");
+    
+    return info ? info->name.c_str() : "";
+}
+
+int CMetalTexture::GetWidth()
+{
+    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
+    
+    if (!m_manager)
+        return 0;
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    assert(info && "CMetalTexture: texture info not found - texture may have been deleted!");
+    
+    return info ? info->width : 0;
+}
+
+int CMetalTexture::GetHeight()
+{
+    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
+    
+    if (!m_manager)
+        return 0;
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    assert(info && "CMetalTexture: texture info not found - texture may have been deleted!");
+    
+    return info ? info->height : 0;
+}
+
+int CMetalTexture::GetOriginalWidth()
+{
+    return GetWidth();
+}
+
+int CMetalTexture::GetOriginalHeight()
+{
+    return GetHeight();
+}
+
+int CMetalTexture::GetTextureID()
+{
+    assert(m_textureId > 0 && "CMetalTexture: invalid texture ID!");
+    return m_textureId;
+}
+
+int CMetalTexture::GetFlags()
+{
+    return 0;
+}
+
+int CMetalTexture::GetFlags2()
+{
+    return 0;
+}
+
+void CMetalTexture::SetClamp(bool bEnable)
+{
+}
+
+bool CMetalTexture::IsTextureLoaded()
+{
+    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
+    
+    if (!m_manager)
+        return false;
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    return info ? info->isLoaded : false;
+}
+
+void CMetalTexture::PrecacheAsynchronously(float fDist, int Flags)
+{
+}
+
+void CMetalTexture::Preload(int Flags)
+{
+    assert(m_manager && "CMetalTexture: manager is null!");
+    
+    if (!m_manager)
+        return;
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    if (!info)
+        return;
+    
+    if (info->isLoaded)
+        return;
+}
+
+byte* CMetalTexture::GetData32()
+{
+    assert(m_manager && "CMetalTexture: manager is null!");
+    
+    if (!m_manager)
+        return nullptr;
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    if (!info || !info->metalTexture)
+        return nullptr;
+    
+    int width = info->width;
+    int height = info->height;
+    size_t dataSize = width * height * 4;
+    
+    byte* data = new byte[dataSize];
+    
+    [info->metalTexture getBytes:data
+                      bytesPerRow:width * 4
+                       fromRegion:MTLRegionMake2D(0, 0, width, height)
+                      mipmapLevel:0];
+    
+    return data;
+}
+
+bool CMetalTexture::SetFilter(int nFilter)
+{
+    assert(m_manager && "CMetalTexture: manager is null!");
+    
+    if (!m_manager)
+        return false;
+    
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    if (!info || !info->metalTexture)
+        return false;
+    
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// CMetalTextureManager
+////////////////////////////////////////////////////////////////////////////
+
 CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     : m_renderer(renderer)
     , m_nextTextureId(1)
@@ -1102,28 +1280,74 @@ void CMetalTextureManager::FontRestoreRenderingState()
     m_savedViewportHeight = 0;
 }
 
-// Shader texture management
+////////////////////////////////////////////////////////////////////////////
+// EF_GetTextureByID
+//
+// Retrieves an ITexPic interface for a texture by ID.
+//
+// Parameters:
+//   Id - Texture ID to retrieve
+//
+// Returns:
+//   ITexPic interface pointer on success, nullptr if not found
+//
+// Notes:
+//   - Returns newly allocated CMetalTexture wrapper
+//   - Caller is responsible for calling Release() when done
+//   - Uses reference counting for lifetime management
+////////////////////////////////////////////////////////////////////////////
 ITexPic* CMetalTextureManager::EF_GetTextureByID(int Id)
 {
+    assert(Id > 0 && "CMetalTextureManager: EF_GetTextureByID called with invalid ID!");
+    
     auto it = m_textures.find(Id);
     if (it == m_textures.end())
         return nullptr;
-        
-    // Return ITexPic interface - this would need to be implemented
-    return nullptr;
+    
+    if (!it->second.isLoaded)
+    {
+        assert(it->second.isLoaded && "CMetalTextureManager: Texture exists but is not loaded!");
+        return nullptr;
+    }
+    
+    return new CMetalTexture(Id, this);
 }
 
+////////////////////////////////////////////////////////////////////////////
+// EF_LoadTexture
+//
+// Loads a texture for the shader system and returns ITexPic interface.
+//
+// Parameters:
+//   nameTex  - Texture filename
+//   flags    - Texture flags (FT_CLAMP, FT_NOREMOVE, etc.)
+//   flags2   - Additional flags
+//   eTT      - Texture type (eTT_Base, eTT_Bumpmap, etc.)
+//   fAmount1 - Amount parameter 1
+//   fAmount2 - Amount parameter 2
+//   Id       - Texture ID (0 = allocate new)
+//   BindId   - Bind ID
+//
+// Returns:
+//   ITexPic interface pointer on success, nullptr on failure
+//
+// Notes:
+//   - Returns newly allocated CMetalTexture wrapper
+//   - Caller must call Release() when done
+//   - Uses LoadTexture() internally for actual file loading
+////////////////////////////////////////////////////////////////////////////
 ITexPic* CMetalTextureManager::EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, 
                                                float fAmount1, float fAmount2, 
                                                int Id, int BindId)
 {
-    // Load texture for shader system
-    unsigned int textureId = LoadTexture(nameTex, nullptr, 0, true, true);
+    if (!nameTex || !nameTex[0])
+        return nullptr;
+    
+    unsigned int textureId = LoadTexture(nameTex, nullptr, Id, true, true);
     if (textureId == 0)
         return nullptr;
-        
-    // Return ITexPic interface - this would need to be implemented
-    return nullptr;
+    
+    return new CMetalTexture(textureId, this);
 }
 
 int CMetalTextureManager::EF_LoadLightmap(const char* name)
@@ -1176,6 +1400,16 @@ int CMetalTextureManager::GetTextureCount() const
 size_t CMetalTextureManager::GetTotalTextureMemory() const
 {
     return m_totalTextureMemory;
+}
+
+const CMetalTextureManager::TextureInfo* CMetalTextureManager::GetTextureInfo(int textureId) const
+{
+    assert(textureId > 0 && "CMetalTextureManager: GetTextureInfo called with invalid ID!");
+    
+    auto it = m_textures.find(textureId);
+    if (it != m_textures.end())
+        return &it->second;
+    return nullptr;
 }
 
 // Protected methods

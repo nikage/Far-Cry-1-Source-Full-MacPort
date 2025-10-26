@@ -18,6 +18,10 @@ add_executable(test_load_texture
     test_load_texture.mm
 )
 
+add_executable(itexpic_interface_example
+    itexpic_interface_example.mm
+)
+
 target_link_libraries(texture_upload_example
     ${METAL_LIBRARY}
     ${FOUNDATION_LIBRARY}
@@ -36,7 +40,20 @@ target_compile_options(texture_upload_example PRIVATE
     -fobjc-arc
 )
 
+target_link_libraries(itexpic_interface_example
+    ${METAL_LIBRARY}
+    ${METALKIT_LIBRARY}
+    ${FOUNDATION_LIBRARY}
+    ${APPKIT_LIBRARY}
+)
+
 target_compile_options(test_load_texture PRIVATE
+    -Wall
+    -Wno-deprecated-declarations
+    -fobjc-arc
+)
+
+target_compile_options(itexpic_interface_example PRIVATE
     -Wall
     -Wno-deprecated-declarations
     -fobjc-arc
@@ -47,6 +64,10 @@ set_target_properties(texture_upload_example PROPERTIES
 )
 
 set_target_properties(test_load_texture PROPERTIES
+    LINKER_LANGUAGE CXX
+)
+
+set_target_properties(itexpic_interface_example PROPERTIES
     LINKER_LANGUAGE CXX
 )
 

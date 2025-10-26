@@ -693,7 +693,7 @@ public:
     virtual int GetFlags2() { return 0; }
     virtual void SetClamp(bool bEnable) {}
     virtual bool IsTextureLoaded() { return true; }
-    virtual void PrecacheAsynchronously(float fDist, int Flags) {}
+    virtual void PrecacheAsynchronously(float fDist, int Flags) { assert(!"PrecacheAsynchronously not implemented"); }
     virtual void Preload(int Flags) {}
     virtual byte* GetData32() { return nullptr; }
     virtual bool SetFilter(int nFilter) { return true; }
