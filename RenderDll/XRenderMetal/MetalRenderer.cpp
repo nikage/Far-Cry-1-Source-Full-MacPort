@@ -41,11 +41,12 @@ CMetalRenderer::DownLoadToVideoMemory(unsigned char *data, int w, int h,
                                       ETEX_Format eTFSrc, ETEX_Format eTFDst,
                                       int nummipmap, bool repeat, int filter,
                                       int Id, char *szCacheName, int flags) {
+  if (!m_textureManager)
+    return 0;
 
   return m_textureManager->DownLoadToVideoMemory(data, w, h, eTFSrc, eTFDst,
                                                  nummipmap, repeat, filter, Id,
                                                  szCacheName, flags);
-  return 0;
 }
 
 void CMetalRenderer::UpdateTextureInVideoMemory(uint tnum,
@@ -60,28 +61,31 @@ void CMetalRenderer::UpdateTextureInVideoMemory(uint tnum,
 unsigned int CMetalRenderer::LoadTexture(const char *filename, int *tex_type,
                                          unsigned int def_tid,
                                          bool compresstodisk, bool bWarn) {
+  if (!m_textureManager)
+    return 0;
 
   return m_textureManager->LoadTexture(filename, tex_type, def_tid,
                                        compresstodisk, bWarn);
-  return 0;
 }
 
 bool CMetalRenderer::DXTCompress(byte *raw_data, int nWidth, int nHeight,
                                  ETEX_Format eTF, bool bUseHW, bool bGenMips,
                                  int nSrcBytesPerPix, MIPDXTcallback callback) {
+  if (!m_textureManager)
+    return false;
 
   return m_textureManager->DXTCompress(raw_data, nWidth, nHeight, eTF, bUseHW,
                                        bGenMips, nSrcBytesPerPix, callback);
-  return false;
 }
 
 bool CMetalRenderer::DXTDecompress(byte *srcData, byte *dstData, int nWidth,
                                    int nHeight, ETEX_Format eSrcTF, bool bUseHW,
                                    int nDstBytesPerPix) {
+  if (!m_textureManager)
+    return false;
 
   return m_textureManager->DXTDecompress(srcData, dstData, nWidth, nHeight,
                                          eSrcTF, bUseHW, nDstBytesPerPix);
-  return false;
 }
 
 void CMetalRenderer::RemoveTexture(unsigned int TextureId) {
@@ -95,9 +99,10 @@ void CMetalRenderer::RemoveTexture(ITexPic *pTexPic) {
 }
 
 bool CMetalRenderer::SetGammaDelta(const float fGamma) {
+  if (!m_textureManager)
+    return false;
 
   return m_textureManager->SetGammaDelta(fGamma);
-  return false;
 }
 
 // Font system delegation

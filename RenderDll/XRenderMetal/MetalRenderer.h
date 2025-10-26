@@ -54,6 +54,11 @@ public:
     CMetalRenderer();
     virtual ~CMetalRenderer();
     void SetTexture(int tnum, ETexType Type) override;
+    void SetWhiteTexture() override;
+    unsigned int DownLoadToVideoMemory(unsigned char *data, int w, int h,
+                                       ETEX_Format eTFSrc, ETEX_Format eTFDst,
+                                       int nummipmap, bool repeat, int filter,
+                                       int Id, char *szCacheName, int flags) override;
 
   protected:
     // Specialized manager instances
