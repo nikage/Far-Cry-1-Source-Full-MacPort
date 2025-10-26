@@ -138,6 +138,8 @@ public:
     
     // Texture info accessors for CMetalTexture
     const TextureInfo* GetTextureInfo(int textureId) const;
+    void SetTextureClamp(int textureId, bool bEnable);
+    void SetTextureFilter(int textureId, int nFilter);
 
 protected:
     // Metal-specific texture management
@@ -160,6 +162,14 @@ protected:
         std::string name;
         size_t memorySize;
         bool isLoaded;
+        uint flags;
+        uint flags2;
+        byte textureType;
+        float amount1;
+        float amount2;
+        bool clampU;
+        bool clampV;
+        int filterMode;
     };
     
     std::unordered_map<int, TextureInfo> m_textures;

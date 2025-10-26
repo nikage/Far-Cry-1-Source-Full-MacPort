@@ -22,6 +22,14 @@ add_executable(itexpic_interface_example
     itexpic_interface_example.mm
 )
 
+add_executable(texture_flags_example
+    texture_flags_example.mm
+)
+
+add_executable(test_cubemap_scan
+    test_cubemap_scan.mm
+)
+
 target_link_libraries(texture_upload_example
     ${METAL_LIBRARY}
     ${FOUNDATION_LIBRARY}
@@ -53,7 +61,33 @@ target_compile_options(test_load_texture PRIVATE
     -fobjc-arc
 )
 
+target_link_libraries(texture_flags_example
+    ${METAL_LIBRARY}
+    ${METALKIT_LIBRARY}
+    ${FOUNDATION_LIBRARY}
+    ${APPKIT_LIBRARY}
+)
+
 target_compile_options(itexpic_interface_example PRIVATE
+    -Wall
+    -Wno-deprecated-declarations
+    -fobjc-arc
+)
+
+target_link_libraries(test_cubemap_scan
+    ${METAL_LIBRARY}
+    ${METALKIT_LIBRARY}
+    ${FOUNDATION_LIBRARY}
+    ${APPKIT_LIBRARY}
+)
+
+target_compile_options(texture_flags_example PRIVATE
+    -Wall
+    -Wno-deprecated-declarations
+    -fobjc-arc
+)
+
+target_compile_options(test_cubemap_scan PRIVATE
     -Wall
     -Wno-deprecated-declarations
     -fobjc-arc
@@ -68,6 +102,14 @@ set_target_properties(test_load_texture PROPERTIES
 )
 
 set_target_properties(itexpic_interface_example PROPERTIES
+    LINKER_LANGUAGE CXX
+)
+
+set_target_properties(texture_flags_example PROPERTIES
+    LINKER_LANGUAGE CXX
+)
+
+set_target_properties(test_cubemap_scan PROPERTIES
     LINKER_LANGUAGE CXX
 )
 

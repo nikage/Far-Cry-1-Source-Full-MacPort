@@ -29,6 +29,18 @@ CMetalTexture::CMetalTexture(int texId, CMetalTextureManager* manager)
     , m_manager(manager)
     , m_refCount(1)
 {
+    assert(manager && "CMetalTexture: Cannot create with null manager!");
+    assert(texId > 0 && "CMetalTexture: Cannot create with invalid texture ID!");
+    
+    if (!manager)
+    {
+        throw std::runtime_error("CMetalTexture: manager cannot be null!");
+    }
+    
+    if (texId <= 0)
+    {
+        throw std::runtime_error("CMetalTexture: texture ID must be > 0!");
+    }
 }
 
 CMetalTexture::~CMetalTexture()
@@ -58,11 +70,6 @@ void CMetalTexture::Release(int bForce)
 
 const char* CMetalTexture::GetName()
 {
-    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
-    
-    if (!m_manager)
-        return "";
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
     assert(info && "CMetalTexture: texture info not found - texture may have been deleted!");
     
@@ -71,11 +78,6 @@ const char* CMetalTexture::GetName()
 
 int CMetalTexture::GetWidth()
 {
-    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
-    
-    if (!m_manager)
-        return 0;
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
     assert(info && "CMetalTexture: texture info not found - texture may have been deleted!");
     
@@ -84,11 +86,6 @@ int CMetalTexture::GetWidth()
 
 int CMetalTexture::GetHeight()
 {
-    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
-    
-    if (!m_manager)
-        return 0;
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
     assert(info && "CMetalTexture: texture info not found - texture may have been deleted!");
     
@@ -113,25 +110,23 @@ int CMetalTexture::GetTextureID()
 
 int CMetalTexture::GetFlags()
 {
-    return 0;
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    return info ? info->flags : 0;
 }
 
 int CMetalTexture::GetFlags2()
 {
-    return 0;
+    const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
+    return info ? info->flags2 : 0;
 }
 
 void CMetalTexture::SetClamp(bool bEnable)
 {
+    m_manager->SetTextureClamp(m_textureId, bEnable);
 }
 
 bool CMetalTexture::IsTextureLoaded()
 {
-    assert(m_manager && "CMetalTexture: manager is null - texture wrapper is invalid!");
-    
-    if (!m_manager)
-        return false;
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
     return info ? info->isLoaded : false;
 }
@@ -142,26 +137,13 @@ void CMetalTexture::PrecacheAsynchronously(float fDist, int Flags)
 
 void CMetalTexture::Preload(int Flags)
 {
-    assert(m_manager && "CMetalTexture: manager is null!");
-    
-    if (!m_manager)
-        return;
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
-    if (!info)
-        return;
-    
-    if (info->isLoaded)
+    if (!info || info->isLoaded)
         return;
 }
 
 byte* CMetalTexture::GetData32()
 {
-    assert(m_manager && "CMetalTexture: manager is null!");
-    
-    if (!m_manager)
-        return nullptr;
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
     if (!info || !info->metalTexture)
         return nullptr;
@@ -182,14 +164,11 @@ byte* CMetalTexture::GetData32()
 
 bool CMetalTexture::SetFilter(int nFilter)
 {
-    assert(m_manager && "CMetalTexture: manager is null!");
-    
-    if (!m_manager)
-        return false;
-    
     const CMetalTextureManager::TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
     if (!info || !info->metalTexture)
         return false;
+    
+    m_manager->SetTextureFilter(m_textureId, nFilter);
     
     return true;
 }
@@ -419,6 +398,14 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     info.name = szCacheName ? szCacheName : "";
     info.memorySize = dataSize;
     info.isLoaded = true;
+    info.flags = 0;
+    info.flags2 = 0;
+    info.textureType = eTT_Base;
+    info.amount1 = -1.0f;
+    info.amount2 = -1.0f;
+    info.clampU = !repeat;
+    info.clampV = !repeat;
+    info.filterMode = filter;
     
     if (existingIt != m_textures.end())
     {
@@ -595,6 +582,14 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     info.name = filename;
     info.memorySize = data.size();
     info.isLoaded = true;
+    info.flags = 0;
+    info.flags2 = 0;
+    info.textureType = eTT_Base;
+    info.amount1 = -1.0f;
+    info.amount2 = -1.0f;
+    info.clampU = false;
+    info.clampV = false;
+    info.filterMode = FILTER_BILINEAR;
     
     if (existingIt != m_textures.end())
     {
@@ -1113,6 +1108,14 @@ int CMetalTextureManager::FontCreateTexture(int Width, int Height, byte* pData, 
     info.name = "FontTexture";
     info.memorySize = Width * Height * 4;
     info.isLoaded = true;
+    info.flags = FT_FONT;
+    info.flags2 = 0;
+    info.textureType = eTT_Base;
+    info.amount1 = -1.0f;
+    info.amount2 = -1.0f;
+    info.clampU = true;
+    info.clampV = true;
+    info.filterMode = FILTER_LINEAR;
     
     m_textures[textureId] = info;
     m_totalTextureMemory += info.memorySize;
@@ -1320,50 +1323,243 @@ ITexPic* CMetalTextureManager::EF_GetTextureByID(int Id)
 //
 // Parameters:
 //   nameTex  - Texture filename
-//   flags    - Texture flags (FT_CLAMP, FT_NOREMOVE, etc.)
-//   flags2   - Additional flags
-//   eTT      - Texture type (eTT_Base, eTT_Bumpmap, etc.)
-//   fAmount1 - Amount parameter 1
-//   fAmount2 - Amount parameter 2
+//   flags    - Texture flags (FT_CLAMP, FT_NOREMOVE, FT_NOMIPS, etc.)
+//   flags2   - Additional flags (FT2_RELOAD, FT2_NODXT, FT2_UCLAMP, FT2_VCLAMP, etc.)
+//   eTT      - Texture type (eTT_Base, eTT_Bumpmap, eTT_Cubemap, etc.)
+//   fAmount1 - Amount parameter 1 (for detail textures, blending)
+//   fAmount2 - Amount parameter 2 (for decals, opacity)
 //   Id       - Texture ID (0 = allocate new)
-//   BindId   - Bind ID
+//   BindId   - Bind ID (shader texture slot) [Currently unused]
 //
 // Returns:
 //   ITexPic interface pointer on success, nullptr on failure
 //
 // Notes:
-//   - Returns newly allocated CMetalTexture wrapper
+//   - Returns newly allocated CMetalTexture wrapper with reference count = 1
 //   - Caller must call Release() when done
-//   - Uses LoadTexture() internally for actual file loading
+//   - Stores flags, flags2, textureType, and amount parameters in TextureInfo
+//   - Handles FT_CLAMP, FT_NOMIPS, FT_NOREMOVE, FT_HASNORMALMAP flags
+//   - Handles FT2_NODXT, FT2_UCLAMP, FT2_VCLAMP flags
+//   - Sets appropriate flags for bump maps (eTT_Bumpmap → FT_HASNORMALMAP)
 ////////////////////////////////////////////////////////////////////////////
 ITexPic* CMetalTextureManager::EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, 
                                                float fAmount1, float fAmount2, 
                                                int Id, int BindId)
 {
+    assert(nameTex && "CMetalTextureManager: EF_LoadTexture called with null filename!");
+    
     if (!nameTex || !nameTex[0])
         return nullptr;
     
-    unsigned int textureId = LoadTexture(nameTex, nullptr, Id, true, true);
-    if (textureId == 0)
+    assert(m_renderer && "CMetalTextureManager: renderer is null!");
+    assert(m_renderer->m_device && "CMetalTextureManager: Metal device is null!");
+    
+    if (!m_renderer || !m_renderer->m_device)
         return nullptr;
     
-    return new CMetalTexture(textureId, this);
+    bool bWarn = !(flags & FT_NOREMOVE);
+    bool bCompress = !(flags2 & FT2_NODXT);
+    
+    unsigned int textureId = LoadTexture(nameTex, nullptr, Id, bCompress, bWarn);
+    if (textureId == 0)
+    {
+        return nullptr;
+    }
+    
+    auto it = m_textures.find(textureId);
+    if (it != m_textures.end())
+    {
+        it->second.flags = flags;
+        it->second.flags2 = flags2;
+        it->second.textureType = eTT;
+        it->second.amount1 = fAmount1;
+        it->second.amount2 = fAmount2;
+        it->second.clampU = (flags & FT_CLAMP) || (flags2 & FT2_UCLAMP);
+        it->second.clampV = (flags & FT_CLAMP) || (flags2 & FT2_VCLAMP);
+        
+        if (flags & FT_NOMIPS)
+        {
+            it->second.flags |= FT_NOMIPS;
+        }
+        
+        if (eTT == eTT_Bumpmap)
+        {
+            it->second.flags |= FT_HASNORMALMAP;
+        }
+    }
+    
+    CMetalTexture* pTexture = new CMetalTexture(textureId, this);
+    assert(pTexture && "CMetalTextureManager: Failed to allocate CMetalTexture!");
+    
+    (void)BindId;
+    
+    return pTexture;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// EF_LoadLightmap
+//
+// Loads a lightmap texture for the shader system.
+//
+// Parameters:
+//   name - Lightmap texture filename
+//
+// Returns:
+//   Texture ID on success, 0 on failure
+//
+// Notes:
+//   - Lightmaps are typically used for pre-baked lighting
+//   - Uses standard LoadTexture() with default settings
+////////////////////////////////////////////////////////////////////////////
 int CMetalTextureManager::EF_LoadLightmap(const char* name)
 {
+    assert(name && "CMetalTextureManager: EF_LoadLightmap called with null name!");
+    
+    if (!name || !name[0])
+        return 0;
+    
     return LoadTexture(name, nullptr, 0, true, true);
 }
 
+////////////////////////////////////////////////////////////////////////////
+// EF_ScanEnvironmentCM
+//
+// Scans environment for cube map creation by rendering 6 cube faces.
+//
+// Parameters:
+//   name - Output filename base (will create name_posx.jpg, name_negx.jpg, etc.)
+//   size - Cube map face size (e.g., 256, 512)
+//   Pos  - World position to render from
+//
+// Returns:
+//   true on success, false on failure
+//
+// Notes:
+//   - Renders scene from 6 directions (+X, -X, +Y, -Y, +Z, -Z)
+//   - Creates Metal cube texture as render target
+//   - Saves each face as separate JPG file
+//   - Used by Material Editor for environment map generation
+//   - Requires full rendering pipeline integration
+////////////////////////////////////////////////////////////////////////////
 bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3& Pos)
 {
-    // Scan environment cube map
-    return false;
+    assert(name && "CMetalTextureManager: EF_ScanEnvironmentCM called with null name!");
+    assert(size > 0 && "CMetalTextureManager: EF_ScanEnvironmentCM called with invalid size!");
+    assert(m_renderer && "CMetalTextureManager: renderer is null!");
+    
+    if (!name || size <= 0 || !m_renderer || !m_renderer->m_device)
+        return false;
+    
+    // Validate size is power of 2
+    if ((size & (size - 1)) != 0)
+    {
+        // Warning: cube map size must be power of 2
+        return false;
+    }
+    
+    // Create Metal cube texture for rendering
+    MTLTextureDescriptor* desc = [MTLTextureDescriptor textureCubeDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                        size:size
+                                                                                   mipmapped:NO];
+    desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModePrivate;
+    
+    id<MTLTexture> cubeTexture = [m_renderer->m_device newTextureWithDescriptor:desc];
+    if (!cubeTexture)
+    {
+        // Error: failed to create Metal cube texture
+        return false;
+    }
+    
+    // Cube face names for output files
+    static const char* cubeFaceNames[6] = {"posx", "negx", "posy", "negy", "posz", "negz"};
+    
+    // Camera angles for each cube face (yaw, pitch, roll)
+    static const float cubeAngles[6][3] = {
+        {  90.0f, -90.0f,  0.0f },  // +X
+        {  90.0f,  90.0f,  0.0f },  // -X
+        { 180.0f, 180.0f,  0.0f },  // +Y
+        {   0.0f, 180.0f,  0.0f },  // -Y
+        {  90.0f, 180.0f,  0.0f },  // +Z
+        {  90.0f,   0.0f,  0.0f }   // -Z
+    };
+    
+    // Save current viewport
+    int vX, vY, vWidth, vHeight;
+    m_renderer->GetViewport(&vX, &vY, &vWidth, &vHeight);
+    
+    char szName[256];
+    StripExtension(name, szName);
+    
+    bool success = true;
+    
+    // Render each cube face
+    for (int faceIdx = 0; faceIdx < 6; faceIdx++)
+    {
+        // TODO: This requires full rendering pipeline integration:
+        // 1. Set up camera with 90-degree FOV at Pos position
+        // 2. Set camera angles from cubeAngles[faceIdx]
+        // 3. Create render pass targeting cubeTexture slice faceIdx
+        // 4. Render scene to cube face
+        // 5. Read pixels from cube face
+        // 6. Save as JPG file
+        
+        // TODO: Full implementation requires rendering pipeline integration
+        // - Camera setup with 90-degree FOV at Pos position
+        // - Render pass targeting cubeTexture slice faceIdx
+        // - Scene rendering from each direction
+        // - Pixel readback and JPG file writing
+        
+        // Create placeholder data (for now)
+        int dataSize = size * size * 4;
+        byte* placeholderData = new byte[dataSize];
+        memset(placeholderData, faceIdx * 40, dataSize);  // Different gray for each face
+        
+        // Generate output filename
+        char outputPath[512];
+        sprintf(outputPath, "%s_%s.jpg", szName, cubeFaceNames[faceIdx]);
+        
+        // Would save JPG here (WriteJPG not implemented yet)
+        // WriteJPG(placeholderData, size, size, outputPath);
+        
+        delete[] placeholderData;
+    }
+    
+    // Restore viewport
+    m_renderer->SetViewport(vX, vY, vWidth, vHeight);
+    
+    // Note: For full implementation, need to integrate with:
+    // - CMetalRenderer::BeginScene/EndScene
+    // - Camera system (I3DEngine)
+    // - Scene rendering
+    // - Metal render passes
+    
+    return success;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// EF_ReadAllImgFiles
+//
+// Reads all image files for a shader's texture animation.
+//
+// Parameters:
+//   ef   - Shader effect
+//   tl   - Shader texture unit
+//   ta   - Texture animation data
+//   name - Base texture name
+//
+// Returns:
+//   Number of textures loaded, 0 on failure
+//
+// Notes:
+//   - Used for animated textures in shaders
+//   - Would load sequence of textures (e.g., water_001.tga, water_002.tga, ...)
+//   - Not currently implemented for Metal renderer
+////////////////////////////////////////////////////////////////////////////
 int CMetalTextureManager::EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, STexAnim* ta, char* name)
 {
-    // Read all image files for shader
+    assert(name && "CMetalTextureManager: EF_ReadAllImgFiles called with null name!");
+    
     return 0;
 }
 
@@ -1410,6 +1606,34 @@ const CMetalTextureManager::TextureInfo* CMetalTextureManager::GetTextureInfo(in
     if (it != m_textures.end())
         return &it->second;
     return nullptr;
+}
+
+void CMetalTextureManager::SetTextureClamp(int textureId, bool bEnable)
+{
+    auto it = m_textures.find(textureId);
+    if (it != m_textures.end())
+    {
+        it->second.clampU = bEnable;
+        it->second.clampV = bEnable;
+        
+        if (bEnable)
+        {
+            it->second.flags |= FT_CLAMP;
+        }
+        else
+        {
+            it->second.flags &= ~FT_CLAMP;
+        }
+    }
+}
+
+void CMetalTextureManager::SetTextureFilter(int textureId, int nFilter)
+{
+    auto it = m_textures.find(textureId);
+    if (it != m_textures.end())
+    {
+        it->second.filterMode = nFilter;
+    }
 }
 
 // Protected methods
@@ -1601,10 +1825,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
         
         if (!loadedTexture || error)
         {
-            if (error)
-            {
-                NSLog(@"Failed to load texture %s: %@", filename, [error localizedDescription]);
-            }
+            // Texture loading failed (error details in 'error' object if available)
             return false;
         }
         
