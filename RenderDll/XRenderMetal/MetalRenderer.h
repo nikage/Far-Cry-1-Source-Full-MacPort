@@ -59,6 +59,8 @@ public:
                                        ETEX_Format eTFSrc, ETEX_Format eTFDst,
                                        int nummipmap, bool repeat, int filter,
                                        int Id, char *szCacheName, int flags) override;
+    void UpdateTextureInVideoMemory(uint tnum, unsigned char *newdata, int posx,
+                                    int posy, int w, int h, ETEX_Format eTF);
 
   protected:
     // Specialized manager instances

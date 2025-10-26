@@ -125,30 +125,96 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
 {
     if (!data || w <= 0 || h <= 0)
         return 0;
-        
+    
+    if (!m_renderer || !m_renderer->m_device)
+        return 0;
+    
     MTLPixelFormat metalFormat = ConvertToMetalFormat(eTFDst);
     if (metalFormat == MTLPixelFormatInvalid)
         return 0;
-        
-    id<MTLTexture> texture = CreateMetalTexture(w, h, metalFormat, data, w * h * 4);
+    
+    int bytesPerPixel = GetBytesPerPixel(eTFDst);
+    if (bytesPerPixel == 0)
+        return 0;
+    
+    size_t dataSize = w * h * bytesPerPixel;
+    
+    int textureId = (Id > 0) ? Id : AllocateTextureId();
+    if (textureId <= 0)
+        return 0;
+    
+    auto existingIt = m_textures.find(textureId);
+    if (existingIt != m_textures.end())
+    {
+        m_totalTextureMemory -= existingIt->second.memorySize;
+    }
+    
+    bool useMipmaps = (nummipmap > 0);
+    int mipLevels = useMipmaps ? nummipmap : 1;
+    
+    MTLTextureDescriptor* descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalFormat
+                                                                                           width:w
+                                                                                          height:h
+                                                                                       mipmapped:useMipmaps];
+    
+    if (useMipmaps)
+    {
+        descriptor.mipmapLevelCount = mipLevels;
+    }
+    
+    descriptor.usage = MTLTextureUsageShaderRead;
+    descriptor.storageMode = MTLStorageModeShared;
+    
+    id<MTLTexture> texture = [m_renderer->m_device newTextureWithDescriptor:descriptor];
     if (!texture)
+    {
+        if (Id <= 0)
+            ReleaseTextureId(textureId);
         return 0;
-        
-    int textureId = AllocateTextureId();
-    if (textureId == -1)
-        return 0;
-        
+    }
+    
+    size_t bytesPerRow = w * bytesPerPixel;
+    MTLRegion region = MTLRegionMake2D(0, 0, w, h);
+    
+    [texture replaceRegion:region
+               mipmapLevel:0
+                 withBytes:data
+               bytesPerRow:bytesPerRow];
+    
+    if (useMipmaps && nummipmap > 1)
+    {
+        id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        [blitEncoder generateMipmapsForTexture:texture];
+        [blitEncoder endEncoding];
+        [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
+    }
+    
     TextureInfo info;
     info.metalTexture = texture;
     info.width = w;
     info.height = h;
     info.format = eTFDst;
     info.name = szCacheName ? szCacheName : "";
-    info.memorySize = w * h * 4;
+    info.memorySize = dataSize;
     info.isLoaded = true;
     
-    m_textures[textureId] = info;
+    if (existingIt != m_textures.end())
+    {
+        existingIt->second = info;
+    }
+    else
+    {
+        m_textures[textureId] = info;
+    }
+    
     m_totalTextureMemory += info.memorySize;
+    
+    if (szCacheName && szCacheName[0] != '\0')
+    {
+        m_textureNameMap[std::string(szCacheName)] = textureId;
+    }
     
     return textureId;
 }
@@ -489,15 +555,80 @@ MTLPixelFormat CMetalTextureManager::ConvertToMetalFormat(ETEX_Format format)
 {
     switch (format)
     {
-        case eTF_8888: return MTLPixelFormatRGBA8Unorm;
-        case eTF_0888: return MTLPixelFormatRGBA8Unorm; // RGB8Unorm not available, use RGBA8
-        case eTF_4444: return MTLPixelFormatRGBA8Unorm; // RGBA4Unorm not available, use RGBA8
-        case eTF_1555: return MTLPixelFormatRGBA8Unorm; // RGB5A1Unorm not available, use RGBA8
-        case eTF_0565: return MTLPixelFormatRGBA8Unorm; // RGB565 not available, use RGBA8
-        case eTF_DXT1: return MTLPixelFormatRGBA8Unorm; // BC formats not available on macOS, use RGBA8
-        case eTF_DXT3: return MTLPixelFormatRGBA8Unorm; // BC formats not available on macOS, use RGBA8
-        case eTF_DXT5: return MTLPixelFormatRGBA8Unorm; // BC formats not available on macOS, use RGBA8
-        default: return MTLPixelFormatRGBA8Unorm;
+        case eTF_8888:
+        case eTF_RGBA:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_0888:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_4444:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_1555:
+        case eTF_0555:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_0565:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_DXT1:
+#if TARGET_OS_MAC && !TARGET_OS_IPHONE
+            return MTLPixelFormatBC1_RGBA;
+#else
+            return MTLPixelFormatRGBA8Unorm;
+#endif
+        
+        case eTF_DXT3:
+#if TARGET_OS_MAC && !TARGET_OS_IPHONE
+            return MTLPixelFormatBC2_RGBA;
+#else
+            return MTLPixelFormatRGBA8Unorm;
+#endif
+        
+        case eTF_DXT5:
+#if TARGET_OS_MAC && !TARGET_OS_IPHONE
+            return MTLPixelFormatBC3_RGBA;
+#else
+            return MTLPixelFormatRGBA8Unorm;
+#endif
+        
+        case eTF_SIGNED_HILO16:
+            return MTLPixelFormatRG16Snorm;
+        
+        case eTF_SIGNED_HILO8:
+        case eTF_V8U8:
+            return MTLPixelFormatRG8Snorm;
+        
+        case eTF_SIGNED_RGB8:
+            return MTLPixelFormatRGBA8Snorm;
+        
+        case eTF_RGB8:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_V16U16:
+            return MTLPixelFormatRG16Snorm;
+        
+        case eTF_0088:
+            return MTLPixelFormatRG8Unorm;
+        
+        case eTF_8000:
+            return MTLPixelFormatR8Unorm;
+        
+        case eTF_DEPTH:
+            return MTLPixelFormatDepth32Float;
+        
+        case eTF_DSDT_MAG:
+        case eTF_DSDT:
+            return MTLPixelFormatRGBA8Unorm;
+        
+        case eTF_Unknown:
+        case eTF_Index:
+        case eTF_HSV:
+            return MTLPixelFormatInvalid;
+        
+        default:
+            return MTLPixelFormatRGBA8Unorm;
     }
 }
 
@@ -537,6 +668,52 @@ void CMetalTextureManager::SetTextureParameters(id<MTLTexture> texture, bool rep
 {
     // Set texture parameters like filtering and wrapping
     // This would be handled by the Metal render pipeline state
+}
+
+int CMetalTextureManager::GetBytesPerPixel(ETEX_Format format)
+{
+    switch (format)
+    {
+        case eTF_8888:
+        case eTF_0888:
+            return 4;
+        
+        case eTF_4444:
+        case eTF_1555:
+        case eTF_0555:
+        case eTF_0565:
+        case eTF_SIGNED_HILO16:
+        case eTF_V16U16:
+            return 2;
+        
+        case eTF_SIGNED_HILO8:
+        case eTF_SIGNED_RGB8:
+        case eTF_RGB8:
+        case eTF_V8U8:
+        case eTF_0088:
+            return 2;
+        
+        case eTF_DXT1:
+            return 0;
+        
+        case eTF_DXT3:
+        case eTF_DXT5:
+            return 0;
+        
+        case eTF_DSDT_MAG:
+        case eTF_DSDT:
+            return 4;
+        
+        case eTF_Index:
+        case eTF_8000:
+            return 1;
+        
+        case eTF_RGBA:
+            return 4;
+        
+        default:
+            return 4;
+    }
 }
 
 #endif // __APPLE__ && __MACH__

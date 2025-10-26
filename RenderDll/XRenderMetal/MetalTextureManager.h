@@ -138,6 +138,7 @@ protected:
     bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height);
     void GenerateMipmaps(id<MTLTexture> texture);
     void SetTextureParameters(id<MTLTexture> texture, bool repeat, int filter);
+    int GetBytesPerPixel(ETEX_Format format);
 };
 
 #endif // __APPLE__ && __MACH__
