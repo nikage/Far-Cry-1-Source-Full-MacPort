@@ -67,6 +67,8 @@ public:
                       ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix);
     void RemoveTexture(unsigned int TextureId);
     void RemoveTexture(ITexPic* pTexPic);
+    
+    // Display gamma correction (not texture modification)
     bool SetGammaDelta(const float fGamma);
     
     // Font texture management
@@ -98,6 +100,10 @@ public:
     void ClearAllTextures();
     int GetTextureCount() const;
     size_t GetTotalTextureMemory() const;
+    
+    // Gamma accessors for renderer
+    float GetGammaValue() const { return m_gammaValue; }
+    bool IsGammaEnabled() const { return m_gammaEnabled; }
 
 protected:
     // Metal-specific texture management
@@ -132,9 +138,9 @@ protected:
     id<MTLTexture> m_currentTexture;
     id<MTLTexture> m_whiteTexture;
     
-    // Gamma correction
-    float m_gammaValue;
-    bool m_gammaEnabled;
+    // Display gamma correction
+    float m_gammaValue;      // Gamma delta value (added to base gamma)
+    bool m_gammaEnabled;     // True if gamma correction is active
     
     // Reference to base renderer
     CMetalBaseRenderer* m_renderer;

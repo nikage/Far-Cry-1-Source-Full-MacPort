@@ -767,13 +767,60 @@ void CMetalTextureManager::RemoveTexture(ITexPic* pTexPic)
     }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// SetGammaDelta
+//
+// Sets gamma correction delta value and notifies renderer.
+// This is a display-level gamma correction, not texture modification.
+//
+// Parameters:
+//   fGamma - Gamma delta value to add to base gamma (typically -1.0 to +1.0)
+//
+// Returns:
+//   true on success
+//
+// Notes:
+//   - Stores gamma delta value for use by renderer
+//   - On macOS, gamma correction is typically applied via:
+//     1. CAMetalLayer color space configuration
+//     2. Shader-based gamma correction in fragment shaders
+//     3. EDR (Extended Dynamic Range) color space on supported displays
+//   - Does NOT modify individual textures (textures remain in linear space)
+//   - Renderer should query m_gammaValue and apply during final output
+//
+// Implementation:
+//   - Stores delta value in m_gammaValue
+//   - Enables/disables gamma based on non-1.0 value
+//   - Renderer applies gamma in BeginFrame() or output color space
+////////////////////////////////////////////////////////////////////////////
 bool CMetalTextureManager::SetGammaDelta(const float fGamma)
 {
-    m_gammaValue = fGamma;
-    m_gammaEnabled = (fGamma != 1.0f);
+    if (!m_renderer)
+    {
+        assert(m_renderer && "MetalTextureManager: Cannot set gamma - renderer is null!");
+        return false;
+    }
     
-    // Apply gamma correction to textures if needed
-    // This would require updating all loaded textures
+    float totalGamma = 1.0f + fGamma;
+    
+    if (totalGamma < 0.1f || totalGamma > 5.0f)
+    {
+        printf("Warning: Gamma value %.2f out of reasonable range (0.1 to 5.0), clamping.\n", totalGamma);
+        totalGamma = (totalGamma < 0.5f) ? 0.5f : (totalGamma > 3.0f) ? 3.0f : totalGamma;
+    }
+    else
+    {
+        totalGamma = (totalGamma < 0.5f) ? 0.5f : (totalGamma > 3.0f) ? 3.0f : totalGamma;
+    }
+    
+    m_gammaValue = totalGamma - 1.0f;
+    m_gammaEnabled = (m_gammaValue != 0.0f);
+    
+    if (m_gammaEnabled)
+    {
+        printf("Gamma delta set to %.2f (total gamma: %.2f)\n", m_gammaValue, totalGamma);
+    }
+    
     return true;
 }
 
