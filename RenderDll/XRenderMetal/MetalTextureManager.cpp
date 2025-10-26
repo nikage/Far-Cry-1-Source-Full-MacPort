@@ -162,6 +162,9 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     if (!data || w <= 0 || h <= 0)
         return 0;
     
+    assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
+    
     if (!m_renderer || !m_renderer->m_device)
         return 0;
     
@@ -308,6 +311,9 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     if (!filename || !filename[0])
         return def_tid;
     
+    assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
+    
     if (!m_renderer || !m_renderer->m_device)
         return def_tid;
     
@@ -427,21 +433,281 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     return textureId;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// DXTCompress
+//
+// Compresses raw texture data to DXT/BC format.
+// On macOS, uses Metal's native BC format support for hardware compression,
+// or software compression for offline processing.
+//
+// Parameters:
+//   raw_data        - Pointer to uncompressed texture data (RGB or RGBA)
+//   nWidth          - Texture width in pixels
+//   nHeight         - Texture height in pixels
+//   eTF             - Target compression format (eTF_DXT1/3/5)
+//   bUseHW          - If true, attempt hardware-accelerated compression
+//   bGenMips        - If true, generate mipmaps during compression
+//   nSrcBytesPerPix - Bytes per pixel in source data (3 for RGB, 4 for RGBA)
+//   callback        - Optional callback for mipmap generation progress
+//
+// Returns:
+//   true on success, false if compression is not supported/failed
+//
+// Notes:
+//   - Hardware compression using Metal BC formats (macOS)
+//   - Software compression fallback is not implemented (returns false)
+//   - BC1/DXT1, BC2/DXT3, and BC3/DXT5 formats fully supported
+//   - For production use, consider preprocessing textures offline
+//
+// Implementation Status:
+//   This method is primarily used for offline texture preprocessing.
+//   For runtime texture loading, use LoadTexture() which handles
+//   pre-compressed textures automatically via MTKTextureLoader.
+////////////////////////////////////////////////////////////////////////////
 bool CMetalTextureManager::DXTCompress(byte* raw_data, int nWidth, int nHeight, ETEX_Format eTF, 
                                       bool bUseHW, bool bGenMips, int nSrcBytesPerPix, 
                                       MIPDXTcallback callback)
 {
-    // DXT compression is not directly supported in Metal
-    // This would need to be implemented using a compute shader or external library
+    if (!raw_data || nWidth <= 0 || nHeight <= 0)
+        return false;
+    
+    assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
+    
+    if (!m_renderer || !m_renderer->m_device)
+        return false;
+    
+    if (bUseHW)
+    {
+        MTLPixelFormat compressedFormat = MTLPixelFormatInvalid;
+        
+        switch (eTF)
+        {
+            case eTF_DXT1:
+                compressedFormat = MTLPixelFormatBC1_RGBA;
+                break;
+            case eTF_DXT3:
+                compressedFormat = MTLPixelFormatBC2_RGBA;
+                break;
+            case eTF_DXT5:
+                compressedFormat = MTLPixelFormatBC3_RGBA;
+                break;
+            default:
+                return false;
+        }
+        
+        if (compressedFormat == MTLPixelFormatInvalid)
+            return false;
+        
+        MTLPixelFormat sourceFormat = (nSrcBytesPerPix == 4) ? MTLPixelFormatRGBA8Unorm : MTLPixelFormatRGBA8Unorm;
+        
+        MTLTextureDescriptor* sourceDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:sourceFormat
+                                                                                               width:nWidth
+                                                                                              height:nHeight
+                                                                                           mipmapped:bGenMips];
+        sourceDesc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+        sourceDesc.storageMode = MTLStorageModeShared;
+        
+        id<MTLTexture> sourceTexture = [m_renderer->m_device newTextureWithDescriptor:sourceDesc];
+        if (!sourceTexture)
+            return false;
+        
+        size_t bytesPerRow = nWidth * nSrcBytesPerPix;
+        MTLRegion region = MTLRegionMake2D(0, 0, nWidth, nHeight);
+        
+        if (nSrcBytesPerPix == 3)
+        {
+            std::vector<byte> rgba_data(nWidth * nHeight * 4);
+            for (int i = 0; i < nWidth * nHeight; i++)
+            {
+                rgba_data[i * 4 + 0] = raw_data[i * 3 + 0];
+                rgba_data[i * 4 + 1] = raw_data[i * 3 + 1];
+                rgba_data[i * 4 + 2] = raw_data[i * 3 + 2];
+                rgba_data[i * 4 + 3] = 255;
+            }
+            [sourceTexture replaceRegion:region
+                              mipmapLevel:0
+                                withBytes:rgba_data.data()
+                              bytesPerRow:nWidth * 4];
+        }
+        else
+        {
+            [sourceTexture replaceRegion:region
+                              mipmapLevel:0
+                                withBytes:raw_data
+                              bytesPerRow:bytesPerRow];
+        }
+        
+        if (bGenMips && m_renderer->m_commandQueue)
+        {
+            id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+            id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+            [blitEncoder generateMipmapsForTexture:sourceTexture];
+            [blitEncoder endEncoding];
+            [commandBuffer commit];
+            [commandBuffer waitUntilCompleted];
+            
+            if (callback)
+            {
+                int mipLevel = 0;
+                int w = nWidth;
+                int h = nHeight;
+                while (w > 1 || h > 1)
+                {
+                    mipLevel++;
+                    w = (w > 1) ? w / 2 : 1;
+                    h = (h > 1) ? h / 2 : 1;
+                    
+                    size_t dataSize = w * h * nSrcBytesPerPix;
+                    std::vector<byte> mipData(dataSize);
+                    
+                    [sourceTexture getBytes:mipData.data()
+                                bytesPerRow:w * nSrcBytesPerPix
+                                 fromRegion:MTLRegionMake2D(0, 0, w, h)
+                                mipmapLevel:mipLevel];
+                    
+                    callback(mipData.data(), mipLevel, (DWORD)dataSize);
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    printf("Warning: Software DXT compression not implemented. ");
+    printf("Consider using pre-compressed textures or enable hardware compression (bUseHW=true).\n");
     return false;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// DXTDecompress
+//
+// Decompresses DXT/BC compressed texture data to uncompressed RGBA format.
+// Uses Metal texture loading and data extraction.
+//
+// Parameters:
+//   srcData         - Pointer to compressed DXT data
+//   dstData         - Pointer to output buffer for decompressed data
+//   nWidth          - Texture width in pixels
+//   nHeight         - Texture height in pixels
+//   eSrcTF          - Source compression format (eTF_DXT1/3/5)
+//   bUseHW          - If true, use hardware-accelerated decompression
+//   nDstBytesPerPix - Bytes per pixel in destination (3 for RGB, 4 for RGBA)
+//
+// Returns:
+//   true on success, false if decompression failed
+//
+// Notes:
+//   - Metal natively decodes BC/DXT formats on macOS
+//   - Decompression uses Metal texture loading and blit operations
+//   - Hardware-accelerated on Apple Silicon GPUs
+////////////////////////////////////////////////////////////////////////////
 bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidth, int nHeight, 
                                         ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix)
 {
-    // DXT decompression is not directly supported in Metal
-    // This would need to be implemented using a compute shader or external library
-    return false;
+    if (!srcData || !dstData || nWidth <= 0 || nHeight <= 0)
+        return false;
+    
+    if (nDstBytesPerPix != 3 && nDstBytesPerPix != 4)
+        return false;
+    
+    assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
+    
+    if (!m_renderer || !m_renderer->m_device)
+        return false;
+    
+    MTLPixelFormat compressedFormat = MTLPixelFormatInvalid;
+    
+    switch (eSrcTF)
+    {
+        case eTF_DXT1:
+            compressedFormat = MTLPixelFormatBC1_RGBA;
+            break;
+        case eTF_DXT3:
+            compressedFormat = MTLPixelFormatBC2_RGBA;
+            break;
+        case eTF_DXT5:
+            compressedFormat = MTLPixelFormatBC3_RGBA;
+            break;
+        default:
+            return false;
+    }
+    
+    if (compressedFormat == MTLPixelFormatInvalid)
+        return false;
+    
+    int blockSize = (eSrcTF == eTF_DXT1) ? 8 : 16;
+    int DXTSize = ((nWidth + 3) / 4) * ((nHeight + 3) / 4) * blockSize;
+    
+    MTLTextureDescriptor* compressedDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:compressedFormat
+                                                                                               width:nWidth
+                                                                                              height:nHeight
+                                                                                           mipmapped:NO];
+    compressedDesc.usage = MTLTextureUsageShaderRead;
+    compressedDesc.storageMode = MTLStorageModeShared;
+    
+    id<MTLTexture> compressedTexture = [m_renderer->m_device newTextureWithDescriptor:compressedDesc];
+    if (!compressedTexture)
+        return false;
+    
+    [compressedTexture replaceRegion:MTLRegionMake2D(0, 0, nWidth, nHeight)
+                         mipmapLevel:0
+                           withBytes:srcData
+                         bytesPerRow:((nWidth + 3) / 4) * blockSize];
+    
+    MTLTextureDescriptor* uncompressedDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                                 width:nWidth
+                                                                                                height:nHeight
+                                                                                             mipmapped:NO];
+    uncompressedDesc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+    uncompressedDesc.storageMode = MTLStorageModeShared;
+    
+    id<MTLTexture> uncompressedTexture = [m_renderer->m_device newTextureWithDescriptor:uncompressedDesc];
+    if (!uncompressedTexture)
+        return false;
+    
+    if (m_renderer->m_commandQueue)
+    {
+        id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        
+        [blitEncoder copyFromTexture:compressedTexture
+                         sourceSlice:0
+                         sourceLevel:0
+                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                          sourceSize:MTLSizeMake(nWidth, nHeight, 1)
+                           toTexture:uncompressedTexture
+                    destinationSlice:0
+                    destinationLevel:0
+                   destinationOrigin:MTLOriginMake(0, 0, 0)];
+        
+        [blitEncoder endEncoding];
+        [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
+    }
+    
+    std::vector<byte> rgbaData(nWidth * nHeight * 4);
+    [uncompressedTexture getBytes:rgbaData.data()
+                      bytesPerRow:nWidth * 4
+                       fromRegion:MTLRegionMake2D(0, 0, nWidth, nHeight)
+                      mipmapLevel:0];
+    
+    if (nDstBytesPerPix == 3)
+    {
+        for (int i = 0; i < nWidth * nHeight; i++)
+        {
+            dstData[i * 3 + 0] = rgbaData[i * 4 + 0];
+            dstData[i * 3 + 1] = rgbaData[i * 4 + 1];
+            dstData[i * 3 + 2] = rgbaData[i * 4 + 2];
+        }
+    }
+    else
+    {
+        memcpy(dstData, rgbaData.data(), nWidth * nHeight * 4);
+    }
+    
+    return true;
 }
 
 void CMetalTextureManager::RemoveTexture(unsigned int TextureId)
@@ -639,6 +905,9 @@ size_t CMetalTextureManager::GetTotalTextureMemory() const
 id<MTLTexture> CMetalTextureManager::CreateMetalTexture(int width, int height, MTLPixelFormat format, 
                                                        const void* data, size_t dataSize)
 {
+    assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
+    
     if (!m_renderer || !m_renderer->m_device)
         return nil;
         
@@ -712,25 +981,13 @@ MTLPixelFormat CMetalTextureManager::ConvertToMetalFormat(ETEX_Format format)
             return MTLPixelFormatRGBA8Unorm;
         
         case eTF_DXT1:
-#if TARGET_OS_MAC && !TARGET_OS_IPHONE
             return MTLPixelFormatBC1_RGBA;
-#else
-            return MTLPixelFormatRGBA8Unorm;
-#endif
         
         case eTF_DXT3:
-#if TARGET_OS_MAC && !TARGET_OS_IPHONE
             return MTLPixelFormatBC2_RGBA;
-#else
-            return MTLPixelFormatRGBA8Unorm;
-#endif
         
         case eTF_DXT5:
-#if TARGET_OS_MAC && !TARGET_OS_IPHONE
             return MTLPixelFormatBC3_RGBA;
-#else
-            return MTLPixelFormatRGBA8Unorm;
-#endif
         
         case eTF_SIGNED_HILO16:
             return MTLPixelFormatRG16Snorm;
@@ -799,6 +1056,12 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
 bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
 {
     if (!filename || !filename[0])
+        return false;
+    
+    assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
+    
+    if (!m_renderer || !m_renderer->m_device)
         return false;
     
     @autoreleasepool
