@@ -824,15 +824,90 @@ bool CMetalTextureManager::SetGammaDelta(const float fGamma)
     return true;
 }
 
-// Font texture management methods
+////////////////////////////////////////////////////////////////////////////
+// FontUploadTexture
+//
+// Uploads a font bitmap to GPU as a Metal texture.
+// CFBitmap contains grayscale (8-bit) glyph data.
+//
+// Parameters:
+//   bitmap - Pointer to CFBitmap containing font glyph data
+//   eTF    - Target texture format (typically eTF_8888 for RGBA)
+//
+// Returns:
+//   true on success, false on failure
+//
+// Notes:
+//   - CFBitmap contains grayscale data (1 byte per pixel)
+//   - Converts grayscale to RGBA by replicating value across channels
+//   - Stores texture ID in bitmap->m_pIRenderData for later use
+//   - If bitmap already has render data, updates existing texture
+////////////////////////////////////////////////////////////////////////////
 bool CMetalTextureManager::FontUploadTexture(class CFBitmap* bitmap, ETEX_Format eTF)
 {
     if (!bitmap)
         return false;
-        
-    // Convert CFBitmap to Metal texture
-    // This would need to be implemented based on CFBitmap structure
-    return false;
+    
+    if (!bitmap->GetData() || bitmap->GetWidth() <= 0 || bitmap->GetHeight() <= 0)
+        return false;
+    
+    assert(m_renderer && "MetalTextureManager: renderer is null!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null!");
+    
+    if (!m_renderer || !m_renderer->m_device)
+        return false;
+    
+    int width = bitmap->GetWidth();
+    int height = bitmap->GetHeight();
+    unsigned char* srcData = bitmap->GetData();
+    
+    int* pRenderData = (int*)bitmap->GetRenderData();
+    int textureId = pRenderData ? *pRenderData : 0;
+    
+    if (textureId > 0)
+    {
+        auto it = m_textures.find(textureId);
+        if (it != m_textures.end() && it->second.metalTexture)
+        {
+            std::vector<unsigned char> rgbaData(width * height * 4);
+            
+            for (int i = 0; i < width * height; i++)
+            {
+                unsigned char gray = srcData[i];
+                rgbaData[i * 4 + 0] = 255;
+                rgbaData[i * 4 + 1] = 255;
+                rgbaData[i * 4 + 2] = 255;
+                rgbaData[i * 4 + 3] = gray;
+            }
+            
+            [it->second.metalTexture replaceRegion:MTLRegionMake2D(0, 0, width, height)
+                                       mipmapLevel:0
+                                         withBytes:rgbaData.data()
+                                       bytesPerRow:width * 4];
+            return true;
+        }
+    }
+    
+    std::vector<unsigned char> rgbaData(width * height * 4);
+    
+    for (int i = 0; i < width * height; i++)
+    {
+        unsigned char gray = srcData[i];
+        rgbaData[i * 4 + 0] = 255;
+        rgbaData[i * 4 + 1] = 255;
+        rgbaData[i * 4 + 2] = 255;
+        rgbaData[i * 4 + 3] = gray;
+    }
+    
+    textureId = FontCreateTexture(width, height, rgbaData.data(), eTF);
+    if (textureId <= 0)
+        return false;
+    
+    int* pNewRenderData = new int;
+    *pNewRenderData = textureId;
+    bitmap->SetRenderData(pNewRenderData);
+    
+    return true;
 }
 
 int CMetalTextureManager::FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF)
@@ -874,21 +949,89 @@ bool CMetalTextureManager::FontUpdateTexture(int nTexId, int X, int Y, int USize
     return true;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// FontReleaseTexture
+//
+// Releases font texture resources associated with a CFBitmap.
+//
+// Parameters:
+//   pBmp - Pointer to CFBitmap to release texture for
+//
+// Notes:
+//   - Removes texture from GPU
+//   - Frees render data pointer
+//   - Safe to call multiple times
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontReleaseTexture(class CFBitmap* pBmp)
 {
-    // Release font texture resources
+    if (!pBmp)
+        return;
+    
+    int* pRenderData = (int*)pBmp->GetRenderData();
+    if (pRenderData)
+    {
+        int textureId = *pRenderData;
+        if (textureId > 0)
+        {
+            RemoveTexture((unsigned int)textureId);
+        }
+        
+        delete pRenderData;
+        pBmp->SetRenderData(nullptr);
+    }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// FontSetTexture (CFBitmap overload)
+//
+// Sets a font texture as the current active texture for rendering.
+//
+// Parameters:
+//   bitmap       - Font bitmap containing texture
+//   nFilterMode  - Texture filtering mode
+//
+// Notes:
+//   - Extracts texture ID from bitmap's render data
+//   - Binds texture to current rendering context
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetTexture(class CFBitmap* bitmap, int nFilterMode)
 {
-    // Set font texture filtering mode
+    if (!bitmap)
+        return;
+    
+    int* pRenderData = (int*)bitmap->GetRenderData();
+    if (pRenderData && *pRenderData > 0)
+    {
+        FontSetTexture(*pRenderData, nFilterMode);
+    }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// FontSetTexture (int overload)
+//
+// Sets a font texture by ID as the current active texture for rendering.
+//
+// Parameters:
+//   nTexId       - Texture ID to bind
+//   nFilterMode  - Texture filtering mode
+//
+// Notes:
+//   - Binds texture for font rendering operations
+//   - Sets filtering parameters based on nFilterMode
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
 {
     auto it = m_textures.find(nTexId);
-    if (it != m_textures.end())
+    if (it != m_textures.end() && it->second.metalTexture)
     {
+        m_currentTexture = it->second.metalTexture;
+        m_currentTextureSlot = nTexId;
+        
+        if (m_renderer && m_renderer->m_renderEncoder)
+        {
+            [m_renderer->m_renderEncoder setFragmentTexture:it->second.metalTexture atIndex:0];
+        }
+        
         SetTextureParameters(it->second.metalTexture, true, nFilterMode);
     }
 }
