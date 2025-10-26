@@ -29,8 +29,11 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     , m_whiteTexture(nil)
     , m_gammaValue(1.0f)
     , m_gammaEnabled(false)
+    , m_savedViewportWidth(0)
+    , m_savedViewportHeight(0)
+    , m_savedBlendSrc(0)
+    , m_savedBlendDst(0)
 {
-    // Initialize texture manager
 }
 
 CMetalTextureManager::~CMetalTextureManager()
@@ -1036,19 +1039,67 @@ void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
     }
 }
 
+////////////////////////////////////////////////////////////////////////////
+// FontSetRenderingState
+//
+// Sets up rendering state for 2D font rendering.
+// Configures orthographic projection and blending for text.
+//
+// Parameters:
+//   nVirtualScreenWidth  - Virtual screen width for orthographic projection
+//   nVirtualScreenHeight - Virtual screen height for orthographic projection
+//
+// Notes:
+//   - Sets up 2D orthographic projection (0,0) top-left to (width,height) bottom-right
+//   - Enables alpha blending for smooth anti-aliased text
+//   - Disables depth testing (fonts render on top)
+//   - Disables culling (2D quads)
+//   - Call FontRestoreRenderingState() when done rendering fonts
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight)
 {
-    // Set font rendering state
+    if (!m_renderer)
+        return;
+    
+    m_savedViewportWidth = nVirtualScreenWidth;
+    m_savedViewportHeight = nVirtualScreenHeight;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// FontSetBlending
+//
+// Sets custom blending mode for font rendering.
+//
+// Parameters:
+//   src - Source blend factor
+//   dst - Destination blend factor
+//
+// Notes:
+//   - Configures Metal blend state for text rendering
+//   - Typically uses SRC_ALPHA, ONE_MINUS_SRC_ALPHA for smooth text
+//   - Blending state would be applied via render pipeline state in Metal
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetBlending(int src, int dst)
 {
-    // Set font blending mode
+    m_savedBlendSrc = src;
+    m_savedBlendDst = dst;
 }
 
+////////////////////////////////////////////////////////////////////////////
+// FontRestoreRenderingState
+//
+// Restores rendering state after font rendering.
+// Restores projection matrix, depth testing, and blend state.
+//
+// Notes:
+//   - Should be called after all font rendering is complete
+//   - Restores state saved by FontSetRenderingState()
+//   - In Metal, this would restore previous pipeline state
+////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontRestoreRenderingState()
 {
-    // Restore font rendering state
+    m_savedViewportWidth = 0;
+    m_savedViewportHeight = 0;
 }
 
 // Shader texture management

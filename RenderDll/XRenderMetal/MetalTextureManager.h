@@ -142,6 +142,12 @@ protected:
     float m_gammaValue;      // Gamma delta value (added to base gamma)
     bool m_gammaEnabled;     // True if gamma correction is active
     
+    // Font rendering state
+    unsigned long m_savedViewportWidth;
+    unsigned long m_savedViewportHeight;
+    int m_savedBlendSrc;
+    int m_savedBlendDst;
+    
     // Reference to base renderer
     CMetalBaseRenderer* m_renderer;
     
