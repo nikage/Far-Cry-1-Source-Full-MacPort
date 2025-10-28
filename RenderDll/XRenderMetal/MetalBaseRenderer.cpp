@@ -468,7 +468,7 @@ void CMetalBaseRenderer::MakeCurrent()
 
 void CMetalBaseRenderer::SetCamera(const CCamera& cam)
 {
-    m_camera = (void*)&cam; // Store pointer to avoid incomplete type issues
+    m_camera = cam; // Copy camera (same pattern as OpenGL renderer)
     
     // Update Metal view and projection matrices
     if (m_renderEncoder)
@@ -489,7 +489,7 @@ void CMetalBaseRenderer::SetCamera(const CCamera& cam)
 
 const CCamera& CMetalBaseRenderer::GetCamera()
 {
-    return *(CCamera*)m_camera;
+    return m_camera;
 }
 
 // Additional core method implementations would go here...

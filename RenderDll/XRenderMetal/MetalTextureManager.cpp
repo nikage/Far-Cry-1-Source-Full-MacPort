@@ -16,9 +16,19 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "MetalTextureManager.h"
-#include "MetalBaseRenderer.h"
+#include "../../CryFont/FBitmap.h"
 #include "I3DEngine.h"
+#include "ISystem.h"
+#include "MetalBaseRenderer.h"
 #include <Cocoa/Cocoa.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <ImageIO/ImageIO.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+
+// Forward declarations and external functions
+class CCamera;
+extern ISystem *iSystem;
+extern void StripExtension(const char *in, char *out);
 
 ////////////////////////////////////////////////////////////////////////////
 // CMetalTexture - ITexPic implementation for Metal textures
@@ -742,7 +752,7 @@ bool CMetalTextureManager::DXTCompress(byte* raw_data, int nWidth, int nHeight, 
                                  fromRegion:MTLRegionMake2D(0, 0, w, h)
                                 mipmapLevel:mipLevel];
                     
-                    callback(mipData.data(), mipLevel, (DWORD)dataSize);
+                    callback(mipData.data(), mipLevel, (DWORD)dataSize, w, h, nullptr);
                 }
             }
         }
@@ -1452,10 +1462,12 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
     
     // Validate size is power of 2
     if ((size & (size - 1)) != 0)
-    {
-        // Warning: cube map size must be power of 2
         return false;
-    }
+    
+    // Get 3D engine once (fail early if not available)
+    I3DEngine* pEngine = iSystem ? iSystem->GetI3DEngine() : nullptr;
+    if (!pEngine)
+        return false;
     
     // Create Metal cube texture for rendering
     MTLTextureDescriptor* desc = [MTLTextureDescriptor textureCubeDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
@@ -1466,10 +1478,7 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
     
     id<MTLTexture> cubeTexture = [m_renderer->m_device newTextureWithDescriptor:desc];
     if (!cubeTexture)
-    {
-        // Error: failed to create Metal cube texture
         return false;
-    }
     
     // Cube face names for output files
     static const char* cubeFaceNames[6] = {"posx", "negx", "posy", "negy", "posz", "negz"};
@@ -1493,48 +1502,343 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
     
     bool success = true;
     
-    // Render each cube face
+    // Create render pass descriptor for cube map rendering
+    MTLRenderPassDescriptor* renderPassDesc = [MTLRenderPassDescriptor renderPassDescriptor];
+    assert(renderPassDesc && "Failed to create render pass descriptor!");
+    if (!renderPassDesc)
+    {
+        success = false;
+        return success;
+    }
+    
+    // Create temporary texture for reading back data (cube textures in Private storage can't be read directly)
+    MTLTextureDescriptor* readbackDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                             width:size
+                                                                                            height:size
+                                                                                         mipmapped:NO];
+    assert(readbackDesc && "Failed to create texture descriptor!");
+    
+    readbackDesc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+    readbackDesc.storageMode = MTLStorageModeShared;  // Shared so we can read from CPU
+    
+    id<MTLTexture> readbackTexture = [m_renderer->m_device newTextureWithDescriptor:readbackDesc];
+    assert(readbackTexture && "Failed to create readback texture!");
+    if (!readbackTexture)
+        return false;
+    
+    // Save current camera state from BOTH renderer and engine
+    CCamera savedCamera = m_renderer->GetCamera();
+    
+    // Create cube map camera (created once, updated per face)
+    CCamera cubeCamera;
+    cubeCamera.Init(size, size, 90.0f * M_PI / 180.0f, 1.0f, 10000.0f);
+    cubeCamera.SetPos(Pos);
+    
+    // ============================================================
+    // PHASE 1: Render all cube faces (GPU work)
+    // ============================================================
     for (int faceIdx = 0; faceIdx < 6; faceIdx++)
     {
-        // TODO: This requires full rendering pipeline integration:
-        // 1. Set up camera with 90-degree FOV at Pos position
-        // 2. Set camera angles from cubeAngles[faceIdx]
-        // 3. Create render pass targeting cubeTexture slice faceIdx
-        // 4. Render scene to cube face
-        // 5. Read pixels from cube face
-        // 6. Save as JPG file
+        assert(faceIdx >= 0 && faceIdx < 6 && "Invalid cube face index!");
         
-        // TODO: Full implementation requires rendering pipeline integration
-        // - Camera setup with 90-degree FOV at Pos position
-        // - Render pass targeting cubeTexture slice faceIdx
-        // - Scene rendering from each direction
-        // - Pixel readback and JPG file writing
+        // Setup camera for this cube face
+        cubeCamera.SetAngle(Vec3(cubeAngles[faceIdx][0], cubeAngles[faceIdx][1], cubeAngles[faceIdx][2]));
+        cubeCamera.Update(size, size);
         
-        // Create placeholder data (for now)
-        int dataSize = size * size * 4;
-        byte* placeholderData = new byte[dataSize];
-        memset(placeholderData, faceIdx * 40, dataSize);  // Different gray for each face
+        // Set camera on both renderer and 3D engine
+        m_renderer->SetCamera(cubeCamera);
+        pEngine->SetCamera(cubeCamera, false);
         
-        // Generate output filename
+        // Render this cube face
+        if (!RenderCubeFace(pEngine, cubeTexture, faceIdx, renderPassDesc, size))
+        {
+            success = false;
+            continue;
+        }
+    }
+    
+    // ============================================================
+    // PHASE 2: Copy all cube faces to readback buffer (batched)
+    // ============================================================
+    id<MTLCommandBuffer> blitCommandBuffer = [m_renderer->m_commandQueue commandBuffer];
+    assert(blitCommandBuffer && "Failed to create blit command buffer!");
+    if (!blitCommandBuffer)
+    {
+        return false;
+    }
+    
+    id<MTLBlitCommandEncoder> blitEncoder = [blitCommandBuffer blitCommandEncoder];
+    assert(blitEncoder && "Failed to create blit encoder!");
+    if (!blitEncoder)
+    {
+        return false;
+    }
+    
+    // Batch all copy operations
+    for (int faceIdx = 0; faceIdx < 6; faceIdx++)
+    {
+        [blitEncoder copyFromTexture:cubeTexture
+                         sourceSlice:faceIdx
+                         sourceLevel:0
+                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                          sourceSize:MTLSizeMake(size, size, 1)
+                           toTexture:readbackTexture
+                    destinationSlice:0
+                    destinationLevel:0
+                   destinationOrigin:MTLOriginMake(0, 0, 0)];
+    }
+    
+    [blitEncoder endEncoding];
+    [blitCommandBuffer commit];
+    [blitCommandBuffer waitUntilCompleted];  // Single wait for all copies
+    
+    // ============================================================
+    // PHASE 3: Read back and save all faces (CPU work)
+    // ============================================================
+    const int dataSize = size * size * 4;
+    const NSUInteger bytesPerRow = size * 4;
+    const MTLRegion region = MTLRegionMake2D(0, 0, size, size);
+    
+    // Use std::vector for automatic memory management
+    std::vector<byte> pixelBuffer(dataSize);
+    
+    for (int faceIdx = 0; faceIdx < 6; faceIdx++)
+    {
+        // Note: We copy each face to the same readback texture sequentially
+        // This could be optimized with 6 separate readback textures
+        id<MTLCommandBuffer> copyBuffer = [m_renderer->m_commandQueue commandBuffer];
+        id<MTLBlitCommandEncoder> copyEncoder = [copyBuffer blitCommandEncoder];
+        
+        [copyEncoder copyFromTexture:cubeTexture
+                         sourceSlice:faceIdx
+                         sourceLevel:0
+                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                          sourceSize:MTLSizeMake(size, size, 1)
+                           toTexture:readbackTexture
+                    destinationSlice:0
+                    destinationLevel:0
+                   destinationOrigin:MTLOriginMake(0, 0, 0)];
+        
+        [copyEncoder endEncoding];
+        [copyBuffer commit];
+        [copyBuffer waitUntilCompleted];
+        
+        // Read pixel data from GPU
+        [readbackTexture getBytes:pixelBuffer.data()
+                      bytesPerRow:bytesPerRow
+                       fromRegion:region
+                      mipmapLevel:0];
+        
+        // Save to JPG file
         char outputPath[512];
         sprintf(outputPath, "%s_%s.jpg", szName, cubeFaceNames[faceIdx]);
         
-        // Would save JPG here (WriteJPG not implemented yet)
-        // WriteJPG(placeholderData, size, size, outputPath);
-        
-        delete[] placeholderData;
+        if (!SaveTextureAsJPG(pixelBuffer.data(), size, size, outputPath))
+        {
+            success = false;
+        }
     }
     
-    // Restore viewport
+    // Restore viewport and camera (on BOTH renderer and engine)
     m_renderer->SetViewport(vX, vY, vWidth, vHeight);
+    m_renderer->SetCamera(savedCamera);
     
-    // Note: For full implementation, need to integrate with:
-    // - CMetalRenderer::BeginScene/EndScene
-    // - Camera system (I3DEngine)
-    // - Scene rendering
-    // - Metal render passes
+    // CRITICAL: Restore engine camera too (was missing!)
+    if (pEngine)
+    {
+        pEngine->SetCamera(savedCamera, false);
+    }
     
     return success;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// RenderCubeFace
+//
+// Renders a single cube face using Metal and the engine's rendering pipeline.
+//
+// Parameters:
+//   pEngine          - I3DEngine instance (with camera already set by caller)
+//   cubeTexture      - Cube texture to render to
+//   faceIdx          - Which face (0-5)
+//   renderPassDesc   - Render pass descriptor
+//   size             - Render target size
+//
+// Returns:
+//   true on success, false on failure
+//
+// Prerequisites:
+//   - Camera MUST be set by caller on pEngine (via pEngine->SetCamera())
+//   - This is a pure RENDER method - no state management
+//
+// Responsibilities:
+//   - Sets up Metal render pass for cube face
+//   - Configures viewport/scissor
+//   - Calls pEngine->DrawLowDetail() to render scene
+//   - Does NOT touch camera, viewport state is local to render pass
+////////////////////////////////////////////////////////////////////////////
+bool CMetalTextureManager::RenderCubeFace(I3DEngine* pEngine,
+                                           id<MTLTexture> cubeTexture,
+                                           int faceIdx,
+                                           MTLRenderPassDescriptor* renderPassDesc,
+                                           int size)
+{
+    assert(cubeTexture && "Cube texture is null!");
+    assert(renderPassDesc && "Render pass descriptor is null!");
+    assert(faceIdx >= 0 && faceIdx < 6 && "Invalid face index!");
+    assert(m_renderer && "Renderer is null!");
+    assert(m_renderer->m_commandQueue && "Command queue is null!");
+    
+    if (!cubeTexture || !renderPassDesc || !m_renderer)
+        return false;
+    
+    // Configure render pass for this cube face
+    renderPassDesc.colorAttachments[0].texture = cubeTexture;
+    renderPassDesc.colorAttachments[0].slice = faceIdx;
+    renderPassDesc.colorAttachments[0].level = 0;
+    renderPassDesc.colorAttachments[0].loadAction = MTLLoadActionClear;
+    renderPassDesc.colorAttachments[0].storeAction = MTLStoreActionStore;
+    
+    // Set clear color (different per face for debugging)
+    static const MTLClearColor faceClearColors[6] = {
+        MTLClearColorMake(1.0, 0.2, 0.2, 1.0),  // +X: Red
+        MTLClearColorMake(0.2, 1.0, 0.2, 1.0),  // -X: Green
+        MTLClearColorMake(0.2, 0.2, 1.0, 1.0),  // +Y: Blue
+        MTLClearColorMake(1.0, 1.0, 0.2, 1.0),  // -Y: Yellow
+        MTLClearColorMake(1.0, 0.2, 1.0, 1.0),  // +Z: Magenta
+        MTLClearColorMake(0.2, 1.0, 1.0, 1.0)   // -Z: Cyan
+    };
+    renderPassDesc.colorAttachments[0].clearColor = faceClearColors[faceIdx];
+    
+    // Create command buffer using renderer's command queue
+    id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+    assert(commandBuffer && "Failed to create command buffer!");
+    if (!commandBuffer)
+        return false;
+    
+    // Create render encoder
+    id<MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDesc];
+    assert(renderEncoder && "Failed to create render encoder!");
+    if (!renderEncoder)
+        return false;
+    
+    // Setup viewport and scissor using renderer's systems
+    m_renderer->SetViewport(0, 0, size, size);
+    m_renderer->SetScissor(0, 0, size, size);
+    
+    // Render scene using I3DEngine (camera already set by caller)
+    if (pEngine)
+    {
+        // Render the scene with appropriate flags
+        // Camera is already set by caller, we just render
+        int renderFlags = DLD_TERRAIN | DLD_STATIC_OBJECTS | DLD_TERRAIN_WATER | 
+                         DLD_PARTICLES | DLD_FAR_SPRITES | DLD_DETAIL_TEXTURES;
+        renderFlags &= ~DLD_ENTITIES;  // Exclude entities for cube maps
+        
+        pEngine->DrawLowDetail(renderFlags);
+    }
+
+    
+    // Finalize rendering
+    [renderEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+    
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// SaveTextureAsJPG
+//
+// Saves raw RGBA pixel data as a JPG file using Core Graphics.
+//
+// Parameters:
+//   pixels - Raw RGBA8 pixel data
+//   width  - Image width
+//   height - Image height
+//   path   - Output file path
+//
+// Returns:
+//   true on success, false on failure
+////////////////////////////////////////////////////////////////////////////
+bool CMetalTextureManager::SaveTextureAsJPG(const byte* pixels, int width, int height, const char* path)
+{
+    assert(pixels && "SaveTextureAsJPG: pixels is null!");
+    assert(path && "SaveTextureAsJPG: path is null!");
+    assert(width > 0 && "SaveTextureAsJPG: width must be > 0!");
+    assert(height > 0 && "SaveTextureAsJPG: height must be > 0!");
+    assert(path[0] != '\0' && "SaveTextureAsJPG: path is empty!");
+    
+    if (!pixels || !path || width <= 0 || height <= 0)
+        return false;
+    
+    @autoreleasepool
+    {
+        // Create CGImage from pixel data
+        size_t bitsPerComponent = 8;
+        size_t bitsPerPixel = 32;
+        size_t bytesPerRow = width * 4;
+        
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        assert(colorSpace && "Failed to create color space!");
+        
+        CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big;
+        
+        CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, pixels, width * height * 4, NULL);
+        assert(provider && "Failed to create data provider!");
+        
+        CGImageRef imageRef = CGImageCreate(width, height,
+                                           bitsPerComponent, bitsPerPixel, bytesPerRow,
+                                           colorSpace, bitmapInfo, provider,
+                                           NULL, false, kCGRenderingIntentDefault);
+        
+        assert(imageRef && "Failed to create CGImage!");
+        if (!imageRef)
+        {
+            CGDataProviderRelease(provider);
+            CGColorSpaceRelease(colorSpace);
+            return false;
+        }
+        
+        // Create destination URL
+        NSString* nsPath = [NSString stringWithUTF8String:path];
+        assert(nsPath && "Failed to create NSString from path!");
+        
+        NSURL* url = [NSURL fileURLWithPath:nsPath];
+        assert(url && "Failed to create NSURL!");
+        
+        // Create image destination (JPG)
+        CGImageDestinationRef destination = CGImageDestinationCreateWithURL((__bridge CFURLRef)url,
+                                                                            kUTTypeJPEG,
+                                                                            1,
+                                                                            NULL);
+        
+        assert(destination && "Failed to create image destination!");
+        if (!destination)
+        {
+            CGImageRelease(imageRef);
+            CGDataProviderRelease(provider);
+            CGColorSpaceRelease(colorSpace);
+            return false;
+        }
+        
+        // Set JPG quality (0.9 = 90% quality)
+        NSDictionary* properties = @{
+            (__bridge NSString*)kCGImageDestinationLossyCompressionQuality: @0.9
+        };
+        
+        // Add image to destination and finalize
+        CGImageDestinationAddImage(destination, imageRef, (__bridge CFDictionaryRef)properties);
+        bool success = CGImageDestinationFinalize(destination);
+        
+        // Cleanup
+        CFRelease(destination);
+        CGImageRelease(imageRef);
+        CGDataProviderRelease(provider);
+        CGColorSpaceRelease(colorSpace);
+        
+        return success;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////

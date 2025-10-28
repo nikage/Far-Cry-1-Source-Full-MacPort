@@ -466,3 +466,4 @@ FodyWeavers.xsd
 *.sln.iml
 
 .idea
+docs/CHANGELOG.md

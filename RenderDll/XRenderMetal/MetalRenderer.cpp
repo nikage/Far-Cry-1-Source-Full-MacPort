@@ -19,6 +19,35 @@
 #include "MetalRenderer.h"
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
+
+/**
+ * @def DLL_EXPORT
+ * @brief Platform-specific macro for DLL symbol export
+ * 
+ * On macOS, this expands to __attribute__((visibility("default"))) which
+ * ensures the symbol is visible for dynamic linking. This is required for
+ * the game engine to find PackageRenderConstructor() via dlsym().
+ * 
+ * @platform_specific
+ * - macOS: Uses GCC/Clang visibility attribute
+ * - Other: Empty macro (relies on default visibility)
+ * 
+ * @build_configuration
+ * Requires -fvisibility=hidden compiler flag for this to be effective.
+ * Without that flag, all symbols are visible by default anyway.
+ * 
+ * @see PackageRenderConstructor() (uses this macro)
+ */
+#ifndef DLL_EXPORT
+  #if defined(__APPLE__) && defined(__MACH__)
+    #define DLL_EXPORT __attribute__((visibility("default")))
+  #else
+    #define DLL_EXPORT
+  #endif
+#endif
 
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
@@ -1234,12 +1263,327 @@ void CMetalRenderer::ShutDown(bool bReInit) {
   printf("Shutting down Metal renderer: reinit %s\n", bReInit ? "yes" : "no");
 }
 
-const CCamera &CMetalRenderer::GetCamera() { return *(CCamera *)m_camera; }
+////////////////////////////////////////////////////////////////////////////
+// Camera Management - Delegated to CMetalBaseRenderer
+////////////////////////////////////////////////////////////////////////////
 
-void CMetalRenderer::SetCamera(const CCamera &cam) {
-  m_camera = (void *)&cam;
-  // TODO: Update Metal camera matrices
-  printf("Setting Metal camera\n");
+/**
+ * @brief Gets the current rendering camera
+ * 
+ * This method delegates to the base class (CMetalBaseRenderer) which
+ * stores the camera by value. This design avoids camera duplication and
+ * ensures a single source of truth for camera state.
+ * 
+ * @return Const reference to the current camera object
+ * 
+ * @design_rationale
+ * Camera is stored in CMetalBaseRenderer::m_camera (not duplicated in
+ * CMetalRenderer) to avoid state inconsistency. CMetalRenderer simply
+ * delegates to the base class implementation.
+ * 
+ * @thread_safety Not thread-safe. Must be called from main render thread.
+ * 
+ * @see CMetalBaseRenderer::GetCamera()
+ * @see SetCamera()
+ */
+const CCamera &CMetalRenderer::GetCamera() { 
+  return CMetalBaseRenderer::GetCamera();
 }
+
+/**
+ * @brief Sets the current rendering camera
+ * 
+ * This method delegates to the base class (CMetalBaseRenderer) which:
+ * 1. Stores the camera by value (copies it into m_camera)
+ * 2. Updates Metal view and projection matrices
+ * 3. Uploads matrices to GPU uniform buffers (if render encoder is active)
+ * 
+ * @param cam Camera object to set (copied, not stored by reference)
+ * 
+ * @design_rationale
+ * Camera is stored by value (not pointer) to avoid lifetime issues.
+ * The base class handles all Metal-specific matrix updates.
+ * 
+ * @note
+ * This copies the entire CCamera object. For performance-critical code,
+ * minimize camera changes per frame.
+ * 
+ * @thread_safety Not thread-safe. Must be called from main render thread.
+ * 
+ * @see CMetalBaseRenderer::SetCamera()
+ * @see GetCamera()
+ */
+void CMetalRenderer::SetCamera(const CCamera &cam) {
+  CMetalBaseRenderer::SetCamera(cam);
+}
+
+////////////////////////////////////////////////////////////////////////////
+// DLL Entry Point - Creates and initializes CMetalRenderer instance
+////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Creates and initializes a CMetalRenderer instance
+ * 
+ * This function is the internal factory that:
+ * 1. Allocates a new CMetalRenderer object
+ * 2. Parses command-line arguments for display settings (TODO)
+ * 3. Calls Init() with appropriate parameters
+ * 4. Returns the initialized renderer or nullptr on failure
+ * 
+ * @param argc Number of command-line arguments (currently unused)
+ * @param argv Array of command-line argument strings (currently unused)
+ * @param sp CryEngine render interface (currently unused)
+ * 
+ * @return Pointer to initialized IRenderer, or nullptr if initialization failed
+ * 
+ * @design_pattern Factory Method
+ * 
+ * @error_handling
+ * - Returns nullptr if allocation fails
+ * - Returns nullptr if Init() fails (deletes renderer before returning)
+ * - Logs errors to both console (printf) and /tmp/farcry_metal_create.log
+ * 
+ * @display_settings
+ * Display settings are obtained from (in order of priority):
+ * 1. SCryRenderInterface callbacks (ipGetWidth, ipGetHeight, etc.)
+ * 2. Command-line arguments (-width, -height, -fullscreen, -bpp)
+ * 3. System defaults from NSScreen (macOS primary display)
+ * 4. Hardcoded fallback (800x600) if all else fails
+ * 
+ * Supported command-line arguments:
+ * - -width <pixels> or --width <pixels>
+ * - -height <pixels> or --height <pixels>
+ * - -fullscreen or --fullscreen
+ * - -bpp <bits> or --bpp <bits>
+ * 
+ * @see PackageRenderConstructor() (main DLL entry point)
+ * @see CMetalRenderer::Init()
+ */
+IRenderer* CreateMetalRendererInstance(int argc, char* argv[], SCryRenderInterface* sp)
+{
+    printf("CreateMetalRendererInstance called\n");
+    
+    FILE* f = fopen("/tmp/farcry_metal_create.log", "w");
+    if (f) {
+        fprintf(f, "Creating CMetalRenderer (new architecture)\n");
+        fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+        fflush(f);
+        fclose(f);
+    }
+    
+    CMetalRenderer* renderer = new CMetalRenderer();
+    if (!renderer) {
+        printf("ERROR: Failed to allocate CMetalRenderer\n");
+        if (f) {
+            fprintf(f, "ERROR: Failed to allocate renderer\n");
+            fclose(f);
+        }
+        return nullptr;
+    }
+    
+    printf("CMetalRenderer created: %p\n", renderer);
+    
+    // Get display settings from SCryRenderInterface or system defaults
+    int width = 800;
+    int height = 600;
+    int colorBpp = 32;
+    int depthBpp = 24;
+    int stencilBpp = 8;
+    bool fullscreen = false;
+    
+    // Extract display settings from CryEngine render interface
+    if (sp)
+    {
+        // CryEngine provides display settings via SCryRenderInterface
+        if (sp->ipGetWidth)
+            width = sp->ipGetWidth();
+        if (sp->ipGetHeight)
+            height = sp->ipGetHeight();
+        if (sp->ipGetColorBits)
+            colorBpp = sp->ipGetColorBits();
+        if (sp->ipGetDepthBits)
+            depthBpp = sp->ipGetDepthBits();
+        if (sp->ipGetStencilBits)
+            stencilBpp = sp->ipGetStencilBits();
+        
+        printf("Display settings from CryEngine: %dx%d, color=%d, depth=%d, stencil=%d\n",
+               width, height, colorBpp, depthBpp, stencilBpp);
+    }
+    else
+    {
+        // Fallback: Get primary screen resolution from NSScreen
+        @autoreleasepool
+        {
+            NSScreen* mainScreen = [NSScreen mainScreen];
+            if (mainScreen)
+            {
+                NSRect screenRect = [mainScreen frame];
+                width = (int)screenRect.size.width;
+                height = (int)screenRect.size.height;
+                printf("Display settings from NSScreen: %dx%d\n", width, height);
+            }
+            else
+            {
+                printf("WARNING: Could not get screen resolution, using defaults: %dx%d\n", 
+                       width, height);
+            }
+        }
+    }
+    
+    // Parse command-line overrides (if provided)
+    for (int i = 0; i < argc - 1; i++)
+    {
+        if (strcmp(argv[i], "-width") == 0 || strcmp(argv[i], "--width") == 0)
+        {
+            width = atoi(argv[i + 1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "-height") == 0 || strcmp(argv[i], "--height") == 0)
+        {
+            height = atoi(argv[i + 1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "-fullscreen") == 0 || strcmp(argv[i], "--fullscreen") == 0)
+        {
+            fullscreen = true;
+        }
+        else if (strcmp(argv[i], "-bpp") == 0 || strcmp(argv[i], "--bpp") == 0)
+        {
+            colorBpp = atoi(argv[i + 1]);
+            i++;
+        }
+    }
+    
+    printf("Final renderer settings: %dx%d, color=%dbpp, depth=%dbpp, stencil=%dbpp, fullscreen=%d\n",
+           width, height, colorBpp, depthBpp, stencilBpp, fullscreen);
+    
+    // Initialize the renderer
+    void* result = renderer->Init(0, 0, width, height, colorBpp, depthBpp, stencilBpp, 
+                                   fullscreen, nullptr, nullptr, nullptr, nullptr, false);
+    
+    if (!result) {
+        printf("ERROR: CMetalRenderer::Init() failed!\n");
+        if (f) {
+            fprintf(f, "ERROR: Renderer initialization failed\n");
+            fclose(f);
+        }
+        delete renderer;
+        return nullptr;
+    }
+    
+    printf("CMetalRenderer initialized successfully\n");
+    if (f) {
+        fprintf(f, "SUCCESS: Renderer initialized at %p\n", renderer);
+        fclose(f);
+    }
+    
+    return renderer;
+}
+
+////////////////////////////////////////////////////////////////////////////
+// Main DLL Entry Point - Called by game engine to create renderer
+////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Main DLL entry point for renderer creation
+ * 
+ * This function is called by the FarCry engine during initialization to
+ * create the Metal renderer. It must have C linkage and be exported from
+ * the DLL with proper visibility.
+ * 
+ * @param argc Number of command-line arguments passed by engine
+ * @param argv Array of command-line arguments passed by engine
+ * @param sp Pointer to CryEngine render interface (for callbacks)
+ * 
+ * @return Pointer to initialized IRenderer, or nullptr if creation failed
+ * 
+ * @dll_export
+ * Symbol is exported with __attribute__((visibility("default"))) on macOS
+ * to ensure it's visible to the dynamic linker.
+ * 
+ * @calling_convention
+ * C calling convention (extern "C") to ensure consistent name mangling
+ * across compilers and linker compatibility.
+ * 
+ * @lifecycle
+ * 1. Engine calls PackageRenderConstructor() during startup
+ * 2. This function delegates to CreateMetalRendererInstance()
+ * 3. Returns initialized renderer to engine
+ * 4. Engine uses returned IRenderer* for all rendering operations
+ * 5. Engine calls renderer->Release() on shutdown
+ * 
+ * @logging
+ * Writes diagnostic logs to:
+ * - /tmp/farcry_render_constructor.log (entry point called)
+ * - /tmp/farcry_render_created.log (result of creation)
+ * - stdout (printf for debugging)
+ * 
+ * @example
+ * ```cpp
+ * // Engine code (System.cpp):
+ * typedef IRenderer* (*PFNCREATEMETALRENDERER)(int, char*[], SCryRenderInterface*);
+ * 
+ * void* hDLL = dlopen("libXRenderMetal.dylib", RTLD_NOW);
+ * PFNCREATEMETALRENDERER pfnCreate = 
+ *     (PFNCREATEMETALRENDERER)dlsym(hDLL, "PackageRenderConstructor");
+ * 
+ * IRenderer* renderer = pfnCreate(argc, argv, &renderInterface);
+ * if (!renderer) {
+ *     FatalError("Failed to create Metal renderer");
+ * }
+ * ```
+ * 
+ * @compatibility
+ * This is the standard entry point used by all CryEngine renderers
+ * (OpenGL, Direct3D, Metal). The signature must match exactly.
+ * 
+ * @see CreateMetalRendererInstance() (internal factory)
+ * @see IRenderer (base interface)
+ */
+extern "C" DLL_EXPORT IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
+{
+    printf("PackageRenderConstructor called (CMetalRenderer architecture)\n");
+    
+    FILE* f = fopen("/tmp/farcry_render_constructor.log", "w");
+    if (f) {
+        fprintf(f, "PackageRenderConstructor called\n");
+        fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+        fprintf(f, "Using CMetalRenderer (manager pattern)\n");
+        fflush(f);
+        fclose(f);
+    }
+    
+    IRenderer* renderer = CreateMetalRendererInstance(argc, argv, sp);
+    
+    f = fopen("/tmp/farcry_render_created.log", "w");
+    if (f) {
+        if (renderer) {
+            fprintf(f, "SUCCESS: CMetalRenderer created and initialized: %p\n", renderer);
+        } else {
+            fprintf(f, "ERROR: CMetalRenderer creation failed!\n");
+        }
+        fflush(f);
+        fclose(f);
+    }
+    
+    return renderer;
+}
+
+/**
+ * @brief Force symbol export by referencing PackageRenderConstructor
+ * 
+ * This static variable ensures that the PackageRenderConstructor symbol
+ * is not stripped by the linker during optimization. By creating a
+ * reference to the function, we guarantee it will be present in the
+ * final DLL for dynamic loading.
+ * 
+ * @technical_note
+ * Without this reference, aggressive linker optimization might remove
+ * the symbol if it appears unused within the DLL itself (even though
+ * it's needed for external dynamic loading).
+ * 
+ * @see PackageRenderConstructor() (exported function)
+ */
+static IRenderer* (*g_PackageRenderConstructor)(int, char*[], SCryRenderInterface*) = PackageRenderConstructor;
 
 #endif // __APPLE__ && __MACH__

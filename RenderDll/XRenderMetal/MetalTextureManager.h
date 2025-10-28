@@ -32,6 +32,7 @@
 // Forward declarations
 class CMetalBaseRenderer;
 struct STexPic;
+class I3DEngine;
 class CMetalTextureManager;
 
 // Metal texture wrapper implementing ITexPic interface
@@ -136,24 +137,7 @@ public:
     float GetGammaValue() const { return m_gammaValue; }
     bool IsGammaEnabled() const { return m_gammaEnabled; }
     
-    // Texture info accessors for CMetalTexture
-    const TextureInfo* GetTextureInfo(int textureId) const;
-    void SetTextureClamp(int textureId, bool bEnable);
-    void SetTextureFilter(int textureId, int nFilter);
-
-protected:
-    // Metal-specific texture management
-    id<MTLTexture> CreateMetalTexture(int width, int height, MTLPixelFormat format, 
-                                     const void* data = nullptr, size_t dataSize = 0);
-    id<MTLTexture> CreateMetalTextureFromFile(const char* filename);
-    void UpdateMetalTexture(id<MTLTexture> texture, const void* data, int x, int y, int w, int h);
-    void BindTexture(int slot, id<MTLTexture> texture);
-    
-    // Texture format conversion
-    MTLPixelFormat ConvertToMetalFormat(ETEX_Format format);
-    ETEX_Format ConvertFromMetalFormat(MTLPixelFormat format);
-    
-    // Texture caching and management
+    // Texture info structure (public for CMetalTexture access)
     struct TextureInfo
     {
         id<MTLTexture> metalTexture;
@@ -171,6 +155,30 @@ protected:
         bool clampV;
         int filterMode;
     };
+    
+    // Texture info accessors for CMetalTexture
+    const TextureInfo* GetTextureInfo(int textureId) const;
+    void SetTextureClamp(int textureId, bool bEnable);
+    void SetTextureFilter(int textureId, int nFilter);
+    
+    // Image file I/O
+    bool SaveTextureAsJPG(const byte* pixels, int width, int height, const char* path);
+    
+    // Cube map rendering helpers
+    bool RenderCubeFace(I3DEngine* pEngine, id<MTLTexture> cubeTexture, int faceIdx, 
+                       MTLRenderPassDescriptor* renderPassDesc, int size);
+
+protected:
+    // Metal-specific texture management
+    id<MTLTexture> CreateMetalTexture(int width, int height, MTLPixelFormat format, 
+                                     const void* data = nullptr, size_t dataSize = 0);
+    id<MTLTexture> CreateMetalTextureFromFile(const char* filename);
+    void UpdateMetalTexture(id<MTLTexture> texture, const void* data, int x, int y, int w, int h);
+    void BindTexture(int slot, id<MTLTexture> texture);
+    
+    // Texture format conversion
+    MTLPixelFormat ConvertToMetalFormat(ETEX_Format format);
+    ETEX_Format ConvertFromMetalFormat(MTLPixelFormat format);
     
     std::unordered_map<int, TextureInfo> m_textures;
     std::unordered_map<std::string, int> m_textureNameMap;

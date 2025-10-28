@@ -28,6 +28,7 @@
 
 // Include CryEngine interfaces
 #include "IRenderer.h"
+#include "Cry_Camera.h"
 #include "IShader.h"
 #include "Cry_Math.h"
 
@@ -77,7 +78,7 @@ public:
     virtual void SetScissor(int x = 0, int y = 0, int width = 0, int height = 0);
     virtual void MakeCurrent();
     virtual void SetCamera(const CCamera& cam);
-    virtual const CCamera& GetCamera();
+    virtual const CCamera& GetCamera();  // Non-const method (matches IRenderer)
     
     // Drawing Methods
     virtual void DrawTriStrip(CVertexBuffer* src, int vert_num = 4);
@@ -365,7 +366,28 @@ public:
     int m_width, m_height;
     int m_cbpp, m_zbpp, m_sbpp;
     bool m_fullscreen;
-    void* m_camera; // CCamera* - forward declaration to avoid include issues
+    
+    /**
+     * @brief Current rendering camera (stored by value)
+     * 
+     * The camera is stored by value (not pointer) to avoid lifetime issues
+     * and ensure the renderer owns its camera state. This is updated via
+     * SetCamera() and queried via GetCamera().
+     * 
+     * @design_decision
+     * Storing by value instead of pointer:
+     * - PRO: No lifetime/ownership issues
+     * - PRO: No null pointer checks needed
+     * - PRO: Matches OpenGL renderer pattern
+     * - CON: Copy overhead when calling SetCamera() (acceptable)
+     * 
+     * @note
+     * CMetalRenderer delegates camera access to this base class member
+     * to avoid duplication and ensure single source of truth.
+     * 
+     * @see SetCamera(), GetCamera()
+     */
+    CCamera m_camera;
     
     // Viewport state
     int m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight;
