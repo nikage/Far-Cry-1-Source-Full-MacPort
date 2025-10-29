@@ -1,0 +1,1 @@
+run linter and fix issues on staged files 

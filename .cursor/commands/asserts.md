@@ -1,0 +1,1 @@
+add asserts,  prefer constructors over methods where possible
