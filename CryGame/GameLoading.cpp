@@ -1694,10 +1694,10 @@ void CXGame::LoadConfiguration(const string &sSystemCfg,const string &sGameCfg)
 	{
 		// if for some reason the game config is not found 
 		// (first time, new installation etc.)
-		char szBuffer[512];
-		strcpy(szBuffer,"Input:BindCommandToKey(\"\\\\SkipCutScene\",\"F7\",1);");
+			char szBuffer[512];
+			strcpy(szBuffer,"Input:BindCommandToKey(\"\\\\SkipCutScene\",\"F7\",1);");
 		m_pSystem->GetIScriptSystem()->ExecuteBuffer(szBuffer,strlen(szBuffer));
-		strcpy(szBuffer,"Input:BindCommandToKey(\"\\\\SkipCutScene\",\"spacebar\",1);");
+			strcpy(szBuffer,"Input:BindCommandToKey(\"\\\\SkipCutScene\",\"spacebar\",1);");
 		m_pSystem->GetIScriptSystem()->ExecuteBuffer(szBuffer,strlen(szBuffer));
 		return;
 	}

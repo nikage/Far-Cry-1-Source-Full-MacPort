@@ -221,7 +221,14 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 	char szNewSrc[g_nMaxPath];
 	strcpy(szNewSrc, src);
 	BeautifyPath(szNewSrc);
+	
+#if defined(__APPLE__) || defined(LINUX)
+	// On Unix/macOS, use realpath() instead of _fullpath()
+	char* result = realpath(szNewSrc, dst);
+	if (!result)
+#else
 	if (!_fullpath (dst, szNewSrc, g_nMaxPath))
+#endif
 	{
 		src = szNewSrc;
 		m_pLog->LogError("\002Cannot transform file name %s to absolute path, resorting to desparate measures!", src);

@@ -850,15 +850,9 @@ bool CSystem::InitAISystem()
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitScriptSystem()
 {
-#ifndef _XBOX
-	// Temporarily disable script system for macOS to isolate other issues
-	GetILog()->LogToFile( "Script system temporarily disabled for macOS" );
-	m_pScriptSystem = NULL;
-	m_pScriptSink = NULL;
-	return true;
-#else
+
 	m_pScriptSink = new CScriptSink(this,m_pConsole);
-	m_pScriptSystem=CreateScriptSystem(m_pScriptSink,NULL,true);
+	m_pScriptSystem=CreateScriptSystem(this, m_pScriptSink, NULL, true);
 	if (m_pScriptSystem==NULL)
 	{
 		Error( "Error initializeing ScriptSystem" );
@@ -866,7 +860,6 @@ bool CSystem::InitScriptSystem()
 		m_pScriptSink = NULL;
     return (false);
 	}
-#endif
 
 	if (m_pScriptSink)
 		m_pScriptSink->Init();
@@ -1475,28 +1468,57 @@ bool CSystem::Init( const SSystemInitParams &params )
 		//////////////////////////////////////////////////////////////////////////
 		// Init 3d engine
 		//////////////////////////////////////////////////////////////////////////
+		printf("CSystem::Init - About to init 3D engine\n");
+		fflush(stdout);
 		CryLogAlways("Initializing 3D Engine");
+		printf("CSystem::Init - About to call Init3DEngine\n");
+		fflush(stdout);
 		if (!Init3DEngine())
+		{
+			printf("CSystem::Init - Init3DEngine failed!\n");
+			fflush(stdout);
 			return false;
+		}
+		printf("CSystem::Init - Init3DEngine completed successfully\n");
+		fflush(stdout);
 
 		//////////////////////////////////////////////////////////////////////////
 		// SCRIPT BINDINGS
 		//////////////////////////////////////////////////////////////////////////
+		printf("CSystem::Init - About to init script bindings\n");
+		fflush(stdout);
 		CryLogAlways("Initializing Script Bindings");
+		printf("CSystem::Init - About to call InitScriptBindings\n");
+		fflush(stdout);
 		if(!InitScriptBindings())
 		{
+			printf("CSystem::Init - InitScriptBindings failed!\n");
+			fflush(stdout);
 			return false;
 		}
+		printf("CSystem::Init - InitScriptBindings completed successfully\n");
+		fflush(stdout);
 	}
+	
+	printf("CSystem::Init - After editor mode block\n");
+	fflush(stdout);
 
+	printf("CSystem::Init - About to create CDownloadManager\n");
+	fflush(stdout);
 	m_pDownloadManager = new CDownloadManager;
+	printf("CSystem::Init - CDownloadManager created, calling Create\n");
+	fflush(stdout);
 	m_pDownloadManager->Create(this);
+	printf("CSystem::Init - CDownloadManager initialized\n");
+	fflush(stdout);
 
 
 	//////////////////////////////////////////////////////////////////////////
 	// Check loader.
 	//////////////////////////////////////////////////////////////////////////
 #if defined(_DATAPROBE) && !defined(LINUX)
+	printf("CSystem::Init - About to check loader (DATA_PROBE)\n");
+	fflush(stdout);
 	CDataProbe probe;
 	if (!params.pCheckFunc || !probe.CheckLoader( params.pCheckFunc ))
 	{
@@ -1504,10 +1526,18 @@ bool CSystem::Init( const SSystemInitParams &params )
 		*p = 1;
 		Strange();
 	}
+	printf("CSystem::Init - Loader check complete\n");
+	fflush(stdout);
 #endif
 
+	printf("CSystem::Init - About to call SetAffinity\n");
+	fflush(stdout);
 	SetAffinity();
+	printf("CSystem::Init - SetAffinity complete\n");
+	fflush(stdout);
 
+	printf("CSystem::Init - INITIALIZATION COMPLETE - returning true\n");
+	fflush(stdout);
 	return (true);
 }
 

@@ -44,8 +44,8 @@ void CXSurfaceMgr::Init(IScriptSystem *pScriptSystem,I3DEngine *p3DEngine,IPhysi
 	m_pPhysicalWorld=pPhysicalWorld;
 
 	m_p3DEngine->SetPhysMaterialEnumerator(this);
-	m_pMaterialScriptObject=m_pScriptSystem->CreateEmptyObject();
-	m_pObjectMaterials=m_pScriptSystem->CreateGlobalObject("Materials");	
+		m_pMaterialScriptObject=m_pScriptSystem->CreateEmptyObject();
+		m_pObjectMaterials=m_pScriptSystem->CreateGlobalObject("Materials");
 }
 
 //////////////////////////////////////////////////////////////////////////

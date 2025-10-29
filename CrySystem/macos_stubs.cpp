@@ -2,7 +2,6 @@
 #include "stdafx.h"
 
 // Forward declarations
-class IGame;
 namespace XDOM {
     class IXMLDOMDocument;
 }

@@ -757,14 +757,20 @@ bool CSystem::CreateGame( const SGameInitParams &params )
 	}
 			
 #else
+	CryLogAlways("CSystem::CreateGame - macOS/console path");
+	
 	if (params.pGame)
 	{
+		CryLogAlways("CSystem::CreateGame - using provided pGame: %p", params.pGame);
 		m_pGame = params.pGame;
 	}
 	else
 	{
+		CryLogAlways("CSystem::CreateGame - calling CreateGameInstance()");
 		m_pGame = CreateGameInstance();
-		m_pGame->Init(this, false, m_bEditor, NULL);
+			m_pGame->Init(this, false, m_bEditor, NULL);
+			CryLogAlways("CSystem::CreateGame - m_pGame->Init() complete");
+		}
 	}
 
 	if (m_pIPhysicalWorld)

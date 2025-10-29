@@ -945,18 +945,30 @@ int main(int argc, char* argv[]) {
     g_pISystem->GetIConsole()->SetScrollMax(600/2);
     
     // Create game (statically linked)
+    printf("main(): About to call CreateGame\n");
+    fflush(stdout);
     SGameInitParams gip;
     if (!g_pISystem->CreateGame(gip)) {
         printf("CreateGame Failed\n");
         g_pISystem->Release();
         return -1;
     }
+    printf("main(): CreateGame completed successfully\n");
+    fflush(stdout);
     
     // Get game interface and run
+    printf("main(): About to call GetIGame\n");
+    fflush(stdout);
     IGame *pGame = g_pISystem->GetIGame();
+    printf("main(): GetIGame returned: %p\n", pGame);
+    fflush(stdout);
     if (pGame) {
+        printf("main(): About to call pGame->Run\n");
+        fflush(stdout);
         bool bRelaunch = false;
         pGame->Run(bRelaunch);
+        printf("main(): pGame->Run completed\n");
+        fflush(stdout);
     }
     
     // Cleanup

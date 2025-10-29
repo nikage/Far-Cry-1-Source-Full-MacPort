@@ -89,7 +89,7 @@ ISystem* GetISystem()
 
 //////////////////////////////////////////////////////////////////////
 // interface of the DLL
-IGame* CreateGameInstance()
+extern "C" CRYGAME_API IGame* CreateGameInstance()
 {
 	CXGame *pGame = new CXGame();
 	return pGame;
@@ -527,14 +527,22 @@ IXSystem *CXGame::GetXSystem(){return m_pServer?m_pServer->m_pISystem:m_pClient?
 //! Initialize the game. This must be called before calling other functions of this class.
 bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,const char *szGameMod)
 {	
+	CryLogAlways("CXGame::Init - ENTRY POINT");
+	
 	// Setup the system and 3D Engine pointers
 	m_pSystem	= pSystem;
+	CryLogAlways("CXGame::Init - m_pSystem set, creating CGameMods");
 
 	m_pGameMods = new CGameMods(this);
+	CryLogAlways("CXGame::Init - CGameMods created");
 
 	gISystem = pSystem;
 	m_bDedicatedServer=bDedicatedSrv;
+	
+	CryLogAlways("CXGame::Init - About to init XAreaMgr");
 	m_XAreaMgr.Init( pSystem );
+	CryLogAlways("CXGame::Init - XAreaMgr initialized");
+	
 	m_bEditor=bInEditor;
 
 
@@ -547,85 +555,109 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	m_pClient	= NULL;
 	m_pServer	= NULL;
 
+	CryLogAlways("CXGame::Init - About to log game initialization");
   m_pSystem->GetILog()->Log("Game Initialization");
+	CryLogAlways("CXGame::Init - Game initialization logged");
+	
 #if !defined(LINUX)	
+	CryLogAlways("CXGame::Init - Getting movie system");
 	IMovieSystem *pMovieSystem=m_pSystem->GetIMovieSystem();
 	if (pMovieSystem)
 		pMovieSystem->SetUser(m_pMovieUser);
+	CryLogAlways("CXGame::Init - Movie system setup complete");
 #endif
+	CryLogAlways("CXGame::Init - Creating time demo recorder");
 	if (!m_pTimeDemoRecorder)
 		m_pTimeDemoRecorder = new CTimeDemoRecorder(pSystem);
+	CryLogAlways("CXGame::Init - Time demo recorder created");
   
 	m_pUIHud = NULL;
+	CryLogAlways("CXGame::Init - Getting system interfaces");
 	m_pNetwork= m_pSystem->GetINetwork();
 	m_pLog= m_pSystem->GetILog();
+	CryLogAlways("CXGame::Init - Got network and log");
 	m_p3DEngine	= m_pSystem->GetI3DEngine();
+	CryLogAlways("CXGame::Init - Got 3D engine");
 	m_pRenderer = m_pSystem->GetIRenderer();
+	CryLogAlways("CXGame::Init - Got renderer");
 	m_pScriptSystem=pSystem->GetIScriptSystem();
+	CryLogAlways("CXGame::Init - Got script system");
 	m_pEntitySystem=m_pSystem->GetIEntitySystem();
+	CryLogAlways("CXGame::Init - Got entity system");
 
 	// Register game rendering callback.
 	//[Timur] m_p3DEngine->SetRenderCallback( OnRenderCallback,this );
 	
 	// init subsystems
 #ifndef _XBOX
-	m_pServerSnooper=m_pNetwork->CreateServerSnooper(this);
-	m_pNETServerSnooper=m_pNetwork->CreateNETServerSnooper(this);
-	m_pRConSystem=m_pNetwork->CreateRConSystem();
+	// Networking disabled for macOS - not a priority for initial port
+	CryLogAlways("CXGame::Init - Networking disabled for macOS");
+	m_pServerSnooper = NULL;
+	m_pNETServerSnooper = NULL;
+	m_pRConSystem = NULL;
 #endif
+	CryLogAlways("CXGame::Init - Creating game subsystems");
 	m_pWeaponSystemEx = new CWeaponSystemEx();
+	CryLogAlways("CXGame::Init - Weapon system created");
 	m_pVehicleSystem = new CVehicleSystem();
+	CryLogAlways("CXGame::Init - Vehicle system created");
 	m_pPlayerSystem = new CPlayerSystem();
+	CryLogAlways("CXGame::Init - Player system created");
 	m_pFlockManager = new CFlockManager(m_pSystem);
+	CryLogAlways("CXGame::Init - Flock manager created");
 
-	CScriptObjectUI::InitializeTemplate(m_pScriptSystem);
+	if (m_pScriptSystem) {
+		CScriptObjectUI::InitializeTemplate(m_pScriptSystem);
+	} else {
+		CryLogAlways("CXGame::Init - ScriptSystem is NULL, skipping ScriptObjectUI");
+	}
 
-	// init is not necessary for now, but add here if it later is
-	m_pScriptObjectGame=new CScriptObjectGame;
-	CScriptObjectGame::InitializeTemplate(m_pScriptSystem);
+		// init is not necessary for now, but add here if it later is
+		m_pScriptObjectGame=new CScriptObjectGame;
+		CScriptObjectGame::InitializeTemplate(m_pScriptSystem);
 
-	m_pScriptObjectInput=new CScriptObjectInput;
-	CScriptObjectInput::InitializeTemplate(m_pScriptSystem);
-	m_pScriptObjectLanguage=new CScriptObjectLanguage;
-	CScriptObjectLanguage::InitializeTemplate(m_pScriptSystem);
-	m_pScriptObjectBoids = new CScriptObjectBoids;
-	CScriptObjectBoids::InitializeTemplate(m_pScriptSystem);
-	m_pScriptObjectAI = new CScriptObjectAI;
-	CScriptObjectAI::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectServer::InitializeTemplate(m_pScriptSystem);
+		m_pScriptObjectInput=new CScriptObjectInput;
+		CScriptObjectInput::InitializeTemplate(m_pScriptSystem);
+		m_pScriptObjectLanguage=new CScriptObjectLanguage;
+		CScriptObjectLanguage::InitializeTemplate(m_pScriptSystem);
+		m_pScriptObjectBoids = new CScriptObjectBoids;
+		CScriptObjectBoids::InitializeTemplate(m_pScriptSystem);
+		m_pScriptObjectAI = new CScriptObjectAI;
+		CScriptObjectAI::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectServer::InitializeTemplate(m_pScriptSystem);
 
-	CScriptObjectPlayer::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectFireParam::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectWeaponClass::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectVehicle::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectSpectator::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectAdvCamSystem::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectSynched2DTable::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectRenderer::InitializeTemplate(m_pScriptSystem);
-
-
-	m_pScriptObjectGame->Init(m_pScriptSystem, this);
-	m_pScriptObjectInput->Init(m_pScriptSystem,this,m_pSystem);
+		CScriptObjectPlayer::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectFireParam::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectWeaponClass::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectVehicle::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectSpectator::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectAdvCamSystem::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectSynched2DTable::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectRenderer::InitializeTemplate(m_pScriptSystem);
 
 
-	m_pScriptObjectBoids->Init(m_pScriptSystem,m_pSystem,m_pFlockManager);
-	m_pScriptObjectLanguage->Init(m_pScriptSystem,&m_StringTableMgr);
-	m_pScriptObjectAI->Init(m_pScriptSystem,m_pSystem,this);
+		m_pScriptObjectGame->Init(m_pScriptSystem, this);
+		m_pScriptObjectInput->Init(m_pScriptSystem,this,m_pSystem);
 
-	CScriptObjectServerSlot::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectClient::InitializeTemplate(m_pScriptSystem);
-	CScriptObjectStream::InitializeTemplate(m_pScriptSystem);
-	
-	m_pScriptTimerMgr=new CScriptTimerMgr(m_pScriptSystem,m_pSystem->GetIEntitySystem(),this);
 
-// making some constants accessable to the script
-	m_pScriptSystem->SetGlobalValue("FireActivation_OnPress",ePressing);
-	m_pScriptSystem->SetGlobalValue("FireActivation_OnRelease",eReleasing);
-	m_pScriptSystem->SetGlobalValue("FireActivation_OnHold",eHolding);
-	
-	m_pScriptSystem->SetGlobalValue("ENTITYTYPE_PLAYER", ENTITYTYPE_PLAYER);
-	m_pScriptSystem->SetGlobalValue("ENTITYTYPE_WAYPOINT", ENTITYTYPE_WAYPOINT);
-	m_pScriptSystem->SetGlobalValue("ENTITYTYPE_OWNTEAM", ENTITYTYPE_OWNTEAM);
+		m_pScriptObjectBoids->Init(m_pScriptSystem,m_pSystem,m_pFlockManager);
+		m_pScriptObjectLanguage->Init(m_pScriptSystem,&m_StringTableMgr);
+		m_pScriptObjectAI->Init(m_pScriptSystem,m_pSystem,this);
+
+		CScriptObjectServerSlot::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectClient::InitializeTemplate(m_pScriptSystem);
+		CScriptObjectStream::InitializeTemplate(m_pScriptSystem);
+		
+		m_pScriptTimerMgr=new CScriptTimerMgr(m_pScriptSystem,m_pSystem->GetIEntitySystem(),this);
+
+		// making some constants accessable to the script
+		m_pScriptSystem->SetGlobalValue("FireActivation_OnPress",ePressing);
+		m_pScriptSystem->SetGlobalValue("FireActivation_OnRelease",eReleasing);
+		m_pScriptSystem->SetGlobalValue("FireActivation_OnHold",eHolding);
+		
+		m_pScriptSystem->SetGlobalValue("ENTITYTYPE_PLAYER", ENTITYTYPE_PLAYER);
+		m_pScriptSystem->SetGlobalValue("ENTITYTYPE_WAYPOINT", ENTITYTYPE_WAYPOINT);
+		m_pScriptSystem->SetGlobalValue("ENTITYTYPE_OWNTEAM", ENTITYTYPE_OWNTEAM);
 
 /*	m_pScriptSystem->SetGlobalValue("CMD_GO", CMD_GO);
 	m_pScriptSystem->SetGlobalValue("CMD_ATTACK", CMD_ATTACK);
@@ -633,35 +665,61 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	m_pScriptSystem->SetGlobalValue("CMD_COVER", CMD_COVER);
 	m_pScriptSystem->SetGlobalValue("CMD_BARRAGEFIRE", CMD_BARRAGEFIRE);*/
 
+	m_pLog->Log("CXGame::Init - Calling InitConsoleVars");
 	InitConsoleVars();
+	m_pLog->Log("CXGame::Init - InitConsoleVars COMPLETED");
 
 	if (szGameMod && szGameMod[0])
 	{
+		m_pLog->Log("CXGame::Init - Applying game mod: %s", szGameMod);
 		// apply the mod without restarting as the game just started!
 		GetModsInterface()->SetCurrentMod(szGameMod,false);
 	}
 	
+	m_pLog->Log("CXGame::Init - Calling InitClassRegistry");
 	InitClassRegistry();
+	m_pLog->Log("CXGame::Init - InitClassRegistry done");
 		
 	// execute the "main"-script (to pre-load other scripts, etc.)
-	m_pScriptSystem->ExecuteFile("scripts/main.lua");
-	m_pScriptSystem->BeginCall("Init");
-	m_pScriptSystem->PushFuncParam(0);
-	m_pScriptSystem->EndCall();
+	if (m_pScriptSystem) {
+		m_pLog->Log("CXGame::Init - Executing main.lua");
+		m_pScriptSystem->ExecuteFile("scripts/main.lua");
+		m_pScriptSystem->BeginCall("Init");
+		m_pScriptSystem->PushFuncParam(0);
+		m_pScriptSystem->EndCall();
+		m_pLog->Log("CXGame::Init - main.lua executed");
+	} else {
+		m_pLog->Log("CXGame::Init - WARNING: Skipping main.lua (no script system)");
+	}
 
 	// initialize the surface-manager
+	m_pLog->Log("CXGame::Init - Initializing surface manager");
 	m_XSurfaceMgr.Init(m_pScriptSystem,m_p3DEngine,GetSystem()->GetIPhysicalWorld());
+	m_pLog->Log("CXGame::Init - Surface manager initialized");
 	
 	// init key-bindings
-	if(!m_bDedicatedServer)
+	if(!m_bDedicatedServer && m_pIActionMapManager) {
+		m_pLog->Log("CXGame::Init - Calling InitInputMap");
 		InitInputMap();
+		m_pLog->Log("CXGame::Init - InitInputMap done");
+	} else if (!m_pIActionMapManager) {
+		m_pLog->Log("CXGame::Init - Skipping InitInputMap (ActionMapManager not available)");
+	}
 
 	// create various console-commands/variables
+	m_pLog->Log("CXGame::Init - Calling InitConsoleCommands");
 	InitConsoleCommands();
+	m_pLog->Log("CXGame::Init - InitConsoleCommands done");
 	
 	// loading the main language-string-table
-	if (!m_StringTableMgr.Load(GetSystem(),*m_pScriptObjectLanguage,g_language->GetString()))
-		m_pLog->Log("cannot load language file [%s]",g_language->GetString());
+	if (m_pScriptObjectLanguage) {
+		m_pLog->Log("CXGame::Init - Loading language file");
+		if (!m_StringTableMgr.Load(GetSystem(),*m_pScriptObjectLanguage,g_language->GetString()))
+			m_pLog->Log("cannot load language file [%s]",g_language->GetString());
+		m_pLog->Log("CXGame::Init - Language file loaded");
+	} else {
+		m_pLog->Log("CXGame::Init - WARNING: Skipping language file loading (no script object)");
+	}
 		
 	// creating HUD interface
 	m_pLog->Log("Initializing UI");
@@ -680,16 +738,17 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 		m_pSystem->GetIConsole()->ShowConsole(0);
 		if (!bInEditor)
 		{
-			//------------------------------------------------------------------------------------------------- 
-			m_pUISystem = new CUISystem;
+			//-------------------------------------------------------------------------------------------------
+				m_pUISystem = new CUISystem;
 
-			if (m_pUISystem)
-			{
-				m_pUISystem->Create(this, m_pSystem, m_pScriptSystem, "Scripts/MenuScreens/UISystem.lua", 1);
-			}
-			else
-			{
-				m_pLog->Log("Failed to create UI System!");
+				if (m_pUISystem)
+				{
+					m_pUISystem->Create(this, m_pSystem, m_pScriptSystem, "Scripts/MenuScreens/UISystem.lua", 1);
+					m_pLog->Log("CXGame::Init - UI System created successfully");
+				}
+				else
+				{
+					m_pLog->Log("Failed to create UI System!");
 			}
 			//------------------------------------------------------------------------------------------------- 
 		}

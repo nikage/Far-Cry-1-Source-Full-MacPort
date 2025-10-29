@@ -291,7 +291,13 @@ public:
 	enum {g_nPseudoFileIdxOffset = 1};
 
 	// this defines which slash will be kept internally
+#if defined(__APPLE__) || defined(LINUX)
+	// On Unix/macOS, forward slash is native
+	enum {g_cNativeSlash = '/', g_cNonNativeSlash = '\\'};
+#else
+	// On Windows, backslash is native
 	enum {g_cNativeSlash = '\\', g_cNonNativeSlash = '/'};
+#endif
 
   // makes the path lower-case and removes the duplicate and non native slashes
   // may make some other fool-proof stuff

@@ -72,7 +72,11 @@ endif()
 
 # Platform-specific linking
 if(APPLE)
+    # On macOS, CrySystem directly calls CreateGameInstance() and CreateScriptSystem()
+    # instead of dynamic loading, so we need to link these libraries
     target_link_libraries(CrySystem PRIVATE
+        CryGame
+        CryScriptSystem
         ${CORE_FOUNDATION_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
         "-framework Security"
