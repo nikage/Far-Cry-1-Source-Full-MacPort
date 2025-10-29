@@ -1,1 +1,1 @@
-write doc comments of newly created classes/methods 
+run git diff write doc comments classes/methods if needed 

@@ -24,6 +24,8 @@ set(XRENDER_METAL_SOURCES
     MetalVertexDescriptor.h
     MetalRenderElements.cpp
     MetalRenderElements.h
+    MetalOptimizations.cpp
+    MetalOptimizations.h
     SimpleMetalRenderer.cpp
 )
 
@@ -87,6 +89,10 @@ set_source_files_properties(MetalShaderLoader.cpp PROPERTIES
 )
 
 set_source_files_properties(MetalRenderElements.cpp PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalOptimizations.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 
