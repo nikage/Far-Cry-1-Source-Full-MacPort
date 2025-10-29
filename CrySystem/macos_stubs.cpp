@@ -6,11 +6,8 @@ namespace XDOM {
     class IXMLDOMDocument;
 }
 
-// Game instance creation stub
-extern "C" IGame* CreateGameInstance() {
-    // Return nullptr for macOS - game will need to be properly implemented later
-    return nullptr;
-}
+// Note: CreateGameInstance() is properly implemented in CryGame/Game.cpp
+// DO NOT add a stub here as it would override the real implementation
 
 // XML DOM creation stub  
 XDOM::IXMLDOMDocument* CreateDOMDocument() {
