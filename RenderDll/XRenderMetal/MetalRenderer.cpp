@@ -20,56 +20,80 @@
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 #include <cstdio>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 
 /**
  * @def DLL_EXPORT
  * @brief Platform-specific macro for DLL symbol export
- * 
+ *
  * On macOS, this expands to __attribute__((visibility("default"))) which
  * ensures the symbol is visible for dynamic linking. This is required for
  * the game engine to find PackageRenderConstructor() via dlsym().
- * 
+ *
  * @platform_specific
  * - macOS: Uses GCC/Clang visibility attribute
  * - Other: Empty macro (relies on default visibility)
- * 
+ *
  * @build_configuration
  * Requires -fvisibility=hidden compiler flag for this to be effective.
  * Without that flag, all symbols are visible by default anyway.
- * 
+ *
  * @see PackageRenderConstructor() (uses this macro)
  */
 #ifndef DLL_EXPORT
-  #if defined(__APPLE__) && defined(__MACH__)
-    #define DLL_EXPORT __attribute__((visibility("default")))
-  #else
-    #define DLL_EXPORT
-  #endif
+#if defined(__APPLE__) && defined(__MACH__)
+#define DLL_EXPORT __attribute__((visibility("default")))
+#else
+#define DLL_EXPORT
+#endif
 #endif
 
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr) {
   // Initialize specialized managers
-  InitializeManagers();
+  bool success = InitializeManagers();
+  assert(success && "CMetalRenderer::CMetalRenderer: Failed to initialize managers!");
+  assert(m_textureManager && "CMetalRenderer::CMetalRenderer: Texture manager is null after initialization!");
+  assert(m_shaderManager && "CMetalRenderer::CMetalRenderer: Shader manager is null after initialization!");
+  assert(m_utilityRenderer && "CMetalRenderer::CMetalRenderer: Utility renderer is null after initialization!");
 }
 
-CMetalRenderer::~CMetalRenderer() { ShutdownManagers(); }
+CMetalRenderer::~CMetalRenderer() {
+  assert(m_textureManager && "CMetalRenderer::~CMetalRenderer: Texture manager is null during destruction!");
+  assert(m_shaderManager && "CMetalRenderer::~CMetalRenderer: Shader manager is null during destruction!");
+  assert(m_utilityRenderer && "CMetalRenderer::~CMetalRenderer: Utility renderer is null during destruction!");
+  
+  ShutdownManagers();
+  
+  assert(!m_textureManager && "CMetalRenderer::~CMetalRenderer: Texture manager not released!");
+  assert(!m_shaderManager && "CMetalRenderer::~CMetalRenderer: Shader manager not released!");
+  assert(!m_utilityRenderer && "CMetalRenderer::~CMetalRenderer: Utility renderer not released!");
+}
 
 // Texture management delegation
 void CMetalRenderer::SetTexture(int tnum, ETexType Type) {
+  assert(m_textureManager && "SetTexture: Texture manager is null!");
+  assert(tnum >= 0 && "SetTexture: Texture number cannot be negative!");
+  
   m_textureManager->SetTexture(tnum, Type);
 }
 
-void CMetalRenderer::SetWhiteTexture() { m_textureManager->SetWhiteTexture(); }
+void CMetalRenderer::SetWhiteTexture() {
+  assert(m_textureManager && "SetWhiteTexture: Texture manager is null!");
+  m_textureManager->SetWhiteTexture();
+}
 
 unsigned int
 CMetalRenderer::DownLoadToVideoMemory(unsigned char *data, int w, int h,
                                       ETEX_Format eTFSrc, ETEX_Format eTFDst,
                                       int nummipmap, bool repeat, int filter,
                                       int Id, char *szCacheName, int flags) {
+  assert(m_textureManager && "DownLoadToVideoMemory: Texture manager is null!");
+  assert(data && "DownLoadToVideoMemory: Data cannot be null!");
+  assert(w > 0 && h > 0 && "DownLoadToVideoMemory: Dimensions must be positive!");
+  
   if (!m_textureManager)
     return 0;
 
@@ -82,6 +106,10 @@ void CMetalRenderer::UpdateTextureInVideoMemory(uint tnum,
                                                 unsigned char *newdata,
                                                 int posx, int posy, int w,
                                                 int h, ETEX_Format eTF) {
+  assert(m_textureManager && "UpdateTextureInVideoMemory: Texture manager is null!");
+  assert(newdata && "UpdateTextureInVideoMemory: Data cannot be null!");
+  assert(w > 0 && h > 0 && "UpdateTextureInVideoMemory: Dimensions must be positive!");
+  assert(posx >= 0 && posy >= 0 && "UpdateTextureInVideoMemory: Position cannot be negative!");
 
   m_textureManager->UpdateTextureInVideoMemory(tnum, newdata, posx, posy, w, h,
                                                eTF);
@@ -90,6 +118,9 @@ void CMetalRenderer::UpdateTextureInVideoMemory(uint tnum,
 unsigned int CMetalRenderer::LoadTexture(const char *filename, int *tex_type,
                                          unsigned int def_tid,
                                          bool compresstodisk, bool bWarn) {
+  assert(m_textureManager && "LoadTexture: Texture manager is null!");
+  assert(filename && "LoadTexture: Filename cannot be null!");
+  assert(filename[0] != '\0' && "LoadTexture: Filename cannot be empty!");
 
   return m_textureManager->LoadTexture(filename, tex_type, def_tid,
                                        compresstodisk, bWarn);
@@ -137,21 +168,18 @@ bool CMetalRenderer::FontUploadTexture(class CFBitmap *bitmap,
                                        ETEX_Format eTF) {
 
   return m_textureManager->FontUploadTexture(bitmap, eTF);
-  return false;
 }
 
 int CMetalRenderer::FontCreateTexture(int Width, int Height, byte *pData,
                                       ETEX_Format eTF) {
 
   return m_textureManager->FontCreateTexture(Width, Height, pData, eTF);
-  return 0;
 }
 
 bool CMetalRenderer::FontUpdateTexture(int nTexId, int X, int Y, int USize,
                                        int VSize, byte *pData) {
 
   return m_textureManager->FontUpdateTexture(nTexId, X, Y, USize, VSize, pData);
-  return false;
 }
 
 void CMetalRenderer::FontReleaseTexture(class CFBitmap *pBmp) {
@@ -189,86 +217,75 @@ void CMetalRenderer::FontRestoreRenderingState() {
 // Shader system delegation
 bool CMetalRenderer::EF_PrecacheResource(IShader *pSH, float fDist,
                                          float fTimeToReady, int Flags) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_PrecacheResource(pSH, fDist, fTimeToReady,
-                                                Flags);
-  return false;
+
+  return m_shaderManager->EF_PrecacheResource(pSH, fDist, fTimeToReady, Flags);
 }
 
 bool CMetalRenderer::EF_PrecacheResource(ITexPic *pTP, float fDist,
                                          float fTimeToReady, int Flags) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_PrecacheResource(pTP, fDist, fTimeToReady,
-                                                Flags);
-  return false;
+
+  return m_shaderManager->EF_PrecacheResource(pTP, fDist, fTimeToReady, Flags);
 }
 
 bool CMetalRenderer::EF_PrecacheResource(CLeafBuffer *pPB, float fDist,
                                          float fTimeToReady, int Flags) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_PrecacheResource(pPB, fDist, fTimeToReady,
-                                                Flags);
-  return false;
+
+  return m_shaderManager->EF_PrecacheResource(pPB, fDist, fTimeToReady, Flags);
 }
 
 bool CMetalRenderer::EF_PrecacheResource(CDLight *pLS, float fDist,
                                          float fTimeToReady, int Flags) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_PrecacheResource(pLS, fDist, fTimeToReady,
-                                                Flags);
-  return false;
+
+  return m_shaderManager->EF_PrecacheResource(pLS, fDist, fTimeToReady, Flags);
 }
 
 void CMetalRenderer::EF_EnableHeatVision(bool bEnable) {
-  if (m_shaderManager)
-    m_shaderManager->EF_EnableHeatVision(bEnable);
+
+  m_shaderManager->EF_EnableHeatVision(bEnable);
 }
 
 bool CMetalRenderer::EF_GetHeatVision() {
-  if (m_shaderManager)
-    return m_shaderManager->EF_GetHeatVision();
-  return false;
+
+  return m_shaderManager->EF_GetHeatVision();
 }
 
 void CMetalRenderer::EF_PolygonOffset(bool bEnable, float fFactor,
                                       float fUnits) {
-  if (m_shaderManager)
-    m_shaderManager->EF_PolygonOffset(bEnable, fFactor, fUnits);
+
+  m_shaderManager->EF_PolygonOffset(bEnable, fFactor, fUnits);
 }
 
 void CMetalRenderer::EF_AddPolyToScene3D(int Ef, int numPts, SColorVert *verts,
                                          CCObject *obj, int nFogID) {
-  if (m_shaderManager)
-    m_shaderManager->EF_AddPolyToScene3D(Ef, numPts, verts, obj, nFogID);
+
+  m_shaderManager->EF_AddPolyToScene3D(Ef, numPts, verts, obj, nFogID);
 }
 
 CCObject *CMetalRenderer::EF_AddSpriteToScene(int Ef, int numPts,
                                               SColorVert *verts, CCObject *obj,
                                               byte *inds, int ninds,
                                               int nFogID) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_AddSpriteToScene(Ef, numPts, verts, obj, inds,
-                                                ninds, nFogID);
-  return nullptr;
+
+  return m_shaderManager->EF_AddSpriteToScene(Ef, numPts, verts, obj, inds,
+                                              ninds, nFogID);
 }
 
 void CMetalRenderer::EF_AddPolyToScene2D(int Ef, int numPts,
                                          SColorVert2D *verts) {
-  if (m_shaderManager)
-    m_shaderManager->EF_AddPolyToScene2D(Ef, numPts, verts);
+
+  m_shaderManager->EF_AddPolyToScene2D(Ef, numPts, verts);
 }
 
 void CMetalRenderer::EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts,
                                          SColorVert2D *verts) {
-  if (m_shaderManager)
-    m_shaderManager->EF_AddPolyToScene2D(si, nTempl, numPts, verts);
+
+  m_shaderManager->EF_AddPolyToScene2D(si, nTempl, numPts, verts);
 }
 
 IShader *CMetalRenderer::EF_LoadShader(const char *name, EShClass Class,
                                        int flags, uint64 nMaskGen) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_LoadShader(name, Class, flags, nMaskGen);
-  return nullptr;
+
+  return m_shaderManager->EF_LoadShader(name, Class, flags, nMaskGen);
 }
 
 SShaderItem CMetalRenderer::EF_LoadShaderItem(const char *name, EShClass Class,
@@ -276,38 +293,34 @@ SShaderItem CMetalRenderer::EF_LoadShaderItem(const char *name, EShClass Class,
                                               const char *templName, int flags,
                                               SInputShaderResources *Res,
                                               uint64 nMaskGen) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_LoadShaderItem(name, Class, bShare, templName,
-                                              flags, Res, nMaskGen);
-  return SShaderItem();
+
+  return m_shaderManager->EF_LoadShaderItem(name, Class, bShare, templName,
+                                            flags, Res, nMaskGen);
 }
 
 bool CMetalRenderer::EF_ReloadFile(const char *szFileName) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_ReloadFile(szFileName);
-  return false;
+
+  return m_shaderManager->EF_ReloadFile(szFileName);
 }
 
 void CMetalRenderer::EF_ReloadShaderFiles(int nCategory) {
-  if (m_shaderManager)
-    m_shaderManager->EF_ReloadShaderFiles(nCategory);
+
+  m_shaderManager->EF_ReloadShaderFiles(nCategory);
 }
 
 void CMetalRenderer::EF_ReloadTextures() {
-  if (m_shaderManager)
-    m_shaderManager->EF_ReloadTextures();
+
+  m_shaderManager->EF_ReloadTextures();
 }
 
 IShader *CMetalRenderer::EF_CopyShader(IShader *ef) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_CopyShader(ef);
-  return nullptr;
+
+  return m_shaderManager->EF_CopyShader(ef);
 }
 
 ITexPic *CMetalRenderer::EF_GetTextureByID(int Id) {
 
   return m_textureManager->EF_GetTextureByID(Id);
-  return nullptr;
 }
 
 ITexPic *CMetalRenderer::EF_LoadTexture(const char *nameTex, uint flags,
@@ -316,219 +329,191 @@ ITexPic *CMetalRenderer::EF_LoadTexture(const char *nameTex, uint flags,
 
   return m_textureManager->EF_LoadTexture(nameTex, flags, flags2, eTT, fAmount1,
                                           fAmount2, Id, BindId);
-  return nullptr;
 }
 
 int CMetalRenderer::EF_LoadLightmap(const char *name) {
 
   return m_textureManager->EF_LoadLightmap(name);
-  return 0;
 }
 
 bool CMetalRenderer::EF_ScanEnvironmentCM(const char *name, int size,
                                           Vec3 &Pos) {
 
   return m_textureManager->EF_ScanEnvironmentCM(name, size, Pos);
-  return false;
 }
 
 int CMetalRenderer::EF_ReadAllImgFiles(IShader *ef, SShaderTexUnit *tl,
                                        STexAnim *ta, char *name) {
 
   return m_textureManager->EF_ReadAllImgFiles(ef, tl, ta, name);
-  return 0;
 }
 
 char **CMetalRenderer::EF_GetShadersForFile(const char *File, int num) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_GetShadersForFile(File, num);
-  return nullptr;
+
+  return m_shaderManager->EF_GetShadersForFile(File, num);
 }
 
 SLightMaterial *CMetalRenderer::EF_GetLightMaterial(char *Str) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_GetLightMaterial(Str);
-  return nullptr;
+
+  return m_shaderManager->EF_GetLightMaterial(Str);
 }
 
 bool CMetalRenderer::EF_RegisterTemplate(int nTemplId, char *Name,
                                          bool bReplace) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_RegisterTemplate(nTemplId, Name, bReplace);
-  return false;
+
+  return m_shaderManager->EF_RegisterTemplate(nTemplId, Name, bReplace);
 }
 
 void CMetalRenderer::EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce,
                                   int Id) {
-  if (m_shaderManager)
-    m_shaderManager->EF_AddSplash(Pos, eST, fForce, Id);
+
+  m_shaderManager->EF_AddSplash(Pos, eST, fForce, Id);
 }
 
 bool CMetalRenderer::EF_HideTemplate(const char *name) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_HideTemplate(name);
-  return false;
+
+  return m_shaderManager->EF_HideTemplate(name);
 }
 
 bool CMetalRenderer::EF_UnhideTemplate(const char *name) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_UnhideTemplate(name);
-  return false;
+
+  return m_shaderManager->EF_UnhideTemplate(name);
 }
 
 bool CMetalRenderer::EF_UnhideAllTemplates() {
-  if (m_shaderManager)
-    return m_shaderManager->EF_UnhideAllTemplates();
-  return false;
+
+  return m_shaderManager->EF_UnhideAllTemplates();
 }
 
 bool CMetalRenderer::EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex,
                                      float fScale, bool bAdditive) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_SetLightHole(vPos, vNormal, idTex, fScale,
-                                            bAdditive);
-  return false;
+
+  return m_shaderManager->EF_SetLightHole(vPos, vNormal, idTex, fScale,
+                                          bAdditive);
 }
 
 CRendElement *CMetalRenderer::EF_CreateRE(EDataType edt) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_CreateRE(edt);
-  return nullptr;
+
+  return m_shaderManager->EF_CreateRE(edt);
 }
 
-void CMetalRenderer::EF_StartEf() {
-  if (m_shaderManager)
-    m_shaderManager->EF_StartEf();
-}
+void CMetalRenderer::EF_StartEf() { m_shaderManager->EF_StartEf(); }
 
 CCObject *CMetalRenderer::EF_GetObject(bool bTemp, int num) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_GetObject(bTemp, num);
-  return nullptr;
+
+  return m_shaderManager->EF_GetObject(bTemp, num);
 }
 
 void CMetalRenderer::EF_AddEf(int NumFog, CRendElement *re, IShader *ef,
                               SRenderShaderResources *sr, CCObject *obj,
                               int nTempl, IShader *efState, int nSort) {
-  if (m_shaderManager)
-    m_shaderManager->EF_AddEf(NumFog, re, ef, sr, obj, nTempl, efState, nSort);
+
+  m_shaderManager->EF_AddEf(NumFog, re, ef, sr, obj, nTempl, efState, nSort);
 }
 
 void CMetalRenderer::EF_EndEf3D(int nFlags) {
-  if (m_shaderManager)
-    m_shaderManager->EF_EndEf3D(nFlags);
+
+  m_shaderManager->EF_EndEf3D(nFlags);
 }
 
 bool CMetalRenderer::EF_IsFakeDLight(CDLight *Source) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_IsFakeDLight(Source);
-  return false;
+
+  return m_shaderManager->EF_IsFakeDLight(Source);
 }
 
 void CMetalRenderer::EF_ADDDlight(CDLight *Source) {
-  if (m_shaderManager)
-    m_shaderManager->EF_ADDDlight(Source);
+
+  m_shaderManager->EF_ADDDlight(Source);
 }
 
 void CMetalRenderer::EF_ClearLightsList() {
-  if (m_shaderManager)
-    m_shaderManager->EF_ClearLightsList();
+
+  m_shaderManager->EF_ClearLightsList();
 }
 
 bool CMetalRenderer::EF_UpdateDLight(CDLight *pDL) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_UpdateDLight(pDL);
-  return false;
+
+  return m_shaderManager->EF_UpdateDLight(pDL);
 }
 
 void CMetalRenderer::EF_EndEf2D(bool bSort) {
-  if (m_shaderManager)
-    m_shaderManager->EF_EndEf2D(bSort);
+
+  m_shaderManager->EF_EndEf2D(bSort);
 }
 
 bool CMetalRenderer::EF_DrawEfForName(char *name, float x, float y, float width,
                                       float height, CFColor &col, int nTempl) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawEfForName(name, x, y, width, height, col,
-                                             nTempl);
-  return false;
+
+  return m_shaderManager->EF_DrawEfForName(name, x, y, width, height, col,
+                                           nTempl);
 }
 
 bool CMetalRenderer::EF_DrawEfForNum(int num, float x, float y, float width,
                                      float height, CFColor &col, int nTempl) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawEfForNum(num, x, y, width, height, col,
-                                            nTempl);
-  return false;
+
+  return m_shaderManager->EF_DrawEfForNum(num, x, y, width, height, col,
+                                          nTempl);
 }
 
 bool CMetalRenderer::EF_DrawEf(IShader *ef, float x, float y, float width,
                                float height, CFColor &col, int nTempl) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawEf(ef, x, y, width, height, col, nTempl);
-  return false;
+
+  return m_shaderManager->EF_DrawEf(ef, x, y, width, height, col, nTempl);
 }
 
 bool CMetalRenderer::EF_DrawEf(SShaderItem si, float x, float y, float width,
                                float height, CFColor &col, int nTempl) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawEf(si, x, y, width, height, col, nTempl);
-  return false;
+
+  return m_shaderManager->EF_DrawEf(si, x, y, width, height, col, nTempl);
 }
 
 bool CMetalRenderer::EF_DrawPartialEfForName(char *name, SVrect *vr, SVrect *pr,
                                              CFColor &col) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawPartialEfForName(name, vr, pr, col);
-  return false;
+
+  return m_shaderManager->EF_DrawPartialEfForName(name, vr, pr, col);
 }
 
 bool CMetalRenderer::EF_DrawPartialEfForNum(int num, SVrect *vr, SVrect *pr,
                                             CFColor &col) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawPartialEfForNum(num, vr, pr, col);
-  return false;
+
+  return m_shaderManager->EF_DrawPartialEfForNum(num, vr, pr, col);
 }
 
 bool CMetalRenderer::EF_DrawPartialEf(IShader *ef, SVrect *vr, SVrect *pr,
                                       CFColor &col, float iwdt, float ihgt) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_DrawPartialEf(ef, vr, pr, col, iwdt, ihgt);
-  return false;
+
+  return m_shaderManager->EF_DrawPartialEf(ef, vr, pr, col, iwdt, ihgt);
 }
 
 void *CMetalRenderer::EF_Query(int Query, int Param) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_Query(Query, Param);
-  return nullptr;
+
+  return m_shaderManager->EF_Query(Query, Param);
 }
 
 void CMetalRenderer::EF_ConstructEf(IShader *Ef) {
-  if (m_shaderManager)
-    m_shaderManager->EF_ConstructEf(Ef);
+
+  m_shaderManager->EF_ConstructEf(Ef);
 }
 
 void CMetalRenderer::EF_SetWorldColor(float r, float g, float b, float a) {
-  if (m_shaderManager)
-    m_shaderManager->EF_SetWorldColor(r, g, b, a);
+
+  m_shaderManager->EF_SetWorldColor(r, g, b, a);
 }
 
 int CMetalRenderer::EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ,
                                          CFColor color, int nIndex,
                                          bool bCaustics) {
-  if (m_shaderManager)
-    return m_shaderManager->EF_RegisterFogVolume(fMaxFogDist, fFogLayerZ, color,
-                                                 nIndex, bCaustics);
-  return 0;
+
+  return m_shaderManager->EF_RegisterFogVolume(fMaxFogDist, fFogLayerZ, color,
+                                               nIndex, bCaustics);
 }
 
 // LeafBuffer delegation
 CLeafBuffer *
 CMetalRenderer::CreateLeafBuffer(bool bDynamic, const char *szSource,
                                  class CIndexedMesh *pIndexedMesh) {
-  if (m_shaderManager)
-    return m_shaderManager->CreateLeafBuffer(bDynamic, szSource, pIndexedMesh);
-  return nullptr;
+
+  return m_shaderManager->CreateLeafBuffer(bDynamic, szSource, pIndexedMesh);
 }
 
 CLeafBuffer *CMetalRenderer::CreateLeafBufferInitialized(
@@ -537,17 +522,15 @@ CLeafBuffer *CMetalRenderer::CreateLeafBufferInitialized(
     EBufferType eBufType, int nMatInfoCount, int nClientTextureBindID,
     bool (*PrepareBufferCallback)(CLeafBuffer *, bool), void *CustomData,
     bool bOnlyVideoBuffer, bool bPrecache) {
-  if (m_shaderManager)
-    return m_shaderManager->CreateLeafBufferInitialized(
-        pVertBuffer, nVertCount, nVertFormat, pIndices, nIndices,
-        nPrimetiveType, szSource, eBufType, nMatInfoCount, nClientTextureBindID,
-        PrepareBufferCallback, CustomData, bOnlyVideoBuffer, bPrecache);
-  return nullptr;
+
+  return m_shaderManager->CreateLeafBufferInitialized(
+      pVertBuffer, nVertCount, nVertFormat, pIndices, nIndices, nPrimetiveType,
+      szSource, eBufType, nMatInfoCount, nClientTextureBindID,
+      PrepareBufferCallback, CustomData, bOnlyVideoBuffer, bPrecache);
 }
 
 void CMetalRenderer::DeleteLeafBuffer(CLeafBuffer *pLBuffer) {
-  if (m_shaderManager)
-    m_shaderManager->DeleteLeafBuffer(pLBuffer);
+  m_shaderManager->DeleteLeafBuffer(pLBuffer);
 }
 
 // Utility rendering delegation
@@ -591,12 +574,17 @@ int CMetalRenderer::SetPolygonMode(int mode) {
 // Additional utility methods would be delegated similarly...
 
 bool CMetalRenderer::InitializeManagers() {
+  assert(!m_textureManager && "InitializeManagers: Texture manager already exists!");
+  assert(!m_shaderManager && "InitializeManagers: Shader manager already exists!");
+  assert(!m_utilityRenderer && "InitializeManagers: Utility renderer already exists!");
+  
   // Initialize texture manager
   m_textureManager = std::make_unique<CMetalTextureManager>(this);
   if (!m_textureManager) {
     printf("Error: Failed to create Metal texture manager");
     return false;
   }
+  assert(m_textureManager && "InitializeManagers: Texture manager creation failed!");
 
   // Initialize shader manager
   m_shaderManager =
@@ -605,6 +593,7 @@ bool CMetalRenderer::InitializeManagers() {
     printf("Error: Failed to create Metal shader manager");
     return false;
   }
+  assert(m_shaderManager && "InitializeManagers: Shader manager creation failed!");
 
   // Initialize utility renderer
   m_utilityRenderer = std::make_unique<CMetalUtilityRenderer>(
@@ -613,14 +602,23 @@ bool CMetalRenderer::InitializeManagers() {
     printf("Error: Failed to create Metal utility renderer");
     return false;
   }
+  assert(m_utilityRenderer && "InitializeManagers: Utility renderer creation failed!");
 
   return true;
 }
 
 void CMetalRenderer::ShutdownManagers() {
+  assert(m_utilityRenderer && "ShutdownManagers: Utility renderer is null!");
+  assert(m_shaderManager && "ShutdownManagers: Shader manager is null!");
+  assert(m_textureManager && "ShutdownManagers: Texture manager is null!");
+  
   m_utilityRenderer.reset();
   m_shaderManager.reset();
   m_textureManager.reset();
+  
+  assert(!m_utilityRenderer && "ShutdownManagers: Utility renderer not released!");
+  assert(!m_shaderManager && "ShutdownManagers: Shader manager not released!");
+  assert(!m_textureManager && "ShutdownManagers: Texture manager not released!");
 }
 
 // Export functions for the renderer
@@ -644,6 +642,10 @@ IRenderer *CreateRenderer(int argc, char *argv[], SCryRenderInterface *sp) {
 void CMetalRenderer::DrawBuffer(CVertexBuffer *src, SVertexStream *indicies,
                                 int numindices, int offsindex, int prmode,
                                 int vert_start, int vert_stop, CMatInfo *mi) {
+  assert(src && "DrawBuffer: Vertex buffer cannot be null!");
+  assert(vert_start >= 0 && "DrawBuffer: Vertex start cannot be negative!");
+  assert(vert_stop >= vert_start && "DrawBuffer: Vertex stop must be >= vertex start!");
+  
   if (!src || !m_renderEncoder)
     return;
 
@@ -725,6 +727,10 @@ void CMetalRenderer::DrawBuffer(CVertexBuffer *src, SVertexStream *indicies,
 CVertexBuffer *CMetalRenderer::CreateBuffer(int vertexcount, int vertexformat,
                                             const char *szSource,
                                             bool bDynamic) {
+  assert(m_device && "CreateBuffer: Metal device is null!");
+  assert(vertexcount > 0 && "CreateBuffer: Vertex count must be positive!");
+  assert(vertexformat >= 0 && "CreateBuffer: Vertex format cannot be negative!");
+  
   if (!m_device)
     return nullptr;
 
@@ -739,6 +745,8 @@ CVertexBuffer *CMetalRenderer::CreateBuffer(int vertexcount, int vertexformat,
 }
 
 void CMetalRenderer::ReleaseBuffer(CVertexBuffer *bufptr) {
+  assert(bufptr && "ReleaseBuffer: Buffer pointer cannot be null!");
+  
   if (!bufptr)
     return;
 
@@ -749,6 +757,11 @@ void CMetalRenderer::ReleaseBuffer(CVertexBuffer *bufptr) {
 void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
                                   int vertexcount, bool bUnLock, int nOffs,
                                   int Type) {
+  assert(dest && "UpdateBuffer: Destination buffer cannot be null!");
+  assert(src && "UpdateBuffer: Source data cannot be null!");
+  assert(vertexcount > 0 && "UpdateBuffer: Vertex count must be positive!");
+  assert(nOffs >= 0 && "UpdateBuffer: Offset cannot be negative!");
+  
   if (!dest || !src)
     return;
 
@@ -759,6 +772,10 @@ void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
 
 void CMetalRenderer::CreateIndexBuffer(SVertexStream *dest, const void *src,
                                        int indexcount) {
+  assert(dest && "CreateIndexBuffer: Destination stream cannot be null!");
+  assert(src && "CreateIndexBuffer: Source data cannot be null!");
+  assert(indexcount > 0 && "CreateIndexBuffer: Index count must be positive!");
+  
   if (!dest || !src)
     return;
 
@@ -768,6 +785,10 @@ void CMetalRenderer::CreateIndexBuffer(SVertexStream *dest, const void *src,
 
 void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
                                        int indexcount, bool bUnLock) {
+  assert(dest && "UpdateIndexBuffer: Destination stream cannot be null!");
+  assert(src && "UpdateIndexBuffer: Source data cannot be null!");
+  assert(indexcount > 0 && "UpdateIndexBuffer: Index count must be positive!");
+  
   if (!dest || !src)
     return;
 
@@ -776,6 +797,8 @@ void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
 }
 
 void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
+  assert(dest && "ReleaseIndexBuffer: Destination stream cannot be null!");
+  
   if (!dest)
     return;
 
@@ -1161,6 +1184,9 @@ void CMetalRenderer::MakeCurrent() {
 }
 
 void CMetalRenderer::SetViewport(int x, int y, int width, int height) {
+  assert(width > 0 && height > 0 && "SetViewport: Dimensions must be positive!");
+  assert(x >= 0 && y >= 0 && "SetViewport: Position cannot be negative!");
+  
   if (!m_isInitialized)
     return;
 
@@ -1269,47 +1295,47 @@ void CMetalRenderer::ShutDown(bool bReInit) {
 
 /**
  * @brief Gets the current rendering camera
- * 
+ *
  * This method delegates to the base class (CMetalBaseRenderer) which
  * stores the camera by value. This design avoids camera duplication and
  * ensures a single source of truth for camera state.
- * 
+ *
  * @return Const reference to the current camera object
- * 
+ *
  * @design_rationale
  * Camera is stored in CMetalBaseRenderer::m_camera (not duplicated in
  * CMetalRenderer) to avoid state inconsistency. CMetalRenderer simply
  * delegates to the base class implementation.
- * 
+ *
  * @thread_safety Not thread-safe. Must be called from main render thread.
- * 
+ *
  * @see CMetalBaseRenderer::GetCamera()
  * @see SetCamera()
  */
-const CCamera &CMetalRenderer::GetCamera() { 
+const CCamera &CMetalRenderer::GetCamera() {
   return CMetalBaseRenderer::GetCamera();
 }
 
 /**
  * @brief Sets the current rendering camera
- * 
+ *
  * This method delegates to the base class (CMetalBaseRenderer) which:
  * 1. Stores the camera by value (copies it into m_camera)
  * 2. Updates Metal view and projection matrices
  * 3. Uploads matrices to GPU uniform buffers (if render encoder is active)
- * 
+ *
  * @param cam Camera object to set (copied, not stored by reference)
- * 
+ *
  * @design_rationale
  * Camera is stored by value (not pointer) to avoid lifetime issues.
  * The base class handles all Metal-specific matrix updates.
- * 
+ *
  * @note
  * This copies the entire CCamera object. For performance-critical code,
  * minimize camera changes per frame.
- * 
+ *
  * @thread_safety Not thread-safe. Must be called from main render thread.
- * 
+ *
  * @see CMetalBaseRenderer::SetCamera()
  * @see GetCamera()
  */
@@ -1323,161 +1349,155 @@ void CMetalRenderer::SetCamera(const CCamera &cam) {
 
 /**
  * @brief Creates and initializes a CMetalRenderer instance
- * 
+ *
  * This function is the internal factory that:
  * 1. Allocates a new CMetalRenderer object
  * 2. Parses command-line arguments for display settings (TODO)
  * 3. Calls Init() with appropriate parameters
  * 4. Returns the initialized renderer or nullptr on failure
- * 
+ *
  * @param argc Number of command-line arguments (currently unused)
  * @param argv Array of command-line argument strings (currently unused)
  * @param sp CryEngine render interface (currently unused)
- * 
+ *
  * @return Pointer to initialized IRenderer, or nullptr if initialization failed
- * 
+ *
  * @design_pattern Factory Method
- * 
+ *
  * @error_handling
  * - Returns nullptr if allocation fails
  * - Returns nullptr if Init() fails (deletes renderer before returning)
  * - Logs errors to both console (printf) and /tmp/farcry_metal_create.log
- * 
+ *
  * @display_settings
  * Display settings are obtained from (in order of priority):
  * 1. SCryRenderInterface callbacks (ipGetWidth, ipGetHeight, etc.)
  * 2. Command-line arguments (-width, -height, -fullscreen, -bpp)
  * 3. System defaults from NSScreen (macOS primary display)
  * 4. Hardcoded fallback (800x600) if all else fails
- * 
+ *
  * Supported command-line arguments:
  * - -width <pixels> or --width <pixels>
  * - -height <pixels> or --height <pixels>
  * - -fullscreen or --fullscreen
  * - -bpp <bits> or --bpp <bits>
- * 
+ *
  * @see PackageRenderConstructor() (main DLL entry point)
  * @see CMetalRenderer::Init()
  */
-IRenderer* CreateMetalRendererInstance(int argc, char* argv[], SCryRenderInterface* sp)
-{
-    printf("CreateMetalRendererInstance called\n");
-    
-    FILE* f = fopen("/tmp/farcry_metal_create.log", "w");
+IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
+                                       SCryRenderInterface *sp) {
+  printf("CreateMetalRendererInstance called\n");
+  
+  assert(argc >= 0 && "CreateMetalRendererInstance: argc cannot be negative!");
+
+  FILE *f = fopen("/tmp/farcry_metal_create.log", "w");
+  if (f) {
+    fprintf(f, "Creating CMetalRenderer (new architecture)\n");
+    fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+    fflush(f);
+    fclose(f);
+  }
+
+  CMetalRenderer *renderer = new CMetalRenderer();
+  assert(renderer && "CreateMetalRendererInstance: Failed to allocate CMetalRenderer!");
+  if (!renderer) {
+    printf("ERROR: Failed to allocate CMetalRenderer\n");
     if (f) {
-        fprintf(f, "Creating CMetalRenderer (new architecture)\n");
-        fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
-        fflush(f);
-        fclose(f);
+      fprintf(f, "ERROR: Failed to allocate renderer\n");
+      fclose(f);
     }
-    
-    CMetalRenderer* renderer = new CMetalRenderer();
-    if (!renderer) {
-        printf("ERROR: Failed to allocate CMetalRenderer\n");
-        if (f) {
-            fprintf(f, "ERROR: Failed to allocate renderer\n");
-            fclose(f);
-        }
-        return nullptr;
+    return nullptr;
+  }
+
+  printf("CMetalRenderer created: %p\n", renderer);
+
+  // Get display settings from SCryRenderInterface or system defaults
+  int width = 800;
+  int height = 600;
+  int colorBpp = 32;
+  int depthBpp = 24;
+  int stencilBpp = 8;
+  bool fullscreen = false;
+
+  // Extract display settings from CryEngine render interface
+  if (sp) {
+    // CryEngine provides display settings via SCryRenderInterface
+    if (sp->ipGetWidth)
+      width = sp->ipGetWidth();
+    if (sp->ipGetHeight)
+      height = sp->ipGetHeight();
+    if (sp->ipGetColorBits)
+      colorBpp = sp->ipGetColorBits();
+    if (sp->ipGetDepthBits)
+      depthBpp = sp->ipGetDepthBits();
+    if (sp->ipGetStencilBits)
+      stencilBpp = sp->ipGetStencilBits();
+
+    printf("Display settings from CryEngine: %dx%d, color=%d, depth=%d, "
+           "stencil=%d\n",
+           width, height, colorBpp, depthBpp, stencilBpp);
+  } else {
+    // Fallback: Get primary screen resolution from NSScreen
+    @autoreleasepool {
+      NSScreen *mainScreen = [NSScreen mainScreen];
+      if (mainScreen) {
+        NSRect screenRect = [mainScreen frame];
+        width = (int)screenRect.size.width;
+        height = (int)screenRect.size.height;
+        printf("Display settings from NSScreen: %dx%d\n", width, height);
+      } else {
+        printf(
+            "WARNING: Could not get screen resolution, using defaults: %dx%d\n",
+            width, height);
+      }
     }
-    
-    printf("CMetalRenderer created: %p\n", renderer);
-    
-    // Get display settings from SCryRenderInterface or system defaults
-    int width = 800;
-    int height = 600;
-    int colorBpp = 32;
-    int depthBpp = 24;
-    int stencilBpp = 8;
-    bool fullscreen = false;
-    
-    // Extract display settings from CryEngine render interface
-    if (sp)
-    {
-        // CryEngine provides display settings via SCryRenderInterface
-        if (sp->ipGetWidth)
-            width = sp->ipGetWidth();
-        if (sp->ipGetHeight)
-            height = sp->ipGetHeight();
-        if (sp->ipGetColorBits)
-            colorBpp = sp->ipGetColorBits();
-        if (sp->ipGetDepthBits)
-            depthBpp = sp->ipGetDepthBits();
-        if (sp->ipGetStencilBits)
-            stencilBpp = sp->ipGetStencilBits();
-        
-        printf("Display settings from CryEngine: %dx%d, color=%d, depth=%d, stencil=%d\n",
-               width, height, colorBpp, depthBpp, stencilBpp);
+  }
+
+  // Parse command-line overrides (if provided)
+  for (int i = 0; i < argc - 1; i++) {
+    if (strcmp(argv[i], "-width") == 0 || strcmp(argv[i], "--width") == 0) {
+      width = atoi(argv[i + 1]);
+      i++;
+    } else if (strcmp(argv[i], "-height") == 0 ||
+               strcmp(argv[i], "--height") == 0) {
+      height = atoi(argv[i + 1]);
+      i++;
+    } else if (strcmp(argv[i], "-fullscreen") == 0 ||
+               strcmp(argv[i], "--fullscreen") == 0) {
+      fullscreen = true;
+    } else if (strcmp(argv[i], "-bpp") == 0 || strcmp(argv[i], "--bpp") == 0) {
+      colorBpp = atoi(argv[i + 1]);
+      i++;
     }
-    else
-    {
-        // Fallback: Get primary screen resolution from NSScreen
-        @autoreleasepool
-        {
-            NSScreen* mainScreen = [NSScreen mainScreen];
-            if (mainScreen)
-            {
-                NSRect screenRect = [mainScreen frame];
-                width = (int)screenRect.size.width;
-                height = (int)screenRect.size.height;
-                printf("Display settings from NSScreen: %dx%d\n", width, height);
-            }
-            else
-            {
-                printf("WARNING: Could not get screen resolution, using defaults: %dx%d\n", 
-                       width, height);
-            }
-        }
-    }
-    
-    // Parse command-line overrides (if provided)
-    for (int i = 0; i < argc - 1; i++)
-    {
-        if (strcmp(argv[i], "-width") == 0 || strcmp(argv[i], "--width") == 0)
-        {
-            width = atoi(argv[i + 1]);
-            i++;
-        }
-        else if (strcmp(argv[i], "-height") == 0 || strcmp(argv[i], "--height") == 0)
-        {
-            height = atoi(argv[i + 1]);
-            i++;
-        }
-        else if (strcmp(argv[i], "-fullscreen") == 0 || strcmp(argv[i], "--fullscreen") == 0)
-        {
-            fullscreen = true;
-        }
-        else if (strcmp(argv[i], "-bpp") == 0 || strcmp(argv[i], "--bpp") == 0)
-        {
-            colorBpp = atoi(argv[i + 1]);
-            i++;
-        }
-    }
-    
-    printf("Final renderer settings: %dx%d, color=%dbpp, depth=%dbpp, stencil=%dbpp, fullscreen=%d\n",
-           width, height, colorBpp, depthBpp, stencilBpp, fullscreen);
-    
-    // Initialize the renderer
-    void* result = renderer->Init(0, 0, width, height, colorBpp, depthBpp, stencilBpp, 
-                                   fullscreen, nullptr, nullptr, nullptr, nullptr, false);
-    
-    if (!result) {
-        printf("ERROR: CMetalRenderer::Init() failed!\n");
-        if (f) {
-            fprintf(f, "ERROR: Renderer initialization failed\n");
-            fclose(f);
-        }
-        delete renderer;
-        return nullptr;
-    }
-    
-    printf("CMetalRenderer initialized successfully\n");
+  }
+
+  printf("Final renderer settings: %dx%d, color=%dbpp, depth=%dbpp, "
+         "stencil=%dbpp, fullscreen=%d\n",
+         width, height, colorBpp, depthBpp, stencilBpp, fullscreen);
+
+  // Initialize the renderer
+  void *result =
+      renderer->Init(0, 0, width, height, colorBpp, depthBpp, stencilBpp,
+                     fullscreen, nullptr, nullptr, nullptr, nullptr, false);
+
+  if (!result) {
+    printf("ERROR: CMetalRenderer::Init() failed!\n");
     if (f) {
-        fprintf(f, "SUCCESS: Renderer initialized at %p\n", renderer);
-        fclose(f);
+      fprintf(f, "ERROR: Renderer initialization failed\n");
+      fclose(f);
     }
-    
-    return renderer;
+    delete renderer;
+    return nullptr;
+  }
+
+  printf("CMetalRenderer initialized successfully\n");
+  if (f) {
+    fprintf(f, "SUCCESS: Renderer initialized at %p\n", renderer);
+    fclose(f);
+  }
+
+  return renderer;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1486,104 +1506,107 @@ IRenderer* CreateMetalRendererInstance(int argc, char* argv[], SCryRenderInterfa
 
 /**
  * @brief Main DLL entry point for renderer creation
- * 
+ *
  * This function is called by the FarCry engine during initialization to
  * create the Metal renderer. It must have C linkage and be exported from
  * the DLL with proper visibility.
- * 
+ *
  * @param argc Number of command-line arguments passed by engine
  * @param argv Array of command-line arguments passed by engine
  * @param sp Pointer to CryEngine render interface (for callbacks)
- * 
+ *
  * @return Pointer to initialized IRenderer, or nullptr if creation failed
- * 
+ *
  * @dll_export
  * Symbol is exported with __attribute__((visibility("default"))) on macOS
  * to ensure it's visible to the dynamic linker.
- * 
+ *
  * @calling_convention
  * C calling convention (extern "C") to ensure consistent name mangling
  * across compilers and linker compatibility.
- * 
+ *
  * @lifecycle
  * 1. Engine calls PackageRenderConstructor() during startup
  * 2. This function delegates to CreateMetalRendererInstance()
  * 3. Returns initialized renderer to engine
  * 4. Engine uses returned IRenderer* for all rendering operations
  * 5. Engine calls renderer->Release() on shutdown
- * 
+ *
  * @logging
  * Writes diagnostic logs to:
  * - /tmp/farcry_render_constructor.log (entry point called)
  * - /tmp/farcry_render_created.log (result of creation)
  * - stdout (printf for debugging)
- * 
+ *
  * @example
  * ```cpp
  * // Engine code (System.cpp):
- * typedef IRenderer* (*PFNCREATEMETALRENDERER)(int, char*[], SCryRenderInterface*);
- * 
+ * typedef IRenderer* (*PFNCREATEMETALRENDERER)(int, char*[],
+ * SCryRenderInterface*);
+ *
  * void* hDLL = dlopen("libXRenderMetal.dylib", RTLD_NOW);
- * PFNCREATEMETALRENDERER pfnCreate = 
+ * PFNCREATEMETALRENDERER pfnCreate =
  *     (PFNCREATEMETALRENDERER)dlsym(hDLL, "PackageRenderConstructor");
- * 
+ *
  * IRenderer* renderer = pfnCreate(argc, argv, &renderInterface);
  * if (!renderer) {
  *     FatalError("Failed to create Metal renderer");
  * }
  * ```
- * 
+ *
  * @compatibility
  * This is the standard entry point used by all CryEngine renderers
  * (OpenGL, Direct3D, Metal). The signature must match exactly.
- * 
+ *
  * @see CreateMetalRendererInstance() (internal factory)
  * @see IRenderer (base interface)
  */
-extern "C" DLL_EXPORT IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
-{
-    printf("PackageRenderConstructor called (CMetalRenderer architecture)\n");
-    
-    FILE* f = fopen("/tmp/farcry_render_constructor.log", "w");
-    if (f) {
-        fprintf(f, "PackageRenderConstructor called\n");
-        fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
-        fprintf(f, "Using CMetalRenderer (manager pattern)\n");
-        fflush(f);
-        fclose(f);
+extern "C" DLL_EXPORT IRenderer *
+PackageRenderConstructor(int argc, char *argv[], SCryRenderInterface *sp) {
+  printf("PackageRenderConstructor called (CMetalRenderer architecture)\n");
+
+  FILE *f = fopen("/tmp/farcry_render_constructor.log", "w");
+  if (f) {
+    fprintf(f, "PackageRenderConstructor called\n");
+    fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+    fprintf(f, "Using CMetalRenderer (manager pattern)\n");
+    fflush(f);
+    fclose(f);
+  }
+
+  IRenderer *renderer = CreateMetalRendererInstance(argc, argv, sp);
+
+  f = fopen("/tmp/farcry_render_created.log", "w");
+  if (f) {
+    if (renderer) {
+      fprintf(f, "SUCCESS: CMetalRenderer created and initialized: %p\n",
+              renderer);
+    } else {
+      fprintf(f, "ERROR: CMetalRenderer creation failed!\n");
     }
-    
-    IRenderer* renderer = CreateMetalRendererInstance(argc, argv, sp);
-    
-    f = fopen("/tmp/farcry_render_created.log", "w");
-    if (f) {
-        if (renderer) {
-            fprintf(f, "SUCCESS: CMetalRenderer created and initialized: %p\n", renderer);
-        } else {
-            fprintf(f, "ERROR: CMetalRenderer creation failed!\n");
-        }
-        fflush(f);
-        fclose(f);
-    }
-    
-    return renderer;
+    fflush(f);
+    fclose(f);
+  }
+
+  return renderer;
 }
 
 /**
  * @brief Force symbol export by referencing PackageRenderConstructor
- * 
+ *
  * This static variable ensures that the PackageRenderConstructor symbol
  * is not stripped by the linker during optimization. By creating a
  * reference to the function, we guarantee it will be present in the
  * final DLL for dynamic loading.
- * 
+ *
  * @technical_note
  * Without this reference, aggressive linker optimization might remove
  * the symbol if it appears unused within the DLL itself (even though
  * it's needed for external dynamic loading).
- * 
+ *
  * @see PackageRenderConstructor() (exported function)
  */
-static IRenderer* (*g_PackageRenderConstructor)(int, char*[], SCryRenderInterface*) = PackageRenderConstructor;
+static IRenderer *(*g_PackageRenderConstructor)(
+    int, char *[], SCryRenderInterface *) = PackageRenderConstructor;
 
 #endif // __APPLE__ && __MACH__

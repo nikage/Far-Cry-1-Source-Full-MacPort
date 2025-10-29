@@ -51,6 +51,9 @@ bugprone-unused-raii,
 bugprone-unused-return-value,
 bugprone-use-after-move,
 bugprone-virtual-near-miss,
+clang-analyzer-deadcode.DeadStores,
+clang-diagnostic-unreachable-code,
+clang-diagnostic-unreachable-code-return,
 cert-dcl21-cpp,
 cert-dcl58-cpp,
 cert-err34-c,
@@ -144,3 +147,9 @@ readability-static-definition-in-anonymous-namespace,
 readability-string-compare,
 readability-uniqueptr-delete-release,
 readability-use-anyofallof'
+CheckOptions:
+  - key: readability-redundant-control-flow.WarnOnReturn
+    value: 'true'
+  - key: clang-analyzer-deadcode.DeadStores
+    value: 'true'
+WarningsAsErrors: 'clang-diagnostic-unreachable-code,clang-diagnostic-unreachable-code-return'
