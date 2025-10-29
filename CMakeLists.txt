@@ -132,10 +132,16 @@ endif()
 if(APPLE)
     install(TARGETS FarCryWorking BUNDLE DESTINATION .)
     
-    # Copy all dylibs to the app bundle automatically
+    # Use @executable_path for dylib lookup so they can be found in the app bundle
+    set_target_properties(FarCryWorking PROPERTIES
+        BUILD_RPATH "@executable_path"
+        INSTALL_RPATH "@executable_path"
+    )
+    
+    # Copy all dylibs to the app bundle whenever FarCryWorking or any dylib is rebuilt
     add_custom_command(TARGET FarCryWorking POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        COMMAND ${CMAKE_COMMAND} -E copy 
             $<TARGET_FILE:CrySystem>
             $<TARGET_FILE:Cry3DEngine>
             $<TARGET_FILE:CryEntitySystem>
@@ -151,5 +157,9 @@ if(APPLE)
             $<TARGET_FILE:XRenderMetal>
             ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
         COMMENT "Copying all dylibs to app bundle"
+        DEPENDS 
+            CrySystem Cry3DEngine CryEntitySystem CryAnimation CryInput
+            CryMovie CryPhysics CryAISystem CryFont CryScriptSystem
+            CrySoundSystem CryGame XRenderMetal
     )
 endif()
