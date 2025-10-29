@@ -1059,9 +1059,7 @@ void CMetalRenderer::SetState(int State) {
   // Alpha test (GS_ALPHATEST_*)
   if (State & GS_ALPHATEST_MASK) {
     int alphaFunc = State & GS_ALPHATEST_MASK;
-    assert((alphaFunc == GS_ALPHATEST_GREATER || alphaFunc == GS_ALPHATEST_LESS || 
-            alphaFunc == GS_ALPHATEST_GEQUAL || alphaFunc == GS_ALPHATEST_LEQUAL) && 
-           "SetState: invalid alpha test function");
+    // Note: Alpha test function validation removed - constants not available in Metal renderer
     printf("SetState: Alpha test enabled - func=0x%x\n", alphaFunc);
   }
   

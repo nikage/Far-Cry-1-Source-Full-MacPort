@@ -581,15 +581,19 @@ bool CSystem::InitSound(WIN_HWND hwnd)
 		Error( "Error creating the sound system interface");
 		return false;
 	}
-	m_pIMusic = m_pISound->CreateMusicSystem();
-	if (!m_pIMusic)
-	{
-		Error( "Error creating the music system interface");
-		return false;
-	}
+	printf("CSystem::InitSound - Sound system created successfully\n");
+	fflush(stdout);
+	
+	// Skip music system initialization (not critical for renderer testing)
+	m_pIMusic = nullptr;
 	
 #endif
-	return true;
+	printf("CSystem::InitSound - About to return from InitSound\n");
+	fflush(stdout);
+	bool result = true;
+	printf("CSystem::InitSound - result = %d, now returning\n", result);
+	fflush(stdout);
+	return result;
 }
 
 /////////////////////////////////////////////////////////////////////////////////

@@ -24,8 +24,16 @@
 class CSimpleMacOSMusicSystem : public IMusicSystem
 {
 public:
-    CSimpleMacOSMusicSystem() {}
-    virtual ~CSimpleMacOSMusicSystem() {}
+    CSimpleMacOSMusicSystem() {
+        printf("CSimpleMacOSMusicSystem::constructor - initializing stub music system\n");
+        fflush(stdout);
+        m_pSystem = nullptr;
+        m_bPaused = false;
+    }
+    virtual ~CSimpleMacOSMusicSystem() {
+        printf("CSimpleMacOSMusicSystem::destructor called\n");
+        fflush(stdout);
+    }
     
     // Minimal IMusicSystem interface implementation with debug output
     virtual void Release() override { 
@@ -170,6 +178,10 @@ public:
         printf("CSimpleMacOSMusicSystem::Silence called\n");
         fflush(stdout);
     }
+    
+private:
+    ISystem* m_pSystem;
+    bool m_bPaused;
 };
 
 // Simple macOS sound system that implements ISoundSystem interface
@@ -191,9 +203,25 @@ public:
         /* TODO: Update sound system */ 
     }
     virtual IMusicSystem* CreateMusicSystem() override { 
-        printf("CreateMusicSystem called, returning music system\n");
+        printf("CreateMusicSystem called, about to create CSimpleMacOSMusicSystem\n");
         fflush(stdout);
-        return new CSimpleMacOSMusicSystem(); 
+        
+        CSimpleMacOSMusicSystem* pMusicSystem = nullptr;
+        try {
+            printf("CreateMusicSystem: calling new CSimpleMacOSMusicSystem()\n");
+            fflush(stdout);
+            pMusicSystem = new CSimpleMacOSMusicSystem();
+            printf("CreateMusicSystem: CSimpleMacOSMusicSystem created at %p\n", pMusicSystem);
+            fflush(stdout);
+        } catch (...) {
+            printf("CreateMusicSystem: EXCEPTION creating CSimpleMacOSMusicSystem!\n");
+            fflush(stdout);
+            return nullptr;
+        }
+        
+        printf("CreateMusicSystem: returning music system %p\n", pMusicSystem);
+        fflush(stdout);
+        return pMusicSystem; 
     }
     virtual ISound* LoadSound(const char* szFile, int nFlags) override { 
         printf("CSimpleMacOSSoundSystem::LoadSound called with file=%s\n", szFile ? szFile : "NULL");

@@ -355,12 +355,13 @@ inline void free(void *p) { _CryFree(p); };
 #define free_size			CryModuleFreeSize
 
 #ifdef __cplusplus
-	#ifndef GAMECUBE //I don't know how to compile this on GC
+	// Do NOT override operator new/delete on macOS - causes heap corruption with libc++ std::string
+	#if !defined(__APPLE__) && !defined(GAMECUBE)
 		inline void * __cdecl operator new   (size_t  size) { return CryModuleMalloc(size); } 
 		inline void * __cdecl operator new[](size_t size) { return CryModuleMalloc(size); }; 
 		inline void __cdecl operator delete  (void *p) { CryModuleFree(p); };
 		inline void __cdecl operator delete[](void *p) { CryModuleFree(p); };
-	#endif //GAMECUBE
+	#endif //!__APPLE__ && !GAMECUBE
 #endif //__cplusplus
 
 #endif // USE_NEWPOOL
@@ -369,4 +370,13 @@ inline void free(void *p) { _CryFree(p); };
 
 //#endif // CRYSYSTEM_EXPORTS
 #endif //LINUX
+
+// NOTE: On macOS, do not override operator new/delete globally as it causes
+// heap corruption with libc++ std::string and other standard library types.
+// The macOS standard library allocates memory internally using the system allocator,
+// creating an ABI mismatch when we override new/delete to use CryModuleMalloc.
+// This was discovered via AddressSanitizer showing heap-buffer-overflow in
+// std::string destructor when memory allocated by libc++ system allocator 
+// was freed by CryModuleFree.
+
 #endif //_CRY_MEMORY_MANAGER_H_
