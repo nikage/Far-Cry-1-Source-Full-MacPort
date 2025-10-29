@@ -26,10 +26,11 @@ set(XRENDER_METAL_SOURCES
     MetalRenderElements.h
     MetalOptimizations.cpp
     MetalOptimizations.h
+    MetalImageStubs.cpp
 )
 
 # Create the Metal renderer library
-add_library(XRenderMetal SHARED ${XRENDER_METAL_SOURCES})
+add_library(XRenderMetal SHARED ${XRENDER_METAL_SOURCES} $<TARGET_OBJECTS:RenderCommonObj>)
 
 # Link CryCommon interface and RenderCommon base classes
 target_link_libraries(XRenderMetal PRIVATE 
@@ -92,6 +93,10 @@ set_source_files_properties(MetalRenderElements.cpp PROPERTIES
 )
 
 set_source_files_properties(MetalOptimizations.cpp PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalImageStubs.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 

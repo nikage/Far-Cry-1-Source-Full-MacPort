@@ -38,7 +38,7 @@ void SEvalFuncs_RE::WaveDeform(SDeform *df)
   int Str, StrNRM;
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_REAL | FGP_WAIT);
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
-  if ((int)verts < 256)
+  if ((intptr_t)verts < 256)
     return;
   gRenDev->m_RP.m_pRE->mfUpdateFlags(FCEF_MODIF_VERT);
   int nv = gRenDev->m_RP.m_RendNumVerts;
@@ -81,6 +81,24 @@ void SEvalFuncs_RE::WaveDeform(SDeform *df)
   }
 }
 
+/**
+ * Converts triangle mesh indices to polygon boundary indices.
+ * 
+ * Extracts the boundary polygon from a set of triangles by traversing edges that are not
+ * shared between two triangles. Starting from the first index, the function builds a polygon
+ * by following boundary edges in sequence until the polygon is closed or no more boundary
+ * edges can be found.
+ * 
+ * @param indsSrc    Source array of triangle indices (size: nInds). Triangles are defined
+ *                   as consecutive triplets of indices (e.g., [0,1,2] is first triangle)
+ * @param nInds      Total number of indices in indsSrc (must be divisible by 3)
+ * @param nVerts     Expected number of vertices in the resulting polygon boundary
+ * @param indsDst    Destination array for polygon boundary indices (size: at least nVerts).
+ *                   Will be filled with vertex indices forming the boundary polygon in order
+ * 
+ * @return The actual number of boundary vertices found. Returns nVerts if successful,
+ *         or fewer if the boundary could not be fully traversed
+ */
 static int sTrisIndsToPolyInds(ushort *indsSrc, int nInds, int nVerts, ushort *indsDst)
 {
   int i, j, ii, jj, n;
@@ -576,7 +594,7 @@ void SEvalFuncs_RE::VerticalWaveDeform(SDeform *df)
 
   int Str;
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_REAL | FGP_WAIT);
-  if ((int)verts < 256)
+  if ((intptr_t)verts < 256)
     return;
   gRenDev->m_RP.m_pRE->mfUpdateFlags(FCEF_MODIF_VERT);
   int nv = gRenDev->m_RP.m_RendNumVerts;
@@ -626,7 +644,7 @@ void SEvalFuncs_RE::SqueezeDeform(SDeform *df)
 
   int Str, StrNRM;
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_REAL | FGP_WAIT);
-  if ((int)verts < 256)
+  if ((intptr_t)verts < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
   gRenDev->m_RP.m_pRE->mfUpdateFlags(FCEF_MODIF_VERT);
@@ -651,7 +669,7 @@ void SEvalFuncs_RE::BulgeDeform(SDeform *df)
   int val;
   int Str, StrNRM, StrTC;
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_REAL | FGP_WAIT);
-  if ((int)verts < 256)
+  if ((intptr_t)verts < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
   byte *tc = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Tex, &StrTC, GL_FLOAT, eSrcPointer_Tex, FGP_SRC | FGP_REAL);
@@ -687,7 +705,7 @@ void SEvalFuncs_RE::ETC_Environment(int ns)
   int StrTC;
   int Str, StrNRM;
   byte *ptr = (byte *)gRenDev->EF_GetPointer((ESrcPointer)(eSrcPointer_Tex+ns), &StrTC, GL_FLOAT, (ESrcPointer)(eSrcPointer_Tex+ns), FGP_REAL | FGP_WAIT);
-  if ((int)ptr < 256)
+  if ((intptr_t)ptr < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_SRC | FGP_REAL);
@@ -730,7 +748,7 @@ void SEvalFuncs_RE::ETC_SphereMap(int ns)
   // the correct texture coordinates.
   int StrTC, StrNRM;
   byte *ptr = (byte *)gRenDev->EF_GetPointer((ESrcPointer)(eSrcPointer_Tex+ns), &StrTC, GL_FLOAT, (ESrcPointer)(eSrcPointer_Tex+ns), FGP_REAL | FGP_WAIT);
-  if ((int)ptr < 256)
+  if ((intptr_t)ptr < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
   int nv = gRenDev->m_RP.m_RendNumVerts;
@@ -765,7 +783,7 @@ void SEvalFuncs_RE::ETC_SphereMapEnvironment(int ns)
   // the correct texture coordinates.
   int StrTC, StrNRM;
   byte *ptr = (byte *)gRenDev->EF_GetPointer((ESrcPointer)(eSrcPointer_Tex+ns), &StrTC, GL_FLOAT, (ESrcPointer)(eSrcPointer_Tex+ns), FGP_REAL | FGP_WAIT);
-  if ((int)ptr < 256)
+  if ((intptr_t)ptr < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
   int nv = gRenDev->m_RP.m_RendNumVerts;
@@ -869,7 +887,7 @@ void SEvalFuncs_RE::ETC_Projection(int ns, float *Mat, float wdt, float hgt)
   int i;
   int Str, StrTC;
   byte *ptr = (byte *)gRenDev->EF_GetPointer((ESrcPointer)(eSrcPointer_Tex+ns), &StrTC, GL_FLOAT, (ESrcPointer)(eSrcPointer_Tex+ns), FGP_REAL | FGP_WAIT);
-  if ((int)ptr < 256)
+  if ((intptr_t)ptr < 256)
     return;
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_SRC | FGP_REAL);
   int nv = gRenDev->m_RP.m_RendNumVerts;
@@ -896,7 +914,7 @@ void SRendItem::mfCalcProjectVectors(int type, float *Mat, float RefractIndex, b
   int StrV, StrN;
   
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &StrV, GL_FLOAT, eSrcPointer_Vert, FGP_NOCALC | FGP_SRC | FGP_REAL);
-  if ((int)verts < 256)
+  if ((intptr_t)verts < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrN, GL_FLOAT, eSrcPointer_TNormal, FGP_NOCALC | FGP_SRC | FGP_REAL);
 
@@ -970,7 +988,7 @@ void SEvalFuncs_RE::EALPHA_Beam()
   int StrRGBA;
   int Str, StrVD, StrNRM;
   byte *ptr = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Color, &StrRGBA, GL_BYTE, eSrcPointer_Color, FGP_REAL | FGP_WAIT);
-  if ((int)ptr < 256)
+  if ((intptr_t)ptr < 256)
     return;
   byte *norms = (byte *)gRenDev->EF_GetPointer(eSrcPointer_TNormal, &StrNRM, GL_FLOAT, eSrcPointer_TNormal, FGP_SRC | FGP_REAL);
   byte *verts = (byte *)gRenDev->EF_GetPointer(eSrcPointer_Vert, &Str, GL_FLOAT, eSrcPointer_Vert, FGP_SRC | FGP_REAL);

@@ -4,6 +4,33 @@ cmake_minimum_required(VERSION 3.20)
 file(GLOB_RECURSE RENDER_COMMON_SOURCES "*.cpp" "*.c")
 file(GLOB_RECURSE RENDER_COMMON_HEADERS "*.h")
 
+# Exclude platform-specific files on macOS
+if(APPLE)
+    list(REMOVE_ITEM RENDER_COMMON_SOURCES 
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/FFT_SSE.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREMotionBlur.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREFlares.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREFlashBang.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREGlare.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREHDRProcess.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREOcLeaf.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREOcean.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREScreenProcess.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CRETempMesh.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CRETriMeshShadow.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CRE2DQuad.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREClearStencil.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/RendElements/CREOcclusionQuery.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SimpleFrameProfiler.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/XtfImage.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/TgaImage.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/DDSImage.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/JpgImage.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/JpgImage_XBox.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Shaders/ShaderScript.cpp"
+    )
+endif()
+
 # Create interface library for common rendering code
 add_library(RenderCommon INTERFACE)
 

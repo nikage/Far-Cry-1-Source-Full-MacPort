@@ -851,6 +851,7 @@ inline float cry_fabsf(float op) { return fabsf(op); }
 inline float cry_floorf(float op) { return floorf(op); }
 inline float cry_ceilf(float op) { return ceilf(op); }
 inline float cry_tanf(float op) { return tanf(op); }
+inline float cry_tanhf(float op) { return tanhf(op); }
 
 // Handle declaration
 typedef void* HANDLE;

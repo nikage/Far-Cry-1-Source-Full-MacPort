@@ -2999,11 +2999,13 @@ SShader *CShader::mfCompile(SShader *ef, char *scr)
 
       case eFlare:
         {
+#if !defined(__APPLE__)
           CREFlareProp *ps = new CREFlareProp;
           if (ps->mfCompile(ef, params))
             ef->m_REs.AddElem(ps);
           else
             delete ps;
+#endif
         }
         break;
 
@@ -3534,6 +3536,7 @@ void CShader::mfClEfCompile(SShader *ef, char *scr, char *name)
   else
   if (!stricmp(name, "Corona"))
   {
+#if !defined(__APPLE__)
     CREFlare *ps = new CREFlare;
     if (ps->mfCompile(ef, scr))
     {
@@ -3542,6 +3545,7 @@ void CShader::mfClEfCompile(SShader *ef, char *scr, char *name)
     }
     else
       delete ps;
+#endif
     return;
   }
   else
@@ -3579,11 +3583,13 @@ void CShader::mfClEfCompile(SShader *ef, char *scr, char *name)
   else
   if (!stricmp(name, "Flare"))
   {
+#if !defined(__APPLE__)
     CREFlareProp *ps = new CREFlareProp;
     if (ps->mfCompile(ef, scr))
       ef->m_REs.AddElem(ps);
     else
       delete ps;
+#endif
   }
   else
   if (!stricmp(name, "Terrain"))
@@ -3607,6 +3613,7 @@ void CShader::mfClEfCompile(SShader *ef, char *scr, char *name)
   else
   if (!stricmp(name, "Ocean"))
   {
+#if !defined(__APPLE__)
 #ifdef DEBUGALLOC
 #undef new
 #endif
@@ -3618,6 +3625,7 @@ void CShader::mfClEfCompile(SShader *ef, char *scr, char *name)
       ef->m_REs.AddElem(ps);
     else
       delete ps;
+#endif
     return;
   }
   else

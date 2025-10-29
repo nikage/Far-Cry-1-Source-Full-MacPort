@@ -938,17 +938,17 @@ CRenderer::CRenderer()
   CV_r_glossdefault  = iConsole->CreateVariable("r_GlossDefault", "Defaults/gloss",NULL,
     "Name of default gloss map.\n"
     "Usage: r_GlossDefault filename\n"
-    "The texture 'defaults/gloss' is used by default. If you don’t specify a gloss map\n"
+    "The texture 'defaults/gloss' is used by default. If you donï¿½t specify a gloss map\n"
     "this is the texture that will be used.");
   CV_r_detaildefault  = iConsole->CreateVariable("r_DetailDefault", "Textures/Detail/rock",NULL,
     "Name of default detail texture.\n"
     "Usage: r_DetailDefault filename\n"
-    "The texture 'Textures/Detail/rock' is used by default. If you don’t\n"
+    "The texture 'Textures/Detail/rock' is used by default. If you donï¿½t\n"
     "specify a detail texture, this is the texture that will be used.");
   CV_r_opacitydefault  = iConsole->CreateVariable("r_OpacityDefault", "Textures/white",NULL,
     "Name of default opacity mask.\n"
     "Usage: r_OpacityDefault filename\n"
-    "The texture 'Textures/white' is used by default. If you don’t\n"
+    "The texture 'Textures/white' is used by default. If you donï¿½t\n"
     "specify an opacity mask, this is the mask that will be used.");
 
   iConsole->Register("r_DetailTextures", &CV_r_detailtextures, 1, VF_DUMPTODISK,
@@ -2491,18 +2491,25 @@ CRendElement *CRenderer::EF_CreateRE (EDataType edt)
   switch(edt)
   {
     case eDATA_OcLeaf:
+#if !defined(__APPLE__)
       re = new CREOcLeaf;
+#endif
       break;
 
     case eDATA_HDRProcess:
+#if !defined(__APPLE__)
       re = new CREHDRProcess;
+#endif
       break;
 
     case eDATA_OcclusionQuery:
+#if !defined(__APPLE__)
       re = new CREOcclusionQuery;
+#endif
       break;
 
     case eDATA_Ocean:
+#if !defined(__APPLE__)
 #ifdef DEBUGALLOC
 #undef new
 #endif
@@ -2510,10 +2517,13 @@ CRendElement *CRenderer::EF_CreateRE (EDataType edt)
 #ifdef DEBUGALLOC
 #define new DEBUG_CLIENTBLOCK
 #endif
+#endif
       break;
 
     case eDATA_Flare:
+#if !defined(__APPLE__)
       re = new CREFlare;
+#endif
       break;
 
     case eDATA_Sky:
@@ -2525,11 +2535,15 @@ CRendElement *CRenderer::EF_CreateRE (EDataType edt)
       break;
 
     case eDATA_Poly:
+#if !defined(__APPLE__)
       re = new CREPolyMesh;
+#endif
       break;
 
     case eDATA_Glare:
+#if !defined(__APPLE__)
       re = new CREGlare;
+#endif
       break;
 
     case eDATA_Prefab:
@@ -2541,11 +2555,15 @@ CRendElement *CRenderer::EF_CreateRE (EDataType edt)
       break;
 
     case eDATA_2DQuad:
+#if !defined(__APPLE__)
       re = new CRE2DQuad;
+#endif
       break;
 
     case eDATA_TriMeshShadow:
+#if !defined(__APPLE__)
       re = new CRETriMeshShadow;
+#endif
       break;
 
     case eDATA_FarTreeSprites:
@@ -2558,12 +2576,16 @@ CRendElement *CRenderer::EF_CreateRE (EDataType edt)
 
     // tiago: added
     case eDATA_FlashBang:
+#if !defined(__APPLE__)
       re = new CREFlashBang;
+#endif
       break;
 
     case eDATA_ScreenProcess:
+#if !defined(__APPLE__)
       re = new CREScreenProcess;
       m_pREScreenProcess = (CREScreenProcess *)re;
+#endif
       break;
 
     case eDATA_ShadowMapGen:

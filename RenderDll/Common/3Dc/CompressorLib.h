@@ -10,7 +10,7 @@ extern "C"
 {
 #endif
 
-#if defined(LINUX)
+#if defined(LINUX) || defined(__APPLE__)
 	#define _stdcall
 #else
 	#include "Windows.h"

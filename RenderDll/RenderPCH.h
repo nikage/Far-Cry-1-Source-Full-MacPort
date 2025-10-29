@@ -162,6 +162,16 @@ typedef const char*			cstr;
 //#include "_Malloc.h"
 #include "math.h"
 
+#if defined(__APPLE__)
+// Workaround for GetTranslationMat friend function lookup on macOS/Clang
+template<typename F>
+inline Matrix44_tpl<F,4,1> GetTranslationMat(const Vec3_tpl<F>& v) {
+    Matrix44_tpl<F,4,1> m;
+    m.SetTranslationMat(v);
+    return m;
+}
+#endif
+
 #include <VertexFormats.h>
 
 #include "Common/Shaders/Shader.h"
@@ -744,7 +754,7 @@ _inline char * Cry_strdup(const char * str)
 
 _inline void HeapCheck()
 {
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
   int Result = _heapchk();
   assert(Result!=_HEAPBADBEGIN);
   assert(Result!=_HEAPBADNODE);

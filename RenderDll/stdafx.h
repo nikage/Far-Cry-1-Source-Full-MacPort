@@ -43,7 +43,7 @@ typedef unsigned char BYTE;
 
 #include <xtl.h>
 
-#else
+#elif !defined(__APPLE__)
 
 #include <windows.h>
 
@@ -67,7 +67,12 @@ typedef unsigned char BYTE;
 #include <vector>
 #include <list>
 #include <map>
+#if defined(__APPLE__)
+#include <unordered_map>
+#define hash_map unordered_map
+#else
 #include <hash_map>
+#endif
 #include <set>
 #include <string>
 #include <algorithm>
@@ -75,6 +80,11 @@ typedef unsigned char BYTE;
 typedef const char*			cstr;
 
 #define SIZEOF_ARRAY(arr) (sizeof(arr)/sizeof((arr)[0]))
+
+#if defined(__APPLE__)
+// macOS: Define ASSERT macro
+#define ASSERT(condition) assert(condition)
+#endif
 
 // Include common headers.
 //#include "Common\CryHelpers.h"
@@ -114,13 +124,17 @@ typedef const char*			cstr;
 #include <CrySizer.h>
 
 #include "Font.h"
+#if !defined(__APPLE__)
 #include "Except.h"
+#endif
 
 #include <Cry_Math.h>
 #include "Cry_Camera.h"
 //#include "_Malloc.h"
 #include "math.h"
+#if !defined(__APPLE__)
 #include "Common/Mkl/Mkl.h"
+#endif
 
 #include <VertexFormats.h>
 #include <CREPolyMesh.h>
@@ -132,16 +146,25 @@ typedef const char*			cstr;
 #include "Common/EvalFuncs.h"
 #include "Common/RenderPipeline.h"
 #include "Common/Renderer.h"
+#if !defined(__APPLE__)
 #include "Common/CPUDetect.h"
+#endif
 #include "Common/Textures/TexMan.h"
 #include "Common/Shaders/Parser.h"
 #include "Common/SimpleFrameProfiler.h"
 
 // per-frame profilers: collect the infromation for each frame for
 // displaying statistics at the beginning of each frame
+#if defined(__APPLE__)
+// macOS: disable frame profilers for now
+#define DECLARE_FRAME_PROFILER(id,name)
+#endif
 #define PROFILER(ID,NAME) DECLARE_FRAME_PROFILER(ID,NAME)
 #include "Common/FrameProfilers-list.h"
 #undef PROFILER
+#if defined(__APPLE__)
+#undef DECLARE_FRAME_PROFILER
+#endif
 
 // All handled render elements (except common ones included in "RendElement.h")
 #include "Common/RendElements/CREBeam.h"
@@ -327,9 +350,9 @@ _inline void TransformPoint( const SCoord &Coords, Vec3d& in, Vec3d& out)
 //there already is a "TransformPoint" in Cry_Matrix.h
 _inline void TransformPoint( const Matrix44 &Matr, Vec3d& inp, Vec3d& outp)
 {
-  //T_CHANGED_BY_IVO
+	//T_CHANGED_BY_IVO
 	//Vec3d Temp = inp - *(Vec3d *)&Matr.m_values[3][0];
-	Vec3d Temp = inp - Matr.GetTranslation();
+	Vec3d Temp = inp - Matr.GetTranslationOLD();
 
 	//T_CHANGED_BY_IVO
 	//outp.x = Temp | *(Vec3d *)&Matr.m_values[0][0];
@@ -408,7 +431,7 @@ _inline void TransformPosition(Vec3d& out, Vec3d& in, Matrix44& m)
   //out.y = in.x * m.m_values[0][1] + in.y * m.m_values[1][1] + in.z * m.m_values[2][1] + m.m_values[3][1];
   //out.z = in.x * m.m_values[0][2] + in.y * m.m_values[1][2] + in.z * m.m_values[2][2] + m.m_values[3][2];
 	TransformVector (out, in, m);
-	out += m.GetTranslation();
+	out += m.GetTranslationOLD();
 }
 
 
@@ -688,7 +711,7 @@ void UsePath (char *name, char *path, char *dst);
 inline DWORD sCycles()
 {
   uint L;
-#ifndef PS2
+#if !defined(PS2) && !defined(__APPLE__)
   __asm
   {
     xor   eax,eax	          // Required so that VC++ realizes EAX is modified.
@@ -706,7 +729,7 @@ inline DWORD sCycles()
 inline double sCycles2()
 {
   uint L,H;
-#ifndef PS2
+#if !defined(PS2) && !defined(__APPLE__)
   __asm
   {
     xor   eax,eax	// Required so that VC++ realizes EAX is modified.
@@ -726,13 +749,17 @@ inline double sCycles2()
 
 _inline float C_sqrt_tab(float n)
 {
-
+#if defined(__APPLE__)
+  // macOS: Use standard sqrt instead of fast table lookup
+  return sqrtf(n);
+#else
   if (FP_BITS(n) == 0)
     return 0.0;                 // check for square root of 0
 
   FP_BITS(n) = gRenDev->fast_sqrt_table[(FP_BITS(n) >> 8) & 0xFFFF] | ((((FP_BITS(n) - 0x3F800000) >> 1) + 0x3F800000) & 0x7F800000);
 
   return n;
+#endif
 }
 
 //=========================================================================================
@@ -1032,11 +1059,14 @@ inline void cryMemcpy( void* Dst, const void* Src, INT Count )
 	  }
   }
 }
-#else
+#elif !defined(__APPLE__)
 inline void cryMemcpy( void* Dst, const void* Src, INT Count )
 {
   memcpy(Dst, Src, Count);
 }
+#else
+// macOS: Use standard memcpy directly
+#define cryMemcpy memcpy
 #endif
 
 //=========================================================================================
