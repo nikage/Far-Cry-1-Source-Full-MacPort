@@ -1415,24 +1415,14 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
   int stencilBpp = 8;
   bool fullscreen = false;
 
-  // Extract display settings from CryEngine render interface
+  // Use passed-in display settings or defaults
+  // SCryRenderInterface provides system services (log, console, timer), not display settings
   if (sp) {
-    // CryEngine provides display settings via SCryRenderInterface
-    if (sp->ipGetWidth)
-      width = sp->ipGetWidth();
-    if (sp->ipGetHeight)
-      height = sp->ipGetHeight();
-    if (sp->ipGetColorBits)
-      colorBpp = sp->ipGetColorBits();
-    if (sp->ipGetDepthBits)
-      depthBpp = sp->ipGetDepthBits();
-    if (sp->ipGetStencilBits)
-      stencilBpp = sp->ipGetStencilBits();
-
-    printf("Display settings from CryEngine: %dx%d, color=%d, depth=%d, "
-           "stencil=%d\n",
-           width, height, colorBpp, depthBpp, stencilBpp);
-  } else {
+    printf("CryEngine interface provided (log, console, timer available)\n");
+  }
+  
+  // Display settings come from function parameters or defaults
+  {
     // Fallback: Get primary screen resolution from NSScreen
     @autoreleasepool {
       NSScreen *mainScreen = [NSScreen mainScreen];
@@ -1603,5 +1593,79 @@ PackageRenderConstructor(int argc, char *argv[], SCryRenderInterface *sp) {
  */
 static IRenderer *(*g_PackageRenderConstructor)(
     int, char *[], SCryRenderInterface *) = PackageRenderConstructor;
+
+//============================================================================
+// Stub implementations for pure virtual methods
+//============================================================================
+
+void CMetalRenderer::DrawPoints(Vec3 v[], int nump, CFColor& col, int flags) {
+    printf("Metal: DrawPoints stub - %d points\n", nump);
+}
+
+void CMetalRenderer::DrawLines(Vec3 v[], int nump, CFColor& col, int flags, float fGround) {
+    printf("Metal: DrawLines stub - %d points\n", nump);
+}
+
+void CMetalRenderer::EF_Release(int nFlags) {
+    printf("Metal: EF_Release stub - flags %d\n", nFlags);
+}
+
+void CMetalRenderer::CreateBuffer(int size, int vertexformat, CVertexBuffer *buf, int Type, const char *szSource) {
+    printf("Metal: CreateBuffer stub - size %d, format %d\n", size, vertexformat);
+}
+
+void CMetalRenderer::SetClipPlane(int id, float * params) {
+    printf("Metal: SetClipPlane stub - id %d\n", id);
+}
+
+char* CMetalRenderer::GetStatusText(ERendStats type) {
+    static char statusText[256] = "Metal Renderer Status";
+    return statusText;
+}
+
+void CMetalRenderer::EF_SetClipPlane(bool bEnable, float *pPlane, bool bRefract) {
+    printf("Metal: EF_SetClipPlane stub - enable %d\n", bEnable);
+}
+
+void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) {
+    printf("Metal: PrepareDepthMap stub\n");
+}
+
+void CMetalRenderer::EF_CheckOverflow(int nVerts, int nTris, CRendElement *re) {
+    // Stub
+}
+
+void CMetalRenderer::EF_LightMaterial(SLightMaterial *lm, int Flags) {
+    printf("Metal: EF_LightMaterial stub\n");
+}
+
+STexPic* CMetalRenderer::EF_MakePhongTexture(int Exp) {
+    printf("Metal: EF_MakePhongTexture stub - exp %d\n", Exp);
+    return nullptr;
+}
+
+void CMetalRenderer::EF_PipelineShutdown() {
+    printf("Metal: EF_PipelineShutdown stub\n");
+}
+
+void CMetalRenderer::SetupShadowOnlyPass(int Num, ShadowMapFrustum * pFrustum, Vec3 * vShadowTrans, const float fShadowScale, Vec3 vObjTrans, float fObjScale, const Vec3 vObjAngles, Matrix44 * pObjMat) {
+    printf("Metal: SetupShadowOnlyPass stub\n");
+}
+
+void CMetalRenderer::DrawAllShadowsOnTheScreen() {
+    printf("Metal: DrawAllShadowsOnTheScreen stub\n");
+}
+
+void CMetalRenderer::Reset(void) {
+    printf("Metal: Reset stub\n");
+}
+
+void CMetalRenderer::EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, CRendElement *re) {
+    // Stub
+}
+
+void CMetalRenderer::EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, int nFog, CRendElement *re) {
+    // Stub
+}
 
 #endif // __APPLE__ && __MACH__

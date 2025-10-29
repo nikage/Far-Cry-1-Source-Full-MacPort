@@ -258,7 +258,6 @@ public:
     // Rendering state and control methods
     void CheckError(const char *comment) override;
     void Draw3dBBox(const Vec3 &mins, const Vec3 &maxs, int nPrimType) override;
-    void Draw3dPrim(int nPrimType) override;
     void SetState(int State) override;
     void SetCullMode(int mode=R_CULL_BACK) override;
     bool EnableFog(bool enable) override;
@@ -268,7 +267,10 @@ public:
     void SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2) override;
     void SetLodBias(float value=R_DEFAULT_LODBIAS) override;
     void EnableVSync(bool enable) override;
-    void SetFenceCompleted();  // Metal-specific
+    
+    // Metal-specific methods (not virtual in base)
+    void Draw3dPrim(const Vec3 &mins, const Vec3 &maxs, int nPrimType, const float *fRGBA);
+    void SetFenceCompleted(CVertexBuffer *buffer);
     
     // Matrix operations
     void PushMatrix() override;
@@ -284,6 +286,52 @@ public:
     void SelectTMU(int tnum) override;
     bool ChangeDisplay(unsigned int width, unsigned int height, unsigned int cbpp) override;
     void ChangeViewport(unsigned int x, unsigned int y, unsigned int width, unsigned int height) override;
+    
+    // Display and utility methods
+    bool SaveTga(unsigned char *sourcedata, int sourceformat, int w, int h, const char *filename, bool flip) override;
+    int GetWidth() override;
+    int GetHeight() override;
+    void GetMemoryUsage(ICrySizer* Sizer) override;
+    void ScreenShot(const char *filename=NULL) override;
+    int GetColorBpp() override;
+    int GetDepthBpp() override;
+    int GetStencilBpp() override;
+    Vec3 GetUnProject(const Vec3 &WindowCoords, const CCamera &cam) override;
+    
+    // Projection and transformation methods
+    void ProjectToScreen(float ptx, float pty, float ptz, float *sx, float *sy, float *sz) override;
+    int UnProject(float sx, float sy, float sz, float *px, float *py, float *pz, const float modelMatrix[16], const float projMatrix[16], const int viewport[4]) override;
+    int UnProjectFromScreen(float sx, float sy, float sz, float *px, float *py, float *pz) override;
+    void GetModelViewMatrix(float *mat) override;
+    void GetModelViewMatrix(double *mat) override;
+    void GetProjectionMatrix(float *mat) override;
+    void GetProjectionMatrix(double *mat) override;
+    void RenderToViewport(const CCamera &cam, float x, float y, float width, float height) override;
+    
+    // Viewport and frame management
+    void BeginFrame(void) override;
+    void Update(void) override;
+    void SetScissor(int x=0, int y=0, int width=0, int height=0) override;
+    void SetViewport(int x=0, int y=0, int width=0, int height=0) override;
+    void GetViewport(int *x, int *y, int *width, int *height) override;
+    int GetFeatures() override;
+    void MakeCurrent() override;
+    bool CreateContext(WIN_HWND hWnd, bool bAllowFSAA=false) override;
+    bool DeleteContext(WIN_HWND hWnd) override;
+    
+    // Resource and lifecycle management
+    WIN_HWND Init(int x, int y, int width, int height, unsigned int cbpp, int zbpp, int sbits, bool fullscreen, WIN_HINSTANCE hinst, WIN_HWND Glhwnd=0, WIN_HDC Glhdc=0, WIN_HGLRC hGLrc=0, bool bReInit=false) override;
+    void ShutDown(bool bReInit=false) override;
+    void Release() override;
+    void FreeResources(int nFlags) override;
+    void RefreshResources(int nFlags) override;
+    void ShareResources(IRenderer *renderer) override;
+    bool SetCurrentContext(WIN_HWND hWnd) override;
+    bool ChangeResolution(int nNewWidth, int nNewHeight, int nNewColDepth, int nNewRefreshHZ, bool bFullScreen) override;
+    int EnumDisplayFormats(TArray<SDispFormat>& Formats, bool bReset) override;
+    int GetMaxTextureMemory() override;
+    void PreLoad(void) override;
+    void PostLoad(void) override;
     
     // Pure virtual methods that MUST be implemented
     void Reset(void) override;

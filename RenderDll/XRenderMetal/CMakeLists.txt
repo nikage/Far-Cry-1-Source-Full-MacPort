@@ -31,11 +31,15 @@ set(XRENDER_METAL_SOURCES
 # Create the Metal renderer library
 add_library(XRenderMetal SHARED ${XRENDER_METAL_SOURCES})
 
-# Link CryCommon interface
-target_link_libraries(XRenderMetal PRIVATE CryCommon)
+# Link CryCommon interface and RenderCommon base classes
+target_link_libraries(XRenderMetal PRIVATE 
+    CryCommon
+    RenderCommon
+)
 
 # Include directories
 target_include_directories(XRenderMetal PRIVATE
+    ${CMAKE_SOURCE_DIR}/RenderDll
     ${CMAKE_SOURCE_DIR}/RenderDll/Common
     ${CMAKE_SOURCE_DIR}/RenderDll/Common/Shaders
     ${CMAKE_SOURCE_DIR}/CryCommon

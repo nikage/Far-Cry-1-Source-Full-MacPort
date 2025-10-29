@@ -28,7 +28,20 @@
 // Forward declarations and external functions
 class CCamera;
 extern ISystem *iSystem;
-extern void StripExtension(const char *in, char *out);
+
+// Simple implementation of StripExtension for Metal renderer
+static void StripExtension(const char *in, char *out)
+{
+    if (!in || !out)
+        return;
+    
+    strcpy(out, in);
+    char *dot = strrchr(out, '.');
+    if (dot && dot > out)
+    {
+        *dot = 0;
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////
 // CMetalTexture - ITexPic implementation for Metal textures

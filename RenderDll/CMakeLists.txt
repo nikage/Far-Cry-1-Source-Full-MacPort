@@ -29,7 +29,7 @@ elseif(UNIX)
     add_subdirectory(XRenderNULL)
 endif()
 
-# Common render dll components (if any) - disabled for macOS due to Windows dependencies
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Common" AND NOT APPLE)
+# Common render dll components (needed by Metal renderer)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Common")
     add_subdirectory(Common)
 endif()

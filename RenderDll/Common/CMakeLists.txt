@@ -18,6 +18,7 @@ if(RENDER_COMMON_SOURCES)
     
     target_include_directories(RenderCommonObj PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_SOURCE_DIR}/CryCommon
     )
     
