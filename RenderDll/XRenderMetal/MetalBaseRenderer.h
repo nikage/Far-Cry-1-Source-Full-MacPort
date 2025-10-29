@@ -25,12 +25,15 @@
 #include <Cocoa/Cocoa.h>
 #include <vector>
 #include <memory>
+#include <stack>
+#include <array>
 
 // Include CryEngine interfaces
 #include "IRenderer.h"
 #include "Cry_Camera.h"
 #include "IShader.h"
 #include "Cry_Math.h"
+#include "MetalStateCache.h"
 
 // Forward declarations
 struct SSystemInitParams;
@@ -41,6 +44,7 @@ class CVertexBuffer;
 class SShader;
 class SMaterial;
 class STexPic;
+class CMetalStateCache;
 
 // Metal base renderer class that implements core IRenderer functionality
 class CMetalBaseRenderer : public IRenderer
@@ -392,11 +396,77 @@ public:
     // Viewport state
     int m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight;
     
+    // Matrix stack for transformations
+    std::stack<Matrix44> m_matrixStack;
+    Matrix44 m_currentMatrix;
+    Matrix44 m_viewMatrix;
+    Matrix44 m_projectionMatrix;
+    Matrix44 m_modelViewProjectionMatrix;
+    bool m_matrixDirty;
+    
+    // Command buffer pool for triple buffering
+    static const int MAX_FRAMES_IN_FLIGHT = 3;
+    int m_currentFrameIndex;
+    std::array<id<MTLCommandBuffer>, MAX_FRAMES_IN_FLIGHT> m_commandBufferPool;
+    std::array<dispatch_semaphore_t, MAX_FRAMES_IN_FLIGHT> m_frameSemaphores;
+    
+    // Dynamic vertex buffer pool
+    struct DynamicVBPool
+    {
+        id<MTLBuffer> buffer;
+        size_t size;
+        size_t offset;
+        void* cpuData;
+    };
+    static const int NUM_DYNAMIC_VB_POOLS = 2;
+    std::array<DynamicVBPool, NUM_DYNAMIC_VB_POOLS> m_dynamicVBPools;
+    int m_currentDynamicVBPool;
+    
+    // Uniform buffer for MVP matrices and common parameters
+    struct UniformBufferData
+    {
+        Matrix44 modelViewProjectionMatrix;
+        Matrix44 modelMatrix;
+        Matrix44 viewMatrix;
+        Matrix44 projectionMatrix;
+        Vec3 cameraPos;
+        float time;
+        Vec3 lightPos;
+        float padding1;
+        Vec3 lightColor;
+        float padding2;
+    };
+    id<MTLBuffer> m_uniformBuffer;
+    UniformBufferData* m_uniformBufferCPU;
+    
+    // State cache
+    std::unique_ptr<CMetalStateCache> m_stateCache;
+    
+    // Current render state tracking
+    int m_currentState;
+    int m_currentCullMode;
+    bool m_fogEnabled;
+    bool m_texGenEnabled;
+    float m_lodBias;
+    bool m_vSyncEnabled;
+    int m_currentTMU;
+    
+    // Frame statistics
+    int m_frameID;
+    int m_numDrawCalls;
+    int m_numTriangles;
+    
     // Internal methods
     bool InitializeDevice();
     bool InitializeCommandQueue();
     bool InitializeRenderPipeline();
     void UpdateRenderPassDescriptor();
+    bool InitializeCommandBufferPool();
+    bool InitializeDynamicVBPools();
+    bool InitializeUniformBuffers();
+    void CleanupCommandBufferPool();
+    void CleanupDynamicVBPools();
+    void CleanupUniformBuffers();
     
     // Vertex buffer management
     int CreateVertexBuffer(const void* data, size_t size);
@@ -417,6 +487,14 @@ public:
     void SetBlending(bool enabled);
     void SetBlendFactors(MTLBlendFactor source, MTLBlendFactor dest, MTLBlendOperation operation);
     void ApplyRenderState();
+    void UpdateMatrices();
+    void UpdateUniformBuffer();
+    
+    // Helper conversion functions
+    MTLPrimitiveType ConvertPrimitiveType(int prmode);
+    MTLCompareFunction ConvertCompareFunction(int func);
+    MTLBlendFactor ConvertBlendFactor(int factor);
+    int GetVertexFormatSize(int vertexformat);
 };
 
 #endif // __APPLE__ && __MACH__
