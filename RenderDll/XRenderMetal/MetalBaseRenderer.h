@@ -34,6 +34,7 @@
 #include "IShader.h"
 #include "Cry_Math.h"
 #include "MetalStateCache.h"
+#include "MetalRenderElements.h"
 
 // Forward declarations
 struct SSystemInitParams;
@@ -253,7 +254,7 @@ public:
     virtual bool EF_UnhideTemplate(const char* name) { return false; }
     virtual bool EF_UnhideAllTemplates() { return false; }
     virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale = 1.0f, bool bAdditive = true) { return false; }
-    virtual CRendElement* EF_CreateRE(EDataType edt) { return nullptr; }
+    virtual CRendElement* EF_CreateRE(EDataType edt);
     virtual void EF_StartEf() {}
     virtual CCObject* EF_GetObject(bool bTemp = false, int num = -1) { return nullptr; }
     virtual void EF_AddEf(int NumFog, CRendElement* re, IShader* ef, SRenderShaderResources* sr, CCObject* obj, int nTempl, IShader* efState = 0, int nSort = 0) {}

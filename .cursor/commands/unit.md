@@ -1,1 +1,1 @@
-write unit tests for staged changes
+review changed code with git diff write unit tests for staged changes

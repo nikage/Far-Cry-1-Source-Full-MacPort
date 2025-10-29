@@ -1142,6 +1142,20 @@ int CMetalBaseRenderer::GetStencilBpp()
     return m_sbpp;
 }
 
+CRendElement* CMetalBaseRenderer::EF_CreateRE(EDataType edt)
+{
+    extern CRendElement* CreateMetalRenderElement(EDataType edt);
+    
+    CRendElement* re = CreateMetalRenderElement(edt);
+    
+    if (!re)
+    {
+        printf("Warning: Failed to create render element for type %d\n", (int)edt);
+    }
+    
+    return re;
+}
+
 void CMetalBaseRenderer::CheckError(const char* comment)
 {
 }

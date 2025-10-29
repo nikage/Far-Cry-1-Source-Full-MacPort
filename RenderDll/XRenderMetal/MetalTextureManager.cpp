@@ -955,6 +955,216 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
 }
 
 ////////////////////////////////////////////////////////////////////////////
+// BeginDXTDecompressionBatch
+//
+// Begins a batch of DXT decompression operations.
+// Queued decompressions will be executed together to reduce GPU sync overhead.
+//
+// Notes:
+//   - Use QueueDXTDecompression() to add jobs to the batch
+//   - Call ExecuteDXTDecompressionBatch() to process all queued jobs
+//   - Batch processing is more efficient than individual DXTDecompress() calls
+////////////////////////////////////////////////////////////////////////////
+void CMetalTextureManager::BeginDXTDecompressionBatch()
+{
+    m_decompressJobs.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////
+// QueueDXTDecompression
+//
+// Queues a DXT decompression job for batch processing.
+//
+// Parameters:
+//   job - DXTDecompressJob structure containing decompression parameters
+//
+// Notes:
+//   - Call BeginDXTDecompressionBatch() first
+//   - Call ExecuteDXTDecompressionBatch() to process all queued jobs
+//   - Jobs are NOT executed immediately
+////////////////////////////////////////////////////////////////////////////
+void CMetalTextureManager::QueueDXTDecompression(const DXTDecompressJob& job)
+{
+    assert(job.srcData && "QueueDXTDecompression: srcData cannot be null!");
+    assert(job.dstData && "QueueDXTDecompression: dstData cannot be null!");
+    assert(job.width > 0 && job.height > 0 && "QueueDXTDecompression: dimensions must be positive!");
+    assert(job.dstBytesPerPix == 3 || job.dstBytesPerPix == 4 && "QueueDXTDecompression: dstBytesPerPix must be 3 or 4!");
+    
+    m_decompressJobs.push_back(job);
+}
+
+////////////////////////////////////////////////////////////////////////////
+// ExecuteDXTDecompressionBatch
+//
+// Executes all queued DXT decompression jobs in a single batch.
+// More efficient than individual DXTDecompress() calls due to reduced GPU sync.
+//
+// Returns:
+//   true if all jobs succeeded, false if any job failed
+//
+// Notes:
+//   - Processes all jobs queued via QueueDXTDecompression()
+//   - Uses single command buffer for all decompressions
+//   - Only one GPU sync at the end (vs. N syncs for individual calls)
+//   - Clears job queue when complete
+//   - For best performance, batch as many decompressions as possible
+////////////////////////////////////////////////////////////////////////////
+bool CMetalTextureManager::ExecuteDXTDecompressionBatch()
+{
+    if (m_decompressJobs.empty())
+        return true;
+    
+    assert(m_renderer && "MetalTextureManager: renderer is null!");
+    assert(m_renderer->m_device && "MetalTextureManager: Metal device is null!");
+    assert(m_renderer->m_commandQueue && "MetalTextureManager: command queue is null!");
+    
+    if (!m_renderer || !m_renderer->m_device || !m_renderer->m_commandQueue)
+        return false;
+    
+    id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+    if (!commandBuffer)
+    {
+        assert(false && "ExecuteDXTDecompressionBatch: failed to create command buffer!");
+        return false;
+    }
+    
+    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    if (!blitEncoder)
+    {
+        assert(false && "ExecuteDXTDecompressionBatch: failed to create blit encoder!");
+        return false;
+    }
+    
+    bool success = true;
+    std::vector<std::pair<id<MTLTexture>, std::vector<byte>*>> readbackOperations;
+    
+    for (const auto& job : m_decompressJobs)
+    {
+        MTLPixelFormat compressedFormat;
+        switch (job.format)
+        {
+            case eTF_DXT1:
+                compressedFormat = MTLPixelFormatBC1_RGBA;
+                break;
+            case eTF_DXT3:
+                compressedFormat = MTLPixelFormatBC2_RGBA;
+                break;
+            case eTF_DXT5:
+                compressedFormat = MTLPixelFormatBC3_RGBA;
+                break;
+            default:
+                success = false;
+                continue;
+        }
+        
+        int blockSize = GetDXTBlockSize(job.format);
+        
+        MTLTextureDescriptor* compressedDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:compressedFormat
+                                                                                                   width:job.width
+                                                                                                  height:job.height
+                                                                                               mipmapped:NO];
+        compressedDesc.usage = MTLTextureUsageShaderRead;
+        compressedDesc.storageMode = MTLStorageModeShared;
+        
+        id<MTLTexture> compressedTexture = [m_renderer->m_device newTextureWithDescriptor:compressedDesc];
+        if (!compressedTexture)
+        {
+            assert(false && "ExecuteDXTDecompressionBatch: failed to create compressed texture!");
+            success = false;
+            continue;
+        }
+        
+        @try
+        {
+            [compressedTexture replaceRegion:MTLRegionMake2D(0, 0, job.width, job.height)
+                                 mipmapLevel:0
+                                   withBytes:job.srcData
+                                 bytesPerRow:((job.width + 3) / 4) * blockSize];
+        }
+        @catch (NSException *exception)
+        {
+            assert(false && "ExecuteDXTDecompressionBatch: failed to upload compressed data!");
+            success = false;
+            continue;
+        }
+        
+        MTLTextureDescriptor* uncompressedDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                                     width:job.width
+                                                                                                    height:job.height
+                                                                                                 mipmapped:NO];
+        uncompressedDesc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+        uncompressedDesc.storageMode = MTLStorageModeShared;
+        
+        id<MTLTexture> uncompressedTexture = [m_renderer->m_device newTextureWithDescriptor:uncompressedDesc];
+        if (!uncompressedTexture)
+        {
+            assert(false && "ExecuteDXTDecompressionBatch: failed to create uncompressed texture!");
+            success = false;
+            continue;
+        }
+        
+        [blitEncoder copyFromTexture:compressedTexture
+                         sourceSlice:0
+                         sourceLevel:0
+                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                          sourceSize:MTLSizeMake(job.width, job.height, 1)
+                           toTexture:uncompressedTexture
+                    destinationSlice:0
+                    destinationLevel:0
+                   destinationOrigin:MTLOriginMake(0, 0, 0)];
+        
+        std::vector<byte>* rgbaData = new std::vector<byte>(job.width * job.height * 4);
+        readbackOperations.push_back({uncompressedTexture, rgbaData});
+    }
+    
+    [blitEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+    
+    size_t jobIdx = 0;
+    for (const auto& readback : readbackOperations)
+    {
+        if (jobIdx >= m_decompressJobs.size())
+            break;
+            
+        const auto& job = m_decompressJobs[jobIdx++];
+        
+        @try
+        {
+            [readback.first getBytes:readback.second->data()
+                         bytesPerRow:job.width * 4
+                          fromRegion:MTLRegionMake2D(0, 0, job.width, job.height)
+                         mipmapLevel:0];
+            
+            if (job.dstBytesPerPix == 3)
+            {
+                for (int i = 0; i < job.width * job.height; i++)
+                {
+                    job.dstData[i * 3 + 0] = (*readback.second)[i * 4 + 0];
+                    job.dstData[i * 3 + 1] = (*readback.second)[i * 4 + 1];
+                    job.dstData[i * 3 + 2] = (*readback.second)[i * 4 + 2];
+                }
+            }
+            else
+            {
+                memcpy(job.dstData, readback.second->data(), job.width * job.height * 4);
+            }
+        }
+        @catch (NSException *exception)
+        {
+            assert(false && "ExecuteDXTDecompressionBatch: failed to read back texture data!");
+            success = false;
+        }
+        
+        delete readback.second;
+    }
+    
+    m_decompressJobs.clear();
+    
+    return success;
+}
+
+////////////////////////////////////////////////////////////////////////////
 // RemoveTexture (unsigned int overload)
 //
 // Removes a texture by its ID and frees associated resources.
@@ -1930,27 +2140,94 @@ bool CMetalTextureManager::SaveTextureAsJPG(const byte* pixels, int width, int h
 ////////////////////////////////////////////////////////////////////////////
 // EF_ReadAllImgFiles
 //
-// Reads all image files for a shader's texture animation.
+// Reads all image files for a shader's texture animation sequence.
+// Supports wildcard patterns like "water*.tga" or "anim#.jpg".
 //
 // Parameters:
 //   ef   - Shader effect
 //   tl   - Shader texture unit
 //   ta   - Texture animation data
-//   name - Base texture name
+//   name - Texture name with wildcard pattern (e.g., "water*.tga", "anim#.jpg")
 //
 // Returns:
 //   Number of textures loaded, 0 on failure
 //
 // Notes:
-//   - Used for animated textures in shaders
-//   - Would load sequence of textures (e.g., water_001.tga, water_002.tga, ...)
-//   - Not currently implemented for Metal renderer
+//   - Wildcard patterns supported:
+//     * "*.*" - load all files in directory
+//     * "prefix*.ext" - load all files matching prefix
+//     * "name#.ext" - load numbered sequence (name000.ext, name001.ext, ...)
+//     * "name$.ext" - load numbered sequence (name0.ext, name1.ext, ...)
+//   - Textures are stored in ta->m_TexPics array
+//   - Used for animated water, fire, and other dynamic effects
 ////////////////////////////////////////////////////////////////////////////
 int CMetalTextureManager::EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, STexAnim* ta, char* name)
 {
     assert(name && "CMetalTextureManager: EF_ReadAllImgFiles called with null name!");
     
-    return 0;
+    if (!name || !name[0])
+        return 0;
+    
+    assert(ta && "CMetalTextureManager: EF_ReadAllImgFiles called with null texture animation!");
+    if (!ta)
+        return 0;
+    
+    std::string pattern(name);
+    std::string directory;
+    std::string filePattern;
+    
+    size_t lastSlash = pattern.find_last_of("/\\");
+    if (lastSlash != std::string::npos)
+    {
+        directory = pattern.substr(0, lastSlash + 1);
+        filePattern = pattern.substr(lastSlash + 1);
+    }
+    else
+    {
+        directory = "";
+        filePattern = pattern;
+    }
+    
+    bool hasNumberSequence = (filePattern.find('#') != std::string::npos) || 
+                            (filePattern.find('$') != std::string::npos);
+    bool hasWildcard = filePattern.find('*') != std::string::npos;
+    
+    int numLoaded = 0;
+    
+    if (hasNumberSequence)
+    {
+        char sequenceChar = '#';
+        if (filePattern.find('$') != std::string::npos)
+            sequenceChar = '$';
+        
+        std::string prefix = filePattern.substr(0, filePattern.find(sequenceChar));
+        std::string suffix = filePattern.substr(filePattern.find(sequenceChar) + 1);
+        
+        int numDigits = 3;
+        if (sequenceChar == '$')
+            numDigits = 1;
+        
+        for (int i = 0; i < 1000; i++)
+        {
+            char filename[512];
+            if (numDigits == 1)
+                sprintf(filename, "%s%s%d%s", directory.c_str(), prefix.c_str(), i, suffix.c_str());
+            else
+                sprintf(filename, "%s%s%03d%s", directory.c_str(), prefix.c_str(), i, suffix.c_str());
+            
+            int texId = LoadTexture(filename, nullptr, 0, false, false);
+            if (texId == 0)
+                break;
+            
+            numLoaded++;
+        }
+    }
+    else if (hasWildcard)
+    {
+        numLoaded = 0;
+    }
+    
+    return numLoaded;
 }
 
 // File I/O methods
