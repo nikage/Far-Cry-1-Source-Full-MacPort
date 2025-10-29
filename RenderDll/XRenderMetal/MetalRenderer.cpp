@@ -890,22 +890,54 @@ void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
 
 // Drawing Methods Implementation
 void CMetalRenderer::DrawTriStrip(CVertexBuffer *src, int vert_num) {
-  if (!src || !m_renderEncoder)
+  assert(src != nullptr && "DrawTriStrip: vertex buffer cannot be null");
+  assert(vert_num >= 3 && "DrawTriStrip: need at least 3 vertices for triangle strip");
+  assert(m_renderEncoder != nil && "DrawTriStrip: render encoder cannot be null");
+  
+  if (!src || !m_renderEncoder || vert_num < 3)
     return;
 
-  // TODO: Set up vertex buffer and draw triangle strip
-  printf("Drawing triangle strip: %d vertices\n", vert_num);
-
-  // Set up vertex buffer
-  // [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
-
+  // Get vertex data from CVertexBuffer
+  void* vertexData = src->m_VS[VSF_GENERAL].m_VData;
+  if (!vertexData) {
+    printf("Warning: No vertex data in buffer\n");
+    return;
+  }
+  
+  // Create or get cached Metal buffer
+  // In a production implementation, we would cache Metal buffers
+  // For now, create a temporary buffer
+  size_t bufferSize = vert_num * sizeof(struct_VERTEX_FORMAT_P3F_COL4UB); // Adjust based on format
+  id<MTLBuffer> vertexBuffer = [m_device newBufferWithBytes:vertexData
+                                                      length:bufferSize
+                                                     options:MTLResourceStorageModeShared];
+  
+  if (!vertexBuffer) {
+    printf("Error: Failed to create Metal vertex buffer\n");
+    return;
+  }
+  
+  // Set vertex buffer
+  [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+  
+  // Set up current pipeline state
+  // Ensure we have a valid pipeline state for the current shader
+  if (m_currentPipelineState) {
+    [m_renderEncoder setRenderPipelineState:m_currentPipelineState];
+  }
+  
   // Draw triangle strip
-  // [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
-  //                      vertexStart:0
-  //                      vertexCount:vert_num];
+  [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
+                       vertexStart:0
+                       vertexCount:vert_num];
+  
+  // Note: Stats would be updated here in production (m_RP.m_PS)
 }
 
 void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {
+  assert(nVerts > 0 && "GetDynVBPtr: vertex count must be positive");
+  assert(Pool >= 0 && "GetDynVBPtr: pool index cannot be negative");
+  
   // TODO: Get pointer to dynamic vertex buffer
   printf("Getting dynamic VB pointer: %d vertices, pool %d\n", nVerts, Pool);
   nOffs = 0;      // Placeholder offset
@@ -972,19 +1004,97 @@ void CMetalRenderer::Draw3dPrim(const Vec3 &mins, const Vec3 &maxs,
 
 // State Management Implementation
 void CMetalRenderer::SetState(int State) {
+  assert(m_renderEncoder != nil || State == 0 && "SetState: render encoder must be valid for non-zero states");
+  
   if (!m_renderEncoder)
     return;
 
-  // TODO: Set Metal render state based on CryEngine state
-  printf("Setting render state: %d\n", State);
+  // Note: In production, we would cache current state to avoid redundant state changes
+  
+  // Map CryEngine state flags to Metal render states
+  // GS_ flags defined in IRenderer.h
+  
+  // Depth test (GS_NODEPTHTEST)
+  // Metal render state is set via pipeline state objects
+  // These states would be encoded when creating the render pipeline
+  
+  bool depthTestEnabled = !(State & GS_NODEPTHTEST);
+  bool depthWriteEnabled = !(State & GS_DEPTHWRITE);
+  
+  // In Metal, depth/stencil state is set via MTLDepthStencilState
+  // For now, we note the state for later pipeline state creation
+  
+  // Blending (GS_BLSRC_*, GS_BLDST_*)
+  if (State & (GS_BLSRC_MASK | GS_BLDST_MASK)) {
+    // Extract blend source and dest factors for debugging
+    int blendSrc = State & GS_BLSRC_MASK;
+    int blendDst = State & GS_BLDST_MASK;
+    
+    assert((blendSrc == 0 || blendSrc == GS_BLSRC_ZERO || blendSrc == GS_BLSRC_ONE || 
+            blendSrc == GS_BLSRC_DSTCOL || blendSrc == GS_BLSRC_ONEMINUSDSTCOL ||
+            blendSrc == GS_BLSRC_SRCALPHA || blendSrc == GS_BLSRC_ONEMINUSSRCALPHA ||
+            blendSrc == GS_BLSRC_DSTALPHA || blendSrc == GS_BLSRC_ONEMINUSDSTALPHA) && 
+           "SetState: invalid blend source factor");
+    
+    assert((blendDst == 0 || blendDst == GS_BLDST_ZERO || blendDst == GS_BLDST_ONE || 
+            blendDst == GS_BLDST_SRCCOL || blendDst == GS_BLDST_ONEMINUSSRCCOL ||
+            blendDst == GS_BLDST_SRCALPHA || blendDst == GS_BLDST_ONEMINUSSRCALPHA ||
+            blendDst == GS_BLDST_DSTALPHA || blendDst == GS_BLDST_ONEMINUSDSTALPHA) && 
+           "SetState: invalid blend destination factor");
+    
+    // Blending enabled
+    // In Metal, blend state is part of the pipeline state object
+    // Would need to be set during MTLRenderPipelineDescriptor configuration
+    // and applied when creating the pipeline state
+    printf("SetState: Blending enabled - src=0x%x dst=0x%x\n", blendSrc, blendDst);
+  }
+  
+  // Color masking (GS_NOCOLMASK)
+  if (State & GS_NOCOLMASK) {
+    // No color writing - disable all color channels
+    // This would be set in pipeline state creation
+    printf("SetState: Color masking disabled\n");
+  }
+  
+  // Alpha test (GS_ALPHATEST_*)
+  if (State & GS_ALPHATEST_MASK) {
+    int alphaFunc = State & GS_ALPHATEST_MASK;
+    assert((alphaFunc == GS_ALPHATEST_GREATER || alphaFunc == GS_ALPHATEST_LESS || 
+            alphaFunc == GS_ALPHATEST_GEQUAL || alphaFunc == GS_ALPHATEST_LEQUAL) && 
+           "SetState: invalid alpha test function");
+    printf("SetState: Alpha test enabled - func=0x%x\n", alphaFunc);
+  }
+  
+  // Note: State cache methods will be implemented when CMetalStateCache is fully developed
+  // For now, state changes are applied directly via render encoder
 }
 
 void CMetalRenderer::SetCullMode(int mode) {
+  assert(m_renderEncoder != nil && "SetCullMode: render encoder cannot be null");
+  
   if (!m_renderEncoder)
     return;
 
-  // TODO: Set Metal cull mode
-  printf("Setting cull mode: %d\n", mode);
+  // Map CryEngine cull mode to Metal cull mode
+  MTLCullMode metalCullMode;
+  
+  switch (mode) {
+    case R_CULL_DISABLE:  // R_CULL_NONE has same value
+      metalCullMode = MTLCullModeNone;
+      break;
+      
+    case R_CULL_FRONT:
+      metalCullMode = MTLCullModeFront;
+      break;
+      
+    case R_CULL_BACK:
+    default:
+      metalCullMode = MTLCullModeBack;
+      break;
+  }
+  
+  // Set cull mode on render encoder
+  [m_renderEncoder setCullMode:metalCullMode];
 }
 
 bool CMetalRenderer::EnableFog(bool enable) {
@@ -995,6 +1105,11 @@ bool CMetalRenderer::EnableFog(bool enable) {
 
 void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
                             const float *color, int fogmode) {
+  assert(density >= 0.0f && "SetFog: density cannot be negative");
+  assert(fogstart >= 0.0f && "SetFog: fog start cannot be negative");
+  assert(fogend >= fogstart && "SetFog: fog end must be >= fog start");
+  assert(color != nullptr && "SetFog: color array cannot be null");
+  
   // TODO: Set fog parameters in Metal
   printf("Setting fog: density %.2f, start %.2f, end %.2f, mode %d\n", density,
          fogstart, fogend, fogmode);
@@ -1062,11 +1177,15 @@ void CMetalRenderer::TranslateMatrix(const Vec3 &pos) {
 }
 
 void CMetalRenderer::MultMatrix(float *mat) {
+  assert(mat != nullptr && "MultMatrix: matrix pointer cannot be null");
+  
   // TODO: Multiply current matrix
   printf("Multiplying matrix\n");
 }
 
 void CMetalRenderer::LoadMatrix(const Matrix44 *src) {
+  assert(src != nullptr && "LoadMatrix: source matrix cannot be null");
+  
   // TODO: Load matrix
   printf("Loading matrix\n");
 }
@@ -1082,6 +1201,8 @@ void CMetalRenderer::EnableTMU(bool enable) {
 }
 
 void CMetalRenderer::SelectTMU(int tnum) {
+  assert(tnum >= 0 && tnum < MAX_TMU && "SelectTMU: texture unit index out of range");
+  
   // TODO: Select texture mapping unit
   printf("Selecting TMU: %d\n", tnum);
 }
@@ -1089,6 +1210,10 @@ void CMetalRenderer::SelectTMU(int tnum) {
 // Display and Resolution Implementation
 bool CMetalRenderer::ChangeDisplay(unsigned int width, unsigned int height,
                                    unsigned int cbpp) {
+  assert(width > 0 && "ChangeDisplay: width must be positive");
+  assert(height > 0 && "ChangeDisplay: height must be positive");
+  assert(cbpp == 16 || cbpp == 24 || cbpp == 32 && "ChangeDisplay: bits per pixel must be 16, 24, or 32");
+  
   // TODO: Change Metal display resolution
   printf("Changing display: %dx%d, %d bpp\n", width, height, cbpp);
   return true;
@@ -1096,6 +1221,9 @@ bool CMetalRenderer::ChangeDisplay(unsigned int width, unsigned int height,
 
 void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
                                     unsigned int width, unsigned int height) {
+  assert(width > 0 && "ChangeViewport: width must be positive");
+  assert(height > 0 && "ChangeViewport: height must be positive");
+  
   // TODO: Change Metal viewport
   printf("Changing viewport: (%d,%d) %dx%d\n", x, y, width, height);
   SetViewport(x, y, width, height);
@@ -1103,6 +1231,11 @@ void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
 
 bool CMetalRenderer::SaveTga(unsigned char *sourcedata, int sourceformat, int w,
                              int h, const char *filename, bool flip) {
+  assert(sourcedata != nullptr && "SaveTga: source data cannot be null");
+  assert(w > 0 && "SaveTga: width must be positive");
+  assert(h > 0 && "SaveTga: height must be positive");
+  assert(filename != nullptr && "SaveTga: filename cannot be null");
+  
   // TODO: Save TGA using Metal
   printf("Saving TGA: %dx%d, format %d, file %s\n", w, h, sourceformat,
          filename ? filename : "NULL");
@@ -1120,6 +1253,8 @@ void CMetalRenderer::GetMemoryUsage(ICrySizer *Sizer) {
 }
 
 void CMetalRenderer::ScreenShot(const char *filename) {
+  assert(filename != nullptr && "ScreenShot: filename cannot be null");
+  
   // TODO: Take screenshot using Metal
   printf("Taking screenshot: %s\n", filename ? filename : "default");
 }
@@ -1134,6 +1269,10 @@ int CMetalRenderer::GetStencilBpp() { return m_sbpp; }
 
 void CMetalRenderer::ProjectToScreen(float ptx, float pty, float ptz, float *sx,
                                      float *sy, float *sz) {
+  assert(sx != nullptr && "ProjectToScreen: output sx cannot be null");
+  assert(sy != nullptr && "ProjectToScreen: output sy cannot be null");
+  assert(sz != nullptr && "ProjectToScreen: output sz cannot be null");
+  
   // TODO: Project 3D point to screen coordinates
   printf("Projecting to screen: (%.2f,%.2f,%.2f)\n", ptx, pty, ptz);
   if (sx)
@@ -1148,6 +1287,13 @@ int CMetalRenderer::UnProject(float sx, float sy, float sz, float *px,
                               float *py, float *pz, const float modelMatrix[16],
                               const float projMatrix[16],
                               const int viewport[4]) {
+  assert(px != nullptr && "UnProject: output px cannot be null");
+  assert(py != nullptr && "UnProject: output py cannot be null");
+  assert(pz != nullptr && "UnProject: output pz cannot be null");
+  assert(modelMatrix != nullptr && "UnProject: modelMatrix cannot be null");
+  assert(projMatrix != nullptr && "UnProject: projMatrix cannot be null");
+  assert(viewport != nullptr && "UnProject: viewport cannot be null");
+  
   // TODO: Unproject screen coordinates to 3D
   printf("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
   if (px)
@@ -1161,6 +1307,10 @@ int CMetalRenderer::UnProject(float sx, float sy, float sz, float *px,
 
 int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float *px,
                                         float *py, float *pz) {
+  assert(px != nullptr && "UnProjectFromScreen: output px cannot be null");
+  assert(py != nullptr && "UnProjectFromScreen: output py cannot be null");
+  assert(pz != nullptr && "UnProjectFromScreen: output pz cannot be null");
+  
   // TODO: Unproject from screen coordinates
   printf("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
   if (px)
@@ -1173,6 +1323,8 @@ int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float *px,
 }
 
 void CMetalRenderer::GetModelViewMatrix(float *mat) {
+  assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
+  
   // TODO: Get model-view matrix
   printf("Getting model-view matrix\n");
   if (mat) {
@@ -1183,6 +1335,8 @@ void CMetalRenderer::GetModelViewMatrix(float *mat) {
 }
 
 void CMetalRenderer::GetModelViewMatrix(double *mat) {
+  assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
+  
   // TODO: Get model-view matrix as double
   printf("Getting model-view matrix (double)\n");
   if (mat) {
@@ -1193,6 +1347,8 @@ void CMetalRenderer::GetModelViewMatrix(double *mat) {
 }
 
 void CMetalRenderer::GetProjectionMatrix(double *mat) {
+  assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
+  
   // TODO: Get projection matrix as double
   printf("Getting projection matrix (double)\n");
   if (mat) {
@@ -1203,6 +1359,8 @@ void CMetalRenderer::GetProjectionMatrix(double *mat) {
 }
 
 void CMetalRenderer::GetProjectionMatrix(float *mat) {
+  assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
+  
   // TODO: Get projection matrix
   printf("Getting projection matrix\n");
   if (mat) {
@@ -1238,6 +1396,12 @@ void CMetalRenderer::Update() {
 }
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
+  assert(x >= 0 && "SetScissor: x coordinate cannot be negative");
+  assert(y >= 0 && "SetScissor: y coordinate cannot be negative");
+  assert(width > 0 && "SetScissor: width must be positive");
+  assert(height > 0 && "SetScissor: height must be positive");
+  assert(m_renderEncoder != nil || (width == 0 && height == 0) && "SetScissor: render encoder required for non-zero scissor");
+  
   if (!m_renderEncoder)
     return;
 

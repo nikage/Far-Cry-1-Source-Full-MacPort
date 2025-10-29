@@ -1,1 +1,1 @@
-run git diff and add asserts where necessary,  prefer constructors over methods where possible
+run git diff --stat and add asserts where necessary,  prefer constructors over methods where possible
