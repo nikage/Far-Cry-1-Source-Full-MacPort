@@ -146,14 +146,23 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
         
     // Get texture from texture manager
     id<MTLTexture> texture = nil;
-    if (m_textureManager && texture_id >= 0)
+    if (m_textureManager && texture_id > 0)
     {
-        // TODO: Get texture from texture manager by ID
-        // texture = m_textureManager->GetTexture(texture_id);
+        const auto* texInfo = m_textureManager->GetTextureInfo(texture_id);
+        assert(texInfo != nullptr && "Draw2dImage: texture info should exist for valid texture ID");
+        
+        if (texInfo && texInfo->metalTexture)
+        {
+            texture = texInfo->metalTexture;
+            assert(texture != nil && "Draw2dImage: Metal texture should be valid in texture info");
+        }
     }
     
     if (!texture)
+    {
+        printf("Draw2dImage: Warning - texture ID %d not found\n", texture_id);
         return;
+    }
         
     // Set up 2D rendering state
     if (m_spritePipelineState)
@@ -164,7 +173,27 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     // Bind texture
     [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
     
-    // Create quad vertices for 2D image
+    // Convert screen coordinates to normalized device coordinates (NDC)
+    // Metal NDC: x=[-1,1] left to right, y=[-1,1] bottom to top
+    float screenWidth = static_cast<float>(m_renderer->GetWidth());
+    float screenHeight = static_cast<float>(m_renderer->GetHeight());
+    
+    assert(screenWidth > 0 && "Draw2dImage: screen width must be positive");
+    assert(screenHeight > 0 && "Draw2dImage: screen height must be positive");
+    
+    if (screenWidth <= 0 || screenHeight <= 0)
+    {
+        printf("Draw2dImage: Warning - invalid screen dimensions\n");
+        return;
+    }
+    
+    // Convert to NDC
+    float x0_ndc = (xpos / screenWidth) * 2.0f - 1.0f;
+    float y0_ndc = 1.0f - (ypos / screenHeight) * 2.0f;  // Flip Y
+    float x1_ndc = ((xpos + w) / screenWidth) * 2.0f - 1.0f;
+    float y1_ndc = 1.0f - ((ypos + h) / screenHeight) * 2.0f;  // Flip Y
+    
+    // Create quad vertices for 2D image (triangle strip order)
     struct QuadVertex {
         float position[2];
         float texCoord[2];
@@ -172,15 +201,35 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     };
     
     QuadVertex vertices[4] = {
-        {{xpos, ypos}, {s0, t0}, {r, g, b, a}},
-        {{xpos + w, ypos}, {s1, t0}, {r, g, b, a}},
-        {{xpos, ypos + h}, {s0, t1}, {r, g, b, a}},
-        {{xpos + w, ypos + h}, {s1, t1}, {r, g, b, a}}
+        {{x0_ndc, y0_ndc}, {s0, t0}, {r, g, b, a}},  // Top-left
+        {{x1_ndc, y0_ndc}, {s1, t0}, {r, g, b, a}},  // Top-right
+        {{x0_ndc, y1_ndc}, {s0, t1}, {r, g, b, a}},  // Bottom-left
+        {{x1_ndc, y1_ndc}, {s1, t1}, {r, g, b, a}}   // Bottom-right
     };
     
-    // TODO: Create vertex buffer and draw quad
-    // This would involve creating a vertex buffer with the quad data
-    // and calling drawPrimitives on the render encoder
+    // Create temporary vertex buffer for this quad
+    assert(m_renderer->m_device != nil && "Draw2dImage: Metal device cannot be nil");
+    assert(sizeof(vertices) == 32 * 4 && "Draw2dImage: vertex buffer size mismatch");
+    
+    id<MTLBuffer> vertexBuffer = [m_renderer->m_device newBufferWithBytes:vertices
+                                                                    length:sizeof(vertices)
+                                                                   options:MTLResourceStorageModeShared];
+    
+    assert(vertexBuffer != nil && "Draw2dImage: vertex buffer creation should not fail with valid device");
+    
+    if (!vertexBuffer)
+    {
+        printf("Draw2dImage: Error - failed to create vertex buffer\n");
+        return;
+    }
+    
+    // Set vertex buffer
+    [m_renderer->m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    
+    // Draw triangle strip (4 vertices = 2 triangles)
+    [m_renderer->m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
+                                    vertexStart:0
+                                    vertexCount:4];
 }
 
 void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
@@ -198,8 +247,8 @@ void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, 
     assert(b >= 0.0f && b <= 1.0f && "DrawImage: blue component must be in range [0,1]");
     assert(a >= 0.0f && a <= 1.0f && "DrawImage: alpha component must be in range [0,1]");
     
-    // TODO: Draw image
-    // This would queue the image for rendering
+    // DrawImage is a simplified version of Draw2dImage (no angle or z parameter)
+    Draw2dImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1, 0.0f, r, g, b, a, 1.0f);
 }
 
 int CMetalUtilityRenderer::SetPolygonMode(int mode)
@@ -754,16 +803,86 @@ void CMetalUtilityRenderer::CreateSpritePipelineState()
     if (!m_renderer || !m_renderer->m_device)
         return;
         
-    // Create sprite pipeline state
+    // Create sprite pipeline state descriptor
     MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
     descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
     descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
     
+    // Enable alpha blending for 2D sprites
+    descriptor.colorAttachments[0].blendingEnabled = YES;
+    descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+    descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+    descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+    descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+    
+    // Set up vertex descriptor for 2D sprite vertices
+    MTLVertexDescriptor* vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+    assert(vertexDescriptor != nil && "CreateSpritePipelineState: vertex descriptor allocation failed");
+    
+    // Position (float2 at index 0)
+    vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+    vertexDescriptor.attributes[0].offset = 0;
+    vertexDescriptor.attributes[0].bufferIndex = 0;
+    
+    // TexCoord (float2 at index 1)
+    vertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+    vertexDescriptor.attributes[1].offset = sizeof(float) * 2;
+    vertexDescriptor.attributes[1].bufferIndex = 0;
+    assert(sizeof(float) * 2 == 8 && "CreateSpritePipelineState: texCoord offset should be 8 bytes");
+    
+    // Color (float4 at index 2)
+    vertexDescriptor.attributes[2].format = MTLVertexFormatFloat4;
+    vertexDescriptor.attributes[2].offset = sizeof(float) * 4;
+    vertexDescriptor.attributes[2].bufferIndex = 0;
+    assert(sizeof(float) * 4 == 16 && "CreateSpritePipelineState: color offset should be 16 bytes");
+    
+    // Layout stride
+    vertexDescriptor.layouts[0].stride = sizeof(float) * 8; // 2 + 2 + 4
+    vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+    assert(sizeof(float) * 8 == 32 && "CreateSpritePipelineState: vertex stride should be 32 bytes");
+    
+    descriptor.vertexDescriptor = vertexDescriptor;
+    
+    // Try to load shader functions from default library
     NSError* error = nil;
+    id<MTLLibrary> defaultLibrary = [m_renderer->m_device newDefaultLibrary];
+    
+    if (defaultLibrary)
+    {
+        id<MTLFunction> vertexFunction = [defaultLibrary newFunctionWithName:@"sprite_vertex"];
+        id<MTLFunction> fragmentFunction = [defaultLibrary newFunctionWithName:@"sprite_fragment"];
+        
+        if (vertexFunction && fragmentFunction)
+        {
+            assert(vertexFunction != nil && "CreateSpritePipelineState: sprite_vertex function should be loaded");
+            assert(fragmentFunction != nil && "CreateSpritePipelineState: sprite_fragment function should be loaded");
+            
+            descriptor.vertexFunction = vertexFunction;
+            descriptor.fragmentFunction = fragmentFunction;
+        }
+        else
+        {
+            printf("Warning: Sprite shader functions not found in default library, pipeline may not work\n");
+        }
+    }
+    else
+    {
+        assert(defaultLibrary != nil && "CreateSpritePipelineState: default library should be available");
+        printf("Warning: Could not load default Metal library\n");
+    }
+    
     m_spritePipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    
     if (!m_spritePipelineState)
     {
-        printf("Error: Failed to create sprite pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        printf("Error: Failed to create sprite pipeline state: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+    }
+    else
+    {
+        assert(m_spritePipelineState != nil && "CreateSpritePipelineState: pipeline state should be valid after successful creation");
+        printf("MetalUtilityRenderer: Sprite pipeline state created successfully\n");
     }
 }
 
