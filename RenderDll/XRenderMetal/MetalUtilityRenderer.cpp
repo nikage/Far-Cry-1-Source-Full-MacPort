@@ -45,10 +45,19 @@ CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer,
     assert(shaderManager != nullptr && "CMetalUtilityRenderer: shaderManager cannot be null");
     assert(renderer->m_device != nil && "CMetalUtilityRenderer: renderer must have valid Metal device");
     
+    printf("CMetalUtilityRenderer: Initializing...\n");
+    
     // Initialize utility renderer
-    CreateDebugPipelineState();
-    CreateTextPipelineState();
-    CreateSpritePipelineState();
+    // Note: Pipeline states are TODO - need to load from SpriteShaders.metallib
+    // For now, skip pipeline creation to get past initialization
+    // printf("CMetalUtilityRenderer: Creating debug pipeline state...\n");
+    // CreateDebugPipelineState();
+    // printf("CMetalUtilityRenderer: Creating text pipeline state...\n");
+    // CreateTextPipelineState();
+    // printf("CMetalUtilityRenderer: Creating sprite pipeline state...\n");
+    // CreateSpritePipelineState();
+    
+    printf("CMetalUtilityRenderer: Initialization complete (pipeline states skipped - TODO)\n");
 }
 
 CMetalUtilityRenderer::~CMetalUtilityRenderer()

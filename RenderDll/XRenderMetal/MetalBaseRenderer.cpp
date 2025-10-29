@@ -172,10 +172,8 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     
     printf("Shutting down Metal base renderer\n");
     
-    if (m_device && m_commandQueue)
-    {
-        [m_commandQueue waitUntilCommandBuffersCompleted];
-    }
+    // Wait for all tracked command buffers to complete before cleanup
+    WaitForAllCommandBuffers();
     
     CleanupCommandBufferPool();
     CleanupDynamicVBPools();
@@ -197,6 +195,55 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     m_metalLayer = nil;
     
     m_isInitialized = false;
+}
+
+void CMetalBaseRenderer::TrackCommandBuffer(id<MTLCommandBuffer> buffer)
+{
+    if (!buffer)
+        return;
+    
+    std::lock_guard<std::mutex> lock(m_commandBufferMutex);
+    
+    // Add to tracking list
+    m_activeCommandBuffers.push_back(buffer);
+    printf("TrackCommandBuffer: Now tracking %zu command buffer(s)\n", m_activeCommandBuffers.size());
+    
+    // Add completion handler to auto-remove from tracking
+    [buffer addCompletedHandler:^(id<MTLCommandBuffer> completedBuffer) {
+        std::lock_guard<std::mutex> lock(m_commandBufferMutex);
+        
+        // Remove from active list
+        auto it = std::find(m_activeCommandBuffers.begin(), m_activeCommandBuffers.end(), completedBuffer);
+        if (it != m_activeCommandBuffers.end()) {
+            m_activeCommandBuffers.erase(it);
+            printf("TrackCommandBuffer: Command buffer completed, %zu remaining\n", m_activeCommandBuffers.size());
+        }
+    }];
+}
+
+void CMetalBaseRenderer::WaitForAllCommandBuffers()
+{
+    printf("Waiting for %zu active command buffers to complete...\n", m_activeCommandBuffers.size());
+    
+    // Make a copy to avoid holding lock during wait
+    std::vector<id<MTLCommandBuffer>> buffersToWait;
+    {
+        std::lock_guard<std::mutex> lock(m_commandBufferMutex);
+        buffersToWait = m_activeCommandBuffers;
+    }
+    
+    // Wait for each buffer
+    for (id<MTLCommandBuffer> buffer : buffersToWait) {
+        [buffer waitUntilCompleted];
+    }
+    
+    // Clear the list
+    {
+        std::lock_guard<std::mutex> lock(m_commandBufferMutex);
+        m_activeCommandBuffers.clear();
+    }
+    
+    printf("All command buffers completed\n");
 }
 
 bool CMetalBaseRenderer::InitializeDevice()
@@ -365,6 +412,7 @@ void CMetalBaseRenderer::EndFrame()
     }
     
     [m_currentCommandBuffer commit];
+    TrackCommandBuffer(m_currentCommandBuffer);
     
     m_currentCommandBuffer = nil;
     m_renderPassDescriptor = nil;

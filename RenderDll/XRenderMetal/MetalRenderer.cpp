@@ -137,24 +137,42 @@ extern "C" void CryModuleFree(void* ptr)
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr) {
-  // Initialize specialized managers
-  bool success = InitializeManagers();
-  assert(success && "CMetalRenderer::CMetalRenderer: Failed to initialize managers!");
-  assert(m_textureManager && "CMetalRenderer::CMetalRenderer: Texture manager is null after initialization!");
-  assert(m_shaderManager && "CMetalRenderer::CMetalRenderer: Shader manager is null after initialization!");
-  assert(m_utilityRenderer && "CMetalRenderer::CMetalRenderer: Utility renderer is null after initialization!");
+  // Managers will be initialized in Init() after Metal device is created
+  printf("CMetalRenderer constructor: managers will be initialized after device creation\n");
 }
 
 CMetalRenderer::~CMetalRenderer() {
-  assert(m_textureManager && "CMetalRenderer::~CMetalRenderer: Texture manager is null during destruction!");
-  assert(m_shaderManager && "CMetalRenderer::~CMetalRenderer: Shader manager is null during destruction!");
-  assert(m_utilityRenderer && "CMetalRenderer::~CMetalRenderer: Utility renderer is null during destruction!");
+  if (m_textureManager || m_shaderManager || m_utilityRenderer) {
+    ShutdownManagers();
+  }
+}
+
+WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int cbpp,
+                               int zbpp, int sbits, bool fullscreen, WIN_HINSTANCE hinst,
+                               WIN_HWND Glhwnd, WIN_HDC Glhdc, WIN_HGLRC hGLrc, bool bReInit)
+{
+  // Call base class Init() to create Metal device and initialize core renderer
+  WIN_HWND result = CMetalBaseRenderer::Init(x, y, width, height, cbpp, zbpp, sbits,
+                                             fullscreen, hinst, Glhwnd, Glhdc, hGLrc, bReInit);
   
-  ShutdownManagers();
+  printf("CMetalRenderer::Init - Base renderer Init() returned %p\n", result);
   
-  assert(!m_textureManager && "CMetalRenderer::~CMetalRenderer: Texture manager not released!");
-  assert(!m_shaderManager && "CMetalRenderer::~CMetalRenderer: Shader manager not released!");
-  assert(!m_utilityRenderer && "CMetalRenderer::~CMetalRenderer: Utility renderer not released!");
+  // Check if base renderer initialized successfully
+  // Note: In headless mode m_metalView might be nil, but m_isInitialized should be true
+  if (!m_isInitialized) {
+    printf("CMetalRenderer::Init - Base renderer initialization failed (m_isInitialized=%d)\n", m_isInitialized);
+    return nullptr;
+  }
+  
+  // Now that Metal device is created, initialize managers
+  printf("CMetalRenderer::Init - Initializing managers (device=%p)\n", m_device);
+  if (!InitializeManagers()) {
+    printf("CMetalRenderer::Init - Failed to initialize managers\n");
+    return nullptr;
+  }
+  
+  printf("CMetalRenderer initialized successfully with managers\n");
+  return (WIN_HWND)1; // Return non-null to indicate success
 }
 
 // Texture management delegation
@@ -656,9 +674,15 @@ int CMetalRenderer::SetPolygonMode(int mode) {
 // Additional utility methods would be delegated similarly...
 
 bool CMetalRenderer::InitializeManagers() {
-  assert(!m_textureManager && "InitializeManagers: Texture manager already exists!");
-  assert(!m_shaderManager && "InitializeManagers: Shader manager already exists!");
-  assert(!m_utilityRenderer && "InitializeManagers: Utility renderer already exists!");
+  // If managers already exist, skip initialization (Init can be called multiple times)
+  if (m_textureManager && m_shaderManager && m_utilityRenderer) {
+    printf("InitializeManagers: Managers already initialized, skipping\n");
+    return true;
+  }
+  
+  assert(!m_textureManager && "InitializeManagers: Partial manager state - texture manager exists!");
+  assert(!m_shaderManager && "InitializeManagers: Partial manager state - shader manager exists!");
+  assert(!m_utilityRenderer && "InitializeManagers: Partial manager state - utility renderer exists!");
   
   // Initialize texture manager
   m_textureManager = std::make_unique<CMetalTextureManager>(this);
@@ -1503,15 +1527,7 @@ int CMetalRenderer::GetMaxTextureMemory() {
   return 512 * 1024 * 1024; // 512MB placeholder
 }
 
-WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height,
-                              unsigned int cbpp, int zbpp, int sbits,
-                              bool fullscreen, WIN_HINSTANCE hinst,
-                              WIN_HWND Glhwnd, WIN_HDC Glhdc, WIN_HGLRC hGLrc,
-                              bool bReInit) {
-  // TODO: Initialize Metal renderer
-  printf("Initializing Metal renderer: %dx%d, %d bpp\n", width, height, cbpp);
-  return (WIN_HWND)1; // Placeholder
-}
+// Init implementation moved to earlier in file (after constructor)
 
 void CMetalRenderer::PreLoad() {
   // TODO: Preload Metal resources

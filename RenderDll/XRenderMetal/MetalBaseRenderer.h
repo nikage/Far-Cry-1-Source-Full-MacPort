@@ -336,6 +336,10 @@ public:
     id<MTLCommandBuffer> m_currentCommandBuffer;
     MTLRenderPassDescriptor* m_renderPassDescriptor;
     
+    // Command buffer tracking for proper shutdown
+    std::vector<id<MTLCommandBuffer>> m_activeCommandBuffers;
+    std::mutex m_commandBufferMutex;
+    
     // Render state
     id<MTLRenderPipelineState> m_currentPipelineState;
     id<MTLDepthStencilState> m_currentDepthStencilState;
@@ -457,6 +461,10 @@ public:
     void CleanupCommandBufferPool();
     void CleanupDynamicVBPools();
     void CleanupUniformBuffers();
+    
+    // Command buffer tracking
+    void TrackCommandBuffer(id<MTLCommandBuffer> buffer);
+    void WaitForAllCommandBuffers();
     
     // Vertex buffer management
     int CreateVertexBuffer(const void* data, size_t size);

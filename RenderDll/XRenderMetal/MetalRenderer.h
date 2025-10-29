@@ -320,6 +320,14 @@ public:
     bool DeleteContext(WIN_HWND hWnd) override;
     
     // Resource and lifecycle management
+    /**
+     * @brief Initialize the Metal renderer and create managers
+     * 
+     * Calls base class Init() to create Metal device, then creates
+     * texture/shader/utility managers that depend on the device.
+     * 
+     * @return Window handle if successful, nullptr on failure
+     */
     WIN_HWND Init(int x, int y, int width, int height, unsigned int cbpp, int zbpp, int sbits, bool fullscreen, WIN_HINSTANCE hinst, WIN_HWND Glhwnd=0, WIN_HDC Glhdc=0, WIN_HGLRC hGLrc=0, bool bReInit=false) override;
     void ShutDown(bool bReInit=false) override;
     void Release() override;

@@ -38,6 +38,7 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer,
     assert(renderer != nullptr && "CMetalShaderManager: renderer cannot be null!");
     assert(textureManager != nullptr && "CMetalShaderManager: textureManager cannot be null!");
     assert(renderer->m_device != nil && "CMetalShaderManager: renderer must have valid Metal device!");
+    assert(m_nextShaderId == 1 && "CMetalShaderManager: shader ID counter must start at 1!");
     
     printf("MetalShaderManager: Initializing...\n");
     
@@ -46,7 +47,7 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer,
         printf("Warning: Failed to initialize default shader library\n");
     }
     
-    assert(m_nextShaderId == 1 && "CMetalShaderManager: shader ID counter must start at 1!");
+    printf("MetalShaderManager: Initialization complete (%zu shaders loaded)\n", m_shaders.size());
 }
 
 CMetalShaderManager::~CMetalShaderManager()
@@ -75,7 +76,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     NSError* error = nil;
     
     NSBundle* bundle = [NSBundle mainBundle];
-    NSString* shaderPath = [bundle pathForResource:@"BasicShaders" ofType:@"metal"];
+    NSString* shaderPath = [bundle pathForResource:@"BasicShaders" ofType:@"metallib"];
     
     id<MTLLibrary> defaultLibrary = nil;
     
@@ -83,6 +84,17 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     {
         printf("Loading shader library from: %s\n", [shaderPath UTF8String]);
         defaultLibrary = [m_renderer->m_device newLibraryWithFile:shaderPath error:&error];
+    }
+    
+    if (!defaultLibrary)
+    {
+        // Try loading from app bundle MacOS directory (where we copy the metallibs)
+        NSString* exePath = [[NSBundle mainBundle] executablePath];
+        NSString* exeDir = [exePath stringByDeletingLastPathComponent];
+        NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"BasicShaders.metallib"];
+        
+        printf("Attempting to load from executable directory: %s\n", [metallibPath UTF8String]);
+        defaultLibrary = [m_renderer->m_device newLibraryWithFile:metallibPath error:&error];
     }
     
     if (!defaultLibrary)

@@ -138,7 +138,7 @@ if(APPLE)
         INSTALL_RPATH "@executable_path"
     )
     
-    # Copy all dylibs to the app bundle whenever FarCryWorking or any dylib is rebuilt
+    # Copy all dylibs and Metal shader libraries to the app bundle whenever FarCryWorking or any dylib is rebuilt
     add_custom_command(TARGET FarCryWorking POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
         COMMAND ${CMAKE_COMMAND} -E copy 
@@ -156,7 +156,11 @@ if(APPLE)
             $<TARGET_FILE:CryGame>
             $<TARGET_FILE:XRenderMetal>
             ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
-        COMMENT "Copying all dylibs to app bundle"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/BasicShaders.metallib
+            ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/SpriteShaders.metallib
+            ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
+        COMMENT "Copying all dylibs and Metal shader libraries to app bundle"
         DEPENDS 
             CrySystem Cry3DEngine CryEntitySystem CryAnimation CryInput
             CryMovie CryPhysics CryAISystem CryFont CryScriptSystem

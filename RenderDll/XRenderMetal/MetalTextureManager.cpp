@@ -415,6 +415,7 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
         [blitEncoder generateMipmapsForTexture:texture];
         [blitEncoder endEncoding];
         [commandBuffer commit];
+        m_renderer->TrackCommandBuffer(commandBuffer);
         [commandBuffer waitUntilCompleted];
     }
     
@@ -594,6 +595,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
         [blitEncoder generateMipmapsForTexture:texture];
         [blitEncoder endEncoding];
         [commandBuffer commit];
+        m_renderer->TrackCommandBuffer(commandBuffer);
     }
     
     int textureId = (def_tid > 0 && def_tid != (unsigned int)-1) ? def_tid : AllocateTextureId();
@@ -753,6 +755,7 @@ bool CMetalTextureManager::DXTCompress(byte* raw_data, int nWidth, int nHeight, 
             [blitEncoder generateMipmapsForTexture:sourceTexture];
             [blitEncoder endEncoding];
             [commandBuffer commit];
+            m_renderer->TrackCommandBuffer(commandBuffer);
             [commandBuffer waitUntilCompleted];
             
             if (callback)
@@ -924,6 +927,7 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
         
         [blitEncoder endEncoding];
         [commandBuffer commit];
+        m_renderer->TrackCommandBuffer(commandBuffer);
         
         // Note: Synchronous wait - consider using batch API for multiple decompressions
         [commandBuffer waitUntilCompleted];
@@ -1132,6 +1136,7 @@ bool CMetalTextureManager::ExecuteDXTDecompressionBatch()
     
     [blitEncoder endEncoding];
     [commandBuffer commit];
+    m_renderer->TrackCommandBuffer(commandBuffer);
     [commandBuffer waitUntilCompleted];
     
     size_t jobIdx = 0;
@@ -1899,6 +1904,7 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
     
     [blitEncoder endEncoding];
     [blitCommandBuffer commit];
+    m_renderer->TrackCommandBuffer(blitCommandBuffer);
     [blitCommandBuffer waitUntilCompleted];  // Single wait for all copies
     
     // ============================================================
@@ -1930,6 +1936,7 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
         
         [copyEncoder endEncoding];
         [copyBuffer commit];
+        m_renderer->TrackCommandBuffer(copyBuffer);
         [copyBuffer waitUntilCompleted];
         
         // Read pixel data from GPU
@@ -2051,6 +2058,7 @@ bool CMetalTextureManager::RenderCubeFace(I3DEngine* pEngine,
     // Finalize rendering
     [renderEncoder endEncoding];
     [commandBuffer commit];
+    m_renderer->TrackCommandBuffer(commandBuffer);
     [commandBuffer waitUntilCompleted];
     
     return true;
