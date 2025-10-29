@@ -20,9 +20,12 @@
 #include "MetalShaderManager.h"
 #include "I3DEngine.h"
 #include "ISystem.h"
+#include "IRenderer.h"
+#include "LeafBuffer.h"
 #include <Metal/Metal.h>
 
 extern ISystem *iSystem;
+extern IRenderer *gRenDev;
 
 //=========================================================================
 // CMetalRESky - Sky rendering with sky sphere, fog layers, and portals
@@ -199,7 +202,7 @@ public:
                 break;
             
             r->SetCullMode(R_CULL_NONE);
-            r->SetState(GS_DEPTHWRITE | GS_COLMASKNONE);
+            r->SetState(GS_DEPTHWRITE | GS_NOCOLMASK);
         }
         
         return true;

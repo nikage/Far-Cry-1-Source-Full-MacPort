@@ -161,16 +161,17 @@ public:
     void FontRestoreRenderingState() override;
     
     // Shader/Resource precaching
-    bool EF_PrecacheResource(IShader *pSH, float fDist, float fTimeToReady, int Flags, int nUpdateId) override;
-    bool EF_PrecacheResource(ITexPic *pTP, float fDist, float fTimeToReady, int Flags, int nUpdateId) override;
-    bool EF_PrecacheResource(CLeafBuffer *pPB, float fDist, float fTimeToReady, int Flags, int nUpdateId) override;
+    bool EF_PrecacheResource(IShader *pSH, float fDist, float fTimeToReady, int Flags) override;
+    bool EF_PrecacheResource(ITexPic *pTP, float fDist, float fTimeToReady, int Flags) override;
+    bool EF_PrecacheResource(CLeafBuffer *pPB, float fDist, float fTimeToReady, int Flags) override;
+    bool EF_PrecacheResource(CDLight *pLS, float fDist, float fTimeToReady, int Flags) override;
     
     // Shader system methods
     void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits) override;
-    void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert *verts, SShader *Shader, unsigned short *indices, int ninds, int nAW) override;
-    CCObject *EF_AddSpriteToScene(int Ef, int numPts, SColorVert *verts, SShader *Shader, unsigned short *indices, int ninds, int nAW, float fDist) override;
-    void EF_AddPolyToScene2D(int Ef, int numPts, int ninds, SColorVert *verts, unsigned short *inds, int nAW) override;
-    void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, int ninds, SColorVert *verts, unsigned short *inds, int nAW) override;
+    void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert *verts, CCObject *obj=NULL, int nFogID=0) override;
+    CCObject *EF_AddSpriteToScene(int Ef, int numPts, SColorVert *verts, CCObject *obj, byte *inds=NULL, int ninds=0, int nFogID=0) override;
+    void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D *verts) override;
+    void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D *verts) override;
     IShader *EF_LoadShader(const char *name, EShClass Class, int flags, unsigned int nMaskGen) override;
     SShaderItem EF_LoadShaderItem(const char *name, EShClass Class, int flags, SInputShaderResources *Res, unsigned int nMaskGen) override;
     bool EF_ReloadFile(const char *szFileName) override;
@@ -188,7 +189,7 @@ public:
     // Additional shader/template methods
     char** EF_GetShadersForFile(const char* File, int num) override;
     SLightMaterial* EF_GetLightMaterial(char* Str) override;
-    bool EF_RegisterTemplate(int nTemplId, char* Name, SShaderPassResources* Res, const char* PublicParams, SShaderGen* pShGen) override;
+    bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace) override;
     bool EF_HideTemplate(const char* name) override;
     void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id, int flags, Vec3 vDir) override;
 

@@ -943,7 +943,6 @@ void CMetalBaseRenderer::SetCullMode(int mode)
     switch (mode)
     {
         case R_CULL_DISABLE:
-        case R_CULL_NONE:
             [m_renderEncoder setCullMode:MTLCullModeNone];
             break;
         case R_CULL_FRONT:
@@ -1247,7 +1246,8 @@ int CMetalBaseRenderer::UnProject(float sx, float sy, float sz,
     }
     
     Matrix44 mvp = proj * model;
-    Matrix44 invMVP = mvp.GetInverted();
+    Matrix44 invMVP = mvp;
+    invMVP.Invert44();
     
     float clipW = 1.0f;
     float worldX = invMVP(0,0) * normX + invMVP(0,1) * normY + 

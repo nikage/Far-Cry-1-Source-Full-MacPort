@@ -26,7 +26,6 @@ set(XRENDER_METAL_SOURCES
     MetalRenderElements.h
     MetalOptimizations.cpp
     MetalOptimizations.h
-    SimpleMetalRenderer.cpp
 )
 
 # Create the Metal renderer library
@@ -72,10 +71,6 @@ set_source_files_properties(MetalUtilityRenderer.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 
-set_source_files_properties(SimpleMetalRenderer.cpp PROPERTIES
-    COMPILE_FLAGS "-x objective-c++"
-)
-
 set_source_files_properties(MetalStateCache.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
@@ -101,9 +96,31 @@ target_compile_definitions(XRenderMetal PRIVATE
     XRENDERMETAL_EXPORTS=1
 )
 
+# Compile Metal shaders at build time  
+# Note: Do NOT pass C++ include paths to Metal compiler
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
+    COMMAND xcrun -sdk macosx metal -std=macos-metal2.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/BasicShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.air
+    COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/BasicShaders.metal
+    COMMENT "Compiling Metal shaders"
+    VERBATIM
+)
+
+add_custom_target(MetalShaders ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
+)
+
+add_dependencies(XRenderMetal MetalShaders)
+
 # Install target
 install(TARGETS XRenderMetal 
     LIBRARY DESTINATION lib
     FRAMEWORK DESTINATION Frameworks
+)
+
+# Install Metal shader library
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
+    DESTINATION lib
 )
 

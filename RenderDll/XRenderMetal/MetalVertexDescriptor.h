@@ -19,8 +19,11 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include <Metal/Metal.h>
-#include "VertexFormats.h"
+#import <Metal/Metal.h>
+
+// Include platform and CryEngine headers properly
+#include "../../CryCommon/platform.h"
+#include "../../CryCommon/VertexFormats.h"
 
 class CMetalVertexDescriptorHelper
 {
