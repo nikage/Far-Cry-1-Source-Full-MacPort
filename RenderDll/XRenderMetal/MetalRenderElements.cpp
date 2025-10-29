@@ -20,12 +20,11 @@
 #include "MetalShaderManager.h"
 #include "I3DEngine.h"
 #include "ISystem.h"
-#include "IRenderer.h"
 #include "LeafBuffer.h"
 #include <Metal/Metal.h>
 
 extern ISystem *iSystem;
-extern IRenderer *gRenDev;
+// gRenDev is declared in Renderer.h which is included via MetalBaseRenderer.h
 
 //=========================================================================
 // CMetalRESky - Sky rendering with sky sphere, fog layers, and portals

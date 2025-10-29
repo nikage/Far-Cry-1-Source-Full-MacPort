@@ -19,20 +19,8 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include <Metal/Metal.h>
-#include <MetalKit/MetalKit.h>
-#include <QuartzCore/CAMetalLayer.h>
-#include <Cocoa/Cocoa.h>
-#include <vector>
-#include <memory>
-#include <stack>
-#include <array>
-
-// Include CryEngine interfaces
-#include "IRenderer.h"
-#include "Cry_Camera.h"
-#include "IShader.h"
-#include "Cry_Math.h"
+// Include all CryEngine infrastructure in proper order
+#include "MetalRenderPCH.h"
 #include "MetalStateCache.h"
 #include "MetalRenderElements.h"
 
@@ -47,8 +35,9 @@ class SMaterial;
 class STexPic;
 class CMetalStateCache;
 
-// Metal base renderer class that implements core IRenderer functionality
-class CMetalBaseRenderer : public IRenderer
+// Metal base renderer class that implements core CRenderer functionality
+// Inherits from CRenderer which provides m_RP and other common renderer infrastructure
+class CMetalBaseRenderer : public CRenderer
 {
 public:
     CMetalBaseRenderer();

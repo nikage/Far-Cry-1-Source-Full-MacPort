@@ -27,12 +27,11 @@
 #include <memory>
 
 // Include CryEngine interfaces
-#include "IRenderer.h"
 #include "IShader.h"
 #include "Cry_Math.h"
 #include "Cry_Camera.h"  // For CCamera member
 
-// Include specialized manager classes
+// Include specialized manager classes  
 #include "MetalBaseRenderer.h"
 #include "MetalTextureManager.h"
 #include "MetalShaderManager.h"
@@ -79,7 +78,7 @@ class STexPic;
  * @see IRenderer (base interface from CryEngine)
  */
 ////////////////////////////////////////////////////////////////////////////
-class CMetalRenderer : public IRenderer
+class CMetalRenderer : public CMetalBaseRenderer
 {
 public:
     /**
