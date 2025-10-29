@@ -82,6 +82,13 @@ set(FARCRY_WORKING_SOURCES
     FARCRY/Main.cpp
 )
 
+# On macOS, compile Main.cpp as Objective-C++ for Cocoa API support
+if(APPLE)
+    set_source_files_properties(FARCRY/Main.cpp PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
+endif()
+
 # Create the working Far Cry executable
 add_executable(FarCryWorking ${FARCRY_WORKING_SOURCES})
 

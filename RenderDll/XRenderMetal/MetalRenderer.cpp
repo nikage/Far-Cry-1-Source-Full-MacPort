@@ -136,12 +136,14 @@ extern "C" void CryModuleFree(void* ptr)
 
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
-      m_utilityRenderer(nullptr) {
+      m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
+      m_currentDrawable(nil) {
   // Managers will be initialized in Init() after Metal device is created
   printf("CMetalRenderer constructor: managers will be initialized after device creation\n");
 }
 
 CMetalRenderer::~CMetalRenderer() {
+  DestroyGameWindow();
   if (m_textureManager || m_shaderManager || m_utilityRenderer) {
     ShutdownManagers();
   }
@@ -158,9 +160,15 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
   printf("CMetalRenderer::Init - Base renderer Init() returned %p\n", result);
   
   // Check if base renderer initialized successfully
-  // Note: In headless mode m_metalView might be nil, but m_isInitialized should be true
   if (!m_isInitialized) {
     printf("CMetalRenderer::Init - Base renderer initialization failed (m_isInitialized=%d)\n", m_isInitialized);
+    return nullptr;
+  }
+  
+  // Create game window with Metal layer
+  printf("CMetalRenderer::Init - Creating game window (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
+  if (!CreateGameWindow(width, height, fullscreen)) {
+    printf("CMetalRenderer::Init - Failed to create game window\n");
     return nullptr;
   }
   
@@ -171,8 +179,8 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
     return nullptr;
   }
   
-  printf("CMetalRenderer initialized successfully with managers\n");
-  return (WIN_HWND)1; // Return non-null to indicate success
+  printf("CMetalRenderer initialized successfully with managers and window\n");
+  return (WIN_HWND)m_window;
 }
 
 // Texture management delegation
@@ -725,6 +733,86 @@ void CMetalRenderer::ShutdownManagers() {
   assert(!m_utilityRenderer && "ShutdownManagers: Utility renderer not released!");
   assert(!m_shaderManager && "ShutdownManagers: Shader manager not released!");
   assert(!m_textureManager && "ShutdownManagers: Texture manager not released!");
+}
+
+bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
+  @autoreleasepool {
+    printf("CreateGameWindow: Creating NSWindow (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
+    
+    if (!m_device) {
+      printf("CreateGameWindow: Error - Metal device not created yet\n");
+      return false;
+    }
+    
+    NSRect frame = NSMakeRect(100, 100, width, height);
+    NSWindowStyleMask styleMask = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | 
+                                   NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+    
+    m_window = [[NSWindow alloc] initWithContentRect:frame
+                                            styleMask:styleMask
+                                              backing:NSBackingStoreBuffered
+                                                defer:NO];
+    
+    if (!m_window) {
+      printf("CreateGameWindow: Error - Failed to create NSWindow\n");
+      return false;
+    }
+    
+    [m_window setTitle:@"Far Cry - macOS Metal Port"];
+    [m_window setAcceptsMouseMovedEvents:YES];
+    
+    NSView* contentView = [m_window contentView];
+    if (!contentView) {
+      printf("CreateGameWindow: Error - No content view available\n");
+      [m_window release];
+      m_window = nil;
+      return false;
+    }
+    
+    m_windowMetalLayer = [CAMetalLayer layer];
+    if (!m_windowMetalLayer) {
+      printf("CreateGameWindow: Error - Failed to create CAMetalLayer\n");
+      [m_window release];
+      m_window = nil;
+      return false;
+    }
+    
+    m_windowMetalLayer.device = m_device;
+    m_windowMetalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+    m_windowMetalLayer.framebufferOnly = YES;
+    m_windowMetalLayer.drawableSize = CGSizeMake(width, height);
+    
+    [contentView setWantsLayer:YES];
+    [contentView setLayer:m_windowMetalLayer];
+    
+    [m_window makeKeyAndOrderFront:nil];
+    [m_window makeFirstResponder:contentView];
+    
+    printf("CreateGameWindow: Window created successfully\n");
+    printf("  Window: %p\n", m_window);
+    printf("  Metal Layer: %p\n", m_windowMetalLayer);
+    printf("  Metal Device: %s\n", [[m_device name] UTF8String]);
+    
+    return true;
+  }
+}
+
+void CMetalRenderer::DestroyGameWindow() {
+  @autoreleasepool {
+    if (m_currentDrawable) {
+      m_currentDrawable = nil;
+    }
+    
+    if (m_windowMetalLayer) {
+      m_windowMetalLayer = nil;
+    }
+    
+    if (m_window) {
+      [m_window close];
+      [m_window release];
+      m_window = nil;
+    }
+  }
 }
 
 // Export functions for the renderer
@@ -1408,13 +1496,67 @@ void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
 
 // Missing IRenderer method implementations
 void CMetalRenderer::BeginFrame() {
-  // Call base class BeginFrame
+  // Get next drawable from window layer
+  if (m_windowMetalLayer) {
+    @autoreleasepool {
+      m_currentDrawable = [m_windowMetalLayer nextDrawable];
+      if (!m_currentDrawable) {
+        printf("Warning: Failed to get next drawable\n");
+      }
+    }
+  }
+  
+  // Call base class BeginFrame to set up command buffer
   CMetalBaseRenderer::BeginFrame();
+  
+  // Create render pass descriptor with drawable texture
+  if (m_currentDrawable && m_currentCommandBuffer) {
+    @autoreleasepool {
+      m_renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+      m_renderPassDescriptor.colorAttachments[0].texture = m_currentDrawable.texture;
+      m_renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+      m_renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+      m_renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+      
+      m_renderEncoder = [m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor];
+      if (!m_renderEncoder) {
+        printf("Error: Failed to create render encoder\n");
+      }
+    }
+  }
 }
 
 void CMetalRenderer::Update() {
   // Call base class Update
   CMetalBaseRenderer::Update();
+}
+
+void CMetalRenderer::EndFrame() {
+  // End rendering
+  if (m_renderEncoder) {
+    [m_renderEncoder endEncoding];
+    m_renderEncoder = nil;
+  }
+  
+  // Present drawable
+  if (m_currentDrawable && m_currentCommandBuffer) {
+    [m_currentCommandBuffer presentDrawable:m_currentDrawable];
+  }
+  
+  // Commit command buffer
+  if (m_currentCommandBuffer) {
+    [m_currentCommandBuffer commit];
+    TrackCommandBuffer(m_currentCommandBuffer);
+    m_currentCommandBuffer = nil;
+  }
+  
+  // Clean up
+  m_currentDrawable = nil;
+  m_renderPassDescriptor = nil;
+  
+  // Update frame index
+  m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+  m_currentDynamicVBPool = (m_currentDynamicVBPool + 1) % NUM_DYNAMIC_VB_POOLS;
 }
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {

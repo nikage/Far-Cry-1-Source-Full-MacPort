@@ -480,16 +480,14 @@ bool CSystem::InitRenderer(WIN_HINSTANCE hinst, WIN_HWND hwnd,const char *szCmdL
 	if (!OpenRenderLibrary(m_rDriver->GetString()))
 		return false;
 	
-	// Initialize the renderer for macOS (this was missing!)
-	if (m_pRenderer) {
-		GetILog()->LogToFile( "Calling renderer Init for macOS" );
-		m_pRenderer->Init(0, 0, 800, 600, 32, 24, 8, false, hinst, hwnd);
-		GetILog()->LogToFile( "Renderer Init completed for macOS" );
-	} else {
-		GetILog()->LogToFile( "ERROR: No renderer available for macOS" );
+	// OpenRenderLibrary already initializes the renderer for macOS
+	// The Init() call happens inside PackageRenderConstructor
+	if (!m_pRenderer) {
+		GetILog()->LogToFile( "ERROR: No renderer available after OpenRenderLibrary" );
 		return false;
 	}
 	
+	GetILog()->LogToFile( "Metal renderer initialized successfully" );
 	return true;
 #else
   CreateRendererVars();

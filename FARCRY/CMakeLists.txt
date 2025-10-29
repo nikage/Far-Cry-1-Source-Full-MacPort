@@ -94,6 +94,11 @@ if(APPLE)
     target_compile_options(FarCry PRIVATE
         -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
     )
+    
+    # Compile Main.cpp as Objective-C++ for Cocoa API support
+    set_source_files_properties(Main.cpp PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
 endif()
 
 if(APPLE)

@@ -76,7 +76,7 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F_COL4UB()
     descriptor.attributes[0].offset = offsetof(struct_VERTEX_FORMAT_P3F_COL4UB, xyz);
     descriptor.attributes[0].bufferIndex = 0;
     
-    descriptor.attributes[1].format = MTLVertexFormatUChar4Normalized;
+    descriptor.attributes[1].format = MTLVertexFormatUChar4;
     descriptor.attributes[1].offset = offsetof(struct_VERTEX_FORMAT_P3F_COL4UB, color);
     descriptor.attributes[1].bufferIndex = 0;
     
@@ -99,7 +99,7 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F_COL4UB_T
     descriptor.attributes[0].offset = offsetof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F, xyz);
     descriptor.attributes[0].bufferIndex = 0;
     
-    descriptor.attributes[1].format = MTLVertexFormatUChar4Normalized;
+    descriptor.attributes[1].format = MTLVertexFormatUChar4;
     descriptor.attributes[1].offset = offsetof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F, color);
     descriptor.attributes[1].bufferIndex = 0;
     
@@ -153,7 +153,7 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F_N_COL4UB
     descriptor.attributes[1].offset = offsetof(struct_VERTEX_FORMAT_P3F_N_COL4UB_TEX2F, normal);
     descriptor.attributes[1].bufferIndex = 0;
     
-    descriptor.attributes[2].format = MTLVertexFormatUChar4Normalized;
+    descriptor.attributes[2].format = MTLVertexFormatUChar4;
     descriptor.attributes[2].offset = offsetof(struct_VERTEX_FORMAT_P3F_N_COL4UB_TEX2F, color);
     descriptor.attributes[2].bufferIndex = 0;
     

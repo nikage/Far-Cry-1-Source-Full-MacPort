@@ -607,32 +607,48 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	CryLogAlways("CXGame::Init - Flock manager created");
 
 	if (m_pScriptSystem) {
+		CryLogAlways("CXGame::Init - Initializing UI template");
 		CScriptObjectUI::InitializeTemplate(m_pScriptSystem);
 	} else {
 		CryLogAlways("CXGame::Init - ScriptSystem is NULL, skipping ScriptObjectUI");
 	}
 
 		// init is not necessary for now, but add here if it later is
+		CryLogAlways("CXGame::Init - Creating ScriptObjectGame");
 		m_pScriptObjectGame=new CScriptObjectGame;
+		CryLogAlways("CXGame::Init - Initializing Game template");
 		CScriptObjectGame::InitializeTemplate(m_pScriptSystem);
 
+		CryLogAlways("CXGame::Init - Initializing Input template");
 		m_pScriptObjectInput=new CScriptObjectInput;
 		CScriptObjectInput::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Language template");
 		m_pScriptObjectLanguage=new CScriptObjectLanguage;
 		CScriptObjectLanguage::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Boids template");
 		m_pScriptObjectBoids = new CScriptObjectBoids;
 		CScriptObjectBoids::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing AI template");
 		m_pScriptObjectAI = new CScriptObjectAI;
 		CScriptObjectAI::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Server template");
 		CScriptObjectServer::InitializeTemplate(m_pScriptSystem);
 
+		CryLogAlways("CXGame::Init - Initializing Player template");
 		CScriptObjectPlayer::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing FireParam template");
 		CScriptObjectFireParam::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing WeaponClass template");
 		CScriptObjectWeaponClass::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Vehicle template");
 		CScriptObjectVehicle::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Spectator template");
 		CScriptObjectSpectator::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing AdvCamSystem template");
 		CScriptObjectAdvCamSystem::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Synched2DTable template");
 		CScriptObjectSynched2DTable::InitializeTemplate(m_pScriptSystem);
+		CryLogAlways("CXGame::Init - Initializing Renderer template");
 		CScriptObjectRenderer::InitializeTemplate(m_pScriptSystem);
 
 

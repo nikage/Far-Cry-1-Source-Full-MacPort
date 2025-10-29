@@ -308,9 +308,10 @@ public:
     void GetProjectionMatrix(double *mat) override;
     void RenderToViewport(const CCamera &cam, float x, float y, float width, float height) override;
     
-    // Viewport and frame management
+    // Viewport and frame management  
     void BeginFrame(void) override;
     void Update(void) override;
+    void EndFrame(void) override;
     void SetScissor(int x=0, int y=0, int width=0, int height=0) override;
     void SetViewport(int x=0, int y=0, int width=0, int height=0) override;
     void GetViewport(int *x, int *y, int *width, int *height) override;
@@ -365,11 +366,18 @@ public:
     std::unique_ptr<CMetalShaderManager> m_shaderManager;
     std::unique_ptr<CMetalUtilityRenderer> m_utilityRenderer;
     
+    // Window and rendering surface
+    NSWindow* m_window;
+    CAMetalLayer* m_windowMetalLayer;
+    id<CAMetalDrawable> m_currentDrawable;
+    
     // NOTE: Camera stored in CMetalBaseRenderer::m_camera (no duplication)
     
     // Initialization methods
     bool InitializeManagers();
     void ShutdownManagers();
+    bool CreateGameWindow(int width, int height, bool fullscreen);
+    void DestroyGameWindow();
 };
 
 // Metal utility functions

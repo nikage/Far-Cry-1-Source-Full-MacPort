@@ -22,9 +22,9 @@
 
 // Windows compatibility
 extern "C" {
-    int _fmode = 0;    // macOS uses one underscore
+    int _fmode = 0;
     int __fmode = 0;
-    int ___fmode = 0;  // macOS uses three underscores
+    int ___fmode = 0;
 }
 
 /////////////////////////////////////////////////////
@@ -223,15 +223,11 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 	BeautifyPath(szNewSrc);
 	
 #if defined(__APPLE__) || defined(LINUX)
-	// On Unix/macOS, use realpath() instead of _fullpath()
 	char* result = realpath(szNewSrc, dst);
 	if (!result)
-#else
-	if (!_fullpath (dst, szNewSrc, g_nMaxPath))
-#endif
 	{
 		src = szNewSrc;
-		m_pLog->LogError("\002Cannot transform file name %s to absolute path, resorting to desparate measures!", src);
+#endif
 		if (src[0] == '.' && (src[1] == g_cNativeSlash || src[1] == g_cNonNativeSlash))
 			src+=2;
 #ifdef _XBOX

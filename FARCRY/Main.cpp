@@ -59,6 +59,11 @@ void AuthCheckFunction( void *data )
 
 #define NOT_USE_CRY_MEMORY_MANAGER
 
+// On macOS, include Cocoa headers BEFORE platform.h and CryEngine headers to avoid conflicts
+#if defined(__APPLE__) && defined(__MACH__)
+#import <Cocoa/Cocoa.h>
+#endif
+
 #include <platform.h>
 #include <vector>
 #include <list>
@@ -909,74 +914,107 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 #if defined(__APPLE__) && defined(__MACH__)
 // macOS entry point - use statically linked libraries
 int main(int argc, char* argv[]) {
-    // Convert command line arguments to single string like Windows
-    char cmdLine[1024] = "";
-    for (int i = 1; i < argc; i++) {
-        if (i > 1) strcat(cmdLine, " ");
-        strcat(cmdLine, argv[i]);
-    }
-    
-    // Initialize system parameters
-    SSystemInitParams sip;
-    sip.sLogFileName = "log.txt";
-    if (cmdLine[0]) {
-        strncpy(sip.szSystemCmdLine, cmdLine, sizeof(sip.szSystemCmdLine) - 1);
-        sip.szSystemCmdLine[sizeof(sip.szSystemCmdLine) - 1] = '\0';
-    }
-    
-    // Initialize with macOS-specific parameters
-    sip.hInstance = (HINSTANCE)1;
-    sip.hWnd = NULL;  // No window handle on macOS
-    sip.pSystem = NULL;
-    sip.pCheckFunc = AuthCheckFunction;
-    
-    // Create system interface directly (statically linked)
-    g_pISystem = CreateSystemInterface(sip);
-    if (!g_pISystem) {
-        printf("CreateSystemInterface Failed\n");
-        return -1;
-    }
-    
-    // Enable Log verbosity
-    g_pISystem->GetILog()->EnableVerbosity(true);
-    
-    // Initialize console
-    g_pISystem->GetIConsole()->ShowConsole(false);
-    g_pISystem->GetIConsole()->SetScrollMax(600/2);
-    
-    // Create game (statically linked)
-    printf("main(): About to call CreateGame\n");
-    fflush(stdout);
-    SGameInitParams gip;
-    if (!g_pISystem->CreateGame(gip)) {
-        printf("CreateGame Failed\n");
-        g_pISystem->Release();
-        return -1;
-    }
-    printf("main(): CreateGame completed successfully\n");
-    fflush(stdout);
-    
-    // Get game interface and run
-    printf("main(): About to call GetIGame\n");
-    fflush(stdout);
-    IGame *pGame = g_pISystem->GetIGame();
-    printf("main(): GetIGame returned: %p\n", pGame);
-    fflush(stdout);
-    if (pGame) {
-        printf("main(): About to call pGame->Run\n");
+    @autoreleasepool {
+        // Initialize NSApplication for GUI support
+        [NSApplication sharedApplication];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        [NSApp activateIgnoringOtherApps:YES];
+        
+        printf("NSApplication initialized\n");
+        
+        // Convert command line arguments to single string like Windows
+        char cmdLine[1024] = "";
+        for (int i = 1; i < argc; i++) {
+            if (i > 1) strcat(cmdLine, " ");
+            strcat(cmdLine, argv[i]);
+        }
+        
+        // Initialize system parameters
+        SSystemInitParams sip;
+        sip.sLogFileName = "log.txt";
+        if (cmdLine[0]) {
+            strncpy(sip.szSystemCmdLine, cmdLine, sizeof(sip.szSystemCmdLine) - 1);
+            sip.szSystemCmdLine[sizeof(sip.szSystemCmdLine) - 1] = '\0';
+        }
+        
+        // Initialize with macOS-specific parameters
+        sip.hInstance = (HINSTANCE)1;
+        sip.hWnd = NULL;
+        sip.pSystem = NULL;
+        sip.pCheckFunc = AuthCheckFunction;
+        
+        // Create system interface directly (statically linked)
+        g_pISystem = CreateSystemInterface(sip);
+        if (!g_pISystem) {
+            printf("CreateSystemInterface Failed\n");
+            return -1;
+        }
+        
+        // Enable Log verbosity
+        g_pISystem->GetILog()->EnableVerbosity(true);
+        
+        // Initialize console
+        g_pISystem->GetIConsole()->ShowConsole(false);
+        g_pISystem->GetIConsole()->SetScrollMax(600/2);
+        
+        // Create game (statically linked)
+        printf("main(): About to call CreateGame\n");
         fflush(stdout);
-        bool bRelaunch = false;
-        pGame->Run(bRelaunch);
-        printf("main(): pGame->Run completed\n");
+        SGameInitParams gip;
+        if (!g_pISystem->CreateGame(gip)) {
+            printf("CreateGame Failed\n");
+            g_pISystem->Release();
+            return -1;
+        }
+        printf("main(): CreateGame completed successfully\n");
         fflush(stdout);
+        
+        // Get game interface and run
+        printf("main(): About to call GetIGame\n");
+        fflush(stdout);
+        IGame *pGame = g_pISystem->GetIGame();
+        printf("main(): GetIGame returned: %p\n", pGame);
+        fflush(stdout);
+        
+        if (pGame) {
+            printf("main(): Starting game loop with event processing\n");
+            fflush(stdout);
+            
+            // Main game loop with event processing
+            bool bRelaunch = false;
+            bool bQuit = false;
+            
+            while (!bQuit) {
+                @autoreleasepool {
+                    // Process all pending events
+                    NSEvent *event;
+                    while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                                      untilDate:[NSDate distantPast]
+                                                         inMode:NSDefaultRunLoopMode
+                                                        dequeue:YES])) {
+                        [NSApp sendEvent:event];
+                        [NSApp updateWindows];
+                    }
+                    
+                    // Update game (one frame)
+                    g_pISystem->Update();
+                    
+                    // Check if we should quit (window closed, ESC pressed, etc.)
+                    // TODO: Add proper quit detection
+                }
+            }
+            
+            printf("main(): Game loop ended\n");
+            fflush(stdout);
+        }
+        
+        // Cleanup
+        if (g_pISystem) {
+            g_pISystem->Release();
+            g_pISystem = NULL;
+        }
+        
+        return 0;
     }
-    
-    // Cleanup
-    if (g_pISystem) {
-        g_pISystem->Release();
-        g_pISystem = NULL;
-    }
-    
-    return 0;
 }
 #endif

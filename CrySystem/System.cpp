@@ -768,15 +768,23 @@ bool CSystem::CreateGame( const SGameInitParams &params )
 	{
 		CryLogAlways("CSystem::CreateGame - calling CreateGameInstance()");
 		m_pGame = CreateGameInstance();
+		CryLogAlways("CSystem::CreateGame - CreateGameInstance returned: %p", m_pGame);
+		
+		if (m_pGame)
+		{
+			CryLogAlways("CSystem::CreateGame - calling m_pGame->Init()");
 			m_pGame->Init(this, false, m_bEditor, NULL);
 			CryLogAlways("CSystem::CreateGame - m_pGame->Init() complete");
 		}
 	}
 
-	if (m_pIPhysicalWorld)
+	CryLogAlways("CSystem::CreateGame - checking physical world");
+	if (m_pIPhysicalWorld && m_pGame)
 	{
+		CryLogAlways("CSystem::CreateGame - setting physics streamers");
 		m_pIPhysicalWorld->SetPhysicsStreamer(m_pGame->GetPhysicsStreamer());
 		m_pIPhysicalWorld->SetPhysicsEventClient(m_pGame->GetPhysicsEventClient());
+		CryLogAlways("CSystem::CreateGame - physics streamers set");
 	}
 #endif
 
