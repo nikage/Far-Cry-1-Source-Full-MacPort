@@ -211,17 +211,27 @@ public:
     // Effect drawing methods
     bool EF_DrawEfForName(char* name, float x, float y, float width, float height, CFColor& col, int nTempl) override;
     bool EF_DrawEfForNum(int num, float x, float y, float width, float height, CFColor& col, int nTempl) override;
-    bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl) override;
-    bool EF_DrawPartialEfForName(IShader* ef, char* name, float x, float y, float width, float height, CFColor& col, int nTempl) override;
-    bool EF_DrawPartialEfForNum(IShader* ef, int num, float x, float y, float width, float height, CFColor& col, int nTempl) override;
+    bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl=-1) override;
+    bool EF_DrawEf(SShaderItem si, float x, float y, float width, float height, CFColor& col, int nTempl=-1) override;
+    bool EF_DrawPartialEfForName(char* name, SVrect *vr, SVrect *pr, CFColor& col) override;
+    bool EF_DrawPartialEfForNum(int num, SVrect *vr, SVrect *pr, CFColor& col) override;
+    bool EF_DrawPartialEf(IShader *ef, SVrect *vr, SVrect *pr, CFColor& col, float iwdt=0, float ihgt=0) override;
+    
+    // Shader query and construction
+    void* EF_Query(int Query, int Param=0) override;
+    void EF_ConstructEf(IShader *Ef) override;
+    void EF_SetWorldColor(float r, float g, float b, float a=1.0f) override;
+    int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, int nIndex=-1, bool bCaustics=false) override;
     
     // Leaf buffer management
     CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char *szSource, CIndexedMesh * pIndexedMesh=0) override;
-    CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, VERTEX_FORMAT_ENUM eVF,
-                                             ushort* pIndices, int nIndices, int nPrimetiveType,
-                                             const char *szSource, EBufferType eBufType=eBT_Static, int nMatId=0,
-                                             const list2<struct_VERTEXSTREAM> *pSrcVerts=NULL, bool bOnlyVideoBuffer=false,
-                                             bool bPrecache=true, bool bSyncronBuffer=false) override;
+    CLeafBuffer* CreateLeafBufferInitialized(void * pVertBuffer, int nVertCount, int nVertFormat, 
+                                             ushort* pIndices, int nIndices,
+                                             int nPrimetiveType, const char *szSource, EBufferType eBufType = eBT_Dynamic,
+                                             int nMatInfoCount=1, int nClientTextureBindID=0,    
+                                             bool (*PrepareBufferCallback)(CLeafBuffer *, bool)=NULL,
+                                             void *CustomData = NULL,
+                                             bool bOnlyVideoBuffer=false, bool bPrecache=true) override;
     void DeleteLeafBuffer(CLeafBuffer * pLBuffer) override;
     
     // 2D drawing methods
@@ -230,6 +240,68 @@ public:
     void Draw2dImage(float xpos,float ypos,float w,float h,int texture_id,float s0=0,float t0=0,float s1=1,float t1=1,float angle=0,float r=1,float g=1,float b=1,float a=1,float z=1) override;
     void DrawImage(float xpos,float ypos,float w,float h,int texture_id,float s0,float t0,float s1,float t1,float r,float g,float b,float a) override;
     int SetPolygonMode(int mode) override;
+    
+    // Vertex/Index buffer management (from CRenderer/IRenderer)
+    void* GetDynVBPtr(int nVerts, int &nOffs, int Pool) override;
+    void DrawDynVB(int nOffs, int Pool, int nVerts) override;
+    void DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf, ushort *pInds, int nVerts, int nInds, int nPrimType) override;
+    CVertexBuffer* CreateBuffer(int vertexcount, int vertexformat, const char *szSource, bool bDynamic=false) override;
+    void CreateBuffer(int size, int vertexformat, CVertexBuffer *buf, int Type, const char *szSource) override;
+    void ReleaseBuffer(CVertexBuffer *bufptr) override;
+    void DrawBuffer(CVertexBuffer *src, SVertexStream *indicies, int numindices, int offsindex, int prmode, int vert_start=0, int vert_stop=0, CMatInfo *mi=NULL) override;
+    void UpdateBuffer(CVertexBuffer *dest, const void *src, int vertexcount, bool bUnLock, int offs=0, int Type=0) override;
+    void CreateIndexBuffer(SVertexStream *dest, const void *src, int indexcount) override;
+    void UpdateIndexBuffer(SVertexStream *dest, const void *src, int indexcount, bool bUnLock=true) override;
+    void ReleaseIndexBuffer(SVertexStream *dest) override;
+    void DrawTriStrip(CVertexBuffer *src, int vert_num=4) override;
+    
+    // Rendering state and control methods
+    void CheckError(const char *comment) override;
+    void Draw3dBBox(const Vec3 &mins, const Vec3 &maxs, int nPrimType) override;
+    void Draw3dPrim(int nPrimType) override;
+    void SetState(int State) override;
+    void SetCullMode(int mode=R_CULL_BACK) override;
+    bool EnableFog(bool enable) override;
+    void SetFog(float density, float fogstart, float fogend, const float *color, int fogmode) override;
+    void EnableTexGen(bool enable) override;
+    void SetTexgen(float scaleX, float scaleY, float translateX=0, float translateY=0) override;
+    void SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2) override;
+    void SetLodBias(float value=R_DEFAULT_LODBIAS) override;
+    void EnableVSync(bool enable) override;
+    void SetFenceCompleted();  // Metal-specific
+    
+    // Matrix operations
+    void PushMatrix() override;
+    void RotateMatrix(float a, float x, float y, float z) override;
+    void RotateMatrix(const Vec3 & angels) override;
+    void TranslateMatrix(float x, float y, float z) override;
+    void ScaleMatrix(float x, float y, float z) override;
+    void TranslateMatrix(const Vec3 &pos) override;
+    void MultMatrix(float * mat) override;
+    void LoadMatrix(const Matrix44 *src=0) override;
+    void PopMatrix() override;
+    void EnableTMU(bool enable) override;
+    void SelectTMU(int tnum) override;
+    bool ChangeDisplay(unsigned int width, unsigned int height, unsigned int cbpp) override;
+    void ChangeViewport(unsigned int x, unsigned int y, unsigned int width, unsigned int height) override;
+    
+    // Pure virtual methods that MUST be implemented
+    void Reset(void) override;
+    char* GetStatusText(ERendStats type) override;
+    void PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid=0) override;
+    void SetupShadowOnlyPass(int Num, ShadowMapFrustum * pFrustum, Vec3 * vShadowTrans, const float fShadowScale, Vec3 vObjTrans, float fObjScale, const Vec3 vObjAngles, Matrix44 * pObjMat) override;
+    void DrawAllShadowsOnTheScreen() override;
+    void SetClipPlane(int id, float * params) override;
+    void EF_SetClipPlane(bool bEnable, float *pPlane, bool bRefract) override;
+    void DrawPoints(Vec3 v[], int nump, CFColor& col, int flags) override;
+    void DrawLines(Vec3 v[], int nump, CFColor& col, int flags, float fGround) override;
+    void EF_Release(int nFlags) override;
+    void EF_PipelineShutdown() override;
+    void EF_LightMaterial(SLightMaterial *lm, int Flags) override;
+    void EF_CheckOverflow(int nVerts, int nTris, CRendElement *re) override;
+    void EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, int nFog, CRendElement *re) override;
+    void EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, CRendElement *re) override;
+    STexPic* EF_MakePhongTexture(int Exp) override;
 
   protected:
     // Specialized manager instances
