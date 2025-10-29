@@ -106,3 +106,136 @@ fragment float4 solid_color_fragment(VertexOut in [[stage_in]],
                                     constant Uniforms& uniforms [[buffer(0)]]) {
     return uniforms.materialColor * in.color;
 }
+
+// Simple position-only vertex shader
+struct VertexIn_P3F {
+    float3 position [[attribute(0)]];
+};
+
+struct VertexOut_Simple {
+    float4 position [[position]];
+    float4 color;
+};
+
+vertex VertexOut_Simple simple_vertex(VertexIn_P3F in [[stage_in]],
+                                      constant Uniforms& uniforms [[buffer(1)]],
+                                      constant float4& color [[buffer(2)]]) {
+    VertexOut_Simple out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.color = color;
+    return out;
+}
+
+fragment float4 simple_fragment(VertexOut_Simple in [[stage_in]]) {
+    return in.color;
+}
+
+// Position + Color vertex shader
+struct VertexIn_P3F_COL4UB {
+    float3 position [[attribute(0)]];
+    uchar4 color [[attribute(1)]];
+};
+
+vertex VertexOut_Simple color_vertex(VertexIn_P3F_COL4UB in [[stage_in]],
+                                     constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_Simple out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.color = float4(in.color) / 255.0;
+    return out;
+}
+
+// Position + Color + TexCoord vertex shader (most common)
+struct VertexIn_P3F_COL4UB_TEX2F {
+    float3 position [[attribute(0)]];
+    uchar4 color [[attribute(1)]];
+    float2 texCoord [[attribute(2)]];
+};
+
+struct VertexOut_ColorTex {
+    float4 position [[position]];
+    float4 color;
+    float2 texCoord;
+};
+
+vertex VertexOut_ColorTex colortex_vertex(VertexIn_P3F_COL4UB_TEX2F in [[stage_in]],
+                                          constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_ColorTex out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.color = float4(in.color) / 255.0;
+    out.texCoord = in.texCoord;
+    return out;
+}
+
+fragment float4 colortex_fragment(VertexOut_ColorTex in [[stage_in]],
+                                  texture2d<float> baseTexture [[texture(0)]],
+                                  sampler textureSampler [[sampler(0)]]) {
+    float4 textureColor = baseTexture.sample(textureSampler, in.texCoord);
+    return textureColor * in.color;
+}
+
+// Terrain shader with multi-texturing
+struct VertexIn_Terrain {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    float2 texCoord [[attribute(2)]];
+    float4 color [[attribute(3)]];
+};
+
+struct VertexOut_Terrain {
+    float4 position [[position]];
+    float3 worldPos;
+    float3 normal;
+    float2 texCoord;
+    float4 color;
+    float height;
+};
+
+vertex VertexOut_Terrain terrain_vertex(VertexIn_Terrain in [[stage_in]],
+                                        constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_Terrain out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+    out.normal = (uniforms.normalMatrix * float4(in.normal, 0.0)).xyz;
+    out.texCoord = in.texCoord;
+    out.color = in.color;
+    out.height = in.position.y;
+    return out;
+}
+
+fragment float4 terrain_fragment(VertexOut_Terrain in [[stage_in]],
+                                 constant Uniforms& uniforms [[buffer(0)]],
+                                 texture2d<float> baseTexture [[texture(0)]],
+                                 texture2d<float> detailTexture [[texture(1)]],
+                                 sampler textureSampler [[sampler(0)]]) {
+    float4 baseColor = baseTexture.sample(textureSampler, in.texCoord);
+    float4 detailColor = detailTexture.sample(textureSampler, in.texCoord * 8.0);
+    
+    float3 normal = normalize(in.normal);
+    float3 lightDir = normalize(uniforms.lightPos - in.worldPos);
+    float diff = max(dot(normal, lightDir), 0.0);
+    
+    float3 lighting = float3(0.3) + diff * uniforms.lightColor.rgb * 0.7;
+    float4 finalColor = baseColor * detailColor * float4(lighting, 1.0) * in.color;
+    
+    return finalColor;
+}
+
+// Sky shader
+vertex VertexOut sky_vertex(VertexIn in [[stage_in]],
+                            constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut out;
+    float4 pos = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.position = pos.xyww;
+    out.worldPos = in.position;
+    out.normal = in.normal;
+    out.texCoord = in.texCoord;
+    out.color = in.color;
+    return out;
+}
+
+fragment float4 sky_fragment(VertexOut in [[stage_in]],
+                            texturecube<float> skyTexture [[texture(0)]],
+                            sampler textureSampler [[sampler(0)]]) {
+    float3 direction = normalize(in.worldPos);
+    return skyTexture.sample(textureSampler, direction);
+}

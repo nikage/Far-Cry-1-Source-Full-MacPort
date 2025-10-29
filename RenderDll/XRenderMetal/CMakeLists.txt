@@ -15,10 +15,13 @@ set(XRENDER_METAL_SOURCES
     MetalTextureManager.h
     MetalShaderManager.cpp
     MetalShaderManager.h
+    MetalShaderLoader.cpp
     MetalUtilityRenderer.cpp
     MetalUtilityRenderer.h
     MetalStateCache.cpp
     MetalStateCache.h
+    MetalVertexDescriptor.cpp
+    MetalVertexDescriptor.h
     SimpleMetalRenderer.cpp
 )
 
@@ -70,6 +73,14 @@ set_source_files_properties(SimpleMetalRenderer.cpp PROPERTIES
 )
 
 set_source_files_properties(MetalStateCache.cpp PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalVertexDescriptor.cpp PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalShaderLoader.cpp PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 

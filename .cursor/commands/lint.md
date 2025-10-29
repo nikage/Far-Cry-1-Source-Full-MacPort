@@ -1,1 +1,1 @@
-run linter and fix issues on staged files 
+run linter on git staged files and fix issues on staged files 

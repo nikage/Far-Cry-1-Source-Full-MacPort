@@ -1,1 +1,1 @@
-add asserts,  prefer constructors over methods where possible
+add asserts in git staged files,  prefer constructors over methods where possible

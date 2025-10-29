@@ -132,12 +132,21 @@ public:
     void SetGlobalShaderTemplateId(int nTemplateId);
     int GetGlobalShaderTemplateId();
 
+    // Pipeline state access methods
+    id<MTLRenderPipelineState> GetPipelineStateForShader(const char* shaderName);
+    id<MTLRenderPipelineState> GetPipelineStateForFormat(int vertexFormat);
+
 protected:
     // Metal-specific shader management
+    bool InitializeDefaultShaderLibrary();
+    void CreateDefaultShaders(id<MTLLibrary> library);
     id<MTLFunction> LoadMetalShader(const char* name, const char* source);
     id<MTLRenderPipelineState> CreatePipelineState(id<MTLFunction> vertexFunction, 
                                                    id<MTLFunction> fragmentFunction,
                                                    MTLVertexDescriptor* vertexDescriptor);
+    id<MTLRenderPipelineState> CreatePipelineStateWithFunctions(id<MTLFunction> vertexFunction,
+                                                                id<MTLFunction> fragmentFunction,
+                                                                MTLVertexDescriptor* vertexDescriptor);
     void SetShaderUniforms(id<MTLRenderCommandEncoder> encoder, const SShaderParam& params);
     
     // Shader caching and management
