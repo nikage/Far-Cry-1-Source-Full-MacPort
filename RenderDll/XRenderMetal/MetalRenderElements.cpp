@@ -412,10 +412,10 @@ public:
         if (!gRenDev || !m_pBuffer || !m_pChunk)
             return;
         
-        gRenDev->EF_CheckOverflow(m_pBuffer->GetSecVertCount(), m_pChunk->nNumIndices, this);
+        gRenDev->EF_CheckOverflow(m_pBuffer->m_SecVertCount, m_pChunk->nNumIndices, this);
         gRenDev->m_RP.m_pRE = this;
         gRenDev->m_RP.m_RendNumIndices = m_pChunk->nNumIndices;
-        gRenDev->m_RP.m_RendNumVerts = m_pBuffer->GetSecVertCount();
+        gRenDev->m_RP.m_RendNumVerts = m_pBuffer->m_SecVertCount;
         gRenDev->m_RP.m_FirstIndex = m_pChunk->nFirstIndexId;
         gRenDev->m_RP.m_FirstVertex = 0;
     }

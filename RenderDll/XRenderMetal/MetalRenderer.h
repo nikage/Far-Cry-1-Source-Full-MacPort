@@ -165,14 +165,14 @@ public:
     bool EF_PrecacheResource(CLeafBuffer *pPB, float fDist, float fTimeToReady, int Flags) override;
     bool EF_PrecacheResource(CDLight *pLS, float fDist, float fTimeToReady, int Flags) override;
     
-    // Shader system methods
+    // Shader system methods - corrected signatures to match base class
     void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits) override;
     void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert *verts, CCObject *obj=NULL, int nFogID=0) override;
     CCObject *EF_AddSpriteToScene(int Ef, int numPts, SColorVert *verts, CCObject *obj, byte *inds=NULL, int ninds=0, int nFogID=0) override;
     void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D *verts) override;
     void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D *verts) override;
-    IShader *EF_LoadShader(const char *name, EShClass Class, int flags, unsigned int nMaskGen) override;
-    SShaderItem EF_LoadShaderItem(const char *name, EShClass Class, int flags, SInputShaderResources *Res, unsigned int nMaskGen) override;
+    IShader *EF_LoadShader(const char *name, EShClass Class, int flags=0, uint64 nMaskGen=0) override;
+    SShaderItem EF_LoadShaderItem(const char *name, EShClass Class, bool bShare, const char *templName, int flags=0, SInputShaderResources *Res=NULL, uint64 nMaskGen=0) override;
     bool EF_ReloadFile(const char *szFileName) override;
     void EF_ReloadShaderFiles(int nCategory) override;
     void EF_ReloadTextures() override;
@@ -190,7 +190,46 @@ public:
     SLightMaterial* EF_GetLightMaterial(char* Str) override;
     bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace) override;
     bool EF_HideTemplate(const char* name) override;
-    void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id, int flags, Vec3 vDir) override;
+    bool EF_UnhideTemplate(const char* name) override;
+    bool EF_UnhideAllTemplates() override;
+    void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id=-1) override;
+    bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale=1.0f, bool bAdditive=true) override;
+    
+    // Shader effect management
+    void EF_StartEf() override;
+    CCObject* EF_GetObject(bool bTemp=false, int num=-1) override;
+    void EF_AddEf(int NumFog, CRendElement *re, IShader *ef, SRenderShaderResources *sr, CCObject *obj, int nTempl, IShader *efState=0, int nSort=0) override;
+    void EF_EndEf3D(int nFlags) override;
+    void EF_EndEf2D(bool bSort) override;
+    
+    // Dynamic light management
+    bool EF_IsFakeDLight(CDLight *Source) override;
+    void EF_ADDDlight(CDLight *Source) override;
+    void EF_ClearLightsList() override;
+    bool EF_UpdateDLight(CDLight *pDL) override;
+    
+    // Effect drawing methods
+    bool EF_DrawEfForName(char* name, float x, float y, float width, float height, CFColor& col, int nTempl) override;
+    bool EF_DrawEfForNum(int num, float x, float y, float width, float height, CFColor& col, int nTempl) override;
+    bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl) override;
+    bool EF_DrawPartialEfForName(IShader* ef, char* name, float x, float y, float width, float height, CFColor& col, int nTempl) override;
+    bool EF_DrawPartialEfForNum(IShader* ef, int num, float x, float y, float width, float height, CFColor& col, int nTempl) override;
+    
+    // Leaf buffer management
+    CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char *szSource, CIndexedMesh * pIndexedMesh=0) override;
+    CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, VERTEX_FORMAT_ENUM eVF,
+                                             ushort* pIndices, int nIndices, int nPrimetiveType,
+                                             const char *szSource, EBufferType eBufType=eBT_Static, int nMatId=0,
+                                             const list2<struct_VERTEXSTREAM> *pSrcVerts=NULL, bool bOnlyVideoBuffer=false,
+                                             bool bPrecache=true, bool bSyncronBuffer=false) override;
+    void DeleteLeafBuffer(CLeafBuffer * pLBuffer) override;
+    
+    // 2D drawing methods
+    void WriteXY(CXFont *currfont,int x,int y, float xscale,float yscale,float r,float g,float b,float a,const char *message, ...) override;
+    void Draw2dText(float posX,float posY,const char *szText,SDrawTextInfo &info) override;
+    void Draw2dImage(float xpos,float ypos,float w,float h,int texture_id,float s0=0,float t0=0,float s1=1,float t1=1,float angle=0,float r=1,float g=1,float b=1,float a=1,float z=1) override;
+    void DrawImage(float xpos,float ypos,float w,float h,int texture_id,float s0,float t0,float s1,float t1,float r,float g,float b,float a) override;
+    int SetPolygonMode(int mode) override;
 
   protected:
     // Specialized manager instances

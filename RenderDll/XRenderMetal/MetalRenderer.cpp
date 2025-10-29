@@ -16,12 +16,10 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
+// Include PCH first for proper type definitions
+#include "MetalRenderPCH.h"
 #include "MetalRenderer.h"
 #include "I3DEngine.h"
-#include <Cocoa/Cocoa.h>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 
 /**
  * @def DLL_EXPORT
@@ -392,10 +390,7 @@ bool CMetalRenderer::EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex,
                                           bAdditive);
 }
 
-CRendElement *CMetalRenderer::EF_CreateRE(EDataType edt) {
-
-  return m_shaderManager->EF_CreateRE(edt);
-}
+// Note: EF_CreateRE is implemented in CMetalBaseRenderer
 
 void CMetalRenderer::EF_StartEf() { m_shaderManager->EF_StartEf(); }
 
