@@ -1636,6 +1636,7 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
   printf("CreateMetalRendererInstance called\n");
   
   assert(argc >= 0 && "CreateMetalRendererInstance: argc cannot be negative!");
+  assert(sp != nullptr && "CreateMetalRendererInstance: SCryRenderInterface cannot be null!");
 
   FILE *f = fopen("/tmp/farcry_metal_create.log", "w");
   if (f) {
@@ -1643,6 +1644,20 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
     fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
     fflush(f);
     fclose(f);
+  }
+
+  // Initialize global engine interface pointers BEFORE creating renderer
+  // The CRenderer constructor needs these to register console variables
+  if (sp) {
+    iSystem = sp->ipSystem;
+    iConsole = sp->ipConsole;
+    iLog = sp->ipLog;
+    iTimer = sp->ipTimer;
+    printf("Initialized engine interfaces: iSystem=%p, iConsole=%p, iLog=%p, iTimer=%p\n",
+           iSystem, iConsole, iLog, iTimer);
+  } else {
+    printf("ERROR: No SCryRenderInterface provided - console variables won't be registered\n");
+    return nullptr;
   }
 
   CMetalRenderer *renderer = new CMetalRenderer();
