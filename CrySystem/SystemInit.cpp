@@ -906,13 +906,22 @@ bool CSystem::InitStreamEngine()
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitFont()
 {
+	printf("InitFont: Entry point\n");
+	fflush(stdout);
+	
 	// In Editor mode Renderer is not initialized yet, so skip InitFont.
 	if (m_bEditor && !m_pRenderer)
+	{
+		printf("InitFont: Editor mode, skipping\n");
+		fflush(stdout);
 		return true;
+	}
 
 #ifdef __APPLE__
 	// Temporarily disable font loading on macOS to avoid hangs
 	GetILog()->LogToFile("Font system disabled for macOS - skipping font initialization");
+	printf("InitFont: macOS - skipping font loading\n");
+	fflush(stdout);
 	return true;
 #endif
 
@@ -1361,12 +1370,16 @@ bool CSystem::Init( const SSystemInitParams &params )
 	if (!params.bPreview && !params.bDedicatedServer)
 	{
 		CryLogAlways("Sound initialization");
+		printf("CSystem::Init - About to call InitSound\n");
+		fflush(stdout);
 		if (!InitSound(m_hWnd))
 			return false;
 		printf("CSystem::Init - Sound initialization completed successfully\n");
+		fflush(stdout);
 	}
 
 	printf("CSystem::Init - About to initialize Font\n");
+	fflush(stdout);
 	
 	//////////////////////////////////////////////////////////////////////////
 	// FONT
@@ -1375,22 +1388,45 @@ bool CSystem::Init( const SSystemInitParams &params )
 	{
 		CryLogAlways("Font initialization");
 		printf("CSystem::Init - Calling InitFont\n");
+		fflush(stdout);
 		if (!InitFont())
+		{
+			printf("CSystem::Init - InitFont failed!\n");
+			fflush(stdout);
 			return false;
+		}
 		printf("CSystem::Init - InitFont completed successfully\n");
+		fflush(stdout);
 	}
 
+	printf("CSystem::Init - After Font, before AI\n");
+	fflush(stdout);
+	
 	//////////////////////////////////////////////////////////////////////////
 	// AI
 	//////////////////////////////////////////////////////////////////////////
 	if (!params.bPreview)
 	{
+		printf("CSystem::Init - About to log AI init message\n");
+		fflush(stdout);
 		CryLogAlways("AI initialization");
+		printf("CSystem::Init - About to call InitAISystem\n");
+		fflush(stdout);
 		if (!InitAISystem())
+		{
+			printf("CSystem::Init - InitAISystem failed!\n");
+			fflush(stdout);
 			return false;
+		}
+		printf("CSystem::Init - InitAISystem completed successfully\n");
+		fflush(stdout);
 	}
 
+	printf("CSystem::Init - About to call m_pConsole->Init\n");
+	fflush(stdout);
 	m_pConsole->Init(this);
+	printf("CSystem::Init - m_pConsole->Init completed successfully\n");
+	fflush(stdout);
 
 //#ifndef MEM_STD
 //  CConsole::AddCommand("MemStats",::DumpAllocs);
@@ -1400,19 +1436,42 @@ bool CSystem::Init( const SSystemInitParams &params )
 	//////////////////////////////////////////////////////////////////////////
 	if (!params.bPreview)
 	{
+		printf("CSystem::Init - About to init entity system\n");
+		fflush(stdout);
 		CryLogAlways("Entity system initialization");
+		printf("CSystem::Init - About to call InitEntitySystem\n");
+		fflush(stdout);
 		if (!InitEntitySystem(m_hInst, m_hWnd))
+		{
+			printf("CSystem::Init - InitEntitySystem failed!\n");
+			fflush(stdout);
 			return false;
+		}
+		printf("CSystem::Init - InitEntitySystem completed successfully\n");
+		fflush(stdout);
 	}
 
+	printf("CSystem::Init - After entity system, checking if editor mode\n");
+	fflush(stdout);
+	
 	if (!params.bEditor)
 	{
+		printf("CSystem::Init - Not in editor mode, about to init animation system\n");
+		fflush(stdout);
 		//////////////////////////////////////////////////////////////////////////
 		// Init Animation system
 		//////////////////////////////////////////////////////////////////////////
 		CryLogAlways("Initializing Animation System");
+		printf("CSystem::Init - About to call InitAnimationSystem\n");
+		fflush(stdout);
 		if (!InitAnimationSystem())
+		{
+			printf("CSystem::Init - InitAnimationSystem failed!\n");
+			fflush(stdout);
 			return false;
+		}
+		printf("CSystem::Init - InitAnimationSystem completed successfully\n");
+		fflush(stdout);
 		//////////////////////////////////////////////////////////////////////////
 		// Init 3d engine
 		//////////////////////////////////////////////////////////////////////////

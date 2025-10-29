@@ -53,16 +53,20 @@ CMetalTexture::CMetalTexture(int texId, CMetalTextureManager* manager)
     , m_refCount(1)
 {
     assert(manager && "CMetalTexture: Cannot create with null manager!");
-    assert(texId > 0 && "CMetalTexture: Cannot create with invalid texture ID!");
-    
-    if (!manager)
-    {
-        throw std::runtime_error("CMetalTexture: manager cannot be null!");
-    }
     
     if (texId <= 0)
     {
+        printf("ERROR: CMetalTexture constructed with invalid texture ID: %d\n", texId);
+        printf("Stack trace: manager=%p\n", manager);
+        assert(false && "CMetalTexture: Cannot create with invalid texture ID!");
         throw std::runtime_error("CMetalTexture: texture ID must be > 0!");
+    }
+    
+    if (!manager)
+    {
+        printf("ERROR: CMetalTexture constructed with null manager!\n");
+        assert(false && "CMetalTexture: Cannot create with null manager!");
+        throw std::runtime_error("CMetalTexture: manager cannot be null!");
     }
 }
 
@@ -1625,18 +1629,28 @@ void CMetalTextureManager::FontRestoreRenderingState()
 ////////////////////////////////////////////////////////////////////////////
 ITexPic* CMetalTextureManager::EF_GetTextureByID(int Id)
 {
-    assert(Id > 0 && "CMetalTextureManager: EF_GetTextureByID called with invalid ID!");
+    if (Id <= 0)
+    {
+        printf("ERROR: EF_GetTextureByID called with invalid ID: %d\n", Id);
+        assert(false && "CMetalTextureManager: EF_GetTextureByID called with invalid ID!");
+        return nullptr;
+    }
     
     auto it = m_textures.find(Id);
     if (it == m_textures.end())
+    {
+        printf("Warning: EF_GetTextureByID - texture ID %d not found in texture map\n", Id);
         return nullptr;
+    }
     
     if (!it->second.isLoaded)
     {
+        printf("Warning: EF_GetTextureByID - texture ID %d exists but is not loaded\n", Id);
         assert(it->second.isLoaded && "CMetalTextureManager: Texture exists but is not loaded!");
         return nullptr;
     }
     
+    printf("EF_GetTextureByID: Creating CMetalTexture wrapper for ID %d\n", Id);
     return new CMetalTexture(Id, this);
 }
 
@@ -1685,8 +1699,9 @@ ITexPic* CMetalTextureManager::EF_LoadTexture(const char* nameTex, uint flags, u
     bool bCompress = !(flags2 & FT2_NODXT);
     
     unsigned int textureId = LoadTexture(nameTex, nullptr, Id, bCompress, bWarn);
-    if (textureId == 0)
+    if (textureId == 0 || textureId == (unsigned int)-1)
     {
+        printf("EF_LoadTexture: LoadTexture returned invalid ID %u for '%s'\n", textureId, nameTex);
         return nullptr;
     }
     
