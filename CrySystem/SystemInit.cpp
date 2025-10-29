@@ -1359,16 +1359,21 @@ bool CSystem::Init( const SSystemInitParams &params )
 		CryLogAlways("Sound initialization");
 		if (!InitSound(m_hWnd))
 			return false;
+		printf("CSystem::Init - Sound initialization completed successfully\n");
 	}
 
+	printf("CSystem::Init - About to initialize Font\n");
+	
 	//////////////////////////////////////////////////////////////////////////
 	// FONT
 	//////////////////////////////////////////////////////////////////////////
 	if(!params.bDedicatedServer)
 	{
 		CryLogAlways("Font initialization");
+		printf("CSystem::Init - Calling InitFont\n");
 		if (!InitFont())
 			return false;
+		printf("CSystem::Init - InitFont completed successfully\n");
 	}
 
 	//////////////////////////////////////////////////////////////////////////

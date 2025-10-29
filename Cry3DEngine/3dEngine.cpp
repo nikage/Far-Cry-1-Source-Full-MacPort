@@ -149,14 +149,32 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
 	m_bEnabled=1;
 
 	ITexPic * pPic = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("diskette.tga",0,0,eTT_Base);
-  m_nStreamingIconTexID = pPic->GetTextureID();
+  if (pPic) {
+    m_nStreamingIconTexID = pPic->GetTextureID();
+    printf("C3DEngine constructor: loaded diskette.tga (ID=%d)\n", m_nStreamingIconTexID);
+  } else {
+    printf("C3DEngine constructor: WARNING - failed to load diskette.tga, using default ID 0\n");
+    m_nStreamingIconTexID = 0;
+  }
 
 	pPic = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("black.tga",0,0,eTT_Base);
-  m_nBlackTexID = pPic->GetTextureID();
+  if (pPic) {
+    m_nBlackTexID = pPic->GetTextureID();
+    printf("C3DEngine constructor: loaded black.tga (ID=%d)\n", m_nBlackTexID);
+  } else {
+    printf("C3DEngine constructor: WARNING - failed to load black.tga, using default ID 0\n");
+    m_nBlackTexID = 0;
+  }
 
 	ITexPic * pPicSpot = Cry3DEngineBase::m_pRenderer->EF_LoadTexture("spot_shadow.tga",0,0,eTT_Base);
-	m_nShadowSpotTexId = pPicSpot->GetTextureID();
-	printf("C3DEngine constructor: loaded all textures successfully\n");
+  if (pPicSpot) {
+    m_nShadowSpotTexId = pPicSpot->GetTextureID();
+    printf("C3DEngine constructor: loaded spot_shadow.tga (ID=%d)\n", m_nShadowSpotTexId);
+  } else {
+    printf("C3DEngine constructor: WARNING - failed to load spot_shadow.tga, using default ID 0\n");
+    m_nShadowSpotTexId = 0;
+  }
+	printf("C3DEngine constructor: texture loading phase completed\n");
 
   // create components
   m_pObjManager   = 0;//new CObjManager (m_pSystem);
