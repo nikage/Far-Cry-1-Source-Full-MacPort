@@ -40,6 +40,11 @@ CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer,
     , m_globalShaderTemplateId(0)
     , m_nextRenderTargetId(1)
 {
+    assert(renderer != nullptr && "CMetalUtilityRenderer: renderer cannot be null");
+    assert(textureManager != nullptr && "CMetalUtilityRenderer: textureManager cannot be null");
+    assert(shaderManager != nullptr && "CMetalUtilityRenderer: shaderManager cannot be null");
+    assert(renderer->m_device != nil && "CMetalUtilityRenderer: renderer must have valid Metal device");
+    
     // Initialize utility renderer
     CreateDebugPipelineState();
     CreateTextPipelineState();
@@ -55,6 +60,14 @@ CMetalUtilityRenderer::~CMetalUtilityRenderer()
 void CMetalUtilityRenderer::WriteXY(CXFont* currfont, int x, int y, float xscale, float yscale, 
                                   float r, float g, float b, float a, const char* message, ...)
 {
+    assert(message != nullptr && "WriteXY: message cannot be null");
+    assert(xscale > 0.0f && "WriteXY: xscale must be positive");
+    assert(yscale > 0.0f && "WriteXY: yscale must be positive");
+    assert(r >= 0.0f && r <= 1.0f && "WriteXY: red component must be in range [0,1]");
+    assert(g >= 0.0f && g <= 1.0f && "WriteXY: green component must be in range [0,1]");
+    assert(b >= 0.0f && b <= 1.0f && "WriteXY: blue component must be in range [0,1]");
+    assert(a >= 0.0f && a <= 1.0f && "WriteXY: alpha component must be in range [0,1]");
+    
     if (!message)
         return;
         
@@ -84,6 +97,12 @@ void CMetalUtilityRenderer::WriteXY(CXFont* currfont, int x, int y, float xscale
 
 void CMetalUtilityRenderer::Draw2dText(float posX, float posY, const char* szText, SDrawTextInfo& info)
 {
+    assert(szText != nullptr && "Draw2dText: text cannot be null");
+    assert(info.color[0] >= 0.0f && info.color[0] <= 1.0f && "Draw2dText: red component must be in range [0,1]");
+    assert(info.color[1] >= 0.0f && info.color[1] <= 1.0f && "Draw2dText: green component must be in range [0,1]");
+    assert(info.color[2] >= 0.0f && info.color[2] <= 1.0f && "Draw2dText: blue component must be in range [0,1]");
+    assert(info.color[3] >= 0.0f && info.color[3] <= 1.0f && "Draw2dText: alpha component must be in range [0,1]");
+    
     if (!szText)
         return;
         
@@ -109,6 +128,19 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
                                        float angle, float r, float g, float b, 
                                        float a, float z)
 {
+    assert(m_renderer != nullptr && "Draw2dImage: renderer cannot be null");
+    assert(w > 0.0f && "Draw2dImage: width must be positive");
+    assert(h > 0.0f && "Draw2dImage: height must be positive");
+    assert(texture_id >= 0 && "Draw2dImage: texture_id cannot be negative");
+    assert(s0 >= 0.0f && s0 <= 1.0f && "Draw2dImage: s0 must be in range [0,1]");
+    assert(t0 >= 0.0f && t0 <= 1.0f && "Draw2dImage: t0 must be in range [0,1]");
+    assert(s1 >= 0.0f && s1 <= 1.0f && "Draw2dImage: s1 must be in range [0,1]");
+    assert(t1 >= 0.0f && t1 <= 1.0f && "Draw2dImage: t1 must be in range [0,1]");
+    assert(r >= 0.0f && r <= 1.0f && "Draw2dImage: red component must be in range [0,1]");
+    assert(g >= 0.0f && g <= 1.0f && "Draw2dImage: green component must be in range [0,1]");
+    assert(b >= 0.0f && b <= 1.0f && "Draw2dImage: blue component must be in range [0,1]");
+    assert(a >= 0.0f && a <= 1.0f && "Draw2dImage: alpha component must be in range [0,1]");
+    
     if (!m_renderer || !m_renderer->m_renderEncoder)
         return;
         
@@ -154,7 +186,19 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
 void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
                                      float s0, float t0, float s1, float t1, float r, float g, float b, float a)
 {
-    // Draw image
+    assert(w > 0.0f && "DrawImage: width must be positive");
+    assert(h > 0.0f && "DrawImage: height must be positive");
+    assert(texture_id >= 0 && "DrawImage: texture_id cannot be negative");
+    assert(s0 >= 0.0f && s0 <= 1.0f && "DrawImage: s0 must be in range [0,1]");
+    assert(t0 >= 0.0f && t0 <= 1.0f && "DrawImage: t0 must be in range [0,1]");
+    assert(s1 >= 0.0f && s1 <= 1.0f && "DrawImage: s1 must be in range [0,1]");
+    assert(t1 >= 0.0f && t1 <= 1.0f && "DrawImage: t1 must be in range [0,1]");
+    assert(r >= 0.0f && r <= 1.0f && "DrawImage: red component must be in range [0,1]");
+    assert(g >= 0.0f && g <= 1.0f && "DrawImage: green component must be in range [0,1]");
+    assert(b >= 0.0f && b <= 1.0f && "DrawImage: blue component must be in range [0,1]");
+    assert(a >= 0.0f && a <= 1.0f && "DrawImage: alpha component must be in range [0,1]");
+    
+    // TODO: Draw image
     // This would queue the image for rendering
 }
 
@@ -259,6 +303,12 @@ void CMetalUtilityRenderer::ClearColorBuffer(const Vec3 vColor)
 void CMetalUtilityRenderer::ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, 
                                           bool bBackBuffer, bool bRGBA, int nScaledX, int nScaledY)
 {
+    assert(pRGB != nullptr && "ReadFrameBuffer: output buffer cannot be null");
+    assert(nSizeX > 0 && "ReadFrameBuffer: width must be positive");
+    assert(nSizeY > 0 && "ReadFrameBuffer: height must be positive");
+    assert(nScaledX >= 0 && "ReadFrameBuffer: scaled width cannot be negative");
+    assert(nScaledY >= 0 && "ReadFrameBuffer: scaled height cannot be negative");
+    
     if (!pRGB)
         return;
         
@@ -529,6 +579,13 @@ void CMetalUtilityRenderer::SetTexClampMode(bool clamp)
 // File I/O
 void CMetalUtilityRenderer::WriteDDS(byte* dat, int wdt, int hgt, int Size, const char* name, EImFormat eF, int NumMips)
 {
+    assert(dat != nullptr && "WriteDDS: data cannot be null");
+    assert(name != nullptr && "WriteDDS: filename cannot be null");
+    assert(wdt > 0 && "WriteDDS: width must be positive");
+    assert(hgt > 0 && "WriteDDS: height must be positive");
+    assert(Size > 0 && "WriteDDS: data size must be positive");
+    assert(NumMips >= 0 && "WriteDDS: mipmap count cannot be negative");
+    
     if (!dat || !name)
         return;
         
@@ -537,6 +594,12 @@ void CMetalUtilityRenderer::WriteDDS(byte* dat, int wdt, int hgt, int Size, cons
 
 void CMetalUtilityRenderer::WriteTGA(byte* dat, int wdt, int hgt, const char* name, int bits)
 {
+    assert(dat != nullptr && "WriteTGA: data cannot be null");
+    assert(name != nullptr && "WriteTGA: filename cannot be null");
+    assert(wdt > 0 && "WriteTGA: width must be positive");
+    assert(hgt > 0 && "WriteTGA: height must be positive");
+    assert(bits == 8 || bits == 16 || bits == 24 || bits == 32 && "WriteTGA: bits must be 8, 16, 24, or 32");
+    
     if (!dat || !name)
         return;
         
@@ -545,6 +608,11 @@ void CMetalUtilityRenderer::WriteTGA(byte* dat, int wdt, int hgt, const char* na
 
 void CMetalUtilityRenderer::WriteJPG(byte* dat, int wdt, int hgt, char* name)
 {
+    assert(dat != nullptr && "WriteJPG: data cannot be null");
+    assert(name != nullptr && "WriteJPG: filename cannot be null");
+    assert(wdt > 0 && "WriteJPG: width must be positive");
+    assert(hgt > 0 && "WriteJPG: height must be positive");
+    
     if (!dat || !name)
         return;
         
@@ -594,6 +662,9 @@ int CMetalUtilityRenderer::EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset
 
 int CMetalUtilityRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF)
 {
+    assert(nWidth > 0 && "CreateRenderTarget: width must be positive");
+    assert(nHeight > 0 && "CreateRenderTarget: height must be positive");
+    
     if (nWidth <= 0 || nHeight <= 0)
         return 0;
         
@@ -610,6 +681,9 @@ int CMetalUtilityRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Form
 
 bool CMetalUtilityRenderer::DestroyRenderTarget(int nHandle)
 {
+    assert(nHandle >= 0 && "DestroyRenderTarget: handle cannot be negative");
+    assert(nHandle < m_renderTargets.size() && "DestroyRenderTarget: handle out of range");
+    
     if (nHandle < 0 || nHandle >= m_renderTargets.size())
         return false;
         
@@ -621,6 +695,9 @@ bool CMetalUtilityRenderer::DestroyRenderTarget(int nHandle)
 
 bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
 {
+    assert(nHandle >= 0 && "SetRenderTarget: handle cannot be negative");
+    assert(nHandle < m_renderTargets.size() && "SetRenderTarget: handle out of range");
+    
     if (nHandle < 0 || nHandle >= m_renderTargets.size())
         return false;
         
