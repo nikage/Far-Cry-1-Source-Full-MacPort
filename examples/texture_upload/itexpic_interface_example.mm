@@ -52,6 +52,9 @@ public:
     
     int CreateTexture(const char* name, int width, int height, unsigned char* data)
     {
+        assert(width > 0 && height > 0 && "CreateTexture: invalid dimensions!");
+        assert(data && "CreateTexture: data cannot be null!");
+        
         MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
                                                                                          width:width
                                                                                         height:height
@@ -85,11 +88,13 @@ public:
     
     void RemoveTexture(int texId)
     {
+        assert(texId > 0 && "RemoveTexture: invalid texture ID!");
         m_textures.erase(texId);
     }
     
     const TextureInfo* GetTextureInfo(int texId) const
     {
+        assert(texId > 0 && "GetTextureInfo: invalid texture ID!");
         auto it = m_textures.find(texId);
         return it != m_textures.end() ? &it->second : nullptr;
     }
@@ -104,6 +109,8 @@ public:
     CMetalTexture(int texId, SimpleTextureManager* manager)
         : m_textureId(texId), m_manager(manager), m_refCount(1)
     {
+        assert(manager && "CMetalTexture: manager cannot be null!");
+        assert(texId > 0 && "CMetalTexture: texture ID must be positive!");
     }
     
     virtual ~CMetalTexture()
@@ -112,12 +119,14 @@ public:
     
     virtual void AddRef()
     {
+        assert(m_refCount > 0 && "AddRef: invalid ref count!");
         m_refCount++;
         std::cout << "  AddRef: " << GetName() << " (refCount=" << m_refCount << ")" << std::endl;
     }
     
     virtual void Release(int bForce = false)
     {
+        assert(m_refCount > 0 && "Release: invalid ref count - double free!");
         m_refCount--;
         std::cout << "  Release: " << GetName() << " (refCount=" << m_refCount << ")" << std::endl;
         
@@ -134,6 +143,7 @@ public:
     
     virtual const char* GetName()
     {
+        assert(m_manager && "GetName: manager is null!");
         const TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
         return info ? info->name.c_str() : "";
     }
@@ -168,12 +178,14 @@ public:
     
     virtual unsigned char* GetData32()
     {
+        assert(m_manager && "GetData32: manager is null!");
         const TextureInfo* info = m_manager->GetTextureInfo(m_textureId);
         if (!info || !info->metalTexture)
             return nullptr;
         
         int width = info->width;
         int height = info->height;
+        assert(width > 0 && height > 0 && "GetData32: invalid texture dimensions!");
         size_t dataSize = width * height * 4;
         
         unsigned char* data = new unsigned char[dataSize];
@@ -432,4 +444,5 @@ int main(int argc, char* argv[])
     
     return 0;
 }
+
 

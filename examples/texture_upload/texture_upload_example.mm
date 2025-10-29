@@ -99,6 +99,10 @@ unsigned int DownLoadToVideoMemory(id<MTLDevice> device, id<MTLCommandQueue> com
                                    ETEX_Format eTFSrc, ETEX_Format eTFDst, 
                                    int nummipmap)
 {
+    assert(data && "DownLoadToVideoMemory: data cannot be null!");
+    assert(w > 0 && h > 0 && "DownLoadToVideoMemory: dimensions must be positive!");
+    assert(device && "DownLoadToVideoMemory: device cannot be null!");
+    
     if (!data || w <= 0 || h <= 0)
     {
         std::cout << "   ❌ Invalid parameters" << std::endl;
@@ -144,6 +148,8 @@ unsigned int DownLoadToVideoMemory(id<MTLDevice> device, id<MTLCommandQueue> com
     descriptor.storageMode = MTLStorageModeShared;
     
     id<MTLTexture> texture = [device newTextureWithDescriptor:descriptor];
+    assert(texture && "DownLoadToVideoMemory: failed to create Metal texture!");
+    
     if (!texture)
     {
         std::cout << "   ❌ Failed to create Metal texture" << std::endl;
@@ -369,4 +375,5 @@ int main(int argc, char* argv[])
     
     return 0;
 }
+
 

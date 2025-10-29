@@ -24,6 +24,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <cassert>
 
 // Include CryEngine interfaces
 #include "IRenderer.h"
@@ -92,11 +93,29 @@ public:
     unsigned int LoadTexture(const char* filename, int* tex_type = nullptr,
                             unsigned int def_tid = 0, bool compresstodisk = true, 
                             bool bWarn = true);
+    
+    // DXT decompression job structure (for batch API)
+    struct DXTDecompressJob
+    {
+        byte* srcData;
+        byte* dstData;
+        int width;
+        int height;
+        ETEX_Format format;
+        int dstBytesPerPix;
+    };
+    
     bool DXTCompress(byte* raw_data, int nWidth, int nHeight, ETEX_Format eTF, 
                     bool bUseHW, bool bGenMips, int nSrcBytesPerPix, 
                     MIPDXTcallback callback = 0);
     bool DXTDecompress(byte* srcData, byte* dstData, int nWidth, int nHeight, 
                       ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix);
+    
+    // Batch decompression API (reduces GPU sync overhead)
+    void BeginDXTDecompressionBatch();
+    void QueueDXTDecompression(const DXTDecompressJob& job);
+    bool ExecuteDXTDecompressionBatch();
+    
     void RemoveTexture(unsigned int TextureId);
     void RemoveTexture(ITexPic* pTexPic);
     
@@ -184,6 +203,16 @@ protected:
     std::unordered_map<std::string, int> m_textureNameMap;
     int m_nextTextureId;
     size_t m_totalTextureMemory;
+    
+    // Batch decompression state
+    std::vector<DXTDecompressJob> m_decompressJobs;
+    
+    // Helper functions
+    static inline int GetDXTBlockSize(ETEX_Format format) {
+        assert((format == eTF_DXT1 || format == eTF_DXT3 || format == eTF_DXT5) && 
+               "GetDXTBlockSize: format must be DXT1, DXT3, or DXT5!");
+        return (format == eTF_DXT1) ? 8 : 16;
+    }
     
     // Current state
     int m_currentTextureSlot;

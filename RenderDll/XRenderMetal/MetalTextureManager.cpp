@@ -210,6 +210,8 @@ CMetalTextureManager::~CMetalTextureManager()
 
 void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
 {
+    assert(tnum >= 0 && "SetTexture: texture number cannot be negative!");
+    
     if (tnum < 0)
         return;
 
@@ -263,10 +265,13 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
 
 void CMetalTextureManager::SetWhiteTexture()
 {
+    assert(m_renderer && "SetWhiteTexture: renderer is null!");
+    
     if (!m_whiteTexture)
     {
-        // Create a 1x1 white texture
         m_whiteTexture = CreateMetalTexture(1, 1, MTLPixelFormatRGBA8Unorm);
+        assert(m_whiteTexture && "SetWhiteTexture: failed to create white texture!");
+        
         if (m_whiteTexture)
         {
             // Fill with white color
@@ -439,6 +444,10 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
 void CMetalTextureManager::UpdateTextureInVideoMemory(uint tnum, unsigned char* newdata, int posx, int posy, 
                                                      int w, int h, ETEX_Format eTF)
 {
+    assert(newdata && "UpdateTextureInVideoMemory: newdata cannot be null!");
+    assert(w > 0 && h > 0 && "UpdateTextureInVideoMemory: width and height must be positive!");
+    assert(posx >= 0 && posy >= 0 && "UpdateTextureInVideoMemory: position cannot be negative!");
+    
     auto it = m_textures.find(tnum);
     if (it == m_textures.end())
         return;
@@ -803,8 +812,8 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
     if (!m_renderer || !m_renderer->m_device)
         return false;
     
-    MTLPixelFormat compressedFormat = MTLPixelFormatInvalid;
-    
+    // Convert ETEX_Format to Metal pixel format
+    MTLPixelFormat compressedFormat;
     switch (eSrcTF)
     {
         case eTF_DXT1:
@@ -817,13 +826,12 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
             compressedFormat = MTLPixelFormatBC3_RGBA;
             break;
         default:
+            // Unsupported format
             return false;
     }
     
-    if (compressedFormat == MTLPixelFormatInvalid)
-        return false;
-    
-    int blockSize = (eSrcTF == eTF_DXT1) ? 8 : 16;
+    // Calculate compressed data size using helper
+    int blockSize = GetDXTBlockSize(eSrcTF);
     int DXTSize = ((nWidth + 3) / 4) * ((nHeight + 3) / 4) * blockSize;
     
     MTLTextureDescriptor* compressedDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:compressedFormat
@@ -835,12 +843,24 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
     
     id<MTLTexture> compressedTexture = [m_renderer->m_device newTextureWithDescriptor:compressedDesc];
     if (!compressedTexture)
+    {
+        assert(false && "Failed to create compressed texture!");
         return false;
+    }
     
-    [compressedTexture replaceRegion:MTLRegionMake2D(0, 0, nWidth, nHeight)
-                         mipmapLevel:0
-                           withBytes:srcData
-                         bytesPerRow:((nWidth + 3) / 4) * blockSize];
+    // Upload compressed data to texture (with error handling)
+    @try
+    {
+        [compressedTexture replaceRegion:MTLRegionMake2D(0, 0, nWidth, nHeight)
+                             mipmapLevel:0
+                               withBytes:srcData
+                             bytesPerRow:((nWidth + 3) / 4) * blockSize];
+    }
+    @catch (NSException *exception)
+    {
+        assert(false && "Failed to upload compressed texture data!");
+        return false;
+    }
     
     MTLTextureDescriptor* uncompressedDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
                                                                                                  width:nWidth
@@ -851,12 +871,33 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
     
     id<MTLTexture> uncompressedTexture = [m_renderer->m_device newTextureWithDescriptor:uncompressedDesc];
     if (!uncompressedTexture)
+    {
+        assert(false && "Failed to create uncompressed texture!");
         return false;
+    }
     
-    if (m_renderer->m_commandQueue)
+    // Decompress using Metal blit encoder (hardware-accelerated)
+    if (!m_renderer->m_commandQueue)
+    {
+        assert(false && "Command queue is null!");
+        return false;
+    }
+    
+    @try
     {
         id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+        if (!commandBuffer)
+        {
+            assert(false && "Failed to create command buffer!");
+            return false;
+        }
+        
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        if (!blitEncoder)
+        {
+            assert(false && "Failed to create blit encoder!");
+            return false;
+        }
         
         [blitEncoder copyFromTexture:compressedTexture
                          sourceSlice:0
@@ -870,14 +911,31 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
         
         [blitEncoder endEncoding];
         [commandBuffer commit];
+        
+        // Note: Synchronous wait - consider using batch API for multiple decompressions
         [commandBuffer waitUntilCompleted];
     }
+    @catch (NSException *exception)
+    {
+        assert(false && "Metal decompression failed!");
+        return false;
+    }
     
+    // Read back decompressed data from GPU
     std::vector<byte> rgbaData(nWidth * nHeight * 4);
-    [uncompressedTexture getBytes:rgbaData.data()
-                      bytesPerRow:nWidth * 4
-                       fromRegion:MTLRegionMake2D(0, 0, nWidth, nHeight)
-                      mipmapLevel:0];
+    
+    @try
+    {
+        [uncompressedTexture getBytes:rgbaData.data()
+                          bytesPerRow:nWidth * 4
+                           fromRegion:MTLRegionMake2D(0, 0, nWidth, nHeight)
+                          mipmapLevel:0];
+    }
+    @catch (NSException *exception)
+    {
+        assert(false && "Failed to read back texture data!");
+        return false;
+    }
     
     if (nDstBytesPerPix == 3)
     {
@@ -912,6 +970,8 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::RemoveTexture(unsigned int TextureId)
 {
+    assert(TextureId > 0 && "RemoveTexture: invalid texture ID!");
+    
     auto it = m_textures.find(TextureId);
     if (it != m_textures.end())
     {
@@ -943,10 +1003,14 @@ void CMetalTextureManager::RemoveTexture(unsigned int TextureId)
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::RemoveTexture(ITexPic* pTexPic)
 {
+    assert(pTexPic && "RemoveTexture: pTexPic cannot be null!");
+    
     if (!pTexPic)
         return;
     
     int textureId = pTexPic->GetTextureID();
+    assert(textureId > 0 && "RemoveTexture: texture ID must be positive!");
+    
     if (textureId > 0)
     {
         RemoveTexture((unsigned int)textureId);
@@ -1098,6 +1162,9 @@ bool CMetalTextureManager::FontUploadTexture(class CFBitmap* bitmap, ETEX_Format
 
 int CMetalTextureManager::FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF)
 {
+    assert(pData && "FontCreateTexture: pData cannot be null!");
+    assert(Width > 0 && Height > 0 && "FontCreateTexture: dimensions must be positive!");
+    
     if (!pData || Width <= 0 || Height <= 0)
         return 0;
         
@@ -1107,6 +1174,8 @@ int CMetalTextureManager::FontCreateTexture(int Width, int Height, byte* pData, 
         return 0;
         
     int textureId = AllocateTextureId();
+    assert(textureId > 0 && "FontCreateTexture: failed to allocate texture ID!");
+    
     if (textureId == -1)
         return 0;
         
@@ -1135,6 +1204,11 @@ int CMetalTextureManager::FontCreateTexture(int Width, int Height, byte* pData, 
 
 bool CMetalTextureManager::FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData)
 {
+    assert(nTexId > 0 && "FontUpdateTexture: invalid texture ID!");
+    assert(pData && "FontUpdateTexture: pData cannot be null!");
+    assert(USize > 0 && VSize > 0 && "FontUpdateTexture: update size must be positive!");
+    assert(X >= 0 && Y >= 0 && "FontUpdateTexture: position cannot be negative!");
+    
     auto it = m_textures.find(nTexId);
     if (it == m_textures.end())
         return false;
@@ -1158,6 +1232,8 @@ bool CMetalTextureManager::FontUpdateTexture(int nTexId, int X, int Y, int USize
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontReleaseTexture(class CFBitmap* pBmp)
 {
+    assert(pBmp && "FontReleaseTexture: pBmp cannot be null!");
+    
     if (!pBmp)
         return;
     
@@ -1165,6 +1241,8 @@ void CMetalTextureManager::FontReleaseTexture(class CFBitmap* pBmp)
     if (pRenderData)
     {
         int textureId = *pRenderData;
+        assert(textureId > 0 && "FontReleaseTexture: invalid texture ID in render data!");
+        
         if (textureId > 0)
         {
             RemoveTexture((unsigned int)textureId);
@@ -1190,12 +1268,15 @@ void CMetalTextureManager::FontReleaseTexture(class CFBitmap* pBmp)
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetTexture(class CFBitmap* bitmap, int nFilterMode)
 {
+    assert(bitmap && "FontSetTexture: bitmap cannot be null!");
+    
     if (!bitmap)
         return;
     
     int* pRenderData = (int*)bitmap->GetRenderData();
     if (pRenderData && *pRenderData > 0)
     {
+        assert(*pRenderData > 0 && "FontSetTexture: invalid texture ID in render data!");
         FontSetTexture(*pRenderData, nFilterMode);
     }
 }
@@ -1215,6 +1296,8 @@ void CMetalTextureManager::FontSetTexture(class CFBitmap* bitmap, int nFilterMod
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
 {
+    assert(nTexId > 0 && "FontSetTexture: invalid texture ID!");
+    
     auto it = m_textures.find(nTexId);
     if (it != m_textures.end() && it->second.metalTexture)
     {
@@ -1249,6 +1332,9 @@ void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight)
 {
+    assert(m_renderer && "FontSetRenderingState: renderer is null!");
+    assert(nVirtualScreenWidth > 0 && nVirtualScreenHeight > 0 && "FontSetRenderingState: invalid screen dimensions!");
+    
     if (!m_renderer)
         return;
     
@@ -1914,6 +2000,8 @@ const CMetalTextureManager::TextureInfo* CMetalTextureManager::GetTextureInfo(in
 
 void CMetalTextureManager::SetTextureClamp(int textureId, bool bEnable)
 {
+    assert(textureId > 0 && "SetTextureClamp: invalid texture ID!");
+    
     auto it = m_textures.find(textureId);
     if (it != m_textures.end())
     {
@@ -1933,6 +2021,8 @@ void CMetalTextureManager::SetTextureClamp(int textureId, bool bEnable)
 
 void CMetalTextureManager::SetTextureFilter(int textureId, int nFilter)
 {
+    assert(textureId > 0 && "SetTextureFilter: invalid texture ID!");
+    
     auto it = m_textures.find(textureId);
     if (it != m_textures.end())
     {
@@ -1970,7 +2060,9 @@ id<MTLTexture> CMetalTextureManager::CreateMetalTexture(int width, int height, M
 
 id<MTLTexture> CMetalTextureManager::CreateMetalTextureFromFile(const char* filename)
 {
-    // Load texture from file and create Metal texture
+    assert(filename && "CreateMetalTextureFromFile: filename cannot be null!");
+    assert(filename[0] != '\0' && "CreateMetalTextureFromFile: filename is empty!");
+    
     std::vector<byte> data;
     int width, height;
     if (!LoadTextureData(filename, data, width, height))
@@ -1981,6 +2073,11 @@ id<MTLTexture> CMetalTextureManager::CreateMetalTextureFromFile(const char* file
 
 void CMetalTextureManager::UpdateMetalTexture(id<MTLTexture> texture, const void* data, int x, int y, int w, int h)
 {
+    assert(texture && "UpdateMetalTexture: texture cannot be null!");
+    assert(data && "UpdateMetalTexture: data cannot be null!");
+    assert(w > 0 && h > 0 && "UpdateMetalTexture: dimensions must be positive!");
+    assert(x >= 0 && y >= 0 && "UpdateMetalTexture: position cannot be negative!");
+    
     if (!texture || !data)
         return;
         
@@ -1992,6 +2089,9 @@ void CMetalTextureManager::UpdateMetalTexture(id<MTLTexture> texture, const void
 
 void CMetalTextureManager::BindTexture(int slot, id<MTLTexture> texture)
 {
+    assert(slot >= 0 && "BindTexture: slot cannot be negative!");
+    assert(m_renderer && "BindTexture: renderer is null!");
+    
     if (m_renderer && m_renderer->m_renderEncoder)
     {
         [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:slot];
@@ -2078,16 +2178,20 @@ ETEX_Format CMetalTextureManager::ConvertFromMetalFormat(MTLPixelFormat format)
 
 int CMetalTextureManager::AllocateTextureId()
 {
-    return m_nextTextureId++;
+    int id = m_nextTextureId++;
+    assert(id > 0 && "AllocateTextureId: texture ID overflow!");
+    return id;
 }
 
 void CMetalTextureManager::ReleaseTextureId(int id)
 {
-    // Release texture ID for reuse
+    assert(id > 0 && "ReleaseTextureId: invalid texture ID!");
 }
 
 bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height)
 {
+    assert(filename && "LoadTextureData: filename cannot be null!");
+    
     ETEX_Format format;
     return LoadTextureData(filename, data, width, height, format);
 }
