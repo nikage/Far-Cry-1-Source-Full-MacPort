@@ -155,5 +155,72 @@ void CMetalStateCache::ClearCache()
     m_samplerStateCache.clear();
 }
 
+MTLBlendFactor CMetalStateCache::ConvertBlendFactor(int gsBlendFactor)
+{
+    switch (gsBlendFactor)
+    {
+        case 0x1:  return MTLBlendFactorZero;
+        case 0x2:  return MTLBlendFactorOne;
+        case 0x3:  return MTLBlendFactorDestinationColor;
+        case 0x4:  return MTLBlendFactorOneMinusDestinationColor;
+        case 0x5:  return MTLBlendFactorSourceAlpha;
+        case 0x6:  return MTLBlendFactorOneMinusSourceAlpha;
+        case 0x7:  return MTLBlendFactorDestinationAlpha;
+        case 0x8:  return MTLBlendFactorOneMinusDestinationAlpha;
+        case 0x9:  return MTLBlendFactorSourceAlphaSaturated;
+        default:   return MTLBlendFactorOne;
+    }
+}
+
+MTLCompareFunction CMetalStateCache::ConvertCompareFunction(int state)
+{
+    if (state & 0x00020000)
+        return MTLCompareFunctionAlways;
+    
+    if (state & 0x00100000)
+        return MTLCompareFunctionEqual;
+    
+    if (state & 0x00200000)
+        return MTLCompareFunctionGreater;
+    
+    return MTLCompareFunctionLessEqual;
+}
+
+MTLCullMode CMetalStateCache::ConvertCullMode(int cullMode)
+{
+    switch (cullMode)
+    {
+        case 0:  return MTLCullModeNone;
+        case 1:  return MTLCullModeFront;
+        case 2:  return MTLCullModeBack;
+        default: return MTLCullModeBack;
+    }
+}
+
+void CMetalStateCache::ParseRenderState(int state, bool& depthTest, bool& depthWrite,
+                                        MTLBlendFactor& srcBlend, MTLBlendFactor& dstBlend,
+                                        bool& blendEnabled, MTLCompareFunction& depthFunc)
+{
+    depthTest = !(state & 0x00020000);
+    depthWrite = (state & 0x00000100) != 0;
+    depthFunc = ConvertCompareFunction(state);
+    
+    int srcFactor = state & 0xF;
+    int dstFactor = (state & 0xF0) >> 4;
+    
+    blendEnabled = (srcFactor != 0 || dstFactor != 0);
+    
+    if (blendEnabled)
+    {
+        srcBlend = ConvertBlendFactor(srcFactor);
+        dstBlend = ConvertBlendFactor(dstFactor);
+    }
+    else
+    {
+        srcBlend = MTLBlendFactorOne;
+        dstBlend = MTLBlendFactorZero;
+    }
+}
+
 #endif
 

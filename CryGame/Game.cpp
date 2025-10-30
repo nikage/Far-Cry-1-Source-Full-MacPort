@@ -526,8 +526,8 @@ IXSystem *CXGame::GetXSystem(){return m_pServer?m_pServer->m_pISystem:m_pClient?
 //! Initialize the game. This must be called before calling other functions of this class.
 bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,const char *szGameMod)
 {	
-	assert(pSystem != nullptr && "ISystem must be valid for game initialization");
-	assert(szGameMod != nullptr && "Game mod parameter must not be null");
+	assert(pSystem  && "ISystem must be valid for game initialization");
+	// assert(szGameMod  && "Game mod parameter must not be null");
 	
 	CryLogAlways("CXGame::Init - ENTRY POINT");
 	

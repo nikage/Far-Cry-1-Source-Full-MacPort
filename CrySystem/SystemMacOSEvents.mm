@@ -11,7 +11,14 @@
 static bool s_firstCall = true;
 
 extern "C" void ProcessMacOSEvents() {
-    assert(NSApp != nil && "NSApplication must be initialized before processing events");
+    NSLog(@"ProcessMacOSEvents: ENTRY");
+    
+    if (!NSApp) {
+        NSLog(@"ProcessMacOSEvents: NSApp is nil, returning");
+        return;
+    }
+    
+    NSLog(@"ProcessMacOSEvents: NSApp is valid");
     
     @autoreleasepool {
         if (s_firstCall) {
@@ -19,23 +26,47 @@ extern "C" void ProcessMacOSEvents() {
             s_firstCall = false;
         }
         
+        NSLog(@"ProcessMacOSEvents: About to start event loop");
+        
         NSEvent *event;
         int eventCount = 0;
-        while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                           untilDate:[NSDate distantPast]
+        const int MAX_EVENTS_PER_FRAME = 100;
+        
+        NSLog(@"ProcessMacOSEvents: About to call nextEventMatchingMask");
+        
+        while (eventCount < MAX_EVENTS_PER_FRAME && 
+               (event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                           untilDate:nil
                                               inMode:NSDefaultRunLoopMode
                                              dequeue:YES]))
         {
-            [NSApp sendEvent:event];
-            // Don't call updateWindows - we handle rendering manually in BeginFrame/EndFrame
-            eventCount++;
+            NSLog(@"ProcessMacOSEvents: Got event #%d", eventCount);
+            @try {
+                [NSApp sendEvent:event];
+                NSLog(@"ProcessMacOSEvents: sendEvent completed for event #%d", eventCount);
+                [NSApp updateWindows];
+                NSLog(@"ProcessMacOSEvents: updateWindows completed for event #%d", eventCount);
+                eventCount++;
+            }
+            @catch (NSException *exception) {
+                NSLog(@"ProcessMacOSEvents: Exception processing event: %@", exception);
+                break;
+            }
         }
         
+        NSLog(@"ProcessMacOSEvents: Event loop completed, processed %d events", eventCount);
+        
         static int callCount = 0;
-        if (++callCount % 100 == 0) {
-            NSLog(@"ProcessMacOSEvents: Called %d times (processed %d events this frame)", callCount, eventCount);
+        static int totalEvents = 0;
+        totalEvents += eventCount;
+        
+        if (++callCount % 500 == 0) {
+            NSLog(@"ProcessMacOSEvents: Called %d times (avg %.2f events/frame)", 
+                  callCount, (double)totalEvents / callCount);
         }
     }
+    
+    NSLog(@"ProcessMacOSEvents: EXIT");
 }
 
 #endif

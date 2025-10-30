@@ -36,6 +36,7 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_renderPassDescriptor(nil)
     , m_currentPipelineState(nil)
     , m_currentDepthStencilState(nil)
+    , m_numActiveRenderTargets(1)
     , m_isInitialized(false)
     , m_width(0)
     , m_height(0)
@@ -143,6 +144,12 @@ WIN_HWND CMetalBaseRenderer::Init(int x, int y, int width, int height, unsigned 
         return nullptr;
     }
     
+    if (!InitializeDepthStencilTextures())
+    {
+        iLog->LogError("Failed to initialize depth/stencil textures\n");
+        return nullptr;
+    }
+    
     m_stateCache = std::make_unique<CMetalStateCache>(m_device);
     if (!m_stateCache)
     {
@@ -178,9 +185,13 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     CleanupCommandBufferPool();
     CleanupDynamicVBPools();
     CleanupUniformBuffers();
+    CleanupDepthStencilTextures();
+    ClearRenderPassCache();
     
     m_vertexBuffers.clear();
     m_indexBuffers.clear();
+    m_renderTargets.fill(nil);
+    m_numActiveRenderTargets = 1;
     
     m_stateCache.reset();
     
@@ -201,6 +212,13 @@ void CMetalBaseRenderer::TrackCommandBuffer(id<MTLCommandBuffer> buffer)
 {
     if (!buffer)
         return;
+    
+    // Check if buffer has already been committed - this would cause a crash
+    if (buffer.status != MTLCommandBufferStatusNotEnqueued && 
+        buffer.status != MTLCommandBufferStatusEnqueued) {
+        iLog->LogError("TrackCommandBuffer: Cannot track command buffer in status %d (already committed)\n", (int)buffer.status);
+        return;
+    }
     
     std::lock_guard<std::mutex> lock(m_commandBufferMutex);
     
@@ -364,6 +382,107 @@ void CMetalBaseRenderer::CleanupUniformBuffers()
     m_uniformBufferCPU = nullptr;
 }
 
+bool CMetalBaseRenderer::InitializeDepthStencilTextures()
+{
+    MTLTextureDescriptor* depthStencilDesc = [MTLTextureDescriptor 
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float_Stencil8
+                                     width:m_width
+                                    height:m_height
+                                 mipmapped:NO];
+    depthStencilDesc.usage = MTLTextureUsageRenderTarget;
+    depthStencilDesc.storageMode = MTLStorageModePrivate;
+    
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        m_depthStencilTextures[i] = [m_device newTextureWithDescriptor:depthStencilDesc];
+        if (!m_depthStencilTextures[i])
+        {
+            iLog->LogError("Failed to create depth/stencil texture %d\n", i);
+            return false;
+        }
+    }
+    
+    iLog->Log("Depth/stencil textures created: %dx%d, format=Depth32Float_Stencil8\n", 
+              m_width, m_height);
+    return true;
+}
+
+void CMetalBaseRenderer::CleanupDepthStencilTextures()
+{
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    {
+        m_depthStencilTextures[i] = nil;
+    }
+}
+
+MTLRenderPassDescriptor* CMetalBaseRenderer::CreateRenderPassDescriptor(id<MTLTexture> colorTexture, id<MTLTexture> depthStencilTexture)
+{
+    return GetOrCreateRenderPassDescriptor(colorTexture, depthStencilTexture, 
+                                           MTLLoadActionClear, MTLLoadActionClear, MTLLoadActionClear);
+}
+
+MTLRenderPassDescriptor* CMetalBaseRenderer::GetOrCreateRenderPassDescriptor(id<MTLTexture> colorTexture, 
+                                                                              id<MTLTexture> depthStencilTexture,
+                                                                              MTLLoadAction colorLoad,
+                                                                              MTLLoadAction depthLoad,
+                                                                              MTLLoadAction stencilLoad)
+{
+    RenderPassCacheKey key;
+    key.hasDepth = (depthStencilTexture != nil);
+    key.hasStencil = (depthStencilTexture != nil);
+    key.colorLoadAction = colorLoad;
+    key.depthLoadAction = depthLoad;
+    key.stencilLoadAction = stencilLoad;
+    
+    auto it = m_renderPassCache.find(key);
+    if (it != m_renderPassCache.end())
+    {
+        MTLRenderPassDescriptor* cachedDesc = it->second;
+        if (colorTexture)
+        {
+            cachedDesc.colorAttachments[0].texture = colorTexture;
+        }
+        if (depthStencilTexture)
+        {
+            cachedDesc.depthAttachment.texture = depthStencilTexture;
+            cachedDesc.stencilAttachment.texture = depthStencilTexture;
+        }
+        return cachedDesc;
+    }
+    
+    MTLRenderPassDescriptor* renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+    
+    if (colorTexture)
+    {
+        renderPassDescriptor.colorAttachments[0].texture = colorTexture;
+        renderPassDescriptor.colorAttachments[0].loadAction = colorLoad;
+        renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(
+            m_vClearColor.x, m_vClearColor.y, m_vClearColor.z, 1.0);
+    }
+    
+    if (depthStencilTexture)
+    {
+        renderPassDescriptor.depthAttachment.texture = depthStencilTexture;
+        renderPassDescriptor.depthAttachment.loadAction = depthLoad;
+        renderPassDescriptor.depthAttachment.storeAction = (depthLoad == MTLLoadActionLoad) ? MTLStoreActionStore : MTLStoreActionDontCare;
+        renderPassDescriptor.depthAttachment.clearDepth = 1.0;
+        
+        renderPassDescriptor.stencilAttachment.texture = depthStencilTexture;
+        renderPassDescriptor.stencilAttachment.loadAction = stencilLoad;
+        renderPassDescriptor.stencilAttachment.storeAction = (stencilLoad == MTLLoadActionLoad) ? MTLStoreActionStore : MTLStoreActionDontCare;
+        renderPassDescriptor.stencilAttachment.clearStencil = 0;
+    }
+    
+    m_renderPassCache[key] = renderPassDescriptor;
+    return renderPassDescriptor;
+}
+
+void CMetalBaseRenderer::ClearRenderPassCache()
+{
+    m_renderPassCache.clear();
+}
+
 void CMetalBaseRenderer::BeginFrame()
 {
     if (!m_isInitialized || !m_device || !m_commandQueue)
@@ -393,6 +512,15 @@ void CMetalBaseRenderer::BeginFrame()
 
 void CMetalBaseRenderer::Update()
 {
+    printf("CMetalBaseRenderer::Update ENTRY - calling EndFrame\n");
+    fflush(stdout);
+    
+    // Update() in CryEngine is called at the end of each frame
+    // It should swap buffers and present the frame
+    EndFrame();
+    
+    printf("CMetalBaseRenderer::Update EXIT\n");
+    fflush(stdout);
 }
 
 void CMetalBaseRenderer::EndFrame()
@@ -411,8 +539,8 @@ void CMetalBaseRenderer::EndFrame()
         [m_currentCommandBuffer presentDrawable:m_metalView.currentDrawable];
     }
     
-    [m_currentCommandBuffer commit];
     TrackCommandBuffer(m_currentCommandBuffer);
+    [m_currentCommandBuffer commit];
     
     m_currentCommandBuffer = nil;
     m_renderPassDescriptor = nil;
@@ -1147,21 +1275,94 @@ int CMetalBaseRenderer::GetVertexFormatSize(int vertexformat)
     {
         case VERTEX_FORMAT_P3F:
             return sizeof(struct_VERTEX_FORMAT_P3F);
-        case VERTEX_FORMAT_P3F_COL4UB_TEX2F:
-            return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
-        case VERTEX_FORMAT_P3F_N:
-            return sizeof(struct_VERTEX_FORMAT_P3F_N);
-        case VERTEX_FORMAT_P3F_N_COL4UB_TEX2F:
-            return sizeof(struct_VERTEX_FORMAT_P3F_N_COL4UB_TEX2F);
-        case VERTEX_FORMAT_P3F_TEX2F:
-            return sizeof(struct_VERTEX_FORMAT_P3F_TEX2F);
-        case VERTEX_FORMAT_P3F_N_TEX2F:
-            return sizeof(struct_VERTEX_FORMAT_P3F_N_TEX2F);
         case VERTEX_FORMAT_P3F_COL4UB:
             return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB);
+        case VERTEX_FORMAT_P3F_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_TEX2F);
+        case VERTEX_FORMAT_P3F_COL4UB_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
+        case VERTEX_FORMAT_TRP3F_COL4UB_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_TRP3F_COL4UB_TEX2F);
+        case VERTEX_FORMAT_P3F_COL4UB_COL4UB:
+            return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_COL4UB);
+        case VERTEX_FORMAT_P3F_N:
+            return sizeof(struct_VERTEX_FORMAT_P3F_N);
+        case VERTEX_FORMAT_P3F_N_COL4UB:
+            return sizeof(struct_VERTEX_FORMAT_P3F_N_COL4UB);
+        case VERTEX_FORMAT_P3F_N_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_N_TEX2F);
+        case VERTEX_FORMAT_P3F_N_COL4UB_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_N_COL4UB_TEX2F);
+        case VERTEX_FORMAT_P3F_N_COL4UB_COL4UB:
+            return sizeof(struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB);
+        case VERTEX_FORMAT_P3F_COL4UB_COL4UB_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_COL4UB_TEX2F);
+        case VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F);
+        case VERTEX_FORMAT_T3F_B3F_N3F:
+            return sizeof(SPipTangents);
+        case VERTEX_FORMAT_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_TEX2F);
+        case VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F:
+            return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F);
         default:
             return sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
     }
+}
+
+MTLVertexDescriptor* CMetalBaseRenderer::CreateVertexDescriptor(int vertexformat)
+{
+    MTLVertexDescriptor* descriptor = [[MTLVertexDescriptor alloc] init];
+    
+    int stride = GetVertexFormatSize(vertexformat);
+    if (stride == 0)
+        return nil;
+    
+    descriptor.layouts[0].stride = stride;
+    descriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+    descriptor.layouts[0].stepRate = 1;
+    
+    descriptor.attributes[0].format = MTLVertexFormatFloat3;
+    descriptor.attributes[0].offset = 0;
+    descriptor.attributes[0].bufferIndex = 0;
+    
+    switch (vertexformat)
+    {
+        case VERTEX_FORMAT_P3F_COL4UB_TEX2F:
+            descriptor.attributes[1].format = MTLVertexFormatUChar4Normalized;
+            descriptor.attributes[1].offset = 12;
+            descriptor.attributes[1].bufferIndex = 0;
+            descriptor.attributes[2].format = MTLVertexFormatFloat2;
+            descriptor.attributes[2].offset = 16;
+            descriptor.attributes[2].bufferIndex = 0;
+            break;
+            
+        case VERTEX_FORMAT_P3F_N_COL4UB_TEX2F:
+            descriptor.attributes[1].format = MTLVertexFormatFloat3;
+            descriptor.attributes[1].offset = 12;
+            descriptor.attributes[1].bufferIndex = 0;
+            descriptor.attributes[2].format = MTLVertexFormatUChar4Normalized;
+            descriptor.attributes[2].offset = 24;
+            descriptor.attributes[2].bufferIndex = 0;
+            descriptor.attributes[3].format = MTLVertexFormatFloat2;
+            descriptor.attributes[3].offset = 28;
+            descriptor.attributes[3].bufferIndex = 0;
+            break;
+            
+        case VERTEX_FORMAT_P3F_TEX2F:
+            descriptor.attributes[1].format = MTLVertexFormatFloat2;
+            descriptor.attributes[1].offset = 12;
+            descriptor.attributes[1].bufferIndex = 0;
+            break;
+            
+        case VERTEX_FORMAT_P3F_N:
+            descriptor.attributes[1].format = MTLVertexFormatFloat3;
+            descriptor.attributes[1].offset = 12;
+            descriptor.attributes[1].bufferIndex = 0;
+            break;
+    }
+    
+    return descriptor;
 }
 
 int CMetalBaseRenderer::GetWidth()

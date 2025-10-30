@@ -213,17 +213,20 @@ bool CSystem::OpenRenderLibrary(int type)
 		return false;
 
 	typedef IRenderer *(PROCREND)(int argc, char* argv[], SCryRenderInterface *sp);
-  PROCREND *Proc = (PROCREND *) CryGetProcAddress(m_dll.hRenderer, "PackageRenderConstructor");
-	if (!Proc)
-	{
-		Error( "Error: Library '%s' isn't Crytek render library", libname);
-		FreeLib(m_dll.hRenderer);
-		return false;
+
+	PROCREND *Proc = (PROCREND *) CryGetProcAddress(m_dll.hRenderer, "PackageRenderConstructor");
+	if (Proc) {
+		m_pRenderer = Proc(0, nullptr, &sp);
+		// Error( "Error: Library '%s' isn't Crytek render library", libname);
+		// FreeLib(m_dll.hRenderer);
+		// return false;
 	}
- 
-	GetILog()->LogToFile("OpenRenderLibrary: calling PackageRenderConstructor");
-	m_pRenderer = Proc(0, NULL, &sp);
-	GetILog()->LogToFile("OpenRenderLibrary: PackageRenderConstructor returned %p", m_pRenderer);
+
+        GetILog()->LogToFile(
+            "OpenRenderLibrary: calling PackageRenderConstructor",
+            "OpenRenderLibrary: PackageRenderConstructor returned %p", m_pRenderer
+            );
+
 	if (!m_pRenderer)
 	{
 	    assert(false && "Failed to create renderer");

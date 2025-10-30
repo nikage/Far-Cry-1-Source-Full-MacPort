@@ -23,6 +23,7 @@
 #include "MetalRenderPCH.h"
 #include "MetalStateCache.h"
 #include "MetalRenderElements.h"
+#include <unordered_map>
 
 // Forward declarations
 struct SSystemInitParams;
@@ -336,6 +337,46 @@ public:
     id<MTLCommandBuffer> m_currentCommandBuffer;
     MTLRenderPassDescriptor* m_renderPassDescriptor;
     
+    // Command buffer pool for triple buffering
+    static const int MAX_FRAMES_IN_FLIGHT = 3;
+    
+    // Depth/stencil textures for each frame in flight
+    std::array<id<MTLTexture>, MAX_FRAMES_IN_FLIGHT> m_depthStencilTextures;
+    
+    // Multiple render targets support (up to 4 color attachments)
+    static const int MAX_RENDER_TARGETS = 4;
+    std::array<id<MTLTexture>, MAX_RENDER_TARGETS> m_renderTargets;
+    int m_numActiveRenderTargets;
+    
+    // Render pass caching
+    struct RenderPassCacheKey {
+        bool hasDepth;
+        bool hasStencil;
+        MTLLoadAction colorLoadAction;
+        MTLLoadAction depthLoadAction;
+        MTLLoadAction stencilLoadAction;
+        
+        bool operator==(const RenderPassCacheKey& other) const {
+            return hasDepth == other.hasDepth &&
+                   hasStencil == other.hasStencil &&
+                   colorLoadAction == other.colorLoadAction &&
+                   depthLoadAction == other.depthLoadAction &&
+                   stencilLoadAction == other.stencilLoadAction;
+        }
+    };
+    
+    struct RenderPassCacheKeyHash {
+        std::size_t operator()(const RenderPassCacheKey& k) const {
+            return std::hash<int>()(k.hasDepth) ^ 
+                   (std::hash<int>()(k.hasStencil) << 1) ^
+                   (std::hash<int>()(k.colorLoadAction) << 2) ^
+                   (std::hash<int>()(k.depthLoadAction) << 3) ^
+                   (std::hash<int>()(k.stencilLoadAction) << 4);
+        }
+    };
+    
+    std::unordered_map<RenderPassCacheKey, MTLRenderPassDescriptor*, RenderPassCacheKeyHash> m_renderPassCache;
+    
     // Command buffer tracking for proper shutdown
     std::vector<id<MTLCommandBuffer>> m_activeCommandBuffers;
     std::mutex m_commandBufferMutex;
@@ -398,8 +439,7 @@ public:
     Matrix44 m_modelViewProjectionMatrix;
     bool m_matrixDirty;
     
-    // Command buffer pool for triple buffering
-    static const int MAX_FRAMES_IN_FLIGHT = 3;
+    // Command buffer pool for triple buffering (already defined above)
     int m_currentFrameIndex;
     std::array<id<MTLCommandBuffer>, MAX_FRAMES_IN_FLIGHT> m_commandBufferPool;
     std::array<dispatch_semaphore_t, MAX_FRAMES_IN_FLIGHT> m_frameSemaphores;
@@ -450,7 +490,7 @@ public:
     int m_numDrawCalls;
     int m_numTriangles;
     
-    // Internal methods
+    // Internal methods - some need to be public for manager classes to access
     bool InitializeDevice();
     bool InitializeCommandQueue();
     bool InitializeRenderPipeline();
@@ -458,9 +498,18 @@ public:
     bool InitializeCommandBufferPool();
     bool InitializeDynamicVBPools();
     bool InitializeUniformBuffers();
+    bool InitializeDepthStencilTextures();
     void CleanupCommandBufferPool();
     void CleanupDynamicVBPools();
     void CleanupUniformBuffers();
+    void CleanupDepthStencilTextures();
+    MTLRenderPassDescriptor* CreateRenderPassDescriptor(id<MTLTexture> colorTexture, id<MTLTexture> depthStencilTexture);
+    MTLRenderPassDescriptor* GetOrCreateRenderPassDescriptor(id<MTLTexture> colorTexture, 
+                                                             id<MTLTexture> depthStencilTexture,
+                                                             MTLLoadAction colorLoad = MTLLoadActionClear,
+                                                             MTLLoadAction depthLoad = MTLLoadActionClear,
+                                                             MTLLoadAction stencilLoad = MTLLoadActionClear);
+    void ClearRenderPassCache();
     
     // Command buffer tracking
     void TrackCommandBuffer(id<MTLCommandBuffer> buffer);
@@ -493,6 +542,7 @@ public:
     MTLCompareFunction ConvertCompareFunction(int func);
     MTLBlendFactor ConvertBlendFactor(int factor);
     int GetVertexFormatSize(int vertexformat);
+    MTLVertexDescriptor* CreateVertexDescriptor(int vertexformat);
 };
 
 #endif // __APPLE__ && __MACH__

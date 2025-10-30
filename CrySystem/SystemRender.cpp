@@ -870,19 +870,29 @@ static void g_DrawLine(float *v1,float *v2)
 //////////////////////////////////////////////////////////////////////////
 void CSystem::RenderBegin()
 {
+	printf("CSystem::RenderBegin ENTRY\n");
+	fflush(stdout);
+	
 	FUNCTION_PROFILER( this,PROFILE_SYSTEM );
 
-	if (m_bIgnoreUpdates)
+	if (m_bIgnoreUpdates) {
+		printf("CSystem::RenderBegin - m_bIgnoreUpdates is true, returning\n");
+		fflush(stdout);
 		return;
+	}
 
 	//////////////////////////////////////////////////////////////////////
 	//start the rendering pipeline
 	if (m_pRenderer) {
-		GetILog()->LogToFile("RenderBegin: m_pRenderer = %p", m_pRenderer);
+		printf("CSystem::RenderBegin: calling m_pRenderer->BeginFrame(), renderer = %p\n", m_pRenderer);
+		fflush(stdout);
 		m_pRenderer->BeginFrame();
+		printf("CSystem::RenderBegin: BeginFrame() returned\n");
+		fflush(stdout);
 	} else {
-	     assert(false && "No renderer found");
-		GetILog()->LogToFile("RenderBegin: ERROR - m_pRenderer is NULL!");
+		printf("CSystem::RenderBegin: ERROR - m_pRenderer is NULL!\n");
+		fflush(stdout);
+		assert(false && "No renderer found");
 	}
 }
 
