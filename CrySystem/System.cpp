@@ -18,6 +18,10 @@
 //#include "ini_vars.h"
 #include "CryLibrary.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+extern "C" void ProcessMacOSEvents();
+#endif
+
 // Stub XML node implementation for macOS
 class CXmlNodeStub : public IXmlNode {
 public:
@@ -758,23 +762,37 @@ bool CSystem::CreateGame( const SGameInitParams &params )
 			
 #else
 	CryLogAlways("CSystem::CreateGame - macOS/console path");
-	
+	fflush(stdout);
+
 	if (params.pGame)
 	{
+		assert(params.pGame != NULL && "Provided game instance must not be NULL");
 		CryLogAlways("CSystem::CreateGame - using provided pGame: %p", params.pGame);
+		fflush(stdout);
 		m_pGame = params.pGame;
 	}
 	else
 	{
 		CryLogAlways("CSystem::CreateGame - calling CreateGameInstance()");
+		fflush(stdout);
 		m_pGame = CreateGameInstance();
 		CryLogAlways("CSystem::CreateGame - CreateGameInstance returned: %p", m_pGame);
+		fflush(stdout);
+		
+		assert(m_pGame != NULL && "CreateGameInstance must return valid game instance");
 		
 		if (m_pGame)
 		{
 			CryLogAlways("CSystem::CreateGame - calling m_pGame->Init()");
+			fflush(stdout);
 			m_pGame->Init(this, false, m_bEditor, NULL);
 			CryLogAlways("CSystem::CreateGame - m_pGame->Init() complete");
+			fflush(stdout);
+		}
+		else
+		{
+			CryLogAlways("CSystem::CreateGame - ERROR: CreateGameInstance returned NULL");
+			fflush(stdout);
 		}
 	}
 
@@ -926,7 +944,12 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 	if (IsQuitting())
 		return (false);
 	
-	
+	static bool sysUpdateFirstCall = true;
+	if (sysUpdateFirstCall) {
+		printf("System::Update - FIRST CALL - system update loop started\n");
+		fflush(stdout);
+		sysUpdateFirstCall = false;
+	}
 
 #ifndef _XBOX
 #ifdef WIN32
@@ -944,6 +967,11 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 			}
 		}
   }
+#elif defined(__APPLE__) && defined(__MACH__)
+	{
+		FRAME_PROFILER( "SysUpdate:NSAppEvents",this,PROFILE_SYSTEM );
+		ProcessMacOSEvents();
+	}
 #endif
 #endif
 

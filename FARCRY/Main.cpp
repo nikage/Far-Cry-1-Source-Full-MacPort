@@ -914,11 +914,12 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 #if defined(__APPLE__) && defined(__MACH__)
 // macOS entry point - use statically linked libraries
 int main(int argc, char* argv[]) {
-    @autoreleasepool {
-        // Initialize NSApplication for GUI support
-        [NSApplication sharedApplication];
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-        [NSApp activateIgnoringOtherApps:YES];
+        @autoreleasepool {
+            // Initialize NSApplication for GUI support
+            [NSApplication sharedApplication];
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+            [NSApp finishLaunching];
+            [NSApp activateIgnoringOtherApps:YES];
         
         printf("NSApplication initialized\n");
         
@@ -977,34 +978,15 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         
         if (pGame) {
-            printf("main(): Starting game loop with event processing\n");
+            printf("main(): Starting game\n");
             fflush(stdout);
             
-            // Main game loop with event processing
+            // On macOS, we need to process events but let the game control the loop
+            // The game's Run() method will handle the main loop
             bool bRelaunch = false;
-            bool bQuit = false;
+            pGame->Run(bRelaunch);
             
-            while (!bQuit) {
-                @autoreleasepool {
-                    // Process all pending events
-                    NSEvent *event;
-                    while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                                      untilDate:[NSDate distantPast]
-                                                         inMode:NSDefaultRunLoopMode
-                                                        dequeue:YES])) {
-                        [NSApp sendEvent:event];
-                        [NSApp updateWindows];
-                    }
-                    
-                    // Update game (one frame)
-                    g_pISystem->Update();
-                    
-                    // Check if we should quit (window closed, ESC pressed, etc.)
-                    // TODO: Add proper quit detection
-                }
-            }
-            
-            printf("main(): Game loop ended\n");
+            printf("main(): Game Run() completed\n");
             fflush(stdout);
         }
         

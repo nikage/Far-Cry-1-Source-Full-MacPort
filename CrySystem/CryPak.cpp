@@ -1825,7 +1825,8 @@ void CCryPak::RecordFile( const char *szFilename )
 
 void CCryPak::OnMissingFile (const char* szPath)
 {
-	AUTO_LOCK(m_csMain);
+	// NOTE: m_csMain is already locked by the caller (FOpen), so don't lock it again
+	// AUTO_LOCK(m_csMain); // REMOVED - causes deadlock since FOpen already holds this lock
 	if (m_pPakVars->nLogMissingFiles)
 	{
 		std::pair<MissingFileMap::iterator, bool> insertion = m_mapMissingFiles.insert (MissingFileMap::value_type(szPath,1));

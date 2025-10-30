@@ -739,6 +739,9 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
   @autoreleasepool {
     printf("CreateGameWindow: Creating NSWindow (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
     
+    assert(m_device != nullptr && "Metal device must be created before creating window");
+    assert(width > 0 && height > 0 && "Window dimensions must be positive");
+    
     if (!m_device) {
       printf("CreateGameWindow: Error - Metal device not created yet\n");
       return false;
@@ -776,6 +779,9 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
       m_window = nil;
       return false;
     }
+    
+    assert(m_windowMetalLayer != nil && "Metal layer must be created");
+    assert(m_window != nil && "Window must be created before setting layer");
     
     m_windowMetalLayer.device = m_device;
     m_windowMetalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
@@ -1527,6 +1533,18 @@ void CMetalRenderer::BeginFrame() {
 }
 
 void CMetalRenderer::Update() {
+  // Process macOS events to keep window responsive
+  @autoreleasepool {
+    NSEvent *event;
+    while ((event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                      untilDate:nil
+                                         inMode:NSDefaultRunLoopMode
+                                        dequeue:YES])) {
+      [NSApp sendEvent:event];
+      [NSApp updateWindows];
+    }
+  }
+  
   // Call base class Update
   CMetalBaseRenderer::Update();
 }

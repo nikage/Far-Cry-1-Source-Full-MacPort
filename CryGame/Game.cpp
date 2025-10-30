@@ -861,26 +861,48 @@ bool CXGame::IsInPause(IProcess *pProcess)
 //! update all game and children
 bool CXGame::Update()
 {
+	static bool firstCall = true;
+	if (firstCall) {
+		printf("CXGame::Update - FIRST CALL - entering main game loop\n");
+		fflush(stdout);
+		firstCall = false;
+	}
+	
+	printf("CXGame::Update - checkpoint 1\n"); fflush(stdout);
+	
 	if (!m_nDEBUG_TIMING)
 	{
 		m_fDEBUG_STARTTIMER = m_pSystem->GetITimer()->GetAsyncCurTime();
 		m_nDEBUG_TIMING = 1;
 	}
 
+	printf("CXGame::Update - checkpoint 2\n"); fflush(stdout);
+
 	if (!m_bEditor)
 	{
-		if (!m_bMenuOverlay || !m_pUISystem || m_pUISystem->GetScriptObjectUI()->CanRenderGame())
-		{
-			m_p3DEngine->Enable(1);
+		assert(m_p3DEngine != NULL && "3D Engine must be initialized");
+		
+		bool bCanRender = false;
+		if (!m_bMenuOverlay || !m_pUISystem) {
+			bCanRender = true;
+		} else if (m_pUISystem) {
+			CScriptObjectUI* pScriptUI = m_pUISystem->GetScriptObjectUI();
+			if (pScriptUI && pScriptUI->CanRenderGame()) {
+				bCanRender = true;
+			}
 		}
-		else
-		{
-			m_p3DEngine->Enable(0);
-		}
+		
+		m_p3DEngine->Enable(bCanRender ? 1 : 0);
 	}
 
+	printf("CXGame::Update - checkpoint 3\n"); fflush(stdout);
+
+	assert(g_Render != NULL && "g_Render console variable must be initialized");
+	
 	bool bRenderFrame = (!m_pSystem->GetViewCamera().GetPos().IsZero() || m_bMenuOverlay || m_bUIOverlay) 
-											&& g_Render->GetIVal() != 0;
+											&& (g_Render ? g_Render->GetIVal() != 0 : true);
+
+	printf("CXGame::Update - checkpoint 4\n"); fflush(stdout);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Start Profiling frame
@@ -961,6 +983,12 @@ bool CXGame::Update()
 		for(ListOfPlayers::iterator	pl=m_DeadPlayers.begin(); pl!=m_DeadPlayers.end(); pl++)
 			if ((*pl)->GetEntity() && (*pl)->GetEntity()->GetPhysics())
 				(*pl)->GetEntity()->GetPhysics()->SetParams(&pf);
+	}
+	
+	static int updateCallCount = 0;
+	if (++updateCallCount % 100 == 0) {
+		printf("CXGame::Update - calling m_pSystem->Update() (%d times)\n", updateCallCount);
+		fflush(stdout);
 	}
 	
 	if (!m_pSystem->Update(IsMultiplayer() ? ESYSUPDATE_MULTIPLAYER:0, nPauseMode)) //Update returns false when quitting

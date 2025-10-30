@@ -42,6 +42,7 @@ if(APPLE)
     # Add macOS compatibility stubs
     list(APPEND CRYSYSTEM_SOURCES
         macos_stubs.cpp
+        SystemMacOSEvents.mm
     )
     # list(APPEND CRYSYSTEM_SOURCES
     #     MacOSFileSystem.cpp
@@ -79,6 +80,7 @@ if(APPLE)
         CryScriptSystem
         ${CORE_FOUNDATION_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
+        "-framework Cocoa"
         "-framework Security"
         "-framework SystemConfiguration"
     )
