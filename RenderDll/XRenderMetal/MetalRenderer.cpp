@@ -139,7 +139,6 @@ CMetalRenderer::CMetalRenderer()
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
       m_currentDrawable(nil) {
   // Managers will be initialized in Init() after Metal device is created
-  iLog->Log("CMetalRenderer constructor: managers will be initialized after device creation");
 }
 
 CMetalRenderer::~CMetalRenderer() {
@@ -153,6 +152,8 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
                                int zbpp, int sbits, bool fullscreen, WIN_HINSTANCE hinst,
                                WIN_HWND Glhwnd, WIN_HDC Glhdc, WIN_HGLRC hGLrc, bool bReInit)
 {
+  // Initialize CMetalRenderer
+  
   // Call base class Init() to create Metal device and initialize core renderer
   WIN_HWND result = CMetalBaseRenderer::Init(x, y, width, height, cbpp, zbpp, sbits,
                                              fullscreen, hinst, Glhwnd, Glhdc, hGLrc, bReInit);
@@ -1500,6 +1501,7 @@ void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
 
 // Missing IRenderer method implementations
 void CMetalRenderer::BeginFrame() {
+  // Metal renderer BeginFrame
 
   // End any existing render encoder
   if (m_renderEncoder) {
@@ -1540,7 +1542,6 @@ void CMetalRenderer::BeginFrame() {
     }
   } else {
     iLog->Log("BeginFrame: ERROR - No metal layer!\n");
-
   }
   
   // Call base class BeginFrame to set up command buffer
@@ -1572,6 +1573,9 @@ void CMetalRenderer::BeginFrame() {
       if (!m_renderPassDescriptor) {
         return;
       }
+      
+      // Use default clear color (will be set by game logic)
+      // m_renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
       
       m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
       iLog->Log("BeginFrame: Created render encoder = %p\n", m_renderEncoder);

@@ -884,6 +884,9 @@ void CSystem::RenderBegin()
 	//////////////////////////////////////////////////////////////////////
 	//start the rendering pipeline
 	if (m_pRenderer) {
+		printf("CSystem::RenderBegin: Renderer type = %d (Metal=%d), ptr=%p\n", 
+		       m_pRenderer->GetType(), R_METAL_RENDERER, m_pRenderer);
+		fflush(stdout);
 		m_pRenderer->BeginFrame();
 		printf("CSystem::RenderBegin: BeginFrame() returned\n");
 		fflush(stdout);
