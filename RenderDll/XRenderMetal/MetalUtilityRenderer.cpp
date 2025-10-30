@@ -45,19 +45,19 @@ CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer,
     assert(shaderManager != nullptr && "CMetalUtilityRenderer: shaderManager cannot be null");
     assert(renderer->m_device != nil && "CMetalUtilityRenderer: renderer must have valid Metal device");
     
-    printf("CMetalUtilityRenderer: Initializing...\n");
+    iLog->Log("CMetalUtilityRenderer: Initializing...\n");
     
     // Initialize utility renderer
     // Note: Pipeline states are TODO - need to load from SpriteShaders.metallib
     // For now, skip pipeline creation to get past initialization
-    // printf("CMetalUtilityRenderer: Creating debug pipeline state...\n");
+    // iLog->Log("CMetalUtilityRenderer: Creating debug pipeline state...\n");
     // CreateDebugPipelineState();
-    // printf("CMetalUtilityRenderer: Creating text pipeline state...\n");
+    // iLog->Log("CMetalUtilityRenderer: Creating text pipeline state...\n");
     // CreateTextPipelineState();
-    // printf("CMetalUtilityRenderer: Creating sprite pipeline state...\n");
+    // iLog->Log("CMetalUtilityRenderer: Creating sprite pipeline state...\n");
     // CreateSpritePipelineState();
     
-    printf("CMetalUtilityRenderer: Initialization complete (pipeline states skipped - TODO)\n");
+    iLog->Log("CMetalUtilityRenderer: Initialization complete (pipeline states skipped - TODO)\n");
 }
 
 CMetalUtilityRenderer::~CMetalUtilityRenderer()
@@ -140,7 +140,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     assert(m_renderer != nullptr && "Draw2dImage: renderer cannot be null");
     assert(w > 0.0f && "Draw2dImage: width must be positive");
     assert(h > 0.0f && "Draw2dImage: height must be positive");
-    assert(texture_id >= 0 && "Draw2dImage: texture_id cannot be negative");
+    assert(texture_id < 0 && "Draw2dImage: angle must be 0 for invalid texture");
     assert(s0 >= 0.0f && s0 <= 1.0f && "Draw2dImage: s0 must be in range [0,1]");
     assert(t0 >= 0.0f && t0 <= 1.0f && "Draw2dImage: t0 must be in range [0,1]");
     assert(s1 >= 0.0f && s1 <= 1.0f && "Draw2dImage: s1 must be in range [0,1]");
@@ -169,7 +169,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     
     if (!texture)
     {
-        printf("Draw2dImage: Warning - texture ID %d not found\n", texture_id);
+        iLog->Log("Draw2dImage: Warning - texture ID %d not found\n", texture_id);
         return;
     }
         
@@ -192,7 +192,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     
     if (screenWidth <= 0 || screenHeight <= 0)
     {
-        printf("Draw2dImage: Warning - invalid screen dimensions\n");
+        iLog->Log("Draw2dImage: Warning - invalid screen dimensions\n");
         return;
     }
     
@@ -228,7 +228,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     
     if (!vertexBuffer)
     {
-        printf("Draw2dImage: Error - failed to create vertex buffer\n");
+        iLog->Log("Draw2dImage: Error - failed to create vertex buffer\n");
         return;
     }
     
@@ -246,7 +246,11 @@ void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, 
 {
     assert(w > 0.0f && "DrawImage: width must be positive");
     assert(h > 0.0f && "DrawImage: height must be positive");
-    assert(texture_id >= 0 && "DrawImage: texture_id cannot be negative");
+    
+    if (texture_id < 0) {
+        // Skip drawing with invalid texture
+        return;
+    }
     assert(s0 >= 0.0f && s0 <= 1.0f && "DrawImage: s0 must be in range [0,1]");
     assert(t0 >= 0.0f && t0 <= 1.0f && "DrawImage: t0 must be in range [0,1]");
     assert(s1 >= 0.0f && s1 <= 1.0f && "DrawImage: s1 must be in range [0,1]");
@@ -785,7 +789,7 @@ void CMetalUtilityRenderer::CreateDebugPipelineState()
     m_debugPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     if (!m_debugPipelineState)
     {
-        printf("Error: Failed to create debug pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        iLog->Log("Error: Failed to create debug pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
     }
 }
 
@@ -803,7 +807,7 @@ void CMetalUtilityRenderer::CreateTextPipelineState()
     m_textPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     if (!m_textPipelineState)
     {
-        printf("Error: Failed to create text pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        iLog->Log("Error: Failed to create text pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
     }
 }
 
@@ -873,25 +877,25 @@ void CMetalUtilityRenderer::CreateSpritePipelineState()
         }
         else
         {
-            printf("Warning: Sprite shader functions not found in default library, pipeline may not work\n");
+            iLog->Log("Warning: Sprite shader functions not found in default library, pipeline may not work\n");
         }
     }
     else
     {
         assert(defaultLibrary != nil && "CreateSpritePipelineState: default library should be available");
-        printf("Warning: Could not load default Metal library\n");
+        iLog->Log("Warning: Could not load default Metal library\n");
     }
     
     m_spritePipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     
     if (!m_spritePipelineState)
     {
-        printf("Error: Failed to create sprite pipeline state: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        iLog->Log("Error: Failed to create sprite pipeline state: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
     }
     else
     {
         assert(m_spritePipelineState != nil && "CreateSpritePipelineState: pipeline state should be valid after successful creation");
-        printf("MetalUtilityRenderer: Sprite pipeline state created successfully\n");
+        iLog->Log("MetalUtilityRenderer: Sprite pipeline state created successfully\n");
     }
 }
 

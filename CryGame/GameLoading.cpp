@@ -576,17 +576,18 @@ bool CXGame::SaveToStream(CStream &stm, Vec3d *pos, Vec3d *angles,string sFilena
 	// serialize any playing cutscenes
 	
 	IMovieSystem *pMovies = m_pSystem->GetIMovieSystem();
+	assert(pMovies && "GetIMovieSystem failed");
 	ISequenceIt *pIt = pMovies->GetSequences();
 	IAnimSequence *pSeq = pIt->first();
 	while (pSeq)
 	{
 
 		if (pMovies->IsPlaying(pSeq))
-		{
-			stm.Write((BYTE)CHUNK_INGAME_SEQUENCE);	
-			stm.Write(pSeq->GetName());
-			stm.Write(pMovies->GetPlayingTime(pSeq));
-		}
+	{
+		stm.Write((BYTE)CHUNK_INGAME_SEQUENCE);
+		stm.Write(pSeq->GetName());
+		stm.Write(pMovies->GetPlayingTime(pSeq));
+	}
 		pSeq = pIt->next();
 	}
 	pIt->Release();
@@ -900,7 +901,8 @@ bool CXGame::LoadFromStream(CStream &stm, bool isdemo)
 		}
 
 		m_pSystem->GetI3DEngine()->RestoreTerrainFromDisk();
-		m_pSystem->GetIMovieSystem()->Reset( false );
+		if (m_pSystem->GetIMovieSystem())
+			m_pSystem->GetIMovieSystem()->Reset( false );
 		m_pLog->Log("REMOVING entities:");
 		IEntityItPtr pEntities=pEntitySystem->GetEntityIterator();
 
@@ -1332,16 +1334,17 @@ bool CXGame::LoadFromStream(CStream &stm, bool isdemo)
 			break;
 		case CHUNK_INGAME_SEQUENCE:
 			{
-#if !defined(LINUX)	
 				IMovieSystem *pMovies = m_pSystem->GetIMovieSystem();
-				char szName[1024];
-				stm.Read(szName,1024);
-				float fTime;
-				stm.Read(fTime);
-				IAnimSequence *pSeq = pMovies->FindSequence(szName);
-				pMovies->PlaySequence(pSeq,false);
-				pMovies->SetPlayingTime(pSeq,fTime);
-#endif
+				if (pMovies)
+				{
+					char szName[1024];
+					stm.Read(szName,1024);
+					float fTime;
+					stm.Read(fTime);
+					IAnimSequence *pSeq = pMovies->FindSequence(szName);
+					pMovies->PlaySequence(pSeq,false);
+					pMovies->SetPlayingTime(pSeq,fTime);
+				}
 			}
 			break;
     case CHUNK_HUD:
@@ -1387,7 +1390,8 @@ bool CXGame::LoadFromStream(CStream &stm, bool isdemo)
 	}
 
 	pEntitySystem->Update();
-	m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
+	if (m_pSystem->GetIMovieSystem())
+		m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
 	m_pClient->Reset();
 	
 	m_bIsLoadingLevelFromFile = false;
@@ -1941,7 +1945,8 @@ bool CXGame::LoadFromStream_RELEASEVERSION(CStream &stm, bool isdemo, CScriptObj
 		}
 
 		m_pSystem->GetI3DEngine()->RestoreTerrainFromDisk();
-		m_pSystem->GetIMovieSystem()->Reset( false );
+		if (m_pSystem->GetIMovieSystem())
+			m_pSystem->GetIMovieSystem()->Reset( false );
 		m_pLog->Log("REMOVING entities:");
 		IEntityItPtr pEntities=pEntitySystem->GetEntityIterator();
 
@@ -2335,7 +2340,8 @@ bool CXGame::LoadFromStream_RELEASEVERSION(CStream &stm, bool isdemo, CScriptObj
 	}
 
 	pEntitySystem->Update();
-	m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
+	if (m_pSystem->GetIMovieSystem())
+		m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
 	m_pClient->Reset();
 	
 	m_bIsLoadingLevelFromFile = false;
@@ -2507,7 +2513,8 @@ bool CXGame::LoadFromStream_PATCH_1(CStream &stm, bool isdemo, CScriptObjectStre
 		}
 
 		m_pSystem->GetI3DEngine()->RestoreTerrainFromDisk();
-		m_pSystem->GetIMovieSystem()->Reset( false );
+		if (m_pSystem->GetIMovieSystem())
+			m_pSystem->GetIMovieSystem()->Reset( false );
 		m_pLog->Log("REMOVING entities:");
 		IEntityItPtr pEntities=pEntitySystem->GetEntityIterator();
 
@@ -2935,16 +2942,17 @@ bool CXGame::LoadFromStream_PATCH_1(CStream &stm, bool isdemo, CScriptObjectStre
 			break;
 		case CHUNK_INGAME_SEQUENCE:
 			{
-#if !defined(LINUX)	
 				IMovieSystem *pMovies = m_pSystem->GetIMovieSystem();
-				char szName[1024];
-				stm.Read(szName,1024);
-				float fTime;
-				stm.Read(fTime);
-				IAnimSequence *pSeq = pMovies->FindSequence(szName);
-				pMovies->PlaySequence(pSeq,false);
-				pMovies->SetPlayingTime(pSeq,fTime);
-#endif
+				if (pMovies)
+				{
+					char szName[1024];
+					stm.Read(szName,1024);
+					float fTime;
+					stm.Read(fTime);
+					IAnimSequence *pSeq = pMovies->FindSequence(szName);
+					pMovies->PlaySequence(pSeq,false);
+					pMovies->SetPlayingTime(pSeq,fTime);
+				}
 			}
 			break;
 		case CHUNK_HUD:

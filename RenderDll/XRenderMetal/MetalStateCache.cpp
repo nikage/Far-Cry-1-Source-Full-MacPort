@@ -15,6 +15,7 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
+#include "MetalRenderPCH.h"
 #include "MetalStateCache.h"
 #include <cstdio>
 
@@ -69,7 +70,7 @@ id<MTLRenderPipelineState> CMetalStateCache::GetOrCreatePipelineState(
     
     if (!pipelineState)
     {
-        printf("Error creating pipeline state: %s\n", 
+        iLog->Log("Error creating pipeline state: %s\n",
                error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return nil;
     }
@@ -104,7 +105,7 @@ id<MTLDepthStencilState> CMetalStateCache::GetOrCreateDepthStencilState(
     
     if (!depthStencilState)
     {
-        printf("Error creating depth stencil state\n");
+        iLog->Log("Error creating depth stencil state\n");
         return nil;
     }
     
@@ -139,7 +140,7 @@ id<MTLSamplerState> CMetalStateCache::GetOrCreateSamplerState(
     
     if (!samplerState)
     {
-        printf("Error creating sampler state\n");
+        iLog->Log("Error creating sampler state\n");
         return nil;
     }
     

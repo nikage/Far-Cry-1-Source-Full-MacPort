@@ -15,8 +15,7 @@ extern "C" void ProcessMacOSEvents() {
     
     @autoreleasepool {
         if (s_firstCall) {
-            printf("ProcessMacOSEvents: First call - event loop is running\n");
-            fflush(stdout);
+            NSLog(@"ProcessMacOSEvents: First call - event loop is running");
             s_firstCall = false;
         }
         
@@ -28,14 +27,13 @@ extern "C" void ProcessMacOSEvents() {
                                              dequeue:YES]))
         {
             [NSApp sendEvent:event];
-            [NSApp updateWindows];
+            // Don't call updateWindows - we handle rendering manually in BeginFrame/EndFrame
             eventCount++;
         }
         
         static int callCount = 0;
         if (++callCount % 100 == 0) {
-            printf("ProcessMacOSEvents: Called %d times (processed %d events this frame)\n", callCount, eventCount);
-            fflush(stdout);
+            NSLog(@"ProcessMacOSEvents: Called %d times (processed %d events this frame)", callCount, eventCount);
         }
     }
 }

@@ -396,7 +396,7 @@ void CLog::LogStringToFile( const char *szString,bool bAdd )
 		strcat(szTemp,"\n");
 
 	if (szTemp[0] == '$')
-		strcpy(szTemp, szTemp+2);
+		memmove(szTemp, szTemp+2, strlen(szTemp+2) + 1);
 
 #ifdef _WIN32
 	if (!m_pLogIncludeTime)

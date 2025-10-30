@@ -877,8 +877,13 @@ void CSystem::RenderBegin()
 
 	//////////////////////////////////////////////////////////////////////
 	//start the rendering pipeline
-	if (m_pRenderer) 
+	if (m_pRenderer) {
+		GetILog()->LogToFile("RenderBegin: m_pRenderer = %p", m_pRenderer);
 		m_pRenderer->BeginFrame();
+	} else {
+	     assert(false && "No renderer found");
+		GetILog()->LogToFile("RenderBegin: ERROR - m_pRenderer is NULL!");
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

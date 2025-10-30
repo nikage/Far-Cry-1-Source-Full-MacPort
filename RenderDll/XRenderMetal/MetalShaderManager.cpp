@@ -19,7 +19,6 @@
 #include "MetalBaseRenderer.h"
 #include "MetalTextureManager.h"
 #include "MetalRenderElements.h"  // For Metal render element classes
-#include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 #include <cassert>
 #include <iostream>
@@ -113,7 +112,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     std::string source;
     if (!LoadShaderFromFile(name, source))
     {
-        printf("Error: Failed to load shader: %s", name);
+        iLog->Log("Error: Failed to load shader: %s", name);
         return nullptr;
     }
     
@@ -123,7 +122,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     
     if (!CompileShader(source, vertexFunction) || !CompileShader(source, fragmentFunction))
     {
-        printf("Error: Failed to compile shader: %s", name);
+        iLog->Log("Error: Failed to compile shader: %s", name);
         return nullptr;
     }
     
@@ -131,7 +130,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     id<MTLRenderPipelineState> pipelineState = CreatePipelineState(vertexFunction, fragmentFunction, nil);
     if (!pipelineState)
     {
-        printf("Error: Failed to create pipeline state for shader: %s", name);
+        iLog->Log("Error: Failed to create pipeline state for shader: %s", name);
         return nullptr;
     }
     
@@ -479,7 +478,7 @@ bool CMetalShaderManager::CompileShader(const std::string& source, id<MTLFunctio
     id<MTLLibrary> library = [m_renderer->m_device newLibraryWithSource:@(source.c_str()) options:nil error:&error];
     if (!library)
     {
-        printf("Error: Failed to create Metal library: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        iLog->Log("Error: Failed to create Metal library: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return false;
     }
     

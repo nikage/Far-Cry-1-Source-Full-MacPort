@@ -157,11 +157,13 @@ CXGame::CXGame()
 	m_pCurrentUI = 0;	
 	m_pIActionMapManager=NULL;
 	m_pIngameDialogMgr = new CIngameDialogMgr();
+	assert(m_pIngameDialogMgr != nullptr && "CIngameDialogMgr allocation must succeed");
 	m_pUISystem = 0;
 	mp_model = 0;
 #if !defined(LINUX)
 	// to avoid all references to movie user in this file
 	m_pMovieUser = new CMovieUser(this);
+	assert(m_pMovieUser != nullptr && "CMovieUser allocation must succeed");
 #endif
 	m_nPlayerIconTexId = -1;
 	m_nVehicleIconTexId = -1;
@@ -193,6 +195,7 @@ CXGame::CXGame()
 
 	m_sGameName = "FarCry";
 	m_pTagPointManager = new CTagPointManager( this );
+	assert(m_pTagPointManager != nullptr && "CTagPointManager allocation must succeed");
 	m_nDEBUG_TIMING = 0;
 	m_fDEBUG_STARTTIMER = 0;
 }
@@ -431,10 +434,8 @@ void CXGame::SoftReset()
 		vLoadedWeapons.push_back(m_pWeaponSystemEx->GetWeaponClass(i)->GetName());
 
 	m_pWeaponSystemEx->Reset();
-#if !defined(LINUX)
 	if (m_pSystem->GetIMovieSystem())
 		m_pSystem->GetIMovieSystem()->StopAllSequences();
-#endif
 	m_pScriptObjectGame->Reset();
 
 	m_pScriptSystem->ForceGarbageCollection();
@@ -480,10 +481,8 @@ void CXGame::Reset()
 	m_XSurfaceMgr.Reset();
 	m_XAreaMgr.Clear();
 	ClearTagPoints();
-#if !defined(LINUX)
 	if (m_pSystem->GetIMovieSystem())
 		m_pSystem->GetIMovieSystem()->Reset(false);
-#endif
 	m_pScriptObjectGame->Reset();
 
 	m_pScriptSystem->ForceGarbageCollection();
@@ -527,6 +526,9 @@ IXSystem *CXGame::GetXSystem(){return m_pServer?m_pServer->m_pISystem:m_pClient?
 //! Initialize the game. This must be called before calling other functions of this class.
 bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,const char *szGameMod)
 {	
+	assert(pSystem != nullptr && "ISystem must be valid for game initialization");
+	assert(szGameMod != nullptr && "Game mod parameter must not be null");
+	
 	CryLogAlways("CXGame::Init - ENTRY POINT");
 	
 	// Setup the system and 3D Engine pointers
@@ -534,6 +536,7 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	CryLogAlways("CXGame::Init - m_pSystem set, creating CGameMods");
 
 	m_pGameMods = new CGameMods(this);
+	assert(m_pGameMods != nullptr && "CGameMods allocation must succeed");
 	CryLogAlways("CXGame::Init - CGameMods created");
 
 	gISystem = pSystem;
@@ -863,12 +866,11 @@ bool CXGame::Update()
 {
 	static bool firstCall = true;
 	if (firstCall) {
-		printf("CXGame::Update - FIRST CALL - entering main game loop\n");
-		fflush(stdout);
+		CryLogAlways("CXGame::Update - FIRST CALL - entering main game loop");
 		firstCall = false;
 	}
 	
-	printf("CXGame::Update - checkpoint 1\n"); fflush(stdout);
+	CryLogAlways("CXGame::Update - checkpoint 1");
 	
 	if (!m_nDEBUG_TIMING)
 	{
@@ -876,7 +878,7 @@ bool CXGame::Update()
 		m_nDEBUG_TIMING = 1;
 	}
 
-	printf("CXGame::Update - checkpoint 2\n"); fflush(stdout);
+	CryLogAlways("CXGame::Update - checkpoint 2");
 
 	if (!m_bEditor)
 	{
@@ -895,14 +897,14 @@ bool CXGame::Update()
 		m_p3DEngine->Enable(bCanRender ? 1 : 0);
 	}
 
-	printf("CXGame::Update - checkpoint 3\n"); fflush(stdout);
+	CryLogAlways("CXGame::Update - checkpoint 3");
 
 	assert(g_Render != NULL && "g_Render console variable must be initialized");
 	
 	bool bRenderFrame = (!m_pSystem->GetViewCamera().GetPos().IsZero() || m_bMenuOverlay || m_bUIOverlay) 
 											&& (g_Render ? g_Render->GetIVal() != 0 : true);
 
-	printf("CXGame::Update - checkpoint 4\n"); fflush(stdout);
+	CryLogAlways("CXGame::Update - checkpoint 4");
 
 	//////////////////////////////////////////////////////////////////////////
 	// Start Profiling frame
@@ -955,17 +957,19 @@ bool CXGame::Update()
 	bool bPause=IsInPause(pProcess);
 	if (m_bIsLoadingLevelFromFile)
 		bPause=false;
-#if !defined(LINUX)	
-	// Pauses or unpauses movie system.
+
 	if (bPause != m_bMovieSystemPaused)
 	{
 		m_bMovieSystemPaused = bPause;
-		if (bPause)
-			m_pSystem->GetIMovieSystem()->Pause();
-		else
-			m_pSystem->GetIMovieSystem()->Resume();
+		IMovieSystem* pMovieSystem = m_pSystem->GetIMovieSystem();
+		if (pMovieSystem)
+		{
+			if (bPause)
+				pMovieSystem->Pause();
+			else
+				pMovieSystem->Resume();
+		}
 	}
-#endif
 	// [marco] check current sound and vis areas
 	// for music etc.	
 	CheckSoundVisAreas();
@@ -987,8 +991,7 @@ bool CXGame::Update()
 	
 	static int updateCallCount = 0;
 	if (++updateCallCount % 100 == 0) {
-		printf("CXGame::Update - calling m_pSystem->Update() (%d times)\n", updateCallCount);
-		fflush(stdout);
+		CryLogAlways("CXGame::Update - calling m_pSystem->Update() (%d times)", updateCallCount);
 	}
 	
 	if (!m_pSystem->Update(IsMultiplayer() ? ESYSUPDATE_MULTIPLAYER:0, nPauseMode)) //Update returns false when quitting
@@ -1039,7 +1042,8 @@ bool CXGame::Update()
 		pTimer->MeasureTime("EndServUp");
 	}
 
-	m_pNetwork->UpdateNetwork();	// used to update things like the UBI.com services
+	if (m_pNetwork)
+		m_pNetwork->UpdateNetwork();	// used to update things like the UBI.com services
 
 	DWORD dwCurrentTimeInMS=GetCurrentTime();
 
@@ -1553,11 +1557,9 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 
 		m_pSystem->GetILog()->Log("UISystem: Enabled 3D Engine!");
 	}
-#if !defined(LINUX)	
 	if (m_pSystem->GetIMovieSystem())
 		m_pSystem->GetIMovieSystem()->StopAllCutScenes();
-	//m_lstPlayedCutScenes.clear();
-#endif		
+
 	bool bDedicated=GetSystem()->IsDedicated();
 
 	string strGameType = g_GameType->GetString();

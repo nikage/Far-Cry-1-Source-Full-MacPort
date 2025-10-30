@@ -40,14 +40,14 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer,
     assert(renderer->m_device != nil && "CMetalShaderManager: renderer must have valid Metal device!");
     assert(m_nextShaderId == 1 && "CMetalShaderManager: shader ID counter must start at 1!");
     
-    printf("MetalShaderManager: Initializing...\n");
+    iLog->Log("MetalShaderManager: Initializing...\n");
     
     if (!InitializeDefaultShaderLibrary())
     {
-        printf("Warning: Failed to initialize default shader library\n");
+        iLog->Log("Warning: Failed to initialize default shader library\n");
     }
     
-    printf("MetalShaderManager: Initialization complete (%zu shaders loaded)\n", m_shaders.size());
+    iLog->Log("MetalShaderManager: Initialization complete (%zu shaders loaded)\n", m_shaders.size());
 }
 
 CMetalShaderManager::~CMetalShaderManager()
@@ -55,7 +55,7 @@ CMetalShaderManager::~CMetalShaderManager()
     assert(m_renderer != nullptr && "CMetalShaderManager: renderer should not be null during destruction!");
     assert(m_textureManager != nullptr && "CMetalShaderManager: textureManager should not be null during destruction!");
     
-    printf("MetalShaderManager: Shutting down...\n");
+    iLog->Log("MetalShaderManager: Shutting down...\n");
     ClearAllShaders();
     
     assert(m_shaders.empty() && "CMetalShaderManager: all shaders should be cleared!");
@@ -69,7 +69,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     
     if (!m_renderer || !m_renderer->m_device)
     {
-        printf("Error: No Metal device available\n");
+        iLog->Log("Error: No Metal device available\n");
         return false;
     }
     
@@ -82,7 +82,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     
     if (shaderPath)
     {
-        printf("Loading shader library from: %s\n", [shaderPath UTF8String]);
+        iLog->Log("Loading shader library from: %s\n", [shaderPath UTF8String]);
         defaultLibrary = [m_renderer->m_device newLibraryWithFile:shaderPath error:&error];
     }
     
@@ -93,24 +93,24 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
         NSString* exeDir = [exePath stringByDeletingLastPathComponent];
         NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"BasicShaders.metallib"];
         
-        printf("Attempting to load from executable directory: %s\n", [metallibPath UTF8String]);
+        iLog->Log("Attempting to load from executable directory: %s\n", [metallibPath UTF8String]);
         defaultLibrary = [m_renderer->m_device newLibraryWithFile:metallibPath error:&error];
     }
     
     if (!defaultLibrary)
     {
-        printf("Attempting to load default library...\n");
+        iLog->Log("Attempting to load default library...\n");
         defaultLibrary = [m_renderer->m_device newDefaultLibrary];
     }
     
     if (!defaultLibrary)
     {
-        printf("Error: Failed to create shader library: %s\n",
+        iLog->Log("Error: Failed to create shader library: %s\n",
                error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return false;
     }
     
-    printf("Shader library loaded successfully\n");
+    iLog->Log("Shader library loaded successfully\n");
     
     CreateDefaultShaders(defaultLibrary);
     
@@ -154,7 +154,7 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         
         if (!vertexFunc || !fragmentFunc)
         {
-            printf("Warning: Failed to load shader functions for '%s'\n", shader.name);
+            iLog->Log("Warning: Failed to load shader functions for '%s'\n", shader.name);
             continue;
         }
         
@@ -188,11 +188,11 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
             assert(m_shaders.find(shaderId) != m_shaders.end() && "CreateDefaultShaders: shader should be in map!");
             assert(m_shaderNameMap.find(shader.name) != m_shaderNameMap.end() && "CreateDefaultShaders: shader name should be in map!");
             
-            printf("  Loaded shader: %s (ID: %d)\n", shader.name, shaderId);
+            iLog->Log("  Loaded shader: %s (ID: %d)\n", shader.name, shaderId);
         }
     }
     
-    printf("Default shaders created: %zu shaders\n", m_shaders.size());
+    iLog->Log("Default shaders created: %zu shaders\n", m_shaders.size());
 }
 
 id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions(
@@ -251,7 +251,7 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     
     if (!pipelineState)
     {
-        printf("Error: Failed to create pipeline state: %s\n",
+        iLog->Log("Error: Failed to create pipeline state: %s\n",
                error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return nil;
     }

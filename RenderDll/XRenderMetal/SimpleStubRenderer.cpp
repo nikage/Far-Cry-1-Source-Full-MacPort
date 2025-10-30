@@ -8,6 +8,7 @@ CSimpleStubRenderer::CSimpleStubRenderer()
     , m_frameID(0)
     , m_isInitialized(false)
 {
+    assert(false && "Renderer not implemented, fix dummy stubs");
 }
 
 CSimpleStubRenderer::~CSimpleStubRenderer()
@@ -21,47 +22,47 @@ void* CSimpleStubRenderer::Init(int x, int y, int width, int height, unsigned in
     m_width = (width > 0) ? width : 1024;
     m_height = (height > 0) ? height : 768;
     m_isInitialized = true;
-    printf("SimpleStubRenderer: Initialized with %dx%d (requested: %dx%d)\n", m_width, m_height, width, height);
+    iLog->Log("SimpleStubRenderer: Initialized with %dx%d (requested: %dx%d)\n", m_width, m_height, width, height);
     return (void*)this;
 }
 
 void CSimpleStubRenderer::ShutDown(bool bReInit)
 {
     m_isInitialized = false;
-    printf("SimpleStubRenderer: Shutdown\n");
+    iLog->Log("SimpleStubRenderer: Shutdown\n");
 }
 
 void CSimpleStubRenderer::BeginFrame()
 {
     if (!m_isInitialized) return;
     m_frameID++;
-    // printf("SimpleStubRenderer: BeginFrame %d\n", m_frameID);
+    // iLog->Log("SimpleStubRenderer: BeginFrame %d\n", m_frameID);
 }
 
 void CSimpleStubRenderer::Update()
 {
     if (!m_isInitialized) return;
-    // printf("SimpleStubRenderer: Update\n");
+    // iLog->Log("SimpleStubRenderer: Update\n");
 }
 
 void CSimpleStubRenderer::Set2DMode(bool enable, int ortox, int ortoy)
 {
-    // printf("SimpleStubRenderer: Set2DMode %s\n", enable ? "ON" : "OFF");
+    // iLog->Log("SimpleStubRenderer: Set2DMode %s\n", enable ? "ON" : "OFF");
 }
 
 void CSimpleStubRenderer::SetState(int st)
 {
-    // printf("SimpleStubRenderer: SetState %d\n", st);
+    // iLog->Log("SimpleStubRenderer: SetState %d\n", st);
 }
 
 void CSimpleStubRenderer::Draw2dImage(float xpos, float ypos, float w, float h, int texture_id, float s0, float t0, float s1, float t1, float angle, float r, float g, float b, float a, float z)
 {
-    // printf("SimpleStubRenderer: Draw2dImage pos(%.1f,%.1f) size(%.1fx%.1f) tex=%d\n", xpos, ypos, w, h, texture_id);
+    // iLog->Log("SimpleStubRenderer: Draw2dImage pos(%.1f,%.1f) size(%.1fx%.1f) tex=%d\n", xpos, ypos, w, h, texture_id);
 }
 
 void CSimpleStubRenderer::SetTexture(int tnum, int Type)
 {
-    // printf("SimpleStubRenderer: SetTexture %d\n", tnum);
+    // iLog->Log("SimpleStubRenderer: SetTexture %d\n", tnum);
 }
 
 void CSimpleStubRenderer::TextToScreen(float x, float y, const char* format, ...)
@@ -71,7 +72,7 @@ void CSimpleStubRenderer::TextToScreen(float x, float y, const char* format, ...
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    printf("SimpleStubRenderer TextToScreen: %s\n", buffer);
+    iLog->Log("SimpleStubRenderer TextToScreen: %s\n", buffer);
 }
 
 void CSimpleStubRenderer::TextToScreenColor(int x, int y, float r, float g, float b, float a, const char* format, ...)
@@ -81,7 +82,7 @@ void CSimpleStubRenderer::TextToScreenColor(int x, int y, float r, float g, floa
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    printf("SimpleStubRenderer TextToScreenColor: %s\n", buffer);
+    iLog->Log("SimpleStubRenderer TextToScreenColor: %s\n", buffer);
 }
 
 int CSimpleStubRenderer::GetWidth()
@@ -106,7 +107,7 @@ void CSimpleStubRenderer::Release()
 
 void CSimpleStubRenderer::SetType(char type)
 {
-    printf("SimpleStubRenderer: SetType called with type: %d\n", type);
+    iLog->Log("SimpleStubRenderer: SetType called with type: %d\n", type);
 }
 
 // Simple IRenderer implementation that delegates to CSimpleStubRenderer

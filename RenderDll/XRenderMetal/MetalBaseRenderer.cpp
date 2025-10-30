@@ -101,7 +101,7 @@ WIN_HWND CMetalBaseRenderer::Init(int x, int y, int width, int height, unsigned 
                                  int zbpp, int sbits, bool fullscreen, WIN_HINSTANCE hinst, 
                                  WIN_HWND Glhwnd, WIN_HDC Glhdc, WIN_HGLRC hGLrc, bool bReInit)
 {
-    printf("Metal Base Renderer Init: %dx%d, %dbpp color, %dbpp depth\n", 
+    iLog->Log("Metal Base Renderer Init: %dx%d, %dbpp color, %dbpp depth\n",
            width, height, cbpp, zbpp);
     
     m_width = width;
@@ -115,52 +115,52 @@ WIN_HWND CMetalBaseRenderer::Init(int x, int y, int width, int height, unsigned 
     
     if (!InitializeDevice())
     {
-        printf("Error: Failed to initialize Metal device\n");
+        iLog->LogError("Failed to initialize Metal device\n");
         return nullptr;
     }
     
     if (!InitializeCommandQueue())
     {
-        printf("Error: Failed to initialize Metal command queue\n");
+        iLog->LogError("Failed to initialize Metal command queue\n");
         return nullptr;
     }
     
     if (!InitializeCommandBufferPool())
     {
-        printf("Error: Failed to initialize command buffer pool\n");
+        iLog->LogError("Failed to initialize command buffer pool\n");
         return nullptr;
     }
     
     if (!InitializeDynamicVBPools())
     {
-        printf("Error: Failed to initialize dynamic VB pools\n");
+        iLog->LogError("Failed to initialize dynamic VB pools\n");
         return nullptr;
     }
     
     if (!InitializeUniformBuffers())
     {
-        printf("Error: Failed to initialize uniform buffers\n");
+        iLog->LogError("Failed to initialize uniform buffers\n");
         return nullptr;
     }
     
     m_stateCache = std::make_unique<CMetalStateCache>(m_device);
     if (!m_stateCache)
     {
-        printf("Error: Failed to create state cache\n");
+        iLog->LogError("Failed to create state cache\n");
         return nullptr;
     }
     
     if (!InitializeRenderPipeline())
     {
-        printf("Error: Failed to initialize Metal render pipeline\n");
+        iLog->LogError("Failed to initialize Metal render pipeline\n");
         return nullptr;
     }
     
     m_isInitialized = true;
-    printf("Metal base renderer initialized successfully\n");
-    printf("  Device: %s\n", [[m_device name] UTF8String]);
-    printf("  Max texture size: %lu\n", (unsigned long)[m_device maxTextureWidth2D]);
-    printf("  Triple buffering: enabled (%d frames)\n", MAX_FRAMES_IN_FLIGHT);
+    iLog->Log("Metal base renderer initialized successfully\n");
+    iLog->Log("  Device: %s\n", [[m_device name] UTF8String]);
+    iLog->Log("  Max texture size: %lu\n", (unsigned long)[m_device maxTextureWidth2D]);
+    iLog->Log("  Triple buffering: enabled (%d frames)\n", MAX_FRAMES_IN_FLIGHT);
     
     return (WIN_HWND)m_metalView;
 }
@@ -170,7 +170,7 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     if (!m_isInitialized)
         return;
     
-    printf("Shutting down Metal base renderer\n");
+    iLog->Log("Shutting down Metal base renderer\n");
     
     // Wait for all tracked command buffers to complete before cleanup
     WaitForAllCommandBuffers();
@@ -206,7 +206,7 @@ void CMetalBaseRenderer::TrackCommandBuffer(id<MTLCommandBuffer> buffer)
     
     // Add to tracking list
     m_activeCommandBuffers.push_back(buffer);
-    printf("TrackCommandBuffer: Now tracking %zu command buffer(s)\n", m_activeCommandBuffers.size());
+    iLog->Log("TrackCommandBuffer: Now tracking %zu command buffer(s)\n", m_activeCommandBuffers.size());
     
     // Add completion handler to auto-remove from tracking
     [buffer addCompletedHandler:^(id<MTLCommandBuffer> completedBuffer) {
@@ -216,14 +216,14 @@ void CMetalBaseRenderer::TrackCommandBuffer(id<MTLCommandBuffer> buffer)
         auto it = std::find(m_activeCommandBuffers.begin(), m_activeCommandBuffers.end(), completedBuffer);
         if (it != m_activeCommandBuffers.end()) {
             m_activeCommandBuffers.erase(it);
-            printf("TrackCommandBuffer: Command buffer completed, %zu remaining\n", m_activeCommandBuffers.size());
+            iLog->Log("TrackCommandBuffer: Command buffer completed, %zu remaining\n", m_activeCommandBuffers.size());
         }
     }];
 }
 
 void CMetalBaseRenderer::WaitForAllCommandBuffers()
 {
-    printf("Waiting for %zu active command buffers to complete...\n", m_activeCommandBuffers.size());
+    iLog->Log("Waiting for %zu active command buffers to complete...\n", m_activeCommandBuffers.size());
     
     // Make a copy to avoid holding lock during wait
     std::vector<id<MTLCommandBuffer>> buffersToWait;
@@ -243,7 +243,7 @@ void CMetalBaseRenderer::WaitForAllCommandBuffers()
         m_activeCommandBuffers.clear();
     }
     
-    printf("All command buffers completed\n");
+    iLog->Log("All command buffers completed\n");
 }
 
 bool CMetalBaseRenderer::InitializeDevice()
@@ -251,11 +251,11 @@ bool CMetalBaseRenderer::InitializeDevice()
     m_device = MTLCreateSystemDefaultDevice();
     if (!m_device)
     {
-        printf("Error: Metal is not supported on this device\n");
+        iLog->LogError("Metal is not supported on this device\n");
         return false;
     }
     
-    printf("Metal device created: %s\n", [[m_device name] UTF8String]);
+    iLog->Log("Metal device created: %s\n", [[m_device name] UTF8String]);
     return true;
 }
 
@@ -267,7 +267,7 @@ bool CMetalBaseRenderer::InitializeCommandQueue()
     m_commandQueue = [m_device newCommandQueue];
     if (!m_commandQueue)
     {
-        printf("Error: Failed to create Metal command queue\n");
+        iLog->LogError("Failed to create Metal command queue\n");
         return false;
     }
     
@@ -281,7 +281,7 @@ bool CMetalBaseRenderer::InitializeCommandBufferPool()
         m_frameSemaphores[i] = dispatch_semaphore_create(1);
         if (!m_frameSemaphores[i])
         {
-            printf("Error: Failed to create frame semaphore %d\n", i);
+            iLog->LogError("Failed to create frame semaphore %d\n", i);
             return false;
         }
     }
@@ -300,7 +300,7 @@ bool CMetalBaseRenderer::InitializeDynamicVBPools()
                                                            options:MTLResourceStorageModeShared];
         if (!m_dynamicVBPools[i].buffer)
         {
-            printf("Error: Failed to create dynamic VB pool %d\n", i);
+            iLog->LogError("Failed to create dynamic VB pool %d\n", i);
             return false;
         }
         
@@ -309,7 +309,7 @@ bool CMetalBaseRenderer::InitializeDynamicVBPools()
         m_dynamicVBPools[i].cpuData = [m_dynamicVBPools[i].buffer contents];
     }
     
-    printf("Dynamic VB pools created: %d pools of %zu MB each\n", 
+    iLog->Log("Dynamic VB pools created: %d pools of %zu MB each\n",
            NUM_DYNAMIC_VB_POOLS, poolSize / (1024 * 1024));
     return true;
 }
@@ -322,7 +322,7 @@ bool CMetalBaseRenderer::InitializeUniformBuffers()
                                             options:MTLResourceStorageModeShared];
     if (!m_uniformBuffer)
     {
-        printf("Error: Failed to create uniform buffer\n");
+        iLog->Log("Error: Failed to create uniform buffer\n");
         return false;
     }
     
@@ -374,7 +374,7 @@ void CMetalBaseRenderer::BeginFrame()
     m_currentCommandBuffer = [m_commandQueue commandBuffer];
     if (!m_currentCommandBuffer)
     {
-        printf("Error: Failed to create command buffer\n");
+        iLog->Log("Error: Failed to create command buffer\n");
         return;
     }
     
@@ -1197,7 +1197,7 @@ CRendElement* CMetalBaseRenderer::EF_CreateRE(EDataType edt)
     
     if (!re)
     {
-        printf("Warning: Failed to create render element for type %d\n", (int)edt);
+        iLog->Log("Warning: Failed to create render element for type %d\n", (int)edt);
     }
     
     return re;

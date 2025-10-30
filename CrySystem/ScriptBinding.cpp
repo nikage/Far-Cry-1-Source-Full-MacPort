@@ -40,82 +40,64 @@ CScriptBindings::CScriptBindings()
 
 bool CScriptBindings::Init(CSystem *pSystem)
 {
-	printf("CScriptBindings::Init - Entry\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Entry");
 	
 	IScriptSystem *pSS=pSystem->GetIScriptSystem();
 //SYSTEM
-	printf("CScriptBindings::Init - Initializing ScriptObjectSystem\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectSystem");
 	CScriptObjectSystem::InitializeTemplate(pSS);
 	m_pScriptObjectSystem=new CScriptObjectSystem;
 	m_pScriptObjectSystem->Init(pSS,pSystem);
-	printf("CScriptBindings::Init - ScriptObjectSystem done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectSystem done");
 	
 //PARTICLE
-	printf("CScriptBindings::Init - Initializing ScriptObjectParticle\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectParticle");
 	CScriptObjectParticle::InitializeTemplate(pSS);
 	m_pScriptObjectParticle=new CScriptObjectParticle;
 	m_pScriptObjectParticle->Init(pSS,pSystem);
-	printf("CScriptBindings::Init - ScriptObjectParticle done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectParticle done");
 	
 //ANIMATION
-	printf("CScriptBindings::Init - Initializing ScriptObjectAnimation\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectAnimation");
 	CScriptObjectAnimation::InitializeTemplate(pSS);
 	m_pScriptObjectAnimation=new CScriptObjectAnimation;
 	m_pScriptObjectAnimation->Init(pSS,pSystem);
-	printf("CScriptBindings::Init - ScriptObjectAnimation done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectAnimation done");
 	
 //SOUND	
-	printf("CScriptBindings::Init - Initializing ScriptObjectSound\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectSound");
 	CScriptObjectSound::InitializeTemplate(pSS);
 	m_pScriptObjectSound=new CScriptObjectSound;
 	m_pScriptObjectSound->Init(pSS,pSystem);
-	printf("CScriptBindings::Init - ScriptObjectSound done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectSound done");
 	
 //MOVIE
-	printf("CScriptBindings::Init - Initializing ScriptObjectMovie\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectMovie");
 	CScriptObjectMovie::InitializeTemplate(pSS);
 	m_pScriptObjectMovie=new CScriptObjectMovie;
 	m_pScriptObjectMovie->Init(pSS,pSystem);
-	printf("CScriptBindings::Init - ScriptObjectMovie done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectMovie done");
 	
 //SCRIPT
-	printf("CScriptBindings::Init - Initializing ScriptObjectScript\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectScript");
 	CScriptObjectScript::InitializeTemplate(pSS);
 	m_pScriptObjectScript=new CScriptObjectScript;
 	m_pScriptObjectScript->Init(pSS);
-	printf("CScriptBindings::Init - ScriptObjectScript done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectScript done");
 	
 //ENTITY
-	printf("CScriptBindings::Init - Initializing ScriptObjectEntity\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectEntity");
 	CScriptObjectEntity::InitializeTemplate(pSS);
-	printf("CScriptBindings::Init - ScriptObjectEntity done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectEntity done");
 	
 //DOWNLOAD
 #if !defined(LINUX)
-	printf("CScriptBindings::Init - Initializing HTTPDownloader\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing HTTPDownloader");
 	CHTTPDownloader::InitializeTemplate(pSS);
-	printf("CScriptBindings::Init - HTTPDownloader done\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - HTTPDownloader done");
 #endif
 	
-	printf("CScriptBindings::Init - Completed successfully\n");
-	fflush(stdout);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Completed successfully");
 	return true;
 }
 

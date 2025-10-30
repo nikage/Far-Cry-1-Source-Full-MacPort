@@ -139,7 +139,7 @@ CMetalRenderer::CMetalRenderer()
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
       m_currentDrawable(nil) {
   // Managers will be initialized in Init() after Metal device is created
-  printf("CMetalRenderer constructor: managers will be initialized after device creation\n");
+  iLog->Log("CMetalRenderer constructor: managers will be initialized after device creation");
 }
 
 CMetalRenderer::~CMetalRenderer() {
@@ -157,29 +157,29 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
   WIN_HWND result = CMetalBaseRenderer::Init(x, y, width, height, cbpp, zbpp, sbits,
                                              fullscreen, hinst, Glhwnd, Glhdc, hGLrc, bReInit);
   
-  printf("CMetalRenderer::Init - Base renderer Init() returned %p\n", result);
+  iLog->Log("CMetalRenderer::Init - Base renderer Init() returned %p\n", result);
   
   // Check if base renderer initialized successfully
   if (!m_isInitialized) {
-    printf("CMetalRenderer::Init - Base renderer initialization failed (m_isInitialized=%d)\n", m_isInitialized);
+    iLog->Log("CMetalRenderer::Init - Base renderer initialization failed (m_isInitialized=%d)\n", m_isInitialized);
     return nullptr;
   }
   
   // Create game window with Metal layer
-  printf("CMetalRenderer::Init - Creating game window (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
+  iLog->Log("CMetalRenderer::Init - Creating game window (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
   if (!CreateGameWindow(width, height, fullscreen)) {
-    printf("CMetalRenderer::Init - Failed to create game window\n");
+    iLog->Log("CMetalRenderer::Init - Failed to create game window\n");
     return nullptr;
   }
   
   // Now that Metal device is created, initialize managers
-  printf("CMetalRenderer::Init - Initializing managers (device=%p)\n", m_device);
+  iLog->Log("CMetalRenderer::Init - Initializing managers (device=%p)\n", m_device);
   if (!InitializeManagers()) {
-    printf("CMetalRenderer::Init - Failed to initialize managers\n");
+    iLog->Log("CMetalRenderer::Init - Failed to initialize managers\n");
     return nullptr;
   }
   
-  printf("CMetalRenderer initialized successfully with managers and window\n");
+  iLog->Log("CMetalRenderer initialized successfully with managers and window\n");
   return (WIN_HWND)m_window;
 }
 
@@ -684,7 +684,7 @@ int CMetalRenderer::SetPolygonMode(int mode) {
 bool CMetalRenderer::InitializeManagers() {
   // If managers already exist, skip initialization (Init can be called multiple times)
   if (m_textureManager && m_shaderManager && m_utilityRenderer) {
-    printf("InitializeManagers: Managers already initialized, skipping\n");
+    iLog->Log("InitializeManagers: Managers already initialized, skipping\n");
     return true;
   }
   
@@ -695,7 +695,7 @@ bool CMetalRenderer::InitializeManagers() {
   // Initialize texture manager
   m_textureManager = std::make_unique<CMetalTextureManager>(this);
   if (!m_textureManager) {
-    printf("Error: Failed to create Metal texture manager");
+    iLog->Log("Error: Failed to create Metal texture manager");
     return false;
   }
   assert(m_textureManager && "InitializeManagers: Texture manager creation failed!");
@@ -704,7 +704,7 @@ bool CMetalRenderer::InitializeManagers() {
   m_shaderManager =
       std::make_unique<CMetalShaderManager>(this, m_textureManager.get());
   if (!m_shaderManager) {
-    printf("Error: Failed to create Metal shader manager");
+    iLog->Log("Error: Failed to create Metal shader manager");
     return false;
   }
   assert(m_shaderManager && "InitializeManagers: Shader manager creation failed!");
@@ -713,7 +713,7 @@ bool CMetalRenderer::InitializeManagers() {
   m_utilityRenderer = std::make_unique<CMetalUtilityRenderer>(
       this, m_textureManager.get(), m_shaderManager.get());
   if (!m_utilityRenderer) {
-    printf("Error: Failed to create Metal utility renderer");
+    iLog->Log("Error: Failed to create Metal utility renderer");
     return false;
   }
   assert(m_utilityRenderer && "InitializeManagers: Utility renderer creation failed!");
@@ -737,13 +737,13 @@ void CMetalRenderer::ShutdownManagers() {
 
 bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
   @autoreleasepool {
-    printf("CreateGameWindow: Creating NSWindow (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
+    iLog->Log("CreateGameWindow: Creating NSWindow (%dx%d, fullscreen=%d)\n", width, height, fullscreen);
     
     assert(m_device != nullptr && "Metal device must be created before creating window");
     assert(width > 0 && height > 0 && "Window dimensions must be positive");
     
     if (!m_device) {
-      printf("CreateGameWindow: Error - Metal device not created yet\n");
+      iLog->Log("CreateGameWindow: Error - Metal device not created yet\n");
       return false;
     }
     
@@ -757,7 +757,7 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
                                                 defer:NO];
     
     if (!m_window) {
-      printf("CreateGameWindow: Error - Failed to create NSWindow\n");
+      iLog->Log("CreateGameWindow: Error - Failed to create NSWindow\n");
       return false;
     }
     
@@ -766,15 +766,15 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     
     NSView* contentView = [m_window contentView];
     if (!contentView) {
-      printf("CreateGameWindow: Error - No content view available\n");
+      iLog->Log("CreateGameWindow: Error - No content view available\n");
       [m_window release];
       m_window = nil;
       return false;
     }
     
-    m_windowMetalLayer = [CAMetalLayer layer];
+    m_windowMetalLayer = [[CAMetalLayer layer] retain];
     if (!m_windowMetalLayer) {
-      printf("CreateGameWindow: Error - Failed to create CAMetalLayer\n");
+      iLog->Log("CreateGameWindow: Error - Failed to create CAMetalLayer\n");
       [m_window release];
       m_window = nil;
       return false;
@@ -794,10 +794,10 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     [m_window makeKeyAndOrderFront:nil];
     [m_window makeFirstResponder:contentView];
     
-    printf("CreateGameWindow: Window created successfully\n");
-    printf("  Window: %p\n", m_window);
-    printf("  Metal Layer: %p\n", m_windowMetalLayer);
-    printf("  Metal Device: %s\n", [[m_device name] UTF8String]);
+    iLog->Log("CreateGameWindow: Window created successfully\n");
+    iLog->Log("  Window: %p\n", m_window);
+    iLog->Log("  Metal Layer: %p\n", m_windowMetalLayer);
+    iLog->Log("  Metal Device: %s\n", [[m_device name] UTF8String]);
     
     return true;
   }
@@ -806,10 +806,12 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
 void CMetalRenderer::DestroyGameWindow() {
   @autoreleasepool {
     if (m_currentDrawable) {
+      [m_currentDrawable release];
       m_currentDrawable = nil;
     }
     
     if (m_windowMetalLayer) {
+      [m_windowMetalLayer release];
       m_windowMetalLayer = nil;
     }
     
@@ -861,7 +863,7 @@ void CMetalRenderer::DrawBuffer(CVertexBuffer *src, SVertexStream *indicies,
   // 3. Caching the buffer for reuse
 
   if (!vertexBuffer) {
-    printf("Warning: Vertex buffer not implemented yet\n");
+    iLog->Log("Warning: Vertex buffer not implemented yet\n");
     return;
   }
 
@@ -937,7 +939,7 @@ CVertexBuffer *CMetalRenderer::CreateBuffer(int vertexcount, int vertexformat,
   // Create a new CVertexBuffer (assuming it exists in CryEngine)
   // In a real implementation, this would create a CryEngine vertex buffer
   // and associate it with a Metal buffer
-  printf("Creating vertex buffer: %d vertices, format %d, source: %s\n",
+  iLog->Log("Creating vertex buffer: %d vertices, format %d, source: %s\n",
          vertexcount, vertexformat, szSource ? szSource : "Unknown");
 
   // TODO: Create actual CVertexBuffer and associate with Metal buffer
@@ -951,7 +953,7 @@ void CMetalRenderer::ReleaseBuffer(CVertexBuffer *bufptr) {
     return;
 
   // TODO: Release Metal buffer associated with CVertexBuffer
-  printf("Releasing vertex buffer\n");
+  iLog->Log("Releasing vertex buffer\n");
 }
 
 void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
@@ -966,7 +968,7 @@ void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
     return;
 
   // TODO: Update Metal buffer with new vertex data
-  printf("Updating vertex buffer: %d vertices, offset %d, type %d\n",
+  iLog->Log("Updating vertex buffer: %d vertices, offset %d, type %d\n",
          vertexcount, nOffs, Type);
 }
 
@@ -980,7 +982,7 @@ void CMetalRenderer::CreateIndexBuffer(SVertexStream *dest, const void *src,
     return;
 
   // TODO: Create Metal index buffer from source data
-  printf("Creating index buffer: %d indices\n", indexcount);
+  iLog->Log("Creating index buffer: %d indices\n", indexcount);
 }
 
 void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
@@ -993,7 +995,7 @@ void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
     return;
 
   // TODO: Update Metal index buffer with new data
-  printf("Updating index buffer: %d indices\n", indexcount);
+  iLog->Log("Updating index buffer: %d indices\n", indexcount);
 }
 
 void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
@@ -1003,7 +1005,7 @@ void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
     return;
 
   // TODO: Release Metal index buffer
-  printf("Releasing index buffer\n");
+  iLog->Log("Releasing index buffer\n");
 }
 
 // Drawing Methods Implementation
@@ -1018,7 +1020,7 @@ void CMetalRenderer::DrawTriStrip(CVertexBuffer *src, int vert_num) {
   // Get vertex data from CVertexBuffer
   void* vertexData = src->m_VS[VSF_GENERAL].m_VData;
   if (!vertexData) {
-    printf("Warning: No vertex data in buffer\n");
+    iLog->Log("Warning: No vertex data in buffer\n");
     return;
   }
   
@@ -1031,7 +1033,7 @@ void CMetalRenderer::DrawTriStrip(CVertexBuffer *src, int vert_num) {
                                                      options:MTLResourceStorageModeShared];
   
   if (!vertexBuffer) {
-    printf("Error: Failed to create Metal vertex buffer\n");
+    iLog->Log("Error: Failed to create Metal vertex buffer\n");
     return;
   }
   
@@ -1057,7 +1059,7 @@ void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {
   assert(Pool >= 0 && "GetDynVBPtr: pool index cannot be negative");
   
   // TODO: Get pointer to dynamic vertex buffer
-  printf("Getting dynamic VB pointer: %d vertices, pool %d\n", nVerts, Pool);
+  iLog->Log("Getting dynamic VB pointer: %d vertices, pool %d\n", nVerts, Pool);
   nOffs = 0;      // Placeholder offset
   return nullptr; // Placeholder
 }
@@ -1067,7 +1069,7 @@ void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts) {
     return;
 
   // TODO: Draw from dynamic vertex buffer
-  printf("Drawing dynamic VB: offset %d, pool %d, vertices %d\n", nOffs, Pool,
+  iLog->Log("Drawing dynamic VB: offset %d, pool %d, vertices %d\n", nOffs, Pool,
          nVerts);
 }
 
@@ -1078,7 +1080,7 @@ void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf,
     return;
 
   // TODO: Draw from vertex buffer with indices
-  printf("Drawing dynamic VB with indices: %d vertices, %d indices, prim type "
+  iLog->Log("Drawing dynamic VB with indices: %d vertices, %d indices, prim type "
          "%d\n",
          nVerts, nInds, nPrimType);
 }
@@ -1088,7 +1090,7 @@ void CMetalRenderer::SetFenceCompleted(CVertexBuffer *buffer) {
     return;
 
   // TODO: Set fence for buffer completion
-  printf("Setting fence completed for buffer\n");
+  iLog->Log("Setting fence completed for buffer\n");
 }
 
 // Debug and Utility Drawing Implementation
@@ -1096,7 +1098,7 @@ void CMetalRenderer::CheckError(const char *comment) {
   // Metal doesn't have the same error checking as OpenGL
   // Errors are typically handled through Metal's error reporting system
   if (comment) {
-    printf("Metal renderer check: %s\n", comment);
+    iLog->Log("Metal renderer check: %s\n", comment);
   }
 }
 
@@ -1106,7 +1108,7 @@ void CMetalRenderer::Draw3dBBox(const Vec3 &mins, const Vec3 &maxs,
     return;
 
   // TODO: Draw 3D bounding box using Metal API
-  printf("Drawing 3D bbox: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
+  iLog->Log("Drawing 3D bbox: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
          mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
 }
 
@@ -1116,7 +1118,7 @@ void CMetalRenderer::Draw3dPrim(const Vec3 &mins, const Vec3 &maxs,
     return;
 
   // TODO: Draw 3D primitive using Metal API
-  printf("Drawing 3D prim: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
+  iLog->Log("Drawing 3D prim: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
          mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
 }
 
@@ -1164,21 +1166,21 @@ void CMetalRenderer::SetState(int State) {
     // In Metal, blend state is part of the pipeline state object
     // Would need to be set during MTLRenderPipelineDescriptor configuration
     // and applied when creating the pipeline state
-    printf("SetState: Blending enabled - src=0x%x dst=0x%x\n", blendSrc, blendDst);
+    iLog->Log("SetState: Blending enabled - src=0x%x dst=0x%x\n", blendSrc, blendDst);
   }
   
   // Color masking (GS_NOCOLMASK)
   if (State & GS_NOCOLMASK) {
     // No color writing - disable all color channels
     // This would be set in pipeline state creation
-    printf("SetState: Color masking disabled\n");
+    iLog->Log("SetState: Color masking disabled\n");
   }
   
   // Alpha test (GS_ALPHATEST_*)
   if (State & GS_ALPHATEST_MASK) {
     int alphaFunc = State & GS_ALPHATEST_MASK;
     // Note: Alpha test function validation removed - constants not available in Metal renderer
-    printf("SetState: Alpha test enabled - func=0x%x\n", alphaFunc);
+    iLog->Log("SetState: Alpha test enabled - func=0x%x\n", alphaFunc);
   }
   
   // Note: State cache methods will be implemented when CMetalStateCache is fully developed
@@ -1215,7 +1217,7 @@ void CMetalRenderer::SetCullMode(int mode) {
 
 bool CMetalRenderer::EnableFog(bool enable) {
   // TODO: Enable/disable fog in Metal
-  printf("Fog %s\n", enable ? "enabled" : "disabled");
+  iLog->Log("Fog %s\n", enable ? "enabled" : "disabled");
   return true;
 }
 
@@ -1227,100 +1229,100 @@ void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
   assert(color != nullptr && "SetFog: color array cannot be null");
   
   // TODO: Set fog parameters in Metal
-  printf("Setting fog: density %.2f, start %.2f, end %.2f, mode %d\n", density,
+  iLog->Log("Setting fog: density %.2f, start %.2f, end %.2f, mode %d\n", density,
          fogstart, fogend, fogmode);
 }
 
 void CMetalRenderer::EnableTexGen(bool enable) {
   // TODO: Enable texture generation in Metal
-  printf("Texture generation %s\n", enable ? "enabled" : "disabled");
+  iLog->Log("Texture generation %s\n", enable ? "enabled" : "disabled");
 }
 
 void CMetalRenderer::SetTexgen(float scaleX, float scaleY, float translateX,
                                float translateY) {
   // TODO: Set texture generation parameters in Metal
-  printf("Setting texgen: scale(%.2f,%.2f) translate(%.2f,%.2f)\n", scaleX,
+  iLog->Log("Setting texgen: scale(%.2f,%.2f) translate(%.2f,%.2f)\n", scaleX,
          scaleY, translateX, translateY);
 }
 
 void CMetalRenderer::SetTexgen3D(float x1, float y1, float z1, float x2,
                                  float y2, float z2) {
   // TODO: Set 3D texture generation in Metal
-  printf("Setting 3D texgen: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n", x1, y1,
+  iLog->Log("Setting 3D texgen: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n", x1, y1,
          z1, x2, y2, z2);
 }
 
 void CMetalRenderer::SetLodBias(float value) {
   // TODO: Set LOD bias in Metal
-  printf("Setting LOD bias: %.2f\n", value);
+  iLog->Log("Setting LOD bias: %.2f\n", value);
 }
 
 void CMetalRenderer::EnableVSync(bool enable) {
   // TODO: Enable VSync in Metal
-  printf("VSync %s\n", enable ? "enabled" : "disabled");
+  iLog->Log("VSync %s\n", enable ? "enabled" : "disabled");
 }
 
 // Matrix Management Implementation
 void CMetalRenderer::PushMatrix() {
   // TODO: Push matrix onto stack
-  printf("Pushing matrix\n");
+  iLog->Log("Pushing matrix\n");
 }
 
 void CMetalRenderer::RotateMatrix(float a, float x, float y, float z) {
   // TODO: Rotate current matrix
-  printf("Rotating matrix: angle %.2f axis(%.2f,%.2f,%.2f)\n", a, x, y, z);
+  iLog->Log("Rotating matrix: angle %.2f axis(%.2f,%.2f,%.2f)\n", a, x, y, z);
 }
 
 void CMetalRenderer::RotateMatrix(const Vec3 &angels) {
   // TODO: Rotate current matrix by angles
-  printf("Rotating matrix by angles: (%.2f,%.2f,%.2f)\n", angels.x, angels.y,
+  iLog->Log("Rotating matrix by angles: (%.2f,%.2f,%.2f)\n", angels.x, angels.y,
          angels.z);
 }
 
 void CMetalRenderer::TranslateMatrix(float x, float y, float z) {
   // TODO: Translate current matrix
-  printf("Translating matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
+  iLog->Log("Translating matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
 }
 
 void CMetalRenderer::ScaleMatrix(float x, float y, float z) {
   // TODO: Scale current matrix
-  printf("Scaling matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
+  iLog->Log("Scaling matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
 }
 
 void CMetalRenderer::TranslateMatrix(const Vec3 &pos) {
   // TODO: Translate current matrix by position
-  printf("Translating matrix by pos: (%.2f,%.2f,%.2f)\n", pos.x, pos.y, pos.z);
+  iLog->Log("Translating matrix by pos: (%.2f,%.2f,%.2f)\n", pos.x, pos.y, pos.z);
 }
 
 void CMetalRenderer::MultMatrix(float *mat) {
   assert(mat != nullptr && "MultMatrix: matrix pointer cannot be null");
   
   // TODO: Multiply current matrix
-  printf("Multiplying matrix\n");
+  iLog->Log("Multiplying matrix\n");
 }
 
 void CMetalRenderer::LoadMatrix(const Matrix44 *src) {
   assert(src != nullptr && "LoadMatrix: source matrix cannot be null");
   
   // TODO: Load matrix
-  printf("Loading matrix\n");
+  iLog->Log("Loading matrix\n");
 }
 
 void CMetalRenderer::PopMatrix() {
   // TODO: Pop matrix from stack
-  printf("Popping matrix\n");
+  iLog->Log("Popping matrix\n");
 }
 
 void CMetalRenderer::EnableTMU(bool enable) {
   // TODO: Enable texture mapping unit
-  printf("TMU %s\n", enable ? "enabled" : "disabled");
+  iLog->Log("TMU %s\n", enable ? "enabled" : "disabled");
 }
 
 void CMetalRenderer::SelectTMU(int tnum) {
   assert(tnum >= 0 && tnum < MAX_TMU && "SelectTMU: texture unit index out of range");
   
   // TODO: Select texture mapping unit
-  printf("Selecting TMU: %d\n", tnum);
+  iLog->Log("Selecting TMU: %d\n", tnum);
 }
 
 // Display and Resolution Implementation
@@ -1331,7 +1333,7 @@ bool CMetalRenderer::ChangeDisplay(unsigned int width, unsigned int height,
   assert(cbpp == 16 || cbpp == 24 || cbpp == 32 && "ChangeDisplay: bits per pixel must be 16, 24, or 32");
   
   // TODO: Change Metal display resolution
-  printf("Changing display: %dx%d, %d bpp\n", width, height, cbpp);
+  iLog->Log("Changing display: %dx%d, %d bpp\n", width, height, cbpp);
   return true;
 }
 
@@ -1341,7 +1343,7 @@ void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
   assert(height > 0 && "ChangeViewport: height must be positive");
   
   // TODO: Change Metal viewport
-  printf("Changing viewport: (%d,%d) %dx%d\n", x, y, width, height);
+  iLog->Log("Changing viewport: (%d,%d) %dx%d\n", x, y, width, height);
   SetViewport(x, y, width, height);
 }
 
@@ -1353,7 +1355,7 @@ bool CMetalRenderer::SaveTga(unsigned char *sourcedata, int sourceformat, int w,
   assert(filename != nullptr && "SaveTga: filename cannot be null");
   
   // TODO: Save TGA using Metal
-  printf("Saving TGA: %dx%d, format %d, file %s\n", w, h, sourceformat,
+  iLog->Log("Saving TGA: %dx%d, format %d, file %s\n", w, h, sourceformat,
          filename ? filename : "NULL");
   return true;
 }
@@ -1365,14 +1367,14 @@ int CMetalRenderer::GetHeight() { return m_height; }
 
 void CMetalRenderer::GetMemoryUsage(ICrySizer *Sizer) {
   // TODO: Get Metal memory usage
-  printf("Getting memory usage\n");
+  iLog->Log("Getting memory usage\n");
 }
 
 void CMetalRenderer::ScreenShot(const char *filename) {
   assert(filename != nullptr && "ScreenShot: filename cannot be null");
   
   // TODO: Take screenshot using Metal
-  printf("Taking screenshot: %s\n", filename ? filename : "default");
+  iLog->Log("Taking screenshot: %s\n", filename ? filename : "default");
 }
 
 int CMetalRenderer::GetColorBpp() { return m_cbpp; }
@@ -1390,7 +1392,7 @@ void CMetalRenderer::ProjectToScreen(float ptx, float pty, float ptz, float *sx,
   assert(sz != nullptr && "ProjectToScreen: output sz cannot be null");
   
   // TODO: Project 3D point to screen coordinates
-  printf("Projecting to screen: (%.2f,%.2f,%.2f)\n", ptx, pty, ptz);
+  iLog->Log("Projecting to screen: (%.2f,%.2f,%.2f)\n", ptx, pty, ptz);
   if (sx)
     *sx = ptx;
   if (sy)
@@ -1411,7 +1413,7 @@ int CMetalRenderer::UnProject(float sx, float sy, float sz, float *px,
   assert(viewport != nullptr && "UnProject: viewport cannot be null");
   
   // TODO: Unproject screen coordinates to 3D
-  printf("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
+  iLog->Log("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
   if (px)
     *px = sx;
   if (py)
@@ -1428,7 +1430,7 @@ int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float *px,
   assert(pz != nullptr && "UnProjectFromScreen: output pz cannot be null");
   
   // TODO: Unproject from screen coordinates
-  printf("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
+  iLog->Log("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
   if (px)
     *px = sx;
   if (py)
@@ -1442,7 +1444,7 @@ void CMetalRenderer::GetModelViewMatrix(float *mat) {
   assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
   
   // TODO: Get model-view matrix
-  printf("Getting model-view matrix\n");
+  iLog->Log("Getting model-view matrix\n");
   if (mat) {
     // Return identity matrix
     for (int i = 0; i < 16; i++)
@@ -1454,7 +1456,7 @@ void CMetalRenderer::GetModelViewMatrix(double *mat) {
   assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
   
   // TODO: Get model-view matrix as double
-  printf("Getting model-view matrix (double)\n");
+  iLog->Log("Getting model-view matrix (double)\n");
   if (mat) {
     // Return identity matrix
     for (int i = 0; i < 16; i++)
@@ -1466,7 +1468,7 @@ void CMetalRenderer::GetProjectionMatrix(double *mat) {
   assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
   
   // TODO: Get projection matrix as double
-  printf("Getting projection matrix (double)\n");
+  iLog->Log("Getting projection matrix (double)\n");
   if (mat) {
     // Return identity matrix
     for (int i = 0; i < 16; i++)
@@ -1478,7 +1480,7 @@ void CMetalRenderer::GetProjectionMatrix(float *mat) {
   assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
   
   // TODO: Get projection matrix
-  printf("Getting projection matrix\n");
+  iLog->Log("Getting projection matrix\n");
   if (mat) {
     // Return identity matrix
     for (int i = 0; i < 16; i++)
@@ -1489,7 +1491,7 @@ void CMetalRenderer::GetProjectionMatrix(float *mat) {
 Vec3 CMetalRenderer::GetUnProject(const Vec3 &WindowCoords,
                                   const CCamera &cam) {
   // TODO: Unproject window coordinates
-  printf("Getting unproject: (%.2f,%.2f,%.2f)\n", WindowCoords.x,
+  iLog->Log("Getting unproject: (%.2f,%.2f,%.2f)\n", WindowCoords.x,
          WindowCoords.y, WindowCoords.z);
   return WindowCoords;
 }
@@ -1497,25 +1499,42 @@ Vec3 CMetalRenderer::GetUnProject(const Vec3 &WindowCoords,
 void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
                                       float width, float height) {
   // TODO: Render to viewport
-  printf("Rendering to viewport: (%.2f,%.2f) %fx%f\n", x, y, width, height);
+  iLog->Log("Rendering to viewport: (%.2f,%.2f) %fx%f\n", x, y, width, height);
 }
 
 // Missing IRenderer method implementations
 void CMetalRenderer::BeginFrame() {
+  iLog->Log("CMetalRenderer::BeginFrame ENTRY\n");
+  
+  // End any existing render encoder
+  if (m_renderEncoder) {
+    iLog->Log("BeginFrame: Ending existing encoder\n");
+    [m_renderEncoder endEncoding];
+    [m_renderEncoder release];
+    m_renderEncoder = nil;
+  }
+  
   // Get next drawable from window layer
   if (m_windowMetalLayer) {
-    @autoreleasepool {
-      m_currentDrawable = [m_windowMetalLayer nextDrawable];
-      if (!m_currentDrawable) {
-        printf("Warning: Failed to get next drawable\n");
-      }
+    iLog->Log("BeginFrame: Getting drawable\n");
+    if (m_currentDrawable) {
+      [m_currentDrawable release];
+      m_currentDrawable = nil;
+    }
+    m_currentDrawable = [[m_windowMetalLayer nextDrawable] retain];
+    iLog->Log("BeginFrame: Got drawable = %p\n", m_currentDrawable);
+    if (!m_currentDrawable) {
+      iLog->Log("Warning: Failed to get next drawable\n");
     }
   }
   
   // Call base class BeginFrame to set up command buffer
+  iLog->Log("BeginFrame: About to call base class BeginFrame\n");
   CMetalBaseRenderer::BeginFrame();
+  iLog->Log("BeginFrame: Base class BeginFrame returned\n");
   
   // Create render pass descriptor with drawable texture
+  iLog->Log("BeginFrame: About to create render encoder\n");
   if (m_currentDrawable && m_currentCommandBuffer) {
     @autoreleasepool {
       m_renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -1524,12 +1543,14 @@ void CMetalRenderer::BeginFrame() {
       m_renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
       m_renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
       
-      m_renderEncoder = [m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor];
+      m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
+      iLog->Log("BeginFrame: Created render encoder = %p\n", m_renderEncoder);
       if (!m_renderEncoder) {
-        printf("Error: Failed to create render encoder\n");
+        iLog->Log("Error: Failed to create render encoder\n");
       }
     }
   }
+  iLog->Log("BeginFrame: Exiting\n");
 }
 
 void CMetalRenderer::Update() {
@@ -1553,6 +1574,7 @@ void CMetalRenderer::EndFrame() {
   // End rendering
   if (m_renderEncoder) {
     [m_renderEncoder endEncoding];
+    [m_renderEncoder release];
     m_renderEncoder = nil;
   }
   
@@ -1569,7 +1591,10 @@ void CMetalRenderer::EndFrame() {
   }
   
   // Clean up
-  m_currentDrawable = nil;
+  if (m_currentDrawable) {
+    [m_currentDrawable release];
+    m_currentDrawable = nil;
+  }
   m_renderPassDescriptor = nil;
   
   // Update frame index
@@ -1588,7 +1613,7 @@ void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
     return;
 
   // TODO: Set Metal scissor rect
-  printf("Setting scissor: (%d,%d) %dx%d\n", x, y, width, height);
+  iLog->Log("Setting scissor: (%d,%d) %dx%d\n", x, y, width, height);
 }
 
 int CMetalRenderer::GetFeatures() {
@@ -1634,31 +1659,31 @@ void CMetalRenderer::SetViewport(int x, int y, int width, int height) {
 
 bool CMetalRenderer::CreateContext(WIN_HWND hWnd, bool bAllowFSAA) {
   // TODO: Create Metal context
-  printf("Creating Metal context\n");
+  iLog->Log("Creating Metal context\n");
   return true;
 }
 
 bool CMetalRenderer::DeleteContext(WIN_HWND hWnd) {
   // TODO: Delete Metal context
-  printf("Deleting Metal context\n");
+  iLog->Log("Deleting Metal context\n");
   return true;
 }
 
 void CMetalRenderer::FreeResources(int nFlags) {
   // TODO: Free Metal resources
-  printf("Freeing Metal resources: flags %d\n", nFlags);
+  iLog->Log("Freeing Metal resources: flags %d\n", nFlags);
 }
 
 void CMetalRenderer::ShareResources(IRenderer *renderer) {
   // TODO: Share Metal resources
-  printf("Sharing Metal resources\n");
+  iLog->Log("Sharing Metal resources\n");
 }
 
 bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
                                       int nNewColDepth, int nNewRefreshHZ,
                                       bool bFullScreen) {
   // TODO: Change Metal resolution
-  printf("Changing resolution: %dx%d, %d bpp, %d Hz, fullscreen %s\n",
+  iLog->Log("Changing resolution: %dx%d, %d bpp, %d Hz, fullscreen %s\n",
          nNewWidth, nNewHeight, nNewColDepth, nNewRefreshHZ,
          bFullScreen ? "yes" : "no");
   return true;
@@ -1666,19 +1691,19 @@ bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
 
 void CMetalRenderer::RefreshResources(int nFlags) {
   // TODO: Refresh Metal resources
-  printf("Refreshing Metal resources: flags %d\n", nFlags);
+  iLog->Log("Refreshing Metal resources: flags %d\n", nFlags);
 }
 
 bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd) {
   // TODO: Set current Metal context
-  printf("Setting current Metal context\n");
+  iLog->Log("Setting current Metal context\n");
   return true;
 }
 
 int CMetalRenderer::EnumDisplayFormats(TArray<SDispFormat> &Formats,
                                        bool bReset) {
   // TODO: Enumerate Metal display formats
-  printf("Enumerating Metal display formats\n");
+  iLog->Log("Enumerating Metal display formats\n");
   return 0;
 }
 
@@ -1691,22 +1716,22 @@ int CMetalRenderer::GetMaxTextureMemory() {
 
 void CMetalRenderer::PreLoad() {
   // TODO: Preload Metal resources
-  printf("Preloading Metal resources\n");
+  iLog->Log("Preloading Metal resources\n");
 }
 
 void CMetalRenderer::Release() {
   // TODO: Release Metal resources
-  printf("Releasing Metal resources\n");
+  iLog->Log("Releasing Metal resources\n");
 }
 
 void CMetalRenderer::PostLoad() {
   // TODO: Postload Metal resources
-  printf("Postloading Metal resources\n");
+  iLog->Log("Postloading Metal resources\n");
 }
 
 void CMetalRenderer::ShutDown(bool bReInit) {
   // TODO: Shutdown Metal renderer
-  printf("Shutting down Metal renderer: reinit %s\n", bReInit ? "yes" : "no");
+  iLog->Log("Shutting down Metal renderer: reinit %s\n", bReInit ? "yes" : "no");
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1807,15 +1832,15 @@ void CMetalRenderer::SetCamera(const CCamera &cam) {
  */
 IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
                                        SCryRenderInterface *sp) {
-  printf("CreateMetalRendererInstance called\n");
+  iLog->Log("CreateMetalRendererInstance called\n");
   
   assert(argc >= 0 && "CreateMetalRendererInstance: argc cannot be negative!");
   assert(sp != nullptr && "CreateMetalRendererInstance: SCryRenderInterface cannot be null!");
 
   FILE *f = fopen("/tmp/farcry_metal_create.log", "w");
   if (f) {
-    fprintf(f, "Creating CMetalRenderer (new architecture)\n");
-    fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+    iLog->Log("Creating CMetalRenderer (new architecture)\n");
+    iLog->Log("argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
     fflush(f);
     fclose(f);
   }
@@ -1827,25 +1852,25 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
     iConsole = sp->ipConsole;
     iLog = sp->ipLog;
     iTimer = sp->ipTimer;
-    printf("Initialized engine interfaces: iSystem=%p, iConsole=%p, iLog=%p, iTimer=%p\n",
+    iLog->Log("Initialized engine interfaces: iSystem=%p, iConsole=%p, iLog=%p, iTimer=%p\n",
            iSystem, iConsole, iLog, iTimer);
   } else {
-    printf("ERROR: No SCryRenderInterface provided - console variables won't be registered\n");
+    iLog->Log("ERROR: No SCryRenderInterface provided - console variables won't be registered\n");
     return nullptr;
   }
 
   CMetalRenderer *renderer = new CMetalRenderer();
   assert(renderer && "CreateMetalRendererInstance: Failed to allocate CMetalRenderer!");
   if (!renderer) {
-    printf("ERROR: Failed to allocate CMetalRenderer\n");
+    iLog->Log("ERROR: Failed to allocate CMetalRenderer\n");
     if (f) {
-      fprintf(f, "ERROR: Failed to allocate renderer\n");
+      iLog->Log("ERROR: Failed to allocate renderer\n");
       fclose(f);
     }
     return nullptr;
   }
 
-  printf("CMetalRenderer created: %p\n", renderer);
+  iLog->Log("CMetalRenderer created: %p\n", renderer);
 
   // Get display settings from SCryRenderInterface or system defaults
   int width = 800;
@@ -1858,7 +1883,7 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
   // Use passed-in display settings or defaults
   // SCryRenderInterface provides system services (log, console, timer), not display settings
   if (sp) {
-    printf("CryEngine interface provided (log, console, timer available)\n");
+    iLog->Log("CryEngine interface provided (log, console, timer available)\n");
   }
   
   // Display settings come from function parameters or defaults
@@ -1870,9 +1895,9 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
         NSRect screenRect = [mainScreen frame];
         width = (int)screenRect.size.width;
         height = (int)screenRect.size.height;
-        printf("Display settings from NSScreen: %dx%d\n", width, height);
+        iLog->Log("Display settings from NSScreen: %dx%d\n", width, height);
       } else {
-        printf(
+        iLog->Log(
             "WARNING: Could not get screen resolution, using defaults: %dx%d\n",
             width, height);
       }
@@ -1897,7 +1922,7 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
     }
   }
 
-  printf("Final renderer settings: %dx%d, color=%dbpp, depth=%dbpp, "
+  iLog->Log("Final renderer settings: %dx%d, color=%dbpp, depth=%dbpp, "
          "stencil=%dbpp, fullscreen=%d\n",
          width, height, colorBpp, depthBpp, stencilBpp, fullscreen);
 
@@ -1907,18 +1932,18 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
                      fullscreen, nullptr, nullptr, nullptr, nullptr, false);
 
   if (!result) {
-    printf("ERROR: CMetalRenderer::Init() failed!\n");
+    iLog->Log("ERROR: CMetalRenderer::Init() failed!\n");
     if (f) {
-      fprintf(f, "ERROR: Renderer initialization failed\n");
+      iLog->Log("ERROR: Renderer initialization failed\n");
       fclose(f);
     }
     delete renderer;
     return nullptr;
   }
 
-  printf("CMetalRenderer initialized successfully\n");
+  iLog->Log("CMetalRenderer initialized successfully\n");
   if (f) {
-    fprintf(f, "SUCCESS: Renderer initialized at %p\n", renderer);
+    iLog->Log("SUCCESS: Renderer initialized at %p\n", renderer);
     fclose(f);
   }
 
@@ -1988,13 +2013,13 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
  */
 extern "C" DLL_EXPORT IRenderer *
 PackageRenderConstructor(int argc, char *argv[], SCryRenderInterface *sp) {
-  printf("PackageRenderConstructor called (CMetalRenderer architecture)\n");
+  iLog->Log("PackageRenderConstructor called (CMetalRenderer architecture)\n");
 
   FILE *f = fopen("/tmp/farcry_render_constructor.log", "w");
   if (f) {
-    fprintf(f, "PackageRenderConstructor called\n");
-    fprintf(f, "argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
-    fprintf(f, "Using CMetalRenderer (manager pattern)\n");
+    iLog->Log("PackageRenderConstructor called\n");
+    iLog->Log("argc=%d, argv=%p, sp=%p\n", argc, argv, sp);
+    iLog->Log("Using CMetalRenderer (manager pattern)\n");
     fflush(f);
     fclose(f);
   }
@@ -2004,10 +2029,10 @@ PackageRenderConstructor(int argc, char *argv[], SCryRenderInterface *sp) {
   f = fopen("/tmp/farcry_render_created.log", "w");
   if (f) {
     if (renderer) {
-      fprintf(f, "SUCCESS: CMetalRenderer created and initialized: %p\n",
+      iLog->Log("SUCCESS: CMetalRenderer created and initialized: %p\n",
               renderer);
     } else {
-      fprintf(f, "ERROR: CMetalRenderer creation failed!\n");
+      iLog->Log("ERROR: CMetalRenderer creation failed!\n");
     }
     fflush(f);
     fclose(f);
@@ -2071,11 +2096,41 @@ void CMetalRenderer::CreateBuffer(int size, int vertexformat, CVertexBuffer *buf
     if (!buf || size <= 0)
         return;
     
-    // Create Metal buffer with specified size
+    assert(Type >= 0 && Type < VSF_NUM && "CreateBuffer: Invalid vertex stream type");
+    
+    if (Type < 0 || Type >= VSF_NUM)
+        return;
+    
     @autoreleasepool {
-        id<MTLBuffer> metalBuffer = [m_device newBufferWithLength:size options:MTLResourceStorageModeShared];
-        if (metalBuffer) {
-            // Store buffer info
+        bool bDynamic = buf->m_VS[Type].m_bDynamic != 0;
+        MTLResourceOptions options = bDynamic ? MTLResourceStorageModeShared : MTLResourceStorageModeManaged;
+        
+        id<MTLBuffer> metalBuffer = [m_device newBufferWithLength:size options:options];
+        if (!metalBuffer) {
+            iLog->LogWarning("CreateBuffer failed: Could not allocate Metal buffer of size %d for %s", 
+                           size, szSource ? szSource : "Unknown");
+            return;
+        }
+        
+        int bufferId = m_nextVertexBufferId++;
+        if (bufferId >= (int)m_vertexBuffers.size()) {
+            m_vertexBuffers.resize(bufferId + 1, nil);
+        }
+        m_vertexBuffers[bufferId] = metalBuffer;
+        
+        buf->m_VS[Type].m_VertBuf.m_nID = bufferId;
+        buf->m_VS[Type].m_VData = [metalBuffer contents];
+        
+        if (vertexformat >= 0) {
+            int vertexSize = GetVertexFormatSize(vertexformat);
+            if (vertexSize > 0) {
+                buf->m_VS[Type].m_nItems = size / vertexSize;
+            }
+        }
+        
+        if (szSource && iLog) {
+            iLog->Log("Created Metal buffer: size=%d bytes, format=%d, type=%d, dynamic=%d, source=%s",
+                           size, vertexformat, Type, bDynamic, szSource);
         }
     }
 }

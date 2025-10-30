@@ -56,15 +56,15 @@ CMetalTexture::CMetalTexture(int texId, CMetalTextureManager* manager)
     
     if (texId <= 0)
     {
-        printf("ERROR: CMetalTexture constructed with invalid texture ID: %d\n", texId);
-        printf("Stack trace: manager=%p\n", manager);
+        iLog->Log("ERROR: CMetalTexture constructed with invalid texture ID: %d\n", texId);
+        iLog->Log("Stack trace: manager=%p\n", manager);
         assert(false && "CMetalTexture: Cannot create with invalid texture ID!");
         throw std::runtime_error("CMetalTexture: texture ID must be > 0!");
     }
     
     if (!manager)
     {
-        printf("ERROR: CMetalTexture constructed with null manager!\n");
+        iLog->Log("ERROR: CMetalTexture constructed with null manager!\n");
         assert(false && "CMetalTexture: Cannot create with null manager!");
         throw std::runtime_error("CMetalTexture: manager cannot be null!");
     }
@@ -545,7 +545,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     {
         if (bWarn)
         {
-            printf("Warning: Failed to load texture: %s\n", filename);
+            iLog->Log("Warning: Failed to load texture: %s\n", filename);
         }
         return def_tid;
     }
@@ -553,7 +553,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     if (width <= 0 || height <= 0 || data.empty())
     {
         if (bWarn)
-            printf("Warning: Invalid texture dimensions for: %s\n", filename);
+            iLog->Log("Warning: Invalid texture dimensions for: %s\n", filename);
         return def_tid;
     }
     
@@ -580,7 +580,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     if (!texture)
     {
         if (bWarn)
-            printf("Warning: Failed to create Metal texture for: %s\n", filename);
+            iLog->Log("Warning: Failed to create Metal texture for: %s\n", filename);
         return def_tid;
     }
     
@@ -789,8 +789,8 @@ bool CMetalTextureManager::DXTCompress(byte* raw_data, int nWidth, int nHeight, 
         return true;
     }
     
-    printf("Warning: Software DXT compression not implemented. ");
-    printf("Consider using pre-compressed textures or enable hardware compression (bUseHW=true).\n");
+    iLog->Log("Warning: Software DXT compression not implemented. ");
+    iLog->Log("Consider using pre-compressed textures or enable hardware compression (bUseHW=true).\n");
     return false;
 }
 
@@ -1287,7 +1287,7 @@ bool CMetalTextureManager::SetGammaDelta(const float fGamma)
     
     if (totalGamma < 0.1f || totalGamma > 5.0f)
     {
-        printf("Warning: Gamma value %.2f out of reasonable range (0.1 to 5.0), clamping.\n", totalGamma);
+        iLog->Log("Warning: Gamma value %.2f out of reasonable range (0.1 to 5.0), clamping.\n", totalGamma);
         totalGamma = (totalGamma < 0.5f) ? 0.5f : (totalGamma > 3.0f) ? 3.0f : totalGamma;
     }
     else
@@ -1300,7 +1300,7 @@ bool CMetalTextureManager::SetGammaDelta(const float fGamma)
     
     if (m_gammaEnabled)
     {
-        printf("Gamma delta set to %.2f (total gamma: %.2f)\n", m_gammaValue, totalGamma);
+        iLog->Log("Gamma delta set to %.2f (total gamma: %.2f)\n", m_gammaValue, totalGamma);
     }
     
     return true;
@@ -1631,7 +1631,7 @@ ITexPic* CMetalTextureManager::EF_GetTextureByID(int Id)
 {
     if (Id <= 0)
     {
-        printf("ERROR: EF_GetTextureByID called with invalid ID: %d\n", Id);
+        iLog->Log("ERROR: EF_GetTextureByID called with invalid ID: %d\n", Id);
         assert(false && "CMetalTextureManager: EF_GetTextureByID called with invalid ID!");
         return nullptr;
     }
@@ -1639,18 +1639,18 @@ ITexPic* CMetalTextureManager::EF_GetTextureByID(int Id)
     auto it = m_textures.find(Id);
     if (it == m_textures.end())
     {
-        printf("Warning: EF_GetTextureByID - texture ID %d not found in texture map\n", Id);
+        iLog->Log("Warning: EF_GetTextureByID - texture ID %d not found in texture map\n", Id);
         return nullptr;
     }
     
     if (!it->second.isLoaded)
     {
-        printf("Warning: EF_GetTextureByID - texture ID %d exists but is not loaded\n", Id);
+        iLog->Log("Warning: EF_GetTextureByID - texture ID %d exists but is not loaded\n", Id);
         assert(it->second.isLoaded && "CMetalTextureManager: Texture exists but is not loaded!");
         return nullptr;
     }
     
-    printf("EF_GetTextureByID: Creating CMetalTexture wrapper for ID %d\n", Id);
+    iLog->Log("EF_GetTextureByID: Creating CMetalTexture wrapper for ID %d\n", Id);
     return new CMetalTexture(Id, this);
 }
 
@@ -1701,7 +1701,7 @@ ITexPic* CMetalTextureManager::EF_LoadTexture(const char* nameTex, uint flags, u
     unsigned int textureId = LoadTexture(nameTex, nullptr, Id, bCompress, bWarn);
     if (textureId == 0 || textureId == (unsigned int)-1)
     {
-        printf("EF_LoadTexture: LoadTexture returned invalid ID %u for '%s'\n", textureId, nameTex);
+        iLog->Log("EF_LoadTexture: LoadTexture returned invalid ID %u for '%s'\n", textureId, nameTex);
         return nullptr;
     }
     
@@ -1962,7 +1962,7 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
         
         // Save to JPG file
         char outputPath[512];
-        sprintf(outputPath, "%s_%s.jpg", szName, cubeFaceNames[faceIdx]);
+        snprintf(outputPath, sizeof(outputPath), "%s_%s.jpg", szName, cubeFaceNames[faceIdx]);
         
         if (!SaveTextureAsJPG(pixelBuffer.data(), size, size, outputPath))
         {
@@ -2247,9 +2247,9 @@ int CMetalTextureManager::EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, ST
         {
             char filename[512];
             if (numDigits == 1)
-                sprintf(filename, "%s%s%d%s", directory.c_str(), prefix.c_str(), i, suffix.c_str());
+                snprintf(filename, sizeof(filename), "%s%s%d%s", directory.c_str(), prefix.c_str(), i, suffix.c_str());
             else
-                sprintf(filename, "%s%s%03d%s", directory.c_str(), prefix.c_str(), i, suffix.c_str());
+                snprintf(filename, sizeof(filename), "%s%s%03d%s", directory.c_str(), prefix.c_str(), i, suffix.c_str());
             
             int texId = LoadTexture(filename, nullptr, 0, false, false);
             if (texId == 0)

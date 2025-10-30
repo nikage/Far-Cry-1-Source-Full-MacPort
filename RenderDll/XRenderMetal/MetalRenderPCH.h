@@ -79,6 +79,9 @@
 // Core renderer
 #include "../Common/Renderer.h"
 
+// Metal logging macros - use project's unified logger
+extern ILog *iLog;
+
 #endif // __APPLE__
 
 #endif // METAL_RENDER_PCH_H

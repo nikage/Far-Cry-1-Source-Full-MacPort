@@ -187,7 +187,7 @@ bool CSystem::OpenRenderLibrary(int type)
   sp.ipTimer = GetITimer();
 	sp.pIPhysicalWorld = m_pIPhysicalWorld;
 
-#ifndef _XBOX
+#ifndef _XBOX // FIXME: use apple specific macro
 	char libname[128];
 	if (type == R_GL_RENDERER)
     strcpy(libname, "XRenderOGL.dll");
@@ -221,18 +221,20 @@ bool CSystem::OpenRenderLibrary(int type)
 		return false;
 	}
  
-	printf("OpenRenderLibrary: calling PackageRenderConstructor\n");
+	GetILog()->LogToFile("OpenRenderLibrary: calling PackageRenderConstructor");
 	m_pRenderer = Proc(0, NULL, &sp);
-	printf("OpenRenderLibrary: PackageRenderConstructor returned %p\n", m_pRenderer);
+	GetILog()->LogToFile("OpenRenderLibrary: PackageRenderConstructor returned %p", m_pRenderer);
 	if (!m_pRenderer)
 	{
+	    assert(false && "Failed to create renderer");
+
 		Error( "Error: Couldn't construct render driver '%s'", libname);
 		FreeLib(m_dll.hRenderer);
 		return false;
 	}
-	printf("OpenRenderLibrary: calling SetType(%d)\n", type);
+	GetILog()->LogToFile("OpenRenderLibrary: calling SetType(%d)", type);
 	m_pRenderer->SetType(type);
-	printf("OpenRenderLibrary: SetType completed\n");
+	GetILog()->LogToFile("OpenRenderLibrary: SetType completed");
 #else
   m_pRenderer = (IRenderer*)PackageRenderConstructor(0, NULL, &sp);
   m_pRenderer->SetType(type);
@@ -579,24 +581,24 @@ bool CSystem::InitSound(WIN_HWND hwnd)
 		Error( "Error creating the sound system interface");
 		return false;
 	}
-	printf("CSystem::InitSound - Sound system created successfully\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::InitSound - Sound system created successfully");
 	
 	// Skip music system initialization (not critical for renderer testing)
 	m_pIMusic = nullptr;
 	
 #endif
-	printf("CSystem::InitSound - About to return from InitSound\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::InitSound - About to return from InitSound");
 	bool result = true;
-	printf("CSystem::InitSound - result = %d, now returning\n", result);
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::InitSound - result = %d, now returning", result);
 	return result;
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitPhysics()
 {
+	assert(this != nullptr && "CSystem instance must be valid");
+	assert(GetILog() != nullptr && "Log system must be initialized before physics");
+	
 #ifndef _XBOX
 	m_dll.hPhysics = LoadDLL(DLL_PHYSICS);
 	if(!m_dll.hPhysics)
@@ -626,6 +628,7 @@ bool CSystem::InitPhysics()
 	}
 	GetILog()->LogToFile( "CreatePhysicalWorld function found at %p", pfnCreatePhysicalWorld );
 
+	assert(pfnCreatePhysicalWorld != nullptr && "CreatePhysicalWorld function pointer must be valid before calling");
 	m_pIPhysicalWorld = pfnCreatePhysicalWorld(this);
 #else
 	m_pIPhysicalWorld = CreatePhysicalWorld(this);
@@ -787,31 +790,36 @@ bool CSystem::InitPhysics()
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitMovieSystem()
 {
-#if !defined(LINUX)
-#ifdef WIN32
+	assert(this != nullptr && "CSystem instance must be valid");
+	assert(GetILog() != nullptr && "Log system must be initialized before movie system");
+	
 	m_dll.hMovie = LoadDLL(DLL_MOVIE);
 	if(!m_dll.hMovie)
-		return false;
+	{
+		GetILog()->LogToFile("Warning: Could not load movie system library - continuing without it");
+		m_pIMovieSystem = nullptr;
+		return true;
+	}
 
 	PFNCREATEMOVIESYSTEM pfnCreateMovieSystem = (PFNCREATEMOVIESYSTEM) CryGetProcAddress(m_dll.hMovie,"CreateMovieSystem");
 	if (!pfnCreateMovieSystem)
 	{
-		Error( "Error loading function CreateMovieSystem" );
-		return false;
+		GetILog()->LogToFile("Warning: CreateMovieSystem function not found - continuing without movie system");
+		m_pIMovieSystem = nullptr;
+		return true;
 	}
 
+	assert(pfnCreateMovieSystem != nullptr && "CreateMovieSystem function pointer must be valid");
 	m_pIMovieSystem = pfnCreateMovieSystem(this);
-#else
-	// Stub implementation for macOS
-	m_pIMovieSystem = nullptr;
-#endif
-
 	if (!m_pIMovieSystem)
 	{
-		GetILog()->LogToFile( "Movie system not available on macOS - continuing without it" );
-		// Don't return false, just continue without movie system
+		GetILog()->LogToFile("Warning: Failed to create movie system instance - continuing without it");
 	}
-#endif
+	else
+	{
+		GetILog()->LogToFile("Movie system initialized successfully");
+	}
+
 	return true;
 }
 
@@ -897,22 +905,18 @@ bool CSystem::InitStreamEngine()
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitFont()
 {
-	printf("InitFont: Entry point\n");
-	fflush(stdout);
+	GetILog()->LogToFile("InitFont: Entry point");
 	
 	// In Editor mode Renderer is not initialized yet, so skip InitFont.
 	if (m_bEditor && !m_pRenderer)
 	{
-		printf("InitFont: Editor mode, skipping\n");
-		fflush(stdout);
+		GetILog()->LogToFile("InitFont: Editor mode, skipping");
 		return true;
 	}
 
 #ifdef __APPLE__
 	// Temporarily disable font loading on macOS to avoid hangs
 	GetILog()->LogToFile("Font system disabled for macOS - skipping font initialization");
-	printf("InitFont: macOS - skipping font loading\n");
-	fflush(stdout);
 	return true;
 #endif
 
@@ -980,13 +984,13 @@ bool CSystem::InitFont()
 //////////////////////////////////////////////////////////////////////////
 bool CSystem::Init3DEngine()
 {
-  printf("CSystem::Init3DEngine() called\n");
+  GetILog()->LogToFile("CSystem::Init3DEngine() called");
   ::SetLastError(0);
   m_dll.h3DEngine = LoadDLL(DLL_3DENGINE);
 	if (!m_dll.h3DEngine)
 		return false;
 
-	printf("CSystem::Init3DEngine() DLL loaded, getting CreateCry3DEngine function\n");
+	GetILog()->LogToFile("CSystem::Init3DEngine() DLL loaded, getting CreateCry3DEngine function");
 	PFNCREATECRY3DENGINE pfnCreateCry3DEngine;
 	pfnCreateCry3DEngine = (PFNCREATECRY3DENGINE) CryGetProcAddress( m_dll.h3DEngine, "CreateCry3DEngine");
 	if (!pfnCreateCry3DEngine)
@@ -995,10 +999,10 @@ bool CSystem::Init3DEngine()
 		return false;
 	} 
 
-	printf("CSystem::Init3DEngine() calling CreateCry3DEngine\n");
-	printf("CSystem::Init3DEngine() GetIRenderer() returns %p\n", GetIRenderer());
+	GetILog()->LogToFile("CSystem::Init3DEngine() calling CreateCry3DEngine");
+	GetILog()->LogToFile("CSystem::Init3DEngine() GetIRenderer() returns %p", GetIRenderer());
 	m_pI3DEngine = (*pfnCreateCry3DEngine)(this,g3deInterfaceVersion);
-	printf("CSystem::Init3DEngine() CreateCry3DEngine returned, m_pI3DEngine = %p\n", m_pI3DEngine);
+	GetILog()->LogToFile("CSystem::Init3DEngine() CreateCry3DEngine returned, m_pI3DEngine = %p", m_pI3DEngine);
 
   if (!m_pI3DEngine )
 	{
@@ -1006,13 +1010,13 @@ bool CSystem::Init3DEngine()
 		return false;
 	}
 
-	printf("CSystem::Init3DEngine() calling m_pI3DEngine->Init()\n");
+	GetILog()->LogToFile("CSystem::Init3DEngine() calling m_pI3DEngine->Init()");
 	if (!m_pI3DEngine->Init())
 	{
 		Error( "Error Initializing 3D Engine" );
 		return false;
 	}
-	printf("CSystem::Init3DEngine() Init() completed successfully\n");
+	GetILog()->LogToFile("CSystem::Init3DEngine() Init() completed successfully");
 	m_pProcess = m_pI3DEngine;
 	m_pProcess->SetFlags(PROC_3DENGINE);
 	return true;
@@ -1310,13 +1314,9 @@ bool CSystem::Init( const SSystemInitParams &params )
 	//////////////////////////////////////////////////////////////////////////
 	//if (!params.bPreview)
 	{
-#if defined(LINUX)
-		CryLogAlways("MovieSystem initialization skipped for Linux dedicated server");
-#else
 		CryLogAlways("MovieSystem initialization");
 		if (!InitMovieSystem())
 			return false;
-#endif
 	}
 
 	if (!params.bEditor)
@@ -1361,16 +1361,13 @@ bool CSystem::Init( const SSystemInitParams &params )
 	if (!params.bPreview && !params.bDedicatedServer)
 	{
 		CryLogAlways("Sound initialization");
-		printf("CSystem::Init - About to call InitSound\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to call InitSound");
 		if (!InitSound(m_hWnd))
 			return false;
-		printf("CSystem::Init - Sound initialization completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - Sound initialization completed successfully");
 	}
 
-	printf("CSystem::Init - About to initialize Font\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - About to initialize Font");
 	
 	//////////////////////////////////////////////////////////////////////////
 	// FONT
@@ -1378,46 +1375,36 @@ bool CSystem::Init( const SSystemInitParams &params )
 	if(!params.bDedicatedServer)
 	{
 		CryLogAlways("Font initialization");
-		printf("CSystem::Init - Calling InitFont\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - Calling InitFont");
 		if (!InitFont())
 		{
-			printf("CSystem::Init - InitFont failed!\n");
-			fflush(stdout);
+			GetILog()->LogToFile("CSystem::Init - InitFont failed!");
 			return false;
 		}
-		printf("CSystem::Init - InitFont completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - InitFont completed successfully");
 	}
 
-	printf("CSystem::Init - After Font, before AI\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - After Font, before AI");
 	
 	//////////////////////////////////////////////////////////////////////////
 	// AI
 	//////////////////////////////////////////////////////////////////////////
 	if (!params.bPreview)
 	{
-		printf("CSystem::Init - About to log AI init message\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to log AI init message");
 		CryLogAlways("AI initialization");
-		printf("CSystem::Init - About to call InitAISystem\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to call InitAISystem");
 		if (!InitAISystem())
 		{
-			printf("CSystem::Init - InitAISystem failed!\n");
-			fflush(stdout);
+			GetILog()->LogToFile("CSystem::Init - InitAISystem failed!");
 			return false;
 		}
-		printf("CSystem::Init - InitAISystem completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - InitAISystem completed successfully");
 	}
 
-	printf("CSystem::Init - About to call m_pConsole->Init\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - About to call m_pConsole->Init");
 	m_pConsole->Init(this);
-	printf("CSystem::Init - m_pConsole->Init completed successfully\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - m_pConsole->Init completed successfully");
 
 //#ifndef MEM_STD
 //  CConsole::AddCommand("MemStats",::DumpAllocs);
@@ -1427,96 +1414,74 @@ bool CSystem::Init( const SSystemInitParams &params )
 	//////////////////////////////////////////////////////////////////////////
 	if (!params.bPreview)
 	{
-		printf("CSystem::Init - About to init entity system\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to init entity system");
 		CryLogAlways("Entity system initialization");
-		printf("CSystem::Init - About to call InitEntitySystem\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to call InitEntitySystem");
 		if (!InitEntitySystem(m_hInst, m_hWnd))
 		{
-			printf("CSystem::Init - InitEntitySystem failed!\n");
-			fflush(stdout);
+			GetILog()->LogToFile("CSystem::Init - InitEntitySystem failed!");
 			return false;
 		}
-		printf("CSystem::Init - InitEntitySystem completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - InitEntitySystem completed successfully");
 	}
 
-	printf("CSystem::Init - After entity system, checking if editor mode\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - After entity system, checking if editor mode");
 	
 	if (!params.bEditor)
 	{
-		printf("CSystem::Init - Not in editor mode, about to init animation system\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - Not in editor mode, about to init animation system");
 		//////////////////////////////////////////////////////////////////////////
 		// Init Animation system
 		//////////////////////////////////////////////////////////////////////////
 		CryLogAlways("Initializing Animation System");
-		printf("CSystem::Init - About to call InitAnimationSystem\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to call InitAnimationSystem");
 		if (!InitAnimationSystem())
 		{
-			printf("CSystem::Init - InitAnimationSystem failed!\n");
-			fflush(stdout);
+			GetILog()->LogToFile("CSystem::Init - InitAnimationSystem failed!");
 			return false;
 		}
-		printf("CSystem::Init - InitAnimationSystem completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - InitAnimationSystem completed successfully");
 		//////////////////////////////////////////////////////////////////////////
 		// Init 3d engine
 		//////////////////////////////////////////////////////////////////////////
-		printf("CSystem::Init - About to init 3D engine\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to init 3D engine");
 		CryLogAlways("Initializing 3D Engine");
-		printf("CSystem::Init - About to call Init3DEngine\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to call Init3DEngine");
 		if (!Init3DEngine())
 		{
-			printf("CSystem::Init - Init3DEngine failed!\n");
-			fflush(stdout);
+			GetILog()->LogToFile("CSystem::Init - Init3DEngine failed!");
 			return false;
 		}
-		printf("CSystem::Init - Init3DEngine completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - Init3DEngine completed successfully");
 
 		//////////////////////////////////////////////////////////////////////////
 		// SCRIPT BINDINGS
 		//////////////////////////////////////////////////////////////////////////
-		printf("CSystem::Init - About to init script bindings\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to init script bindings");
 		CryLogAlways("Initializing Script Bindings");
-		printf("CSystem::Init - About to call InitScriptBindings\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - About to call InitScriptBindings");
 		if(!InitScriptBindings())
 		{
-			printf("CSystem::Init - InitScriptBindings failed!\n");
-			fflush(stdout);
+			GetILog()->LogToFile("CSystem::Init - InitScriptBindings failed!");
 			return false;
 		}
-		printf("CSystem::Init - InitScriptBindings completed successfully\n");
-		fflush(stdout);
+		GetILog()->LogToFile("CSystem::Init - InitScriptBindings completed successfully");
 	}
 	
-	printf("CSystem::Init - After editor mode block\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - After editor mode block");
 
-	printf("CSystem::Init - About to create CDownloadManager\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - About to create CDownloadManager");
 	m_pDownloadManager = new CDownloadManager;
-	printf("CSystem::Init - CDownloadManager created, calling Create\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - CDownloadManager created, calling Create");
 	m_pDownloadManager->Create(this);
-	printf("CSystem::Init - CDownloadManager initialized\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - CDownloadManager initialized");
 
 
 	//////////////////////////////////////////////////////////////////////////
 	// Check loader.
 	//////////////////////////////////////////////////////////////////////////
 #if defined(_DATAPROBE) && !defined(LINUX)
-	printf("CSystem::Init - About to check loader (DATA_PROBE)\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - About to check loader (DATA_PROBE)");
 	CDataProbe probe;
 	if (!params.pCheckFunc || !probe.CheckLoader( params.pCheckFunc ))
 	{
@@ -1524,18 +1489,14 @@ bool CSystem::Init( const SSystemInitParams &params )
 		*p = 1;
 		Strange();
 	}
-	printf("CSystem::Init - Loader check complete\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - Loader check complete");
 #endif
 
-	printf("CSystem::Init - About to call SetAffinity\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - About to call SetAffinity");
 	SetAffinity();
-	printf("CSystem::Init - SetAffinity complete\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - SetAffinity complete");
 
-	printf("CSystem::Init - INITIALIZATION COMPLETE - returning true\n");
-	fflush(stdout);
+	GetILog()->LogToFile("CSystem::Init - INITIALIZATION COMPLETE - returning true");
 	return (true);
 }
 
