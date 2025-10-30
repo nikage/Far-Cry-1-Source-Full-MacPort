@@ -873,7 +873,7 @@ void CSystem::RenderBegin()
 	printf("CSystem::RenderBegin ENTRY\n");
 	fflush(stdout);
 	
-	FUNCTION_PROFILER( this,PROFILE_SYSTEM );
+	// FUNCTION_PROFILER( this,PROFILE_SYSTEM );
 
 	if (m_bIgnoreUpdates) {
 		printf("CSystem::RenderBegin - m_bIgnoreUpdates is true, returning\n");
@@ -884,8 +884,6 @@ void CSystem::RenderBegin()
 	//////////////////////////////////////////////////////////////////////
 	//start the rendering pipeline
 	if (m_pRenderer) {
-		printf("CSystem::RenderBegin: calling m_pRenderer->BeginFrame(), renderer = %p\n", m_pRenderer);
-		fflush(stdout);
 		m_pRenderer->BeginFrame();
 		printf("CSystem::RenderBegin: BeginFrame() returned\n");
 		fflush(stdout);

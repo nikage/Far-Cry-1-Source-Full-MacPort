@@ -69,6 +69,8 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_lodBias(0.0f)
     , m_vSyncEnabled(true)
     , m_currentTMU(0)
+    , m_clipPlaneEnabled(false)
+    , m_clipPlaneRefract(false)
     , m_frameID(0)
     , m_numDrawCalls(0)
     , m_numTriangles(0)
@@ -77,6 +79,12 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     m_viewMatrix.SetIdentity();
     m_projectionMatrix.SetIdentity();
     m_modelViewProjectionMatrix.SetIdentity();
+    
+    // Initialize clip plane parameters
+    m_clipPlaneParams[0] = 0.0f;
+    m_clipPlaneParams[1] = 0.0f;
+    m_clipPlaneParams[2] = 0.0f;
+    m_clipPlaneParams[3] = 0.0f;
     
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
@@ -427,59 +435,95 @@ MTLRenderPassDescriptor* CMetalBaseRenderer::GetOrCreateRenderPassDescriptor(id<
                                                                               MTLLoadAction depthLoad,
                                                                               MTLLoadAction stencilLoad)
 {
-    RenderPassCacheKey key;
-    key.hasDepth = (depthStencilTexture != nil);
-    key.hasStencil = (depthStencilTexture != nil);
-    key.colorLoadAction = colorLoad;
-    key.depthLoadAction = depthLoad;
-    key.stencilLoadAction = stencilLoad;
-    
-    auto it = m_renderPassCache.find(key);
-    if (it != m_renderPassCache.end())
-    {
-        MTLRenderPassDescriptor* cachedDesc = it->second;
-        if (colorTexture)
-        {
-            cachedDesc.colorAttachments[0].texture = colorTexture;
-        }
-        if (depthStencilTexture)
-        {
-            cachedDesc.depthAttachment.texture = depthStencilTexture;
-            cachedDesc.stencilAttachment.texture = depthStencilTexture;
-        }
-        return cachedDesc;
-    }
+    // RenderPassCacheKey key;
+    // key.hasDepth = (depthStencilTexture != nil);
+    // key.hasStencil = (depthStencilTexture != nil);
+    // key.colorLoadAction = colorLoad;
+    // key.depthLoadAction = depthLoad;
+    // key.stencilLoadAction = stencilLoad;
+    //
+    // auto it = m_renderPassCache.find(key);
+    // if (it != m_renderPassCache.end())
+    // {
+    //     MTLRenderPassDescriptor* cachedDesc = it->second;
+    //     if (colorTexture)
+    //     {
+    //         cachedDesc.colorAttachments[0].texture = colorTexture;
+    //     }
+    //     if (depthStencilTexture)
+    //     {
+    //         cachedDesc.depthAttachment.texture = depthStencilTexture;
+    //         cachedDesc.stencilAttachment.texture = depthStencilTexture;
+    //     }
+    //     return cachedDesc;
+    // }
+    // TEMPORARY: Disable caching to avoid ARC memory management issues
+    // MTLRenderPassDescriptor creation is lightweight, so this should be fine for now
+    iLog->Log("GetOrCreateRenderPassDescriptor: Creating new descriptor (caching disabled)\n");
     
     MTLRenderPassDescriptor* renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-    
-    if (colorTexture)
+    if (!renderPassDescriptor)
     {
-        renderPassDescriptor.colorAttachments[0].texture = colorTexture;
-        renderPassDescriptor.colorAttachments[0].loadAction = colorLoad;
-        renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(
-            m_vClearColor.x, m_vClearColor.y, m_vClearColor.z, 1.0);
+        iLog->LogError("GetOrCreateRenderPassDescriptor: Failed to create MTLRenderPassDescriptor!\n");
+        return nil;
     }
     
-    if (depthStencilTexture)
-    {
-        renderPassDescriptor.depthAttachment.texture = depthStencilTexture;
-        renderPassDescriptor.depthAttachment.loadAction = depthLoad;
-        renderPassDescriptor.depthAttachment.storeAction = (depthLoad == MTLLoadActionLoad) ? MTLStoreActionStore : MTLStoreActionDontCare;
-        renderPassDescriptor.depthAttachment.clearDepth = 1.0;
+    @try {
+        if (colorTexture)
+        {
+            // Validate texture before use
+            if (![colorTexture conformsToProtocol:@protocol(MTLTexture)])
+            {
+                iLog->LogError("GetOrCreateRenderPassDescriptor: colorTexture is not a valid MTLTexture!\n");
+                return nil;
+            }
+            
+            renderPassDescriptor.colorAttachments[0].texture = colorTexture;
+            renderPassDescriptor.colorAttachments[0].loadAction = colorLoad;
+            renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+        }
         
-        renderPassDescriptor.stencilAttachment.texture = depthStencilTexture;
-        renderPassDescriptor.stencilAttachment.loadAction = stencilLoad;
-        renderPassDescriptor.stencilAttachment.storeAction = (stencilLoad == MTLLoadActionLoad) ? MTLStoreActionStore : MTLStoreActionDontCare;
-        renderPassDescriptor.stencilAttachment.clearStencil = 0;
+        if (depthStencilTexture)
+        {
+            // Validate depth texture before use  
+            if (![depthStencilTexture conformsToProtocol:@protocol(MTLTexture)])
+            {
+                iLog->LogError("GetOrCreateRenderPassDescriptor: depthStencilTexture is not a valid MTLTexture!\n");
+                return nil;
+            }
+            
+            renderPassDescriptor.depthAttachment.texture = depthStencilTexture;
+            renderPassDescriptor.depthAttachment.loadAction = depthLoad;
+            renderPassDescriptor.depthAttachment.storeAction = (depthLoad == MTLLoadActionLoad) ? MTLStoreActionStore : MTLStoreActionDontCare;
+            renderPassDescriptor.depthAttachment.clearDepth = 1.0;
+            
+            renderPassDescriptor.stencilAttachment.texture = depthStencilTexture;
+            renderPassDescriptor.stencilAttachment.loadAction = stencilLoad;
+            renderPassDescriptor.stencilAttachment.storeAction = (stencilLoad == MTLLoadActionLoad) ? MTLStoreActionStore : MTLStoreActionDontCare;
+            renderPassDescriptor.stencilAttachment.clearStencil = 0;
+        }
+    }
+    @catch (NSException *exception) {
+        iLog->LogError("GetOrCreateRenderPassDescriptor: Exception configuring render pass: %s\n", 
+                      [[exception description] UTF8String]);
+        return nil;
     }
     
-    m_renderPassCache[key] = renderPassDescriptor;
+    // Caching disabled - just return the new descriptor
     return renderPassDescriptor;
 }
 
 void CMetalBaseRenderer::ClearRenderPassCache()
 {
+    // Release all retained descriptors before clearing
+    for (auto& pair : m_renderPassCache)
+    {
+        if (pair.second)
+        {
+            [pair.second release];
+        }
+    }
     m_renderPassCache.clear();
 }
 
@@ -512,15 +556,15 @@ void CMetalBaseRenderer::BeginFrame()
 
 void CMetalBaseRenderer::Update()
 {
-    printf("CMetalBaseRenderer::Update ENTRY - calling EndFrame\n");
-    fflush(stdout);
+    iLog->Log("CMetalBaseRenderer::Update ENTRY - calling EndFrame\n");
+
     
     // Update() in CryEngine is called at the end of each frame
     // It should swap buffers and present the frame
     EndFrame();
     
-    printf("CMetalBaseRenderer::Update EXIT\n");
-    fflush(stdout);
+    iLog->Log("CMetalBaseRenderer::Update EXIT\n");
+
 }
 
 void CMetalBaseRenderer::EndFrame()

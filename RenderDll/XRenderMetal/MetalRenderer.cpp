@@ -827,16 +827,12 @@ void CMetalRenderer::DestroyGameWindow() {
 extern "C" {
 IRenderer *CreateRenderer(int argc, char *argv[], SCryRenderInterface *sp) {
   CMetalRenderer *renderer = new CMetalRenderer();
-  if (renderer) {
-    // Initialize the renderer
-    if (renderer->Init(0, 0, 1024, 768, 32, 24, 8, false, nullptr, 0, 0, 0,
-                       false)) {
-      return renderer;
-    } else {
-      delete renderer;
-      return nullptr;
-    }
+  // Initialize the renderer
+  if (renderer && renderer->Init(0, 0, 1024, 768, 32, 24, 8, false, nullptr, 0,
+                                 0, 0, false)) {
+    return renderer;
   }
+  delete renderer;
   return nullptr;
 }
 }
@@ -1504,9 +1500,7 @@ void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
 
 // Missing IRenderer method implementations
 void CMetalRenderer::BeginFrame() {
-  printf("CMetalRenderer::BeginFrame ENTRY\n");
-  fflush(stdout);
-  
+
   // End any existing render encoder
   if (m_renderEncoder) {
     [m_renderEncoder endEncoding];
@@ -1516,8 +1510,8 @@ void CMetalRenderer::BeginFrame() {
   
   // Get next drawable from window layer
   if (m_windowMetalLayer) {
-    printf("BeginFrame: Have layer, getting drawable\n");
-    fflush(stdout);
+    iLog->Log("BeginFrame: Have layer, getting drawable\n");
+
     
     if (m_currentDrawable) {
       [m_currentDrawable release];
@@ -1526,83 +1520,97 @@ void CMetalRenderer::BeginFrame() {
     
     // Check if layer is valid and has a non-zero size
     CGSize layerSize = m_windowMetalLayer.drawableSize;
-    printf("BeginFrame: Layer size: %.0fx%.0f\n", layerSize.width, layerSize.height);
-    fflush(stdout);
+    iLog->Log("BeginFrame: Layer size: %.0fx%.0f\n", layerSize.width, layerSize.height);
+
     
     if (layerSize.width > 0 && layerSize.height > 0) {
-      printf("BeginFrame: About to call nextDrawable\n");
-      fflush(stdout);
+      iLog->Log("BeginFrame: About to call nextDrawable\n");
+
       m_currentDrawable = [[m_windowMetalLayer nextDrawable] retain];
-      printf("BeginFrame: Got drawable = %p\n", m_currentDrawable);
-      fflush(stdout);
+      iLog->Log("BeginFrame: Got drawable = %p\n", m_currentDrawable);
+
       
       if (!m_currentDrawable) {
-        printf("BeginFrame: ERROR - Failed to get drawable!\n");
-        fflush(stdout);
+        iLog->Log("BeginFrame: ERROR - Failed to get drawable!\n");
+
       }
     } else {
-      printf("BeginFrame: Layer has zero size!\n");
-      fflush(stdout);
+      iLog->Log("BeginFrame: Layer has zero size!\n");
+
     }
   } else {
-    printf("BeginFrame: ERROR - No metal layer!\n");
-    fflush(stdout);
+    iLog->Log("BeginFrame: ERROR - No metal layer!\n");
+
   }
   
   // Call base class BeginFrame to set up command buffer
-  printf("BeginFrame: Calling base class BeginFrame\n");
-  fflush(stdout);
+  iLog->Log("BeginFrame: Calling base class BeginFrame\n");
+
   CMetalBaseRenderer::BeginFrame();
-  printf("BeginFrame: Base class returned, cmd buffer = %p\n", m_currentCommandBuffer);
-  fflush(stdout);
+  iLog->Log("BeginFrame: Base class returned, cmd buffer = %p\n", m_currentCommandBuffer);
+
   
   // Create render pass descriptor with drawable texture and depth/stencil
   if (m_currentDrawable && m_currentCommandBuffer) {
-    printf("BeginFrame: Creating render encoder\n");
-    fflush(stdout);
+    iLog->Log("BeginFrame: Creating render encoder\n");
+
     
     @autoreleasepool {
+      iLog->Log("BeginFrame: m_currentFrameIndex=%d, MAX_FRAMES_IN_FLIGHT=%d\n", m_currentFrameIndex, MAX_FRAMES_IN_FLIGHT);
+
+      
+      if (m_currentFrameIndex >= MAX_FRAMES_IN_FLIGHT || m_currentFrameIndex < 0) {
+        iLog->Log("BeginFrame: ERROR - Invalid frame index %d!\n", m_currentFrameIndex);
+
+        return;
+      }
+      
       id<MTLTexture> depthStencilTexture = m_depthStencilTextures[m_currentFrameIndex];
+      
       m_renderPassDescriptor = CreateRenderPassDescriptor(m_currentDrawable.texture, depthStencilTexture);
       
+      if (!m_renderPassDescriptor) {
+        return;
+      }
+      
       m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
-      printf("BeginFrame: Created render encoder = %p\n", m_renderEncoder);
-      fflush(stdout);
+      iLog->Log("BeginFrame: Created render encoder = %p\n", m_renderEncoder);
+
       
       if (!m_renderEncoder) {
-        printf("BeginFrame: ERROR - Failed to create encoder!\n");
-        fflush(stdout);
+        iLog->Log("BeginFrame: ERROR - Failed to create encoder!\n");
+
       }
     }
   } else {
-    printf("BeginFrame: WARNING - No drawable (%p) or command buffer (%p)\n", m_currentDrawable, m_currentCommandBuffer);
-    fflush(stdout);
+    iLog->Log("BeginFrame: WARNING - No drawable (%p) or command buffer (%p)\n", m_currentDrawable, m_currentCommandBuffer);
+
   }
-  printf("BeginFrame: EXIT\n");
-  fflush(stdout);
+  iLog->Log("BeginFrame: EXIT\n");
+
 }
 
 void CMetalRenderer::Update() {
-  printf("CMetalRenderer::Update ENTRY\n");
-  fflush(stdout);
+  iLog->Log("CMetalRenderer::Update ENTRY\n");
+
   
   // Don't process events here - System::Update handles that via ProcessMacOSEvents
   // Just call base class Update which calls EndFrame
   CMetalBaseRenderer::Update();
   
-  printf("CMetalRenderer::Update EXIT\n");
-  fflush(stdout);
+  iLog->Log("CMetalRenderer::Update EXIT\n");
+
 }
 
 void CMetalRenderer::EndFrame() {
-  printf("CMetalRenderer::EndFrame ENTRY (encoder=%p, drawable=%p, cmd=%p)\n", 
+  iLog->Log("CMetalRenderer::EndFrame ENTRY (encoder=%p, drawable=%p, cmd=%p)\n",
          m_renderEncoder, m_currentDrawable, m_currentCommandBuffer);
-  fflush(stdout);
+
   
   // End rendering
   if (m_renderEncoder) {
-    printf("EndFrame: Ending render encoder\n");
-    fflush(stdout);
+    iLog->Log("EndFrame: Ending render encoder\n");
+
     [m_renderEncoder endEncoding];
     [m_renderEncoder release];
     m_renderEncoder = nil;
@@ -1610,15 +1618,15 @@ void CMetalRenderer::EndFrame() {
   
   // Present drawable
   if (m_currentDrawable && m_currentCommandBuffer) {
-    printf("EndFrame: Presenting drawable\n");
-    fflush(stdout);
+    iLog->Log("EndFrame: Presenting drawable\n");
+
     [m_currentCommandBuffer presentDrawable:m_currentDrawable];
   }
   
   // Commit command buffer
   if (m_currentCommandBuffer) {
-    printf("EndFrame: Tracking and committing command buffer\n");
-    fflush(stdout);
+    iLog->Log("EndFrame: Tracking and committing command buffer\n");
+
     TrackCommandBuffer(m_currentCommandBuffer);
     [m_currentCommandBuffer commit];
     m_currentCommandBuffer = nil;
@@ -1635,8 +1643,8 @@ void CMetalRenderer::EndFrame() {
   m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
   m_currentDynamicVBPool = (m_currentDynamicVBPool + 1) % NUM_DYNAMIC_VB_POOLS;
   
-  printf("EndFrame: EXIT\n");
-  fflush(stdout);
+  iLog->Log("EndFrame: EXIT\n");
+
 }
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
@@ -1849,7 +1857,7 @@ void CMetalRenderer::SetCamera(const CCamera &cam) {
  * @error_handling
  * - Returns nullptr if allocation fails
  * - Returns nullptr if Init() fails (deletes renderer before returning)
- * - Logs errors to both console (printf) and /tmp/farcry_metal_create.log
+ * - Logs errors to both console (iLog->Log) and /tmp/farcry_metal_create.log
  *
  * @display_settings
  * Display settings are obtained from (in order of priority):
@@ -1869,11 +1877,11 @@ void CMetalRenderer::SetCamera(const CCamera &cam) {
  */
 IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
                                        SCryRenderInterface *sp) {
-  sp->ipLog->Log("CreateMetalRendererInstance called\n");
+
   
   assert(argc >= 0 && "CreateMetalRendererInstance: argc cannot be negative!");
   assert(sp != nullptr && "CreateMetalRendererInstance: SCryRenderInterface cannot be null!");
-
+  sp->ipLog->Log("CreateMetalRendererInstance called\n");
 
   iLog->Log(
     "Creating CMetalRenderer (new architecture)\n",
@@ -1883,24 +1891,16 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
 
   // Initialize global engine interface pointers BEFORE creating renderer
   // The CRenderer constructor needs these to register console variables
-  if (sp) {
     iSystem = sp->ipSystem;
     iConsole = sp->ipConsole;
     iLog = sp->ipLog;
     iTimer = sp->ipTimer;
     iLog->Log("Initialized engine interfaces: iSystem=%p, iConsole=%p, iLog=%p, iTimer=%p\n",
            iSystem, iConsole, iLog, iTimer);
-  } else {
-    iLog->Log("ERROR: No SCryRenderInterface provided - console variables won't be registered\n");
-    return nullptr;
-  }
+
 
   CMetalRenderer *renderer = new CMetalRenderer();
   assert(renderer && "CreateMetalRendererInstance: Failed to allocate CMetalRenderer!");
-  if (!renderer) {
-    iLog->Log("ERROR: Failed to allocate CMetalRenderer\n");
-    return nullptr;
-  }
 
   iLog->Log("CMetalRenderer created: %p\n", renderer);
 
@@ -1914,9 +1914,7 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
 
   // Use passed-in display settings or defaults
   // SCryRenderInterface provides system services (log, console, timer), not display settings
-  if (sp) {
-    iLog->Log("CryEngine interface provided (log, console, timer available)\n");
-  }
+
   
   // Display settings come from function parameters or defaults
   {
@@ -1970,7 +1968,7 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
   }
 
   iLog->Log("CMetalRenderer initialized successfully\n");
-    iLog->Log("SUCCESS: Renderer initialized at %p\n", renderer);
+  iLog->Log("SUCCESS: Renderer initialized at %p\n", renderer);
 
   return renderer;
 }
@@ -2007,11 +2005,6 @@ IRenderer *CreateMetalRendererInstance(int argc, char *argv[],
  * 4. Engine uses returned IRenderer* for all rendering operations
  * 5. Engine calls renderer->Release() on shutdown
  *
- * @logging
- * Writes diagnostic logs to:
- * - /tmp/farcry_render_constructor.log (entry point called)
- * - /tmp/farcry_render_created.log (result of creation)
- * - stdout (printf for debugging)
  *
  * @example
  * ```cpp
@@ -2149,8 +2142,32 @@ void CMetalRenderer::CreateBuffer(int size, int vertexformat, CVertexBuffer *buf
 }
 
 void CMetalRenderer::SetClipPlane(int id, float * params) {
-    // Metal doesn't support user clip planes directly
-    // Would need to implement in shader using clip distance
+    if (params) {
+        // Enable clipping with the specified plane
+        m_clipPlaneEnabled = true;
+        m_clipPlaneParams[0] = params[0];  // Normal.x
+        m_clipPlaneParams[1] = params[1];  // Normal.y
+        m_clipPlaneParams[2] = params[2];  // Normal.z
+        m_clipPlaneParams[3] = params[3];  // Distance
+        
+        // Update uniform buffer with clip plane data
+        if (m_uniformBufferCPU) {
+            m_uniformBufferCPU->clipPlane.x = params[0];
+            m_uniformBufferCPU->clipPlane.y = params[1];
+            m_uniformBufferCPU->clipPlane.z = params[2];
+            m_uniformBufferCPU->clipPlane.w = params[3];
+            m_uniformBufferCPU->clipEnabled = 1.0f;
+            m_uniformBufferCPU->clipRefract = m_clipPlaneRefract ? 1.0f : 0.0f;
+        }
+    } else {
+        // Disable clipping
+        m_clipPlaneEnabled = false;
+        
+        // Update uniform buffer to disable clipping
+        if (m_uniformBufferCPU) {
+            m_uniformBufferCPU->clipEnabled = 0.0f;
+        }
+    }
 }
 
 char* CMetalRenderer::GetStatusText(ERendStats type) {
@@ -2159,7 +2176,12 @@ char* CMetalRenderer::GetStatusText(ERendStats type) {
 }
 
 void CMetalRenderer::EF_SetClipPlane(bool bEnable, float *pPlane, bool bRefract) {
-    // Metal clip plane implementation would go through shaders
+    if (bEnable && pPlane) {
+        m_clipPlaneRefract = bRefract;
+        SetClipPlane(0, pPlane);  // Use clip plane ID 0
+    } else {
+        SetClipPlane(0, nullptr);  // Disable clipping
+    }
 }
 
 void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) {

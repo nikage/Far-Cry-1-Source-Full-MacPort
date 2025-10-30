@@ -23,6 +23,7 @@ struct VertexOut {
     float3 normal;
     float2 texCoord;
     float4 color;
+    float clipDistance; // Distance to clip plane for fragment clipping
 };
 
 // Uniform buffer for transformation matrices
@@ -34,6 +35,11 @@ struct Uniforms {
     float3 viewPos;
     float4 lightColor;
     float4 materialColor;
+    float4 clipPlane;      // Normal.xyz + Distance
+    float clipEnabled;     // 1.0f if enabled, 0.0f if disabled
+    float clipRefract;     // 1.0f if refract mode, 0.0f if not
+    float padding1;        // Maintain alignment
+    float padding2;        // Maintain alignment
 };
 
 // Basic vertex shader
@@ -50,6 +56,13 @@ vertex VertexOut basic_vertex(VertexIn in [[stage_in]],
     // Transform normal to world space
     out.normal = (uniforms.normalMatrix * float4(in.normal, 0.0)).xyz;
     
+    // Calculate clip distance if clipping is enabled
+    if (uniforms.clipEnabled > 0.0) {
+        out.clipDistance = dot(out.worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0; // Always pass when clipping disabled
+    }
+    
     // Pass through texture coordinates and color
     out.texCoord = in.texCoord;
     out.color = in.color;
@@ -62,6 +75,11 @@ fragment float4 basic_fragment(VertexOut in [[stage_in]],
                               constant Uniforms& uniforms [[buffer(0)]],
                               texture2d<float> baseTexture [[texture(0)]],
                               sampler textureSampler [[sampler(0)]]) {
+    
+    // Perform clip plane test if enabled
+    if (uniforms.clipEnabled > 0.0 && in.clipDistance < 0.0) {
+        discard_fragment();
+    }
     
     // Sample the base texture
     float4 textureColor = baseTexture.sample(textureSampler, in.texCoord);
@@ -115,6 +133,7 @@ struct VertexIn_P3F {
 struct VertexOut_Simple {
     float4 position [[position]];
     float4 color;
+    float clipDistance; // Distance to clip plane for fragment clipping
 };
 
 vertex VertexOut_Simple simple_vertex(VertexIn_P3F in [[stage_in]],
@@ -123,10 +142,25 @@ vertex VertexOut_Simple simple_vertex(VertexIn_P3F in [[stage_in]],
     VertexOut_Simple out;
     out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
     out.color = color;
+    
+    // Calculate clip distance if clipping is enabled
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0; // Always pass when clipping disabled
+    }
+    
     return out;
 }
 
-fragment float4 simple_fragment(VertexOut_Simple in [[stage_in]]) {
+fragment float4 simple_fragment(VertexOut_Simple in [[stage_in]],
+                                constant Uniforms& uniforms [[buffer(0)]]) {
+    // Perform clip plane test if enabled
+    if (uniforms.clipEnabled > 0.0 && in.clipDistance < 0.0) {
+        discard_fragment();
+    }
+    
     return in.color;
 }
 
@@ -141,6 +175,15 @@ vertex VertexOut_Simple color_vertex(VertexIn_P3F_COL4UB in [[stage_in]],
     VertexOut_Simple out;
     out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
     out.color = float4(in.color) / 255.0;
+    
+    // Calculate clip distance if clipping is enabled
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0; // Always pass when clipping disabled
+    }
+    
     return out;
 }
 
@@ -155,6 +198,7 @@ struct VertexOut_ColorTex {
     float4 position [[position]];
     float4 color;
     float2 texCoord;
+    float clipDistance; // Distance to clip plane for fragment clipping
 };
 
 vertex VertexOut_ColorTex colortex_vertex(VertexIn_P3F_COL4UB_TEX2F in [[stage_in]],
@@ -163,12 +207,27 @@ vertex VertexOut_ColorTex colortex_vertex(VertexIn_P3F_COL4UB_TEX2F in [[stage_i
     out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
     out.color = float4(in.color) / 255.0;
     out.texCoord = in.texCoord;
+    
+    // Calculate clip distance if clipping is enabled
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0; // Always pass when clipping disabled
+    }
+    
     return out;
 }
 
 fragment float4 colortex_fragment(VertexOut_ColorTex in [[stage_in]],
+                                  constant Uniforms& uniforms [[buffer(0)]],
                                   texture2d<float> baseTexture [[texture(0)]],
                                   sampler textureSampler [[sampler(0)]]) {
+    // Perform clip plane test if enabled
+    if (uniforms.clipEnabled > 0.0 && in.clipDistance < 0.0) {
+        discard_fragment();
+    }
+    
     float4 textureColor = baseTexture.sample(textureSampler, in.texCoord);
     return textureColor * in.color;
 }

@@ -469,6 +469,11 @@ public:
         float padding1;
         Vec3 lightColor;
         float padding2;
+        Vec4 clipPlane;      // Normal.xyz + Distance
+        float clipEnabled;   // 1.0f if enabled, 0.0f if disabled
+        float clipRefract;   // 1.0f if refract mode, 0.0f if not
+        float padding3;      // Maintain 16-byte alignment
+        float padding4;      // Maintain 16-byte alignment
     };
     id<MTLBuffer> m_uniformBuffer;
     UniformBufferData* m_uniformBufferCPU;
@@ -484,6 +489,11 @@ public:
     float m_lodBias;
     bool m_vSyncEnabled;
     int m_currentTMU;
+    
+    // Clip plane state
+    bool m_clipPlaneEnabled;
+    bool m_clipPlaneRefract;
+    float m_clipPlaneParams[4];  // Normal.xyz + Distance
     
     // Frame statistics
     int m_frameID;
