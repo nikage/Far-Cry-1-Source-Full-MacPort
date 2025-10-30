@@ -26,20 +26,23 @@ struct VertexOut {
     float clipDistance; // Distance to clip plane for fragment clipping
 };
 
-// Uniform buffer for transformation matrices
+// Uniform buffer for transformation matrices - MUST match UniformBufferData in MetalBaseRenderer.h exactly
 struct Uniforms {
     float4x4 modelViewProjectionMatrix;
     float4x4 modelMatrix;
-    float4x4 normalMatrix;
+    float4x4 viewMatrix;
+    float4x4 projectionMatrix;
+    float3 cameraPos;
+    float time;
     float3 lightPos;
-    float3 viewPos;
-    float4 lightColor;
-    float4 materialColor;
+    float padding1;
+    float3 lightColor;
+    float padding2;
     float4 clipPlane;      // Normal.xyz + Distance
     float clipEnabled;     // 1.0f if enabled, 0.0f if disabled
     float clipRefract;     // 1.0f if refract mode, 0.0f if not
-    float padding1;        // Maintain alignment
-    float padding2;        // Maintain alignment
+    float padding3;        // Maintain 16-byte alignment
+    float padding4;        // Maintain 16-byte alignment
 };
 
 // Basic vertex shader
@@ -53,8 +56,8 @@ vertex VertexOut basic_vertex(VertexIn in [[stage_in]],
     // Transform position to world space
     out.worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
     
-    // Transform normal to world space
-    out.normal = (uniforms.normalMatrix * float4(in.normal, 0.0)).xyz;
+    // Transform normal to world space (using modelMatrix since we don't have normalMatrix)
+    out.normal = (uniforms.modelMatrix * float4(in.normal, 0.0)).xyz;
     
     // Calculate clip distance if clipping is enabled
     if (uniforms.clipEnabled > 0.0) {
@@ -87,25 +90,25 @@ fragment float4 basic_fragment(VertexOut in [[stage_in]],
     // Simple Phong lighting calculation
     float3 normal = normalize(in.normal);
     float3 lightDir = normalize(uniforms.lightPos - in.worldPos);
-    float3 viewDir = normalize(uniforms.viewPos - in.worldPos);
+    float3 viewDir = normalize(uniforms.cameraPos - in.worldPos);
     float3 reflectDir = reflect(-lightDir, normal);
     
     // Ambient
     float ambientStrength = 0.1;
-    float3 ambient = ambientStrength * uniforms.lightColor.rgb;
+    float3 ambient = ambientStrength * uniforms.lightColor;
     
     // Diffuse
     float diff = max(dot(normal, lightDir), 0.0);
-    float3 diffuse = diff * uniforms.lightColor.rgb;
+    float3 diffuse = diff * uniforms.lightColor;
     
     // Specular
     float specularStrength = 0.5;
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
-    float3 specular = specularStrength * spec * uniforms.lightColor.rgb;
+    float3 specular = specularStrength * spec * uniforms.lightColor;
     
-    // Combine lighting with texture and material color
+    // Combine lighting with texture (no materialColor in our structure)
     float3 lighting = ambient + diffuse + specular;
-    float4 finalColor = float4(lighting, 1.0) * textureColor * uniforms.materialColor * in.color;
+    float4 finalColor = float4(lighting, 1.0) * textureColor * in.color;
     
     return finalColor;
 }
@@ -122,7 +125,12 @@ fragment float4 unlit_fragment(VertexOut in [[stage_in]],
 // Solid color fragment shader (for debug rendering)
 fragment float4 solid_color_fragment(VertexOut in [[stage_in]],
                                     constant Uniforms& uniforms [[buffer(0)]]) {
-    return uniforms.materialColor * in.color;
+    // Perform clip plane test if enabled
+    if (uniforms.clipEnabled > 0.0 && in.clipDistance < 0.0) {
+        discard_fragment();
+    }
+    
+    return in.color;
 }
 
 // Simple position-only vertex shader
@@ -254,7 +262,7 @@ vertex VertexOut_Terrain terrain_vertex(VertexIn_Terrain in [[stage_in]],
     VertexOut_Terrain out;
     out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
     out.worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
-    out.normal = (uniforms.normalMatrix * float4(in.normal, 0.0)).xyz;
+    out.normal = (uniforms.modelMatrix * float4(in.normal, 0.0)).xyz;
     out.texCoord = in.texCoord;
     out.color = in.color;
     out.height = in.position.y;

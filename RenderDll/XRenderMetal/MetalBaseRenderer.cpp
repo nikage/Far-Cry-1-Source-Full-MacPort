@@ -353,6 +353,26 @@ bool CMetalBaseRenderer::InitializeUniformBuffers()
     }
     
     m_uniformBufferCPU = (UniformBufferData*)[m_uniformBuffer contents];
+    
+    // Initialize uniform buffer with clean data
+    if (m_uniformBufferCPU) {
+        memset(m_uniformBufferCPU, 0, bufferSize);
+        
+        // Set identity matrices
+        m_uniformBufferCPU->modelViewProjectionMatrix.SetIdentity();
+        m_uniformBufferCPU->modelMatrix.SetIdentity();
+        m_uniformBufferCPU->viewMatrix.SetIdentity();
+        m_uniformBufferCPU->projectionMatrix.SetIdentity();
+        
+        // Initialize clip plane to disabled state
+        m_uniformBufferCPU->clipEnabled = 0.0f;
+        m_uniformBufferCPU->clipRefract = 0.0f;
+        m_uniformBufferCPU->clipPlane[0] = 0.0f;
+        m_uniformBufferCPU->clipPlane[1] = 0.0f;
+        m_uniformBufferCPU->clipPlane[2] = 0.0f;
+        m_uniformBufferCPU->clipPlane[3] = 0.0f;
+    }
+    
     return true;
 }
 
@@ -777,6 +797,32 @@ void CMetalBaseRenderer::UpdateUniformBuffer()
     
     m_uniformBufferCPU->lightPos = Vec3(0, 100, 0);
     m_uniformBufferCPU->lightColor = Vec3(1, 1, 1);
+    
+    // Initialize clip plane data
+    if (m_clipPlaneEnabled) {
+        m_uniformBufferCPU->clipPlane[0] = m_clipPlaneParams[0];
+        m_uniformBufferCPU->clipPlane[1] = m_clipPlaneParams[1];
+        m_uniformBufferCPU->clipPlane[2] = m_clipPlaneParams[2];
+        m_uniformBufferCPU->clipPlane[3] = m_clipPlaneParams[3];
+        m_uniformBufferCPU->clipEnabled = 1.0f;
+        m_uniformBufferCPU->clipRefract = m_clipPlaneRefract ? 1.0f : 0.0f;
+    } else {
+        m_uniformBufferCPU->clipPlane[0] = 0.0f;
+        m_uniformBufferCPU->clipPlane[1] = 0.0f;
+        m_uniformBufferCPU->clipPlane[2] = 0.0f;
+        m_uniformBufferCPU->clipPlane[3] = 0.0f;
+        m_uniformBufferCPU->clipEnabled = 0.0f;
+        m_uniformBufferCPU->clipRefract = 0.0f;
+    }
+    
+    // Debug logging (can be removed once stable)
+    static int frameCount = 0;
+    if ((frameCount++ % 60) == 0) { // Log every 60 frames to avoid spam
+        iLog->Log("UpdateUniformBuffer: clipEnabled=%.1f clipRefract=%.1f clipPlane=(%.3f,%.3f,%.3f,%.3f)\n",
+                  m_uniformBufferCPU->clipEnabled, m_uniformBufferCPU->clipRefract,
+                  m_uniformBufferCPU->clipPlane[0], m_uniformBufferCPU->clipPlane[1],
+                  m_uniformBufferCPU->clipPlane[2], m_uniformBufferCPU->clipPlane[3]);
+    }
 }
 
 void CMetalBaseRenderer::GetModelViewMatrix(float* mat)

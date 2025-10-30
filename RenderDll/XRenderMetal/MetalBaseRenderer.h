@@ -469,7 +469,7 @@ public:
         float padding1;
         Vec3 lightColor;
         float padding2;
-        Vec4 clipPlane;      // Normal.xyz + Distance
+        float clipPlane[4];  // Normal.xyz + Distance
         float clipEnabled;   // 1.0f if enabled, 0.0f if disabled
         float clipRefract;   // 1.0f if refract mode, 0.0f if not
         float padding3;      // Maintain 16-byte alignment

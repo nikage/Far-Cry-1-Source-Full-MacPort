@@ -2144,6 +2144,9 @@ void CMetalRenderer::CreateBuffer(int size, int vertexformat, CVertexBuffer *buf
 void CMetalRenderer::SetClipPlane(int id, float * params) {
     if (params) {
         // Enable clipping with the specified plane
+        iLog->Log("SetClipPlane: Enabling clip plane %d: Normal=(%.3f,%.3f,%.3f) Distance=%.3f\n", 
+                  id, params[0], params[1], params[2], params[3]);
+        
         m_clipPlaneEnabled = true;
         m_clipPlaneParams[0] = params[0];  // Normal.x
         m_clipPlaneParams[1] = params[1];  // Normal.y
@@ -2152,20 +2155,30 @@ void CMetalRenderer::SetClipPlane(int id, float * params) {
         
         // Update uniform buffer with clip plane data
         if (m_uniformBufferCPU) {
-            m_uniformBufferCPU->clipPlane.x = params[0];
-            m_uniformBufferCPU->clipPlane.y = params[1];
-            m_uniformBufferCPU->clipPlane.z = params[2];
-            m_uniformBufferCPU->clipPlane.w = params[3];
+            m_uniformBufferCPU->clipPlane[0] = params[0];
+            m_uniformBufferCPU->clipPlane[1] = params[1];
+            m_uniformBufferCPU->clipPlane[2] = params[2];
+            m_uniformBufferCPU->clipPlane[3] = params[3];
             m_uniformBufferCPU->clipEnabled = 1.0f;
             m_uniformBufferCPU->clipRefract = m_clipPlaneRefract ? 1.0f : 0.0f;
+            
+            iLog->Log("SetClipPlane: Updated uniform buffer - clipEnabled=%.1f clipRefract=%.1f\n", 
+                      m_uniformBufferCPU->clipEnabled, m_uniformBufferCPU->clipRefract);
+        } else {
+            iLog->Log("SetClipPlane: WARNING - No uniform buffer CPU pointer!\n");
         }
     } else {
         // Disable clipping
+        iLog->Log("SetClipPlane: Disabling clip plane %d\n", id);
+        
         m_clipPlaneEnabled = false;
         
         // Update uniform buffer to disable clipping
         if (m_uniformBufferCPU) {
             m_uniformBufferCPU->clipEnabled = 0.0f;
+            iLog->Log("SetClipPlane: Disabled clipping in uniform buffer\n");
+        } else {
+            iLog->Log("SetClipPlane: WARNING - No uniform buffer CPU pointer for disable!\n");
         }
     }
 }
