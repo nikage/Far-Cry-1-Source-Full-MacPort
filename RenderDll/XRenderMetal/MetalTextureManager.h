@@ -199,6 +199,9 @@ protected:
     MTLPixelFormat ConvertToMetalFormat(ETEX_Format format);
     ETEX_Format ConvertFromMetalFormat(MTLPixelFormat format);
     
+    // Fallback texture generation
+    bool CreateFallbackTexture(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format);
+    
     std::unordered_map<int, TextureInfo> m_textures;
     std::unordered_map<std::string, int> m_textureNameMap;
     int m_nextTextureId;

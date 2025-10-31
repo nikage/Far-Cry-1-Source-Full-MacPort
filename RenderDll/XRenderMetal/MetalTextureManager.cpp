@@ -21,6 +21,7 @@
 #include "ISystem.h"
 #include "MetalBaseRenderer.h"
 #include <Cocoa/Cocoa.h>
+#include <cmath>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -2509,6 +2510,108 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
     return LoadTextureData(filename, data, width, height, format);
 }
 
+bool CMetalTextureManager::CreateFallbackTexture(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
+{
+    assert(filename && "CreateFallbackTexture: filename cannot be null!");
+    assert(filename[0] != '\0' && "CreateFallbackTexture: filename cannot be empty!");
+    
+    if (!filename || !filename[0])
+        return false;
+    
+    std::string nameStr(filename);
+    
+    const int FALLBACK_SIZE = 64;
+    const int BYTES_PER_PIXEL = 4;
+    
+    // Create fallback textures for common missing textures
+    if (nameStr == "black.tga" || nameStr == "black")
+    {
+        width = FALLBACK_SIZE;
+        height = FALLBACK_SIZE;
+        format = eTF_8888;
+        data.resize(width * height * BYTES_PER_PIXEL);
+        assert(!data.empty() && "CreateFallbackTexture: Failed to allocate memory for black texture!");
+        assert(data.data() && "CreateFallbackTexture: data.data() returned null!");
+        memset(data.data(), 0, data.size());
+        iLog->Log("CreateFallbackTexture: Created black texture (64x64)\n");
+        return true;
+    }
+    else if (nameStr == "diskette.tga" || nameStr == "diskette")
+    {
+        width = FALLBACK_SIZE;
+        height = FALLBACK_SIZE;
+        format = eTF_8888;
+        data.resize(width * height * BYTES_PER_PIXEL);
+        assert(!data.empty() && "CreateFallbackTexture: Failed to allocate memory for diskette texture!");
+        unsigned char* pixels = data.data();
+        assert(pixels && "CreateFallbackTexture: data.data() returned null for diskette texture!");
+        assert(width > 0 && height > 0 && "CreateFallbackTexture: Invalid dimensions for diskette texture!");
+        assert((width * height * BYTES_PER_PIXEL) <= (int)data.size() && "CreateFallbackTexture: Data buffer too small!");
+        
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int idx = (y * width + x) * BYTES_PER_PIXEL;
+                assert(idx >= 0 && idx + BYTES_PER_PIXEL <= (int)data.size() && "CreateFallbackTexture: pixel index out of bounds!");
+                pixels[idx + 0] = 100;
+                pixels[idx + 1] = 100;
+                pixels[idx + 2] = 150;
+                pixels[idx + 3] = 255;
+            }
+        }
+        iLog->Log("CreateFallbackTexture: Created diskette icon texture (64x64)\n");
+        return true;
+    }
+    else if (nameStr == "spot_shadow.tga" || nameStr == "spot_shadow")
+    {
+        width = FALLBACK_SIZE;
+        height = FALLBACK_SIZE;
+        format = eTF_8888;
+        data.resize(width * height * BYTES_PER_PIXEL);
+        assert(!data.empty() && "CreateFallbackTexture: Failed to allocate memory for spot shadow texture!");
+        unsigned char* pixels = data.data();
+        assert(pixels && "CreateFallbackTexture: data.data() returned null for spot shadow texture!");
+        assert(width > 0 && height > 0 && "CreateFallbackTexture: Invalid dimensions for spot shadow texture!");
+        assert((width * height * BYTES_PER_PIXEL) <= (int)data.size() && "CreateFallbackTexture: Data buffer too small!");
+        
+        int centerX = width / 2;
+        int centerY = height / 2;
+        int radius = width / 2;
+        assert(radius > 0 && "CreateFallbackTexture: radius must be greater than zero!");
+        
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int idx = (y * width + x) * BYTES_PER_PIXEL;
+                assert(idx >= 0 && idx + BYTES_PER_PIXEL <= (int)data.size() && "CreateFallbackTexture: pixel index out of bounds!");
+                
+                int dx = x - centerX;
+                int dy = y - centerY;
+                int distSq = dx * dx + dy * dy;
+                assert(distSq >= 0 && "CreateFallbackTexture: distance squared cannot be negative!");
+                
+                float dist = sqrtf((float)distSq);
+                assert(dist >= 0.0f && "CreateFallbackTexture: distance cannot be negative!");
+                
+                float alpha = 1.0f - (dist / radius);
+                if (alpha < 0.0f) alpha = 0.0f;
+                if (alpha > 1.0f) alpha = 1.0f;
+                unsigned char a = (unsigned char)(alpha * 255.0f);
+                pixels[idx + 0] = 0;
+                pixels[idx + 1] = 0;
+                pixels[idx + 2] = 0;
+                pixels[idx + 3] = a;
+            }
+        }
+        iLog->Log("CreateFallbackTexture: Created spot shadow texture (64x64)\n");
+        return true;
+    }
+    
+    return false;
+}
+
 bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
 {
     if (!filename || !filename[0])
@@ -2527,6 +2630,10 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
         
         if (!fileURL || ![[NSFileManager defaultManager] fileExistsAtPath:filePathStr])
         {
+            if (CreateFallbackTexture(filename, data, width, height, format))
+            {
+                return true;
+            }
             return false;
         }
         
