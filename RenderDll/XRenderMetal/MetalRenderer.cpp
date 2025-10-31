@@ -173,6 +173,10 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
     return nullptr;
   }
   
+  // Display splash screen (equivalent to D3D9 DisplaySplash timing)
+  iLog->Log("CMetalRenderer::Init - Displaying splash screen\n");
+  DisplaySplash();
+  
   // Now that Metal device is created, initialize managers
   iLog->Log("CMetalRenderer::Init - Initializing managers (device=%p)\n", m_device);
   if (!InitializeManagers()) {
@@ -1497,6 +1501,129 @@ void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
                                       float width, float height) {
   // TODO: Render to viewport
   iLog->Log("Rendering to viewport: (%.2f,%.2f) %fx%f\n", x, y, width, height);
+}
+
+void CMetalRenderer::DisplaySplash() {
+#if defined(__APPLE__) && defined(__MACH__)
+    @autoreleasepool {
+        iLog->Log("DisplaySplash: Starting splash screen display\\n");
+        
+        // Look for fcsplash.bmp in the app bundle or current directory
+        NSString *splashPath = nil;
+        
+        // First try app bundle Resources directory
+        NSBundle *bundle = [NSBundle mainBundle];
+        if (bundle) {
+            splashPath = [bundle pathForResource:@"fcsplash" ofType:@"bmp"];
+            if (splashPath) {
+                iLog->Log("DisplaySplash: Found splash in bundle: %s\\n", [splashPath UTF8String]);
+            }
+        }
+        
+        // Try Resources directory relative to executable
+        if (!splashPath && m_window) {
+            NSString *exePath = [[NSBundle mainBundle] bundlePath];
+            if (exePath) {
+                NSString *resourcesPath = [exePath stringByAppendingPathComponent:@"Contents/Resources/fcsplash.bmp"];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:resourcesPath]) {
+                    splashPath = resourcesPath;
+                    iLog->Log("DisplaySplash: Found splash in Resources: %s\\n", [splashPath UTF8String]);
+                }
+            }
+        }
+        
+        // If not in bundle, try current working directory
+        if (!splashPath) {
+            NSString *cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+            splashPath = [cwd stringByAppendingPathComponent:@"fcsplash.bmp"];
+            
+            if (![[NSFileManager defaultManager] fileExistsAtPath:splashPath]) {
+                // Try parent directory (source root)
+                splashPath = [[cwd stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"fcsplash.bmp"];
+            }
+            
+            if (![[NSFileManager defaultManager] fileExistsAtPath:splashPath]) {
+                iLog->Log("DisplaySplash: fcsplash.bmp not found (checked bundle, Resources, cwd, parent)\\n");
+                return;
+            }
+            iLog->Log("DisplaySplash: Found splash in filesystem: %s\\n", [splashPath UTF8String]);
+        }
+        
+        // Load the image
+        NSImage *splashImage = [[NSImage alloc] initWithContentsOfFile:splashPath];
+        if (!splashImage) {
+            iLog->Log("DisplaySplash: Failed to load image from %s\\n", [splashPath UTF8String]);
+            return;
+        }
+        
+        // Get window frame if available, otherwise use screen size
+        NSRect windowFrame = NSZeroRect;
+        if (m_window) {
+            windowFrame = [m_window frame];
+        } else {
+            NSScreen *mainScreen = [NSScreen mainScreen];
+            if (mainScreen) {
+                windowFrame = [mainScreen frame];
+            }
+        }
+        
+        // Get image size and center it
+        NSSize imageSize = [splashImage size];
+        if (imageSize.width == 0 || imageSize.height == 0) {
+            NSImageRep *rep = [[splashImage representations] firstObject];
+            if (rep) {
+                imageSize = NSMakeSize([rep pixelsWide], [rep pixelsHigh]);
+            }
+        }
+        
+        // Center splash on screen
+        NSRect splashFrame = NSMakeRect(
+            windowFrame.origin.x + (windowFrame.size.width - imageSize.width) / 2,
+            windowFrame.origin.y + (windowFrame.size.height - imageSize.height) / 2,
+            imageSize.width,
+            imageSize.height
+        );
+        
+        // Create temporary overlay window for splash
+        NSWindow *splashWindow = [[NSWindow alloc] initWithContentRect:splashFrame
+                                                              styleMask:NSWindowStyleMaskBorderless
+                                                                backing:NSBackingStoreBuffered
+                                                                  defer:NO];
+        [splashWindow setOpaque:NO];
+        [splashWindow setBackgroundColor:[NSColor clearColor]];
+        [splashWindow setLevel:NSFloatingWindowLevel];
+        [splashWindow setIgnoresMouseEvents:YES];
+        
+        // Create image view
+        NSImageView *splashView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, imageSize.width, imageSize.height)];
+        [splashView setImage:splashImage];
+        [splashView setImageScaling:NSImageScaleNone];
+        [splashView setImageAlignment:NSImageAlignCenter];
+        
+        [[splashWindow contentView] addSubview:splashView];
+        [splashView release]; // Release the view since window owns it now
+        
+        [splashWindow makeKeyAndOrderFront:nil];
+        [splashWindow display];
+        
+        iLog->Log("DisplaySplash: Splash window displayed (%fx%f at %f,%f)\\n", 
+                  imageSize.width, imageSize.height, splashFrame.origin.x, splashFrame.origin.y);
+        
+        // Retain window for the delayed cleanup block
+        [splashWindow retain];
+        [splashImage release]; // Release image since view owns it
+        
+        // Show splash for 2 seconds, then remove
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), 
+                      dispatch_get_main_queue(), ^{
+            @autoreleasepool {
+                [splashWindow close];
+                [splashWindow release];
+                iLog->Log("DisplaySplash: Splash window closed\\n");
+            }
+        });
+    }
+#endif
 }
 
 // Missing IRenderer method implementations

@@ -114,6 +114,104 @@ if(APPLE)
     endif()
 endif()
 
+# Asset Management
+# Define game assets that need to be deployed
+set(GAME_ASSETS
+    ${CMAKE_SOURCE_DIR}/fcsplash.bmp
+)
+
+# Define level assets if they exist
+file(GLOB LEVEL_ASSETS ${CMAKE_SOURCE_DIR}/Levels/*)
+
+# Asset deployment function
+function(deploy_game_assets target_name)
+    if(APPLE)
+        # Install splash screen and other assets to Resources
+        foreach(ASSET ${GAME_ASSETS})
+            if(EXISTS ${ASSET})
+                get_filename_component(ASSET_NAME ${ASSET} NAME)
+                install(FILES ${ASSET} 
+                    DESTINATION "${CMAKE_INSTALL_PREFIX}/${target_name}.app/Contents/Resources"
+                    COMPONENT Runtime
+                )
+            else()
+                message(WARNING "Asset file not found: ${ASSET}")
+            endif()
+        endforeach()
+        
+        # Install levels directory if it exists
+        if(LEVEL_ASSETS)
+            install(DIRECTORY ${CMAKE_SOURCE_DIR}/Levels
+                DESTINATION "${CMAKE_INSTALL_PREFIX}/${target_name}.app/Contents/Resources"
+                COMPONENT Runtime
+            )
+        endif()
+        
+        # Also use POST_BUILD for development builds (when not installing)
+        # Ensure Resources directory exists first
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_CONTENT_DIR:${target_name}>/Resources"
+            COMMENT "Creating Resources directory for ${target_name}"
+            VERBATIM
+        )
+        
+        # Copy splash screen and other assets
+        foreach(ASSET ${GAME_ASSETS})
+            if(EXISTS ${ASSET})
+                get_filename_component(ASSET_NAME ${ASSET} NAME)
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${ASSET}"
+                        "$<TARGET_BUNDLE_CONTENT_DIR:${target_name}>/Resources/${ASSET_NAME}"
+                    COMMENT "Copying asset: ${ASSET_NAME} to Resources"
+                    VERBATIM
+                    DEPENDS ${ASSET}
+                )
+            endif()
+        endforeach()
+        
+        # Copy levels directory if it exists
+        if(LEVEL_ASSETS)
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                    "${CMAKE_SOURCE_DIR}/Levels"
+                    "$<TARGET_BUNDLE_CONTENT_DIR:${target_name}>/Resources/Levels"
+                COMMENT "Copying Levels directory"
+                VERBATIM
+            )
+        else()
+            # Create Levels directory even if empty (for testing)
+            add_custom_command(TARGET ${target_name} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_BUNDLE_CONTENT_DIR:${target_name}>/Resources/Levels"
+                COMMENT "Creating Levels directory in Resources"
+                VERBATIM
+            )
+        endif()
+    else()
+        # For other platforms, install assets next to executable
+        foreach(ASSET ${GAME_ASSETS})
+            if(EXISTS ${ASSET})
+                get_filename_component(ASSET_NAME ${ASSET} NAME)
+                install(FILES ${ASSET} 
+                    DESTINATION bin
+                    COMPONENT Runtime
+                )
+                add_custom_command(TARGET ${target_name} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${ASSET}"
+                        "$<TARGET_FILE_DIR:${target_name}>/${ASSET_NAME}"
+                    COMMENT "Copying asset: ${ASSET_NAME}"
+                    VERBATIM
+                )
+            endif()
+        endforeach()
+    endif()
+endfunction()
+
+# Deploy assets for this target
+deploy_game_assets(FarCry)
+
 # Set output directory
 set_target_properties(FarCry PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin

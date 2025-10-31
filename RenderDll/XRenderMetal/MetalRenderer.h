@@ -317,6 +317,9 @@ public:
     void GetViewport(int *x, int *y, int *width, int *height) override;
     int GetFeatures() override;
     void MakeCurrent() override;
+    
+    // Platform-specific methods
+    void DisplaySplash(); // Display Far Cry splash screen on startup
     bool CreateContext(WIN_HWND hWnd, bool bAllowFSAA=false) override;
     bool DeleteContext(WIN_HWND hWnd) override;
     

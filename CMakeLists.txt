@@ -179,4 +179,21 @@ if(APPLE)
             CryMovie CryPhysics CryAISystem CryFont CryScriptSystem
             CrySoundSystem CryGame XRenderMetal
     )
+    
+    # Copy game assets to Resources directory
+    if(EXISTS ${CMAKE_SOURCE_DIR}/fcsplash.bmp)
+        add_custom_command(TARGET FarCryWorking POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/fcsplash.bmp
+                ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/fcsplash.bmp
+            COMMENT "Copying splash screen asset to Resources"
+        )
+    endif()
+    
+    # Create Levels directory in Resources
+    add_custom_command(TARGET FarCryWorking POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/Levels
+        COMMENT "Creating Levels directory in Resources"
+    )
 endif()
