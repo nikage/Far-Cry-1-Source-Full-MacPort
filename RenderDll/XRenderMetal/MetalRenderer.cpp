@@ -137,7 +137,7 @@ extern "C" void CryModuleFree(void* ptr)
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
-      m_currentDrawable(nil) {
+      m_currentDrawable(nil), m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0) {
   // Managers will be initialized in Init() after Metal device is created
 }
 
@@ -175,7 +175,8 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
   
   // Display splash screen (equivalent to D3D9 DisplaySplash timing)
   iLog->Log("CMetalRenderer::Init - Displaying splash screen\n");
-  DisplaySplash();
+  // Temporarily disabled to debug AddressSanitizer crash
+  // DisplaySplash();
   
   // Now that Metal device is created, initialize managers
   iLog->Log("CMetalRenderer::Init - Initializing managers (device=%p)\n", m_device);
@@ -799,6 +800,8 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     [m_window makeKeyAndOrderFront:nil];
     [m_window makeFirstResponder:contentView];
     
+    [m_window retain];
+    
     iLog->Log("CreateGameWindow: Window created successfully\n");
     iLog->Log("  Window: %p\n", m_window);
     iLog->Log("  Metal Layer: %p\n", m_windowMetalLayer);
@@ -815,6 +818,14 @@ void CMetalRenderer::DestroyGameWindow() {
       m_currentDrawable = nil;
     }
     
+    if (m_window && m_windowMetalLayer) {
+      NSView* contentView = [m_window contentView];
+      if (contentView && [contentView layer] == m_windowMetalLayer) {
+        [contentView setLayer:nil];
+        [contentView setWantsLayer:NO];
+      }
+    }
+    
     if (m_windowMetalLayer) {
       [m_windowMetalLayer release];
       m_windowMetalLayer = nil;
@@ -822,6 +833,7 @@ void CMetalRenderer::DestroyGameWindow() {
     
     if (m_window) {
       [m_window close];
+      [m_window release];
       [m_window release];
       m_window = nil;
     }
@@ -1216,6 +1228,60 @@ void CMetalRenderer::SetCullMode(int mode) {
   [m_renderEncoder setCullMode:metalCullMode];
 }
 
+void CMetalRenderer::Set2DMode(bool enable, int ortox, int ortoy) {
+    assert(ortox > 0 && ortoy > 0 && "Set2DMode: invalid orthographic dimensions!");
+    
+    if (enable) {
+        // Entering 2D mode: save current matrices and set up orthographic projection
+        assert(!m_2DMode && "Set2DMode: Already in 2D mode! Mismatched enable/disable calls!");
+        
+        // Save current projection and view matrices
+        m_2DProjectionStack.push_back(m_projectionMatrix);
+        m_2DViewStack.push_back(m_viewMatrix);
+        
+        // Set up orthographic projection matrix (left-handed, like D3D)
+        // Orthographic projection: (0,0) top-left to (ortox, ortoy) bottom-right
+        m_projectionMatrix.SetIdentity();
+        m_projectionMatrix(0,0) = 2.0f / (float)ortox;  // Scale X
+        m_projectionMatrix(1,1) = -2.0f / (float)ortoy; // Scale Y (negative for Y-down)
+        m_projectionMatrix(2,2) = 1.0f;                 // Scale Z
+        m_projectionMatrix(3,0) = -1.0f;                // Translate X
+        m_projectionMatrix(3,1) = 1.0f;                 // Translate Y
+        m_projectionMatrix(3,2) = 0.0f;                // Translate Z
+        m_projectionMatrix(3,3) = 1.0f;                // W
+        
+        // Set identity view matrix for 2D rendering
+        m_viewMatrix.SetIdentity();
+        
+        m_2DMode = true;
+        m_2DOriginX = ortox;
+        m_2DOriginY = ortoy;
+        m_matrixDirty = true;
+        
+        iLog->Log("Set2DMode: Enabled 2D mode (%dx%d)\n", ortox, ortoy);
+    } else {
+        // Exiting 2D mode: restore saved matrices
+        assert(m_2DMode && "Set2DMode: Not in 2D mode! Mismatched enable/disable calls!");
+        assert(!m_2DProjectionStack.empty() && "Set2DMode: Projection stack empty!");
+        assert(!m_2DViewStack.empty() && "Set2DMode: View stack empty!");
+        
+        // Restore saved matrices
+        m_projectionMatrix = m_2DProjectionStack.back();
+        m_2DProjectionStack.pop_back();
+        
+        m_viewMatrix = m_2DViewStack.back();
+        m_2DViewStack.pop_back();
+        
+        m_2DMode = false;
+        m_matrixDirty = true;
+        
+        iLog->Log("Set2DMode: Disabled 2D mode\n");
+    }
+    
+    // Update uniform buffer with new matrices
+    UpdateUniformBuffer();
+}
+
 bool CMetalRenderer::EnableFog(bool enable) {
   // TODO: Enable/disable fog in Metal
   iLog->Log("Fog %s\n", enable ? "enabled" : "disabled");
@@ -1585,23 +1651,22 @@ void CMetalRenderer::DisplaySplash() {
         );
         
         // Create temporary overlay window for splash
-        NSWindow *splashWindow = [[NSWindow alloc] initWithContentRect:splashFrame
+        NSWindow *splashWindow = [[[NSWindow alloc] initWithContentRect:splashFrame
                                                               styleMask:NSWindowStyleMaskBorderless
                                                                 backing:NSBackingStoreBuffered
-                                                                  defer:NO];
+                                                                  defer:NO] autorelease];
         [splashWindow setOpaque:NO];
         [splashWindow setBackgroundColor:[NSColor clearColor]];
         [splashWindow setLevel:NSFloatingWindowLevel];
         [splashWindow setIgnoresMouseEvents:YES];
         
         // Create image view
-        NSImageView *splashView = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, imageSize.width, imageSize.height)];
+        NSImageView *splashView = [[[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, imageSize.width, imageSize.height)] autorelease];
         [splashView setImage:splashImage];
         [splashView setImageScaling:NSImageScaleNone];
         [splashView setImageAlignment:NSImageAlignCenter];
         
         [[splashWindow contentView] addSubview:splashView];
-        [splashView release]; // Release the view since window owns it now
         
         [splashWindow makeKeyAndOrderFront:nil];
         [splashWindow display];
@@ -1609,16 +1674,15 @@ void CMetalRenderer::DisplaySplash() {
         iLog->Log("DisplaySplash: Splash window displayed (%fx%f at %f,%f)\\n", 
                   imageSize.width, imageSize.height, splashFrame.origin.x, splashFrame.origin.y);
         
-        // Retain window for the delayed cleanup block
-        [splashWindow retain];
-        [splashImage release]; // Release image since view owns it
+        [splashImage autorelease];
         
-        // Show splash for 2 seconds, then remove
+        NSWindow *splashWindowRetained = [splashWindow retain];
+        
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), 
                       dispatch_get_main_queue(), ^{
             @autoreleasepool {
-                [splashWindow close];
-                [splashWindow release];
+                [splashWindowRetained close];
+                [splashWindowRetained release];
                 iLog->Log("DisplaySplash: Splash window closed\\n");
             }
         });
@@ -1640,12 +1704,9 @@ void CMetalRenderer::BeginFrame() {
   // Get next drawable from window layer
   if (m_windowMetalLayer) {
     iLog->Log("BeginFrame: Have layer, getting drawable\n");
-
     
-    if (m_currentDrawable) {
-      [m_currentDrawable release];
-      m_currentDrawable = nil;
-    }
+    // Note: Previous drawable is released in command buffer completion handler
+    // Don't release it here as it may still be in use by a previous frame
     
     // Check if layer is valid and has a non-zero size
     CGSize layerSize = m_windowMetalLayer.drawableSize;
@@ -1701,6 +1762,8 @@ void CMetalRenderer::BeginFrame() {
         return;
       }
       
+      [m_renderPassDescriptor retain];
+      
       // Use default clear color (will be set by game logic)
       // m_renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
       
@@ -1752,6 +1815,10 @@ void CMetalRenderer::EndFrame() {
     iLog->Log("EndFrame: Presenting drawable\n");
 
     [m_currentCommandBuffer presentDrawable:m_currentDrawable];
+    
+    // Release our retain - command buffer will retain it until completion
+    [m_currentDrawable release];
+    m_currentDrawable = nil;
   }
   
   // Commit command buffer
@@ -1764,11 +1831,10 @@ void CMetalRenderer::EndFrame() {
   }
   
   // Clean up
-  if (m_currentDrawable) {
-    [m_currentDrawable release];
-    m_currentDrawable = nil;
+  if (m_renderPassDescriptor) {
+    [m_renderPassDescriptor release];
+    m_renderPassDescriptor = nil;
   }
-  m_renderPassDescriptor = nil;
   
   // Update frame index
   m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;

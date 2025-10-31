@@ -41,8 +41,8 @@ endif()
 
 # Compiler flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Enable AddressSanitizer for debugging
-    if(APPLE)
+    # Enable AddressSanitizer for debug builds only
+    if(APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
         add_link_options(-fsanitize=address)
     endif()

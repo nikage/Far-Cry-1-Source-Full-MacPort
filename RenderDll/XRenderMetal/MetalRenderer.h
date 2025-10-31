@@ -259,6 +259,7 @@ public:
     void CheckError(const char *comment) override;
     void Draw3dBBox(const Vec3 &mins, const Vec3 &maxs, int nPrimType) override;
     void SetState(int State) override;
+    void Set2DMode(bool enable, int ortox, int ortoy) override;
     void SetCullMode(int mode=R_CULL_BACK) override;
     bool EnableFog(bool enable) override;
     void SetFog(float density, float fogstart, float fogend, const float *color, int fogmode) override;
@@ -373,6 +374,13 @@ public:
     NSWindow* m_window;
     CAMetalLayer* m_windowMetalLayer;
     id<CAMetalDrawable> m_currentDrawable;
+    
+    // 2D mode state
+    bool m_2DMode;
+    int m_2DOriginX;
+    int m_2DOriginY;
+    std::vector<Matrix44> m_2DProjectionStack;
+    std::vector<Matrix44> m_2DViewStack;
     
     // NOTE: Camera stored in CMetalBaseRenderer::m_camera (no duplication)
     
