@@ -155,175 +155,175 @@ public:
     
     // Basic utility methods
     virtual char GetType() { return R_METAL_RENDERER; }
-    virtual char* GetVertexProfile(bool bSupportedProfile) { return nullptr; }
-    virtual char* GetPixelProfile(bool bSupportedProfile) { return nullptr; }
-    virtual void SetType(char type) {}
+    virtual char* GetVertexProfile(bool bSupportedProfile) { assert(false && "GetVertexProfile not implemented"); return nullptr; }
+    virtual char* GetPixelProfile(bool bSupportedProfile) { assert(false && "GetPixelProfile not implemented"); return nullptr; }
+    virtual void SetType(char type) { assert(false && "SetType not implemented"); }
     virtual float ScaleCoordX(float value) { return value; }
     virtual float ScaleCoordY(float value) { return value; }
-    virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) {}
-    virtual void EnableSwapBuffers(bool bEnable) {}
-    virtual WIN_HWND GetHWND() { return nullptr; }
-    virtual void OnEntityDeleted(IEntityRender* pEntityRender) {}
-    virtual void SetGlobalShaderTemplateId(int nTemplateId) {}
-    virtual int GetGlobalShaderTemplateId() { return 0; }
-    virtual int EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset) { return 0; }
-    virtual int CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) { return 0; }
-    virtual bool DestroyRenderTarget(int nHandle) { return false; }
-    virtual bool SetRenderTarget(int nHandle) { return false; }
-    virtual float EF_GetWaterZElevation(float fX, float fY) { return 0.0f; }
+    virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) { assert(false && "SetColorOp not implemented"); }
+    virtual void EnableSwapBuffers(bool bEnable) { assert(false && "EnableSwapBuffers not implemented"); }
+    virtual WIN_HWND GetHWND() { assert(false && "GetHWND not implemented"); return nullptr; }
+    virtual void OnEntityDeleted(IEntityRender* pEntityRender) { assert(false && "OnEntityDeleted not implemented"); }
+    virtual void SetGlobalShaderTemplateId(int nTemplateId) { assert(false && "SetGlobalShaderTemplateId not implemented"); }
+    virtual int GetGlobalShaderTemplateId() { assert(false && "GetGlobalShaderTemplateId not implemented"); return 0; }
+    virtual int EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset) { assert(false && "EnumAAFormats not implemented"); return 0; }
+    virtual int CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) { assert(false && "CreateRenderTarget not implemented"); return 0; }
+    virtual bool DestroyRenderTarget(int nHandle) { assert(false && "DestroyRenderTarget not implemented"); return false; }
+    virtual bool SetRenderTarget(int nHandle) { assert(false && "SetRenderTarget not implemented"); return false; }
+    virtual float EF_GetWaterZElevation(float fX, float fY) { assert(false && "EF_GetWaterZElevation not implemented"); return 0.0f; }
     
     // Statistics
-    virtual int GetPolyCount() { return 0; }
-    virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { nPolygons = 0; nShadowVolPolys = 0; }
-    virtual void SetClearColor(const Vec3& vColor) {}
-    virtual int GetFrameID(bool bIncludeRecursiveCalls = true) { return 0; }
-    virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) {}
+    virtual int GetPolyCount() { assert(false && "GetPolyCount not implemented"); return 0; }
+    virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { assert(false && "GetPolyCount not implemented"); nPolygons = 0; nShadowVolPolys = 0; }
+    virtual void SetClearColor(const Vec3& vColor) { assert(false && "SetClearColor not implemented"); }
+    virtual int GetFrameID(bool bIncludeRecursiveCalls = true) { assert(false && "GetFrameID not implemented"); return 0; }
+    virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) { assert(false && "MakeMatrix not implemented"); }
     
     // Stub implementations for complex methods (to be implemented by specialized classes)
-    virtual void SetTexture(int tnum, ETexType Type = eTT_Base) {}
-    virtual void SetWhiteTexture() {}
+    virtual void SetTexture(int tnum, ETexType Type = eTT_Base) { assert(false && "SetTexture not implemented"); }
+    virtual void SetWhiteTexture() { assert(false && "SetWhiteTexture not implemented"); }
     virtual unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 
                                              ETEX_Format eTFSrc, ETEX_Format eTFDst, 
                                              int nummipmap, bool repeat = true, 
                                              int filter = FILTER_BILINEAR, int Id = 0, 
-                                             char* szCacheName = NULL, int flags = 0) { return 0; }
+                                             char* szCacheName = NULL, int flags = 0) { assert(false && "DownLoadToVideoMemory not implemented"); return 0; }
     virtual void UpdateTextureInVideoMemory(uint tnum, unsigned char* newdata, int posx, int posy, 
-                                           int w, int h, ETEX_Format eTF = eTF_0888) {}
+                                           int w, int h, ETEX_Format eTF = eTF_0888) { assert(false && "UpdateTextureInVideoMemory not implemented"); }
     virtual unsigned int LoadTexture(const char* filename, int* tex_type = NULL, 
                                     unsigned int def_tid = 0, bool compresstodisk = true, 
-                                    bool bWarn = true) { return 0; }
+                                    bool bWarn = true) { assert(false && "LoadTexture not implemented"); return 0; }
     virtual bool DXTCompress(byte* raw_data, int nWidth, int nHeight, ETEX_Format eTF, 
                             bool bUseHW, bool bGenMips, int nSrcBytesPerPix, 
-                            MIPDXTcallback callback = 0) { return false; }
+                            MIPDXTcallback callback = 0) { assert(false && "DXTCompress not implemented"); return false; }
     virtual bool DXTDecompress(byte* srcData, byte* dstData, int nWidth, int nHeight, 
-                              ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix) { return false; }
-    virtual void RemoveTexture(unsigned int TextureId) {}
-    virtual void RemoveTexture(ITexPic* pTexPic) {}
-    virtual bool SetGammaDelta(const float fGamma) { return false; }
+                              ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix) { assert(false && "DXTDecompress not implemented"); return false; }
+    virtual void RemoveTexture(unsigned int TextureId) { assert(false && "RemoveTexture not implemented"); }
+    virtual void RemoveTexture(ITexPic* pTexPic) { assert(false && "RemoveTexture not implemented"); }
+    virtual bool SetGammaDelta(const float fGamma) { assert(false && "SetGammaDelta not implemented"); return false; }
     
     // Text and UI Rendering stubs
     virtual void WriteXY(CXFont* currfont, int x, int y, float xscale, float yscale, 
-                        float r, float g, float b, float a, const char* message, ...) {}
-    virtual void Draw2dText(float posX, float posY, const char* szText, SDrawTextInfo& info) {}
+                        float r, float g, float b, float a, const char* message, ...) { assert(false && "WriteXY not implemented"); }
+    virtual void Draw2dText(float posX, float posY, const char* szText, SDrawTextInfo& info) { assert(false && "Draw2dText not implemented"); }
     virtual void Draw2dImage(float xpos, float ypos, float w, float h, int texture_id, 
                             float s0 = 0, float t0 = 0, float s1 = 1, float t1 = 1, 
                             float angle = 0, float r = 1, float g = 1, float b = 1, 
-                            float a = 1, float z = 1) {}
+                            float a = 1, float z = 1) { assert(false && "Draw2dImage not implemented"); }
     virtual void DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
-                          float s0, float t0, float s1, float t1, float r, float g, float b, float a) {}
-    virtual int SetPolygonMode(int mode) { return 0; }
+                          float s0, float t0, float s1, float t1, float r, float g, float b, float a) { assert(false && "DrawImage not implemented"); }
+    virtual int SetPolygonMode(int mode) { assert(false && "SetPolygonMode not implemented"); return 0; }
     
     // All EF_ (shader system) methods as stubs
-    virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual void EF_EnableHeatVision(bool bEnable) {}
-    virtual bool EF_GetHeatVision() { return false; }
-    virtual void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits) {}
-    virtual void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert* verts, CCObject* obj = NULL, int nFogID = 0) {}
-    virtual CCObject* EF_AddSpriteToScene(int Ef, int numPts, SColorVert* verts, CCObject* obj, byte* inds = NULL, int ninds = 0, int nFogID = 0) { return nullptr; }
-    virtual void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D* verts) {}
-    virtual void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D* verts) {}
-    virtual IShader* EF_LoadShader(const char* name, EShClass Class, int flags = 0, uint64 nMaskGen = 0) { return nullptr; }
-    virtual SShaderItem EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags = 0, SInputShaderResources* Res = NULL, uint64 nMaskGen = 0) { return SShaderItem(); }
-    virtual bool EF_ReloadFile(const char* szFileName) { return false; }
-    virtual void EF_ReloadShaderFiles(int nCategory) {}
-    virtual void EF_ReloadTextures() {}
-    virtual IShader* EF_CopyShader(IShader* ef) { return nullptr; }
-    virtual ITexPic* EF_GetTextureByID(int Id) { return nullptr; }
-    virtual ITexPic* EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1 = -1.0f, float fAmount2 = -1.0f, int Id = -1, int BindId = 0) { return nullptr; }
-    virtual int EF_LoadLightmap(const char* name) { return 0; }
-    virtual bool EF_ScanEnvironmentCM(const char* name, int size, Vec3& Pos) { return false; }
-    virtual int EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, STexAnim* ta, char* name) { return 0; }
-    virtual char** EF_GetShadersForFile(const char* File, int num) { return nullptr; }
-    virtual SLightMaterial* EF_GetLightMaterial(char* Str) { return nullptr; }
-    virtual bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace) { return false; }
-    virtual void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id = -1) {}
-    virtual bool EF_HideTemplate(const char* name) { return false; }
-    virtual bool EF_UnhideTemplate(const char* name) { return false; }
-    virtual bool EF_UnhideAllTemplates() { return false; }
-    virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale = 1.0f, bool bAdditive = true) { return false; }
+    virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags) { assert(false && "EF_PrecacheResource not implemented"); return false; }
+    virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags) { assert(false && "EF_PrecacheResource not implemented"); return false; }
+    virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags) { assert(false && "EF_PrecacheResource not implemented"); return false; }
+    virtual bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags) { assert(false && "EF_PrecacheResource not implemented"); return false; }
+    virtual void EF_EnableHeatVision(bool bEnable) { assert(false && "EF_EnableHeatVision not implemented"); }
+    virtual bool EF_GetHeatVision() { assert(false && "EF_GetHeatVision not implemented"); return false; }
+    virtual void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits) { assert(false && "EF_PolygonOffset not implemented"); }
+    virtual void EF_AddPolyToScene3D(int Ef, int numPts, SColorVert* verts, CCObject* obj = NULL, int nFogID = 0) { assert(false && "EF_AddPolyToScene3D not implemented"); }
+    virtual CCObject* EF_AddSpriteToScene(int Ef, int numPts, SColorVert* verts, CCObject* obj, byte* inds = NULL, int ninds = 0, int nFogID = 0) { assert(false && "EF_AddSpriteToScene not implemented"); return nullptr; }
+    virtual void EF_AddPolyToScene2D(int Ef, int numPts, SColorVert2D* verts) { assert(false && "EF_AddPolyToScene2D not implemented"); }
+    virtual void EF_AddPolyToScene2D(SShaderItem si, int nTempl, int numPts, SColorVert2D* verts) { assert(false && "EF_AddPolyToScene2D not implemented"); }
+    virtual IShader* EF_LoadShader(const char* name, EShClass Class, int flags = 0, uint64 nMaskGen = 0) { assert(false && "EF_LoadShader not implemented"); return nullptr; }
+    virtual SShaderItem EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags = 0, SInputShaderResources* Res = NULL, uint64 nMaskGen = 0) { assert(false && "EF_LoadShaderItem not implemented"); return SShaderItem(); }
+    virtual bool EF_ReloadFile(const char* szFileName) { assert(false && "EF_ReloadFile not implemented"); return false; }
+    virtual void EF_ReloadShaderFiles(int nCategory) { assert(false && "EF_ReloadShaderFiles not implemented"); }
+    virtual void EF_ReloadTextures() { assert(false && "EF_ReloadTextures not implemented"); }
+    virtual IShader* EF_CopyShader(IShader* ef) { assert(false && "EF_CopyShader not implemented"); return nullptr; }
+    virtual ITexPic* EF_GetTextureByID(int Id) { assert(false && "EF_GetTextureByID not implemented"); return nullptr; }
+    virtual ITexPic* EF_LoadTexture(const char* nameTex, uint flags, uint flags2, byte eTT, float fAmount1 = -1.0f, float fAmount2 = -1.0f, int Id = -1, int BindId = 0) { assert(false && "EF_LoadTexture not implemented"); return nullptr; }
+    virtual int EF_LoadLightmap(const char* name) { assert(false && "EF_LoadLightmap not implemented"); return 0; }
+    virtual bool EF_ScanEnvironmentCM(const char* name, int size, Vec3& Pos) { assert(false && "EF_ScanEnvironmentCM not implemented"); return false; }
+    virtual int EF_ReadAllImgFiles(IShader* ef, SShaderTexUnit* tl, STexAnim* ta, char* name) { assert(false && "EF_ReadAllImgFiles not implemented"); return 0; }
+    virtual char** EF_GetShadersForFile(const char* File, int num) { assert(false && "EF_GetShadersForFile not implemented"); return nullptr; }
+    virtual SLightMaterial* EF_GetLightMaterial(char* Str) { assert(false && "EF_GetLightMaterial not implemented"); return nullptr; }
+    virtual bool EF_RegisterTemplate(int nTemplId, char* Name, bool bReplace) { assert(false && "EF_RegisterTemplate not implemented"); return false; }
+    virtual void EF_AddSplash(Vec3 Pos, eSplashType eST, float fForce, int Id = -1) { assert(false && "EF_AddSplash not implemented"); }
+    virtual bool EF_HideTemplate(const char* name) { assert(false && "EF_HideTemplate not implemented"); return false; }
+    virtual bool EF_UnhideTemplate(const char* name) { assert(false && "EF_UnhideTemplate not implemented"); return false; }
+    virtual bool EF_UnhideAllTemplates() { assert(false && "EF_UnhideAllTemplates not implemented"); return false; }
+    virtual bool EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex, float fScale = 1.0f, bool bAdditive = true) { assert(false && "EF_SetLightHole not implemented"); return false; }
     virtual CRendElement* EF_CreateRE(EDataType edt);
-    virtual void EF_StartEf() {}
-    virtual CCObject* EF_GetObject(bool bTemp = false, int num = -1) { return nullptr; }
-    virtual void EF_AddEf(int NumFog, CRendElement* re, IShader* ef, SRenderShaderResources* sr, CCObject* obj, int nTempl, IShader* efState = 0, int nSort = 0) {}
-    virtual void EF_EndEf3D(int nFlags) {}
-    virtual bool EF_IsFakeDLight(CDLight* Source) { return false; }
-    virtual void EF_ADDDlight(CDLight* Source) {}
-    virtual void EF_ClearLightsList() {}
-    virtual bool EF_UpdateDLight(CDLight* pDL) { return false; }
-    virtual void EF_EndEf2D(bool bSort) {}
-    virtual bool EF_DrawEfForName(char* name, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawEfForNum(int num, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawEf(SShaderItem si, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { return false; }
-    virtual bool EF_DrawPartialEfForName(char* name, SVrect* vr, SVrect* pr, CFColor& col) { return false; }
-    virtual bool EF_DrawPartialEfForNum(int num, SVrect* vr, SVrect* pr, CFColor& col) { return false; }
-    virtual bool EF_DrawPartialEf(IShader* ef, SVrect* vr, SVrect* pr, CFColor& col, float iwdt = 0, float ihgt = 0) { return false; }
-    virtual void* EF_Query(int Query, int Param = 0) { return nullptr; }
-    virtual void EF_ConstructEf(IShader* Ef) {}
-    virtual void EF_SetWorldColor(float r, float g, float b, float a = 1.0f) {}
-    virtual int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, int nIndex = -1, bool bCaustics = false) { return 0; }
+    virtual void EF_StartEf() { assert(false && "EF_StartEf not implemented"); }
+    virtual CCObject* EF_GetObject(bool bTemp = false, int num = -1) { assert(false && "EF_GetObject not implemented"); return nullptr; }
+    virtual void EF_AddEf(int NumFog, CRendElement* re, IShader* ef, SRenderShaderResources* sr, CCObject* obj, int nTempl, IShader* efState = 0, int nSort = 0) { assert(false && "EF_AddEf not implemented"); }
+    virtual void EF_EndEf3D(int nFlags) { assert(false && "EF_EndEf3D not implemented"); }
+    virtual bool EF_IsFakeDLight(CDLight* Source) { assert(false && "EF_IsFakeDLight not implemented"); return false; }
+    virtual void EF_ADDDlight(CDLight* Source) { assert(false && "EF_ADDDlight not implemented"); }
+    virtual void EF_ClearLightsList() { assert(false && "EF_ClearLightsList not implemented"); }
+    virtual bool EF_UpdateDLight(CDLight* pDL) { assert(false && "EF_UpdateDLight not implemented"); return false; }
+    virtual void EF_EndEf2D(bool bSort) { assert(false && "EF_EndEf2D not implemented"); }
+    virtual bool EF_DrawEfForName(char* name, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { assert(false && "EF_DrawEfForName not implemented"); return false; }
+    virtual bool EF_DrawEfForNum(int num, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { assert(false && "EF_DrawEfForNum not implemented"); return false; }
+    virtual bool EF_DrawEf(IShader* ef, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { assert(false && "EF_DrawEf not implemented"); return false; }
+    virtual bool EF_DrawEf(SShaderItem si, float x, float y, float width, float height, CFColor& col, int nTempl = -1) { assert(false && "EF_DrawEf not implemented"); return false; }
+    virtual bool EF_DrawPartialEfForName(char* name, SVrect* vr, SVrect* pr, CFColor& col) { assert(false && "EF_DrawPartialEfForName not implemented"); return false; }
+    virtual bool EF_DrawPartialEfForNum(int num, SVrect* vr, SVrect* pr, CFColor& col) { assert(false && "EF_DrawPartialEfForNum not implemented"); return false; }
+    virtual bool EF_DrawPartialEf(IShader* ef, SVrect* vr, SVrect* pr, CFColor& col, float iwdt = 0, float ihgt = 0) { assert(false && "EF_DrawPartialEf not implemented"); return false; }
+    virtual void* EF_Query(int Query, int Param = 0) { assert(false && "EF_Query not implemented"); return nullptr; }
+    virtual void EF_ConstructEf(IShader* Ef) { assert(false && "EF_ConstructEf not implemented"); }
+    virtual void EF_SetWorldColor(float r, float g, float b, float a = 1.0f) { assert(false && "EF_SetWorldColor not implemented"); }
+    virtual int EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ, CFColor color, int nIndex = -1, bool bCaustics = false) { assert(false && "EF_RegisterFogVolume not implemented"); return 0; }
     
     // Font system stubs
-    virtual bool FontUploadTexture(class CFBitmap*, ETEX_Format eTF = eTF_8888) { return false; }
-    virtual int FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF = eTF_8888) { return 0; }
-    virtual bool FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData) { return false; }
-    virtual void FontReleaseTexture(class CFBitmap* pBmp) {}
-    virtual void FontSetTexture(class CFBitmap*, int nFilterMode) {}
-    virtual void FontSetTexture(int nTexId, int nFilterMode) {}
-    virtual void FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight) {}
-    virtual void FontSetBlending(int src, int dst) {}
-    virtual void FontRestoreRenderingState() {}
+    virtual bool FontUploadTexture(class CFBitmap*, ETEX_Format eTF = eTF_8888) { assert(false && "FontUploadTexture not implemented"); return false; }
+    virtual int FontCreateTexture(int Width, int Height, byte* pData, ETEX_Format eTF = eTF_8888) { assert(false && "FontCreateTexture not implemented"); return 0; }
+    virtual bool FontUpdateTexture(int nTexId, int X, int Y, int USize, int VSize, byte* pData) { assert(false && "FontUpdateTexture not implemented"); return false; }
+    virtual void FontReleaseTexture(class CFBitmap* pBmp) { assert(false && "FontReleaseTexture not implemented"); }
+    virtual void FontSetTexture(class CFBitmap*, int nFilterMode) { assert(false && "FontSetTexture not implemented"); }
+    virtual void FontSetTexture(int nTexId, int nFilterMode) { assert(false && "FontSetTexture not implemented"); }
+    virtual void FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight) { assert(false && "FontSetRenderingState not implemented"); }
+    virtual void FontSetBlending(int src, int dst) { assert(false && "FontSetBlending not implemented"); }
+    virtual void FontRestoreRenderingState() { assert(false && "FontRestoreRenderingState not implemented"); }
     
     // LeafBuffer stubs
-    virtual CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char* szSource = "Unknown", class CIndexedMesh* pIndexedMesh = 0) { return nullptr; }
-    virtual CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, int nVertFormat, ushort* pIndices, int nIndices, int nPrimetiveType, const char* szSource, EBufferType eBufType = eBT_Dynamic, int nMatInfoCount = 1, int nClientTextureBindID = 0, bool (*PrepareBufferCallback)(CLeafBuffer*, bool) = NULL, void* CustomData = NULL, bool bOnlyVideoBuffer = false, bool bPrecache = true) { return nullptr; }
-    virtual void DeleteLeafBuffer(CLeafBuffer* pLBuffer) {}
+    virtual CLeafBuffer* CreateLeafBuffer(bool bDynamic, const char* szSource = "Unknown", class CIndexedMesh* pIndexedMesh = 0) { assert(false && "CreateLeafBuffer not implemented"); return nullptr; }
+    virtual CLeafBuffer* CreateLeafBufferInitialized(void* pVertBuffer, int nVertCount, int nVertFormat, ushort* pIndices, int nIndices, int nPrimetiveType, const char* szSource, EBufferType eBufType = eBT_Dynamic, int nMatInfoCount = 1, int nClientTextureBindID = 0, bool (*PrepareBufferCallback)(CLeafBuffer*, bool) = NULL, void* CustomData = NULL, bool bOnlyVideoBuffer = false, bool bPrecache = true) { assert(false && "CreateLeafBufferInitialized not implemented"); return nullptr; }
+    virtual void DeleteLeafBuffer(CLeafBuffer* pLBuffer) { assert(false && "DeleteLeafBuffer not implemented"); }
     
     // Additional utility stubs
-    virtual void TextToScreen(float x, float y, const char* format, ...) {}
-    virtual void TextToScreenColor(int x, int y, float r, float g, float b, float a, const char* format, ...) {}
-    virtual void ResetToDefault() {}
-    virtual int GenerateAlphaGlowTexture(float k) { return 0; }
-    virtual void SetMaterialColor(float r, float g, float b, float a) {}
-    virtual int LoadAnimatedTexture(const char* format, const int nCount) { return 0; }
-    virtual void RemoveAnimatedTexture(AnimTexInfo* pInfo) {}
-    virtual AnimTexInfo* GetAnimTexInfoFromId(int nId) { return nullptr; }
-    virtual void Draw2dLine(float x1, float y1, float x2, float y2) {}
-    virtual void SetLineWidth(float fWidth) {}
-    virtual void DrawLine(const Vec3& vPos1, const Vec3& vPos2) {}
-    virtual void DrawLineColor(const Vec3& vPos1, const CFColor& vColor1, const Vec3& vPos2, const CFColor& vColor2) {}
-    virtual void Graph(byte* g, int x, int y, int wdt, int hgt, int nC, int type, char* text, CFColor& color, float fScale) {}
-    virtual void DrawBall(float x, float y, float z, float radius) {}
-    virtual void DrawBall(const Vec3& pos, float radius) {}
-    virtual void DrawPoint(float x, float y, float z, float fSize = 0.0f) {}
-    virtual void FlushTextMessages() {}
-    virtual void DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan) {}
-    virtual void DrawQuad(const Vec3& right, const Vec3& up, const Vec3& origin, int nFlipMode = 0) {}
-    virtual void DrawQuad(float dy, float dx, float dz, float x, float y, float z) {}
-    virtual void ClearDepthBuffer() {}
-    virtual void ClearColorBuffer(const Vec3 vColor) {}
-    virtual void ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, bool bBackBuffer, bool bRGBA, int nScaledX = -1, int nScaledY = -1) {}
-    virtual void SetFogColor(float* color) {}
-    virtual void TransformTextureMatrix(float x, float y, float angle, float scale) {}
-    virtual void ResetTextureMatrix() {}
-    virtual unsigned int MakeSprite(float object_scale, int tex_size, float angle, IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid) { return 0; }
-    virtual unsigned int Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj) { return 0; }
-    virtual ShadowMapFrustum* MakeShadowMapFrustum(ShadowMapFrustum* lof, ShadowMapLightSource* pLs, const Vec3& obj_pos, list2<IStatObj*>* pStatObjects, int shadow_type) { return nullptr; }
-    virtual void Set2DMode(bool enable, int ortox, int ortoy) {}
-    virtual int ScreenToTexture() { return 0; }
-    virtual void SetTexClampMode(bool clamp) {}
-    virtual void DrawLabelImage(const Vec3& vPos, float fSize, int nTextureId) {}
-    virtual void DrawLabel(Vec3 pos, float font_size, const char* label_text, ...) {}
-    virtual void DrawLabelEx(Vec3 pos, float font_size, float* pfColor, bool bFixedSize, bool bCenter, const char* label_text, ...) {}
-    virtual void Draw2dLabel(float x, float y, float font_size, float* pfColor, bool bCenter, const char* label_text, ...) {}
+    virtual void TextToScreen(float x, float y, const char* format, ...) { assert(false && "TextToScreen not implemented"); }
+    virtual void TextToScreenColor(int x, int y, float r, float g, float b, float a, const char* format, ...) { assert(false && "TextToScreenColor not implemented"); }
+    virtual void ResetToDefault() { assert(false && "ResetToDefault not implemented"); }
+    virtual int GenerateAlphaGlowTexture(float k) { assert(false && "GenerateAlphaGlowTexture not implemented"); return 0; }
+    virtual void SetMaterialColor(float r, float g, float b, float a) { assert(false && "SetMaterialColor not implemented"); }
+    virtual int LoadAnimatedTexture(const char* format, const int nCount) { assert(false && "LoadAnimatedTexture not implemented"); return 0; }
+    virtual void RemoveAnimatedTexture(AnimTexInfo* pInfo) { assert(false && "RemoveAnimatedTexture not implemented"); }
+    virtual AnimTexInfo* GetAnimTexInfoFromId(int nId) { assert(false && "GetAnimTexInfoFromId not implemented"); return nullptr; }
+    virtual void Draw2dLine(float x1, float y1, float x2, float y2) { assert(false && "Draw2dLine not implemented"); }
+    virtual void SetLineWidth(float fWidth) { assert(false && "SetLineWidth not implemented"); }
+    virtual void DrawLine(const Vec3& vPos1, const Vec3& vPos2) { assert(false && "DrawLine not implemented"); }
+    virtual void DrawLineColor(const Vec3& vPos1, const CFColor& vColor1, const Vec3& vPos2, const CFColor& vColor2) { assert(false && "DrawLineColor not implemented"); }
+    virtual void Graph(byte* g, int x, int y, int wdt, int hgt, int nC, int type, char* text, CFColor& color, float fScale) { assert(false && "Graph not implemented"); }
+    virtual void DrawBall(float x, float y, float z, float radius) { assert(false && "DrawBall not implemented"); }
+    virtual void DrawBall(const Vec3& pos, float radius) { assert(false && "DrawBall not implemented"); }
+    virtual void DrawPoint(float x, float y, float z, float fSize = 0.0f) { assert(false && "DrawPoint not implemented"); }
+    virtual void FlushTextMessages() { assert(false && "FlushTextMessages not implemented"); }
+    virtual void DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan) { assert(false && "DrawObjSprites not implemented"); }
+    virtual void DrawQuad(const Vec3& right, const Vec3& up, const Vec3& origin, int nFlipMode = 0) { assert(false && "DrawQuad not implemented"); }
+    virtual void DrawQuad(float dy, float dx, float dz, float x, float y, float z) { assert(false && "DrawQuad not implemented"); }
+    virtual void ClearDepthBuffer() { assert(false && "ClearDepthBuffer not implemented"); }
+    virtual void ClearColorBuffer(const Vec3 vColor) { assert(false && "ClearColorBuffer not implemented"); }
+    virtual void ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, bool bBackBuffer, bool bRGBA, int nScaledX = -1, int nScaledY = -1) { assert(false && "ReadFrameBuffer not implemented"); }
+    virtual void SetFogColor(float* color) { assert(false && "SetFogColor not implemented"); }
+    virtual void TransformTextureMatrix(float x, float y, float angle, float scale) { assert(false && "TransformTextureMatrix not implemented"); }
+    virtual void ResetTextureMatrix() { assert(false && "ResetTextureMatrix not implemented"); }
+    virtual unsigned int MakeSprite(float object_scale, int tex_size, float angle, IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid) { assert(false && "MakeSprite not implemented"); return 0; }
+    virtual unsigned int Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj) { assert(false && "Make3DSprite not implemented"); return 0; }
+    virtual ShadowMapFrustum* MakeShadowMapFrustum(ShadowMapFrustum* lof, ShadowMapLightSource* pLs, const Vec3& obj_pos, list2<IStatObj*>* pStatObjects, int shadow_type) { assert(false && "MakeShadowMapFrustum not implemented"); return nullptr; }
+    virtual void Set2DMode(bool enable, int ortox, int ortoy) { assert(false && "Set2DMode not implemented"); }
+    virtual int ScreenToTexture() { assert(false && "ScreenToTexture not implemented"); return 0; }
+    virtual void SetTexClampMode(bool clamp) { assert(false && "SetTexClampMode not implemented"); }
+    virtual void DrawLabelImage(const Vec3& vPos, float fSize, int nTextureId) { assert(false && "DrawLabelImage not implemented"); }
+    virtual void DrawLabel(Vec3 pos, float font_size, const char* label_text, ...) { assert(false && "DrawLabel not implemented"); }
+    virtual void DrawLabelEx(Vec3 pos, float font_size, float* pfColor, bool bFixedSize, bool bCenter, const char* label_text, ...) { assert(false && "DrawLabelEx not implemented"); }
+    virtual void Draw2dLabel(float x, float y, float font_size, float* pfColor, bool bCenter, const char* label_text, ...) { assert(false && "Draw2dLabel not implemented"); }
     
     // File I/O stubs
-    virtual void WriteDDS(byte* dat, int wdt, int hgt, int Size, const char* name, EImFormat eF, int NumMips) {}
-    virtual void WriteTGA(byte* dat, int wdt, int hgt, const char* name, int bits) {}
-    virtual void WriteJPG(byte* dat, int wdt, int hgt, char* name) {}
+    virtual void WriteDDS(byte* dat, int wdt, int hgt, int Size, const char* name, EImFormat eF, int NumMips) { assert(false && "WriteDDS not implemented"); }
+    virtual void WriteTGA(byte* dat, int wdt, int hgt, const char* name, int bits) { assert(false && "WriteTGA not implemented"); }
+    virtual void WriteJPG(byte* dat, int wdt, int hgt, char* name) { assert(false && "WriteJPG not implemented"); }
 
 public:
     // Metal-specific members (public for manager access)

@@ -955,7 +955,7 @@ CVertexBuffer *CMetalRenderer::CreateBuffer(int vertexcount, int vertexformat,
   iLog->Log("Creating vertex buffer: %d vertices, format %d, source: %s\n",
          vertexcount, vertexformat, szSource ? szSource : "Unknown");
 
-  // TODO: Create actual CVertexBuffer and associate with Metal buffer
+  assert(false && "CreateBuffer not implemented");
   return nullptr; // Placeholder
 }
 
@@ -965,7 +965,7 @@ void CMetalRenderer::ReleaseBuffer(CVertexBuffer *bufptr) {
   if (!bufptr)
     return;
 
-  // TODO: Release Metal buffer associated with CVertexBuffer
+  assert(false && "ReleaseBuffer not implemented");
   iLog->Log("Releasing vertex buffer\n");
 }
 
@@ -980,7 +980,7 @@ void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
   if (!dest || !src)
     return;
 
-  // TODO: Update Metal buffer with new vertex data
+  assert(false && "UpdateBuffer not implemented");
   iLog->Log("Updating vertex buffer: %d vertices, offset %d, type %d\n",
          vertexcount, nOffs, Type);
 }
@@ -994,7 +994,7 @@ void CMetalRenderer::CreateIndexBuffer(SVertexStream *dest, const void *src,
   if (!dest || !src)
     return;
 
-  // TODO: Create Metal index buffer from source data
+  assert(false && "CreateIndexBuffer not implemented");
   iLog->Log("Creating index buffer: %d indices\n", indexcount);
 }
 
@@ -1007,7 +1007,7 @@ void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
   if (!dest || !src)
     return;
 
-  // TODO: Update Metal index buffer with new data
+  assert(false && "UpdateIndexBuffer not implemented");
   iLog->Log("Updating index buffer: %d indices\n", indexcount);
 }
 
@@ -1017,7 +1017,7 @@ void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
   if (!dest)
     return;
 
-  // TODO: Release Metal index buffer
+  assert(false && "ReleaseIndexBuffer not implemented");
   iLog->Log("Releasing index buffer\n");
 }
 
@@ -1071,7 +1071,7 @@ void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {
   assert(nVerts > 0 && "GetDynVBPtr: vertex count must be positive");
   assert(Pool >= 0 && "GetDynVBPtr: pool index cannot be negative");
   
-  // TODO: Get pointer to dynamic vertex buffer
+  assert(false && "GetDynVBPtr not implemented");
   iLog->Log("Getting dynamic VB pointer: %d vertices, pool %d\n", nVerts, Pool);
   nOffs = 0;      // Placeholder offset
   return nullptr; // Placeholder
@@ -1081,7 +1081,7 @@ void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts) {
   if (!m_renderEncoder)
     return;
 
-  // TODO: Draw from dynamic vertex buffer
+  assert(false && "DrawDynVB not implemented");
   iLog->Log("Drawing dynamic VB: offset %d, pool %d, vertices %d\n", nOffs, Pool,
          nVerts);
 }
@@ -1092,7 +1092,7 @@ void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf,
   if (!pBuf || !m_renderEncoder)
     return;
 
-  // TODO: Draw from vertex buffer with indices
+  assert(false && "DrawDynVB not implemented");
   iLog->Log("Drawing dynamic VB with indices: %d vertices, %d indices, prim type "
          "%d\n",
          nVerts, nInds, nPrimType);
@@ -1102,7 +1102,7 @@ void CMetalRenderer::SetFenceCompleted(CVertexBuffer *buffer) {
   if (!buffer)
     return;
 
-  // TODO: Set fence for buffer completion
+  assert(false && "SetFenceCompleted not implemented");
   iLog->Log("Setting fence completed for buffer\n");
 }
 
@@ -1120,7 +1120,7 @@ void CMetalRenderer::Draw3dBBox(const Vec3 &mins, const Vec3 &maxs,
   if (!m_renderEncoder)
     return;
 
-  // TODO: Draw 3D bounding box using Metal API
+  assert(false && "Draw3dBBox not implemented");
   iLog->Log("Drawing 3D bbox: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
          mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
 }
@@ -1130,7 +1130,7 @@ void CMetalRenderer::Draw3dPrim(const Vec3 &mins, const Vec3 &maxs,
   if (!m_renderEncoder)
     return;
 
-  // TODO: Draw 3D primitive using Metal API
+  assert(false && "Draw3dPrim not implemented");
   iLog->Log("Drawing 3D prim: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
          mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
 }
@@ -1283,7 +1283,7 @@ void CMetalRenderer::Set2DMode(bool enable, int ortox, int ortoy) {
 }
 
 bool CMetalRenderer::EnableFog(bool enable) {
-  // TODO: Enable/disable fog in Metal
+  assert(false && "EnableFog not implemented");
   iLog->Log("Fog %s\n", enable ? "enabled" : "disabled");
   return true;
 }
@@ -1295,100 +1295,100 @@ void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
   assert(fogend >= fogstart && "SetFog: fog end must be >= fog start");
   assert(color != nullptr && "SetFog: color array cannot be null");
   
-  // TODO: Set fog parameters in Metal
+  assert(false && "SetFog not implemented");
   iLog->Log("Setting fog: density %.2f, start %.2f, end %.2f, mode %d\n", density,
          fogstart, fogend, fogmode);
 }
 
 void CMetalRenderer::EnableTexGen(bool enable) {
-  // TODO: Enable texture generation in Metal
+  assert(false && "EnableTexGen not implemented");
   iLog->Log("Texture generation %s\n", enable ? "enabled" : "disabled");
 }
 
 void CMetalRenderer::SetTexgen(float scaleX, float scaleY, float translateX,
                                float translateY) {
-  // TODO: Set texture generation parameters in Metal
+  assert(false && "SetTexgen not implemented");
   iLog->Log("Setting texgen: scale(%.2f,%.2f) translate(%.2f,%.2f)\n", scaleX,
          scaleY, translateX, translateY);
 }
 
 void CMetalRenderer::SetTexgen3D(float x1, float y1, float z1, float x2,
                                  float y2, float z2) {
-  // TODO: Set 3D texture generation in Metal
+  assert(false && "SetTexgen3D not implemented");
   iLog->Log("Setting 3D texgen: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n", x1, y1,
          z1, x2, y2, z2);
 }
 
 void CMetalRenderer::SetLodBias(float value) {
-  // TODO: Set LOD bias in Metal
+  assert(false && "SetLodBias not implemented");
   iLog->Log("Setting LOD bias: %.2f\n", value);
 }
 
 void CMetalRenderer::EnableVSync(bool enable) {
-  // TODO: Enable VSync in Metal
+  assert(false && "EnableVSync not implemented");
   iLog->Log("VSync %s\n", enable ? "enabled" : "disabled");
 }
 
 // Matrix Management Implementation
 void CMetalRenderer::PushMatrix() {
-  // TODO: Push matrix onto stack
+  assert(false && "PushMatrix not implemented");
   iLog->Log("Pushing matrix\n");
 }
 
 void CMetalRenderer::RotateMatrix(float a, float x, float y, float z) {
-  // TODO: Rotate current matrix
+  assert(false && "RotateMatrix not implemented");
   iLog->Log("Rotating matrix: angle %.2f axis(%.2f,%.2f,%.2f)\n", a, x, y, z);
 }
 
 void CMetalRenderer::RotateMatrix(const Vec3 &angels) {
-  // TODO: Rotate current matrix by angles
+  assert(false && "RotateMatrix not implemented");
   iLog->Log("Rotating matrix by angles: (%.2f,%.2f,%.2f)\n", angels.x, angels.y,
          angels.z);
 }
 
 void CMetalRenderer::TranslateMatrix(float x, float y, float z) {
-  // TODO: Translate current matrix
+  assert(false && "TranslateMatrix not implemented");
   iLog->Log("Translating matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
 }
 
 void CMetalRenderer::ScaleMatrix(float x, float y, float z) {
-  // TODO: Scale current matrix
+  assert(false && "ScaleMatrix not implemented");
   iLog->Log("Scaling matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
 }
 
 void CMetalRenderer::TranslateMatrix(const Vec3 &pos) {
-  // TODO: Translate current matrix by position
+  assert(false && "TranslateMatrix not implemented");
   iLog->Log("Translating matrix by pos: (%.2f,%.2f,%.2f)\n", pos.x, pos.y, pos.z);
 }
 
 void CMetalRenderer::MultMatrix(float *mat) {
   assert(mat != nullptr && "MultMatrix: matrix pointer cannot be null");
   
-  // TODO: Multiply current matrix
+  assert(false && "MultMatrix not implemented");
   iLog->Log("Multiplying matrix\n");
 }
 
 void CMetalRenderer::LoadMatrix(const Matrix44 *src) {
   assert(src != nullptr && "LoadMatrix: source matrix cannot be null");
   
-  // TODO: Load matrix
+  assert(false && "LoadMatrix not implemented");
   iLog->Log("Loading matrix\n");
 }
 
 void CMetalRenderer::PopMatrix() {
-  // TODO: Pop matrix from stack
+  assert(false && "PopMatrix not implemented");
   iLog->Log("Popping matrix\n");
 }
 
 void CMetalRenderer::EnableTMU(bool enable) {
-  // TODO: Enable texture mapping unit
+  assert(false && "EnableTMU not implemented");
   iLog->Log("TMU %s\n", enable ? "enabled" : "disabled");
 }
 
 void CMetalRenderer::SelectTMU(int tnum) {
   assert(tnum >= 0 && tnum < MAX_TMU && "SelectTMU: texture unit index out of range");
   
-  // TODO: Select texture mapping unit
+  assert(false && "SelectTMU not implemented");
   iLog->Log("Selecting TMU: %d\n", tnum);
 }
 
@@ -1399,7 +1399,7 @@ bool CMetalRenderer::ChangeDisplay(unsigned int width, unsigned int height,
   assert(height > 0 && "ChangeDisplay: height must be positive");
   assert(cbpp == 16 || cbpp == 24 || cbpp == 32 && "ChangeDisplay: bits per pixel must be 16, 24, or 32");
   
-  // TODO: Change Metal display resolution
+  assert(false && "ChangeDisplay not implemented");
   iLog->Log("Changing display: %dx%d, %d bpp\n", width, height, cbpp);
   return true;
 }
@@ -1409,7 +1409,7 @@ void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
   assert(width > 0 && "ChangeViewport: width must be positive");
   assert(height > 0 && "ChangeViewport: height must be positive");
   
-  // TODO: Change Metal viewport
+  assert(false && "ChangeViewport not implemented");
   iLog->Log("Changing viewport: (%d,%d) %dx%d\n", x, y, width, height);
   SetViewport(x, y, width, height);
 }
@@ -1421,7 +1421,7 @@ bool CMetalRenderer::SaveTga(unsigned char *sourcedata, int sourceformat, int w,
   assert(h > 0 && "SaveTga: height must be positive");
   assert(filename != nullptr && "SaveTga: filename cannot be null");
   
-  // TODO: Save TGA using Metal
+  assert(false && "SaveTga not implemented");
   iLog->Log("Saving TGA: %dx%d, format %d, file %s\n", w, h, sourceformat,
          filename ? filename : "NULL");
   return true;
@@ -1433,14 +1433,14 @@ int CMetalRenderer::GetWidth() { return m_width; }
 int CMetalRenderer::GetHeight() { return m_height; }
 
 void CMetalRenderer::GetMemoryUsage(ICrySizer *Sizer) {
-  // TODO: Get Metal memory usage
+  assert(false && "GetMemoryUsage not implemented");
   iLog->Log("Getting memory usage\n");
 }
 
 void CMetalRenderer::ScreenShot(const char *filename) {
   assert(filename != nullptr && "ScreenShot: filename cannot be null");
   
-  // TODO: Take screenshot using Metal
+  assert(false && "ScreenShot not implemented");
   iLog->Log("Taking screenshot: %s\n", filename ? filename : "default");
 }
 
@@ -1458,7 +1458,7 @@ void CMetalRenderer::ProjectToScreen(float ptx, float pty, float ptz, float *sx,
   assert(sy != nullptr && "ProjectToScreen: output sy cannot be null");
   assert(sz != nullptr && "ProjectToScreen: output sz cannot be null");
   
-  // TODO: Project 3D point to screen coordinates
+  assert(false && "ProjectToScreen not implemented");
   iLog->Log("Projecting to screen: (%.2f,%.2f,%.2f)\n", ptx, pty, ptz);
   if (sx)
     *sx = ptx;
@@ -1479,7 +1479,7 @@ int CMetalRenderer::UnProject(float sx, float sy, float sz, float *px,
   assert(projMatrix != nullptr && "UnProject: projMatrix cannot be null");
   assert(viewport != nullptr && "UnProject: viewport cannot be null");
   
-  // TODO: Unproject screen coordinates to 3D
+  assert(false && "UnProject not implemented");
   iLog->Log("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
   if (px)
     *px = sx;
@@ -1496,7 +1496,7 @@ int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float *px,
   assert(py != nullptr && "UnProjectFromScreen: output py cannot be null");
   assert(pz != nullptr && "UnProjectFromScreen: output pz cannot be null");
   
-  // TODO: Unproject from screen coordinates
+  assert(false && "UnProjectFromScreen not implemented");
   iLog->Log("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
   if (px)
     *px = sx;
@@ -1510,7 +1510,7 @@ int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float *px,
 void CMetalRenderer::GetModelViewMatrix(float *mat) {
   assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
   
-  // TODO: Get model-view matrix
+  assert(false && "GetModelViewMatrix not implemented");
   iLog->Log("Getting model-view matrix\n");
   if (mat) {
     // Return identity matrix
@@ -1522,7 +1522,7 @@ void CMetalRenderer::GetModelViewMatrix(float *mat) {
 void CMetalRenderer::GetModelViewMatrix(double *mat) {
   assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
   
-  // TODO: Get model-view matrix as double
+  assert(false && "GetModelViewMatrix not implemented");
   iLog->Log("Getting model-view matrix (double)\n");
   if (mat) {
     // Return identity matrix
@@ -1534,7 +1534,7 @@ void CMetalRenderer::GetModelViewMatrix(double *mat) {
 void CMetalRenderer::GetProjectionMatrix(double *mat) {
   assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
   
-  // TODO: Get projection matrix as double
+  assert(false && "GetProjectionMatrix not implemented");
   iLog->Log("Getting projection matrix (double)\n");
   if (mat) {
     // Return identity matrix
@@ -1546,7 +1546,7 @@ void CMetalRenderer::GetProjectionMatrix(double *mat) {
 void CMetalRenderer::GetProjectionMatrix(float *mat) {
   assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
   
-  // TODO: Get projection matrix
+  assert(false && "GetProjectionMatrix not implemented");
   iLog->Log("Getting projection matrix\n");
   if (mat) {
     // Return identity matrix
@@ -1557,7 +1557,7 @@ void CMetalRenderer::GetProjectionMatrix(float *mat) {
 
 Vec3 CMetalRenderer::GetUnProject(const Vec3 &WindowCoords,
                                   const CCamera &cam) {
-  // TODO: Unproject window coordinates
+  assert(false && "GetUnProject not implemented");
   iLog->Log("Getting unproject: (%.2f,%.2f,%.2f)\n", WindowCoords.x,
          WindowCoords.y, WindowCoords.z);
   return WindowCoords;
@@ -1565,7 +1565,7 @@ Vec3 CMetalRenderer::GetUnProject(const Vec3 &WindowCoords,
 
 void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
                                       float width, float height) {
-  // TODO: Render to viewport
+  assert(false && "RenderToViewport not implemented");
   iLog->Log("Rendering to viewport: (%.2f,%.2f) %fx%f\n", x, y, width, height);
 }
 
@@ -1854,12 +1854,12 @@ void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
   if (!m_renderEncoder)
     return;
 
-  // TODO: Set Metal scissor rect
+  assert(false && "SetScissor not implemented");
   iLog->Log("Setting scissor: (%d,%d) %dx%d\n", x, y, width, height);
 }
 
 int CMetalRenderer::GetFeatures() {
-  // TODO: Return Metal-specific features
+  assert(false && "GetFeatures not implemented");
   return 0;
 }
 
@@ -1900,31 +1900,31 @@ void CMetalRenderer::SetViewport(int x, int y, int width, int height) {
 }
 
 bool CMetalRenderer::CreateContext(WIN_HWND hWnd, bool bAllowFSAA) {
-  // TODO: Create Metal context
+  assert(false && "CreateContext not implemented");
   iLog->Log("Creating Metal context\n");
   return true;
 }
 
 bool CMetalRenderer::DeleteContext(WIN_HWND hWnd) {
-  // TODO: Delete Metal context
+  assert(false && "DeleteContext not implemented");
   iLog->Log("Deleting Metal context\n");
   return true;
 }
 
 void CMetalRenderer::FreeResources(int nFlags) {
-  // TODO: Free Metal resources
+  assert(false && "FreeResources not implemented");
   iLog->Log("Freeing Metal resources: flags %d\n", nFlags);
 }
 
 void CMetalRenderer::ShareResources(IRenderer *renderer) {
-  // TODO: Share Metal resources
+  assert(false && "ShareResources not implemented");
   iLog->Log("Sharing Metal resources\n");
 }
 
 bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
                                       int nNewColDepth, int nNewRefreshHZ,
                                       bool bFullScreen) {
-  // TODO: Change Metal resolution
+  assert(false && "ChangeResolution not implemented");
   iLog->Log("Changing resolution: %dx%d, %d bpp, %d Hz, fullscreen %s\n",
          nNewWidth, nNewHeight, nNewColDepth, nNewRefreshHZ,
          bFullScreen ? "yes" : "no");
@@ -1932,47 +1932,47 @@ bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
 }
 
 void CMetalRenderer::RefreshResources(int nFlags) {
-  // TODO: Refresh Metal resources
+  assert(false && "RefreshResources not implemented");
   iLog->Log("Refreshing Metal resources: flags %d\n", nFlags);
 }
 
 bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd) {
-  // TODO: Set current Metal context
+  assert(false && "SetCurrentContext not implemented");
   iLog->Log("Setting current Metal context\n");
   return true;
 }
 
 int CMetalRenderer::EnumDisplayFormats(TArray<SDispFormat> &Formats,
                                        bool bReset) {
-  // TODO: Enumerate Metal display formats
+  assert(false && "EnumDisplayFormats not implemented");
   iLog->Log("Enumerating Metal display formats\n");
   return 0;
 }
 
 int CMetalRenderer::GetMaxTextureMemory() {
-  // TODO: Get Metal texture memory limit
+  assert(false && "GetMaxTextureMemory not implemented");
   return 512 * 1024 * 1024; // 512MB placeholder
 }
 
 // Init implementation moved to earlier in file (after constructor)
 
 void CMetalRenderer::PreLoad() {
-  // TODO: Preload Metal resources
+  assert(false && "PreLoad not implemented");
   iLog->Log("Preloading Metal resources\n");
 }
 
 void CMetalRenderer::Release() {
-  // TODO: Release Metal resources
+  assert(false && "Release not implemented");
   iLog->Log("Releasing Metal resources\n");
 }
 
 void CMetalRenderer::PostLoad() {
-  // TODO: Postload Metal resources
+  assert(false && "PostLoad not implemented");
   iLog->Log("Postloading Metal resources\n");
 }
 
 void CMetalRenderer::ShutDown(bool bReInit) {
-  // TODO: Shutdown Metal renderer
+  assert(false && "ShutDown not implemented");
   iLog->Log("Shutting down Metal renderer: reinit %s\n", bReInit ? "yes" : "no");
 }
 
@@ -2273,7 +2273,7 @@ void CMetalRenderer::DrawPoints(Vec3 v[], int nump, CFColor& col, int flags) {
     if (!v || nump <= 0 || !m_renderEncoder)
         return;
     
-    // TODO: Implement debug point rendering using Metal line primitives
+    assert(false && "DrawPoints not implemented");
     SetState(GS_NODEPTHTEST);
 }
 
@@ -2281,7 +2281,7 @@ void CMetalRenderer::DrawLines(Vec3 v[], int nump, CFColor& col, int flags, floa
     if (!v || nump < 2 || !m_renderEncoder)
         return;
     
-    // TODO: Implement debug line rendering
+    assert(false && "DrawLines not implemented");
     SetState(GS_NODEPTHTEST);
 }
 
@@ -2398,7 +2398,7 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
     if (!lof)
         return;
     
-    // TODO: Implement shadow map rendering
+    assert(false && "PrepareDepthMap not implemented");
 }
 
 void CMetalRenderer::EF_CheckOverflow(int nVerts, int nTris, CRendElement *re) {
@@ -2414,7 +2414,7 @@ void CMetalRenderer::EF_LightMaterial(SLightMaterial *lm, int Flags) {
 }
 
 STexPic* CMetalRenderer::EF_MakePhongTexture(int Exp) {
-    // Create procedural phong shading texture
+    assert(false && "EF_MakePhongTexture not implemented");
     return nullptr;
 }
 
@@ -2431,11 +2431,11 @@ void CMetalRenderer::SetupShadowOnlyPass(int Num, ShadowMapFrustum * pFrustum, V
     if (!pFrustum)
         return;
     
-    // TODO: Set up shadow rendering pass
+    assert(false && "SetupShadowOnlyPass not implemented");
 }
 
 void CMetalRenderer::DrawAllShadowsOnTheScreen() {
-    // TODO: Render all shadow volumes/maps
+    assert(false && "DrawAllShadowsOnTheScreen not implemented");
 }
 
 void CMetalRenderer::Reset(void) {
