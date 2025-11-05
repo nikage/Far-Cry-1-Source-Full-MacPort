@@ -152,44 +152,35 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         id<MTLFunction> vertexFunc = [library newFunctionWithName:@(shader.vertexFunc)];
         id<MTLFunction> fragmentFunc = [library newFunctionWithName:@(shader.fragmentFunc)];
         
-        if (!vertexFunc || !fragmentFunc)
-        {
-            iLog->Log("Warning: Failed to load shader functions for '%s'\n", shader.name);
-            continue;
-        }
-        
-        assert(vertexFunc != nil && "CreateDefaultShaders: vertex function should not be nil here!");
-        assert(fragmentFunc != nil && "CreateDefaultShaders: fragment function should not be nil here!");
+        assert(vertexFunc != nil && fragmentFunc != nil && 
+               "CreateDefaultShaders: Failed to load shader functions - shader library may be missing or outdated");
         
         MTLVertexDescriptor* vertexDesc = CMetalVertexDescriptorHelper::CreateVertexDescriptor(shader.vertexFormat);
-        assert(vertexDesc != nil && "CreateDefaultShaders: vertex descriptor cannot be nil!");
+        assert(vertexDesc != nil && "CreateDefaultShaders: Failed to create vertex descriptor - invalid vertex format");
         
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(
             vertexFunc, fragmentFunc, vertexDesc);
         
-        if (pipelineState)
-        {
-            assert(pipelineState != nil && "CreateDefaultShaders: pipeline state should not be nil!");
-            
-            int shaderId = AllocateShaderId();
-            assert(shaderId > 0 && "CreateDefaultShaders: shader ID must be positive!");
-            
-            ShaderInfo info;
-            info.vertexFunction = vertexFunc;
-            info.fragmentFunction = fragmentFunc;
-            info.pipelineState = pipelineState;
-            info.name = shader.name;
-            info.shaderClass = eSH_World;
-            info.isLoaded = true;
-            
-            m_shaders[shaderId] = info;
-            m_shaderNameMap[shader.name] = shaderId;
-            
-            assert(m_shaders.find(shaderId) != m_shaders.end() && "CreateDefaultShaders: shader should be in map!");
-            assert(m_shaderNameMap.find(shader.name) != m_shaderNameMap.end() && "CreateDefaultShaders: shader name should be in map!");
-            
-            iLog->Log("  Loaded shader: %s (ID: %d)\n", shader.name, shaderId);
-        }
+        assert(pipelineState != nil && "CreateDefaultShaders: Failed to create pipeline state");
+        
+        int shaderId = AllocateShaderId();
+        assert(shaderId > 0 && "CreateDefaultShaders: shader ID must be positive!");
+        
+        ShaderInfo info;
+        info.vertexFunction = vertexFunc;
+        info.fragmentFunction = fragmentFunc;
+        info.pipelineState = pipelineState;
+        info.name = shader.name;
+        info.shaderClass = eSH_World;
+        info.isLoaded = true;
+        
+        m_shaders[shaderId] = info;
+        m_shaderNameMap[shader.name] = shaderId;
+        
+        assert(m_shaders.find(shaderId) != m_shaders.end() && "CreateDefaultShaders: shader should be in map!");
+        assert(m_shaderNameMap.find(shader.name) != m_shaderNameMap.end() && "CreateDefaultShaders: shader name should be in map!");
+        
+        iLog->Log("  Loaded shader: %s (ID: %d)\n", shader.name, shaderId);
     }
     
     iLog->Log("Default shaders created: %zu shaders\n", m_shaders.size());
@@ -200,13 +191,14 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     id<MTLFunction> fragmentFunction,
     MTLVertexDescriptor* vertexDescriptor)
 {
-    assert(vertexFunction != nil && "CreatePipelineStateWithFunctions: vertexFunction cannot be nil!");
-    assert(fragmentFunction != nil && "CreatePipelineStateWithFunctions: fragmentFunction cannot be nil!");
-    assert(vertexDescriptor != nil && "CreatePipelineStateWithFunctions: vertexDescriptor cannot be nil!");
+    assert(vertexFunction != nil && "CreatePipelineStateWithFunctions: vertexFunction cannot be nil");
+    assert(fragmentFunction != nil && "CreatePipelineStateWithFunctions: fragmentFunction cannot be nil");
+    assert(vertexDescriptor != nil && "CreatePipelineStateWithFunctions: vertexDescriptor cannot be nil");
+    
     assert(m_renderer != nullptr && "CreatePipelineStateWithFunctions: renderer cannot be null!");
     assert(m_renderer->m_device != nil && "CreatePipelineStateWithFunctions: Metal device cannot be nil!");
     
-    if (!m_renderer || !m_renderer->m_device || !vertexFunction || !fragmentFunction)
+    if (!m_renderer || !m_renderer->m_device)
         return nil;
     
     MTLPixelFormat colorFormat = MTLPixelFormatBGRA8Unorm;
@@ -220,11 +212,11 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     key.colorPixelFormat = colorFormat;
     key.depthPixelFormat = depthFormat;
     
-    if (m_renderer->m_stateCache)
+    if (m_renderer->m_stateCache && vertexFunction && fragmentFunction && vertexDescriptor) // Only cache if functions are valid
     {
         id<MTLRenderPipelineState> cachedState = m_renderer->m_stateCache->GetOrCreatePipelineState(
-            key, vertexFunction, fragmentFunction, vertexDescriptor);
-        
+                key, vertexFunction, fragmentFunction, vertexDescriptor);
+
         if (cachedState)
             return cachedState;
     }
@@ -249,11 +241,10 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     id<MTLRenderPipelineState> pipelineState = 
         [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     
-    if (!pipelineState)
+    assert(pipelineState != nil && "CreatePipelineStateWithFunctions: Failed to create pipeline state - check Metal shader compilation");
+    if (!pipelineState && error)
     {
-        iLog->Log("Error: Failed to create pipeline state: %s\n",
-               error ? [[error localizedDescription] UTF8String] : "Unknown error");
-        return nil;
+        iLog->Log("Error details: %s\n", [[error localizedDescription] UTF8String]);
     }
     
     return pipelineState;

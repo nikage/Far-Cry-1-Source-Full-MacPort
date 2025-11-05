@@ -48,16 +48,11 @@ CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer,
     iLog->Log("CMetalUtilityRenderer: Initializing...\n");
     
     // Initialize utility renderer
-    // Note: Pipeline states are TODO - need to load from SpriteShaders.metallib
-    // For now, skip pipeline creation to get past initialization
-    // iLog->Log("CMetalUtilityRenderer: Creating debug pipeline state...\n");
-    // CreateDebugPipelineState();
-    // iLog->Log("CMetalUtilityRenderer: Creating text pipeline state...\n");
-    // CreateTextPipelineState();
-    // iLog->Log("CMetalUtilityRenderer: Creating sprite pipeline state...\n");
-    // CreateSpritePipelineState();
+    // Note: Sprite pipeline state creation is deferred until first use
+    // to avoid crashes if shaders aren't loaded yet
+    // CreateSpritePipelineState will be called lazily in Draw2dImage if needed
     
-    iLog->Log("CMetalUtilityRenderer: Initialization complete (pipeline states skipped - TODO)\n");
+    iLog->Log("CMetalUtilityRenderer: Initialization complete (sprite pipeline deferred)\n");
 }
 
 CMetalUtilityRenderer::~CMetalUtilityRenderer()
@@ -140,7 +135,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     assert(m_renderer != nullptr && "Draw2dImage: renderer cannot be null");
     assert(w > 0.0f && "Draw2dImage: width must be positive");
     assert(h > 0.0f && "Draw2dImage: height must be positive");
-    assert(texture_id < 0 && "Draw2dImage: angle must be 0 for invalid texture");
+    assert(angle == 0.0f && "Draw2dImage: angle rotation not supported yet");
     assert(s0 >= 0.0f && s0 <= 1.0f && "Draw2dImage: s0 must be in range [0,1]");
     assert(t0 >= 0.0f && t0 <= 1.0f && "Draw2dImage: t0 must be in range [0,1]");
     assert(s1 >= 0.0f && s1 <= 1.0f && "Draw2dImage: s1 must be in range [0,1]");
@@ -152,43 +147,36 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     
     if (!m_renderer || !m_renderer->m_renderEncoder)
         return;
+    
+    // Lazy initialization: create sprite pipeline state on first use
+    if (!m_spritePipelineState)
+    {
+        CreateSpritePipelineState();
+        // If pipeline creation failed, we can't render
+        if (!m_spritePipelineState)
+        {
+            iLog->Log("Draw2dImage: Cannot render - sprite pipeline state not available\n");
+            return;
+        }
+    }
         
-    // Get texture from texture manager
+    // Get texture from texture manager (only if texture_id is valid)
     id<MTLTexture> texture = nil;
+    bool hasTexture = false;
     if (m_textureManager && texture_id > 0)
     {
         const auto* texInfo = m_textureManager->GetTextureInfo(texture_id);
-        assert(texInfo != nullptr && "Draw2dImage: texture info should exist for valid texture ID");
-        
         if (texInfo && texInfo->metalTexture)
         {
             texture = texInfo->metalTexture;
-            assert(texture != nil && "Draw2dImage: Metal texture should be valid in texture info");
+            hasTexture = true;
         }
     }
-    
-    if (!texture)
-    {
-        iLog->Log("Draw2dImage: Warning - texture ID %d not found\n", texture_id);
-        return;
-    }
-        
-    // Set up 2D rendering state
-    if (m_spritePipelineState)
-    {
-        [m_renderer->m_renderEncoder setRenderPipelineState:m_spritePipelineState];
-    }
-    
-    // Bind texture
-    [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
     
     // Convert screen coordinates to normalized device coordinates (NDC)
     // Metal NDC: x=[-1,1] left to right, y=[-1,1] bottom to top
     float screenWidth = static_cast<float>(m_renderer->GetWidth());
     float screenHeight = static_cast<float>(m_renderer->GetHeight());
-    
-    assert(screenWidth > 0 && "Draw2dImage: screen width must be positive");
-    assert(screenHeight > 0 && "Draw2dImage: screen height must be positive");
     
     if (screenWidth <= 0 || screenHeight <= 0)
     {
@@ -197,12 +185,16 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     }
     
     // Convert to NDC
+    // Input: screen coordinates where (0,0) is top-left, (screenWidth, screenHeight) is bottom-right
+    // Output: NDC where (-1,-1) is bottom-left, (1,1) is top-right
     float x0_ndc = (xpos / screenWidth) * 2.0f - 1.0f;
-    float y0_ndc = 1.0f - (ypos / screenHeight) * 2.0f;  // Flip Y
+    float y0_ndc = 1.0f - (ypos / screenHeight) * 2.0f;  // Flip Y: top becomes +1
     float x1_ndc = ((xpos + w) / screenWidth) * 2.0f - 1.0f;
-    float y1_ndc = 1.0f - ((ypos + h) / screenHeight) * 2.0f;  // Flip Y
+    float y1_ndc = 1.0f - ((ypos + h) / screenHeight) * 2.0f;  // Flip Y: bottom becomes -1
     
     // Create quad vertices for 2D image (triangle strip order)
+    // Triangle strip order for quad: v0-v1-v2 creates first triangle, then v2-v1-v3 creates second
+    // Correct order: top-left, bottom-left, top-right, bottom-right
     struct QuadVertex {
         float position[2];
         float texCoord[2];
@@ -210,21 +202,16 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     };
     
     QuadVertex vertices[4] = {
-        {{x0_ndc, y0_ndc}, {s0, t0}, {r, g, b, a}},  // Top-left
-        {{x1_ndc, y0_ndc}, {s1, t0}, {r, g, b, a}},  // Top-right
-        {{x0_ndc, y1_ndc}, {s0, t1}, {r, g, b, a}},  // Bottom-left
-        {{x1_ndc, y1_ndc}, {s1, t1}, {r, g, b, a}}   // Bottom-right
+        {{x0_ndc, y0_ndc}, {s0, t0}, {r, g, b, a}},  // v0: Top-left
+        {{x0_ndc, y1_ndc}, {s0, t1}, {r, g, b, a}},  // v1: Bottom-left
+        {{x1_ndc, y0_ndc}, {s1, t0}, {r, g, b, a}},  // v2: Top-right
+        {{x1_ndc, y1_ndc}, {s1, t1}, {r, g, b, a}}   // v3: Bottom-right
     };
     
     // Create temporary vertex buffer for this quad
-    assert(m_renderer->m_device != nil && "Draw2dImage: Metal device cannot be nil");
-    assert(sizeof(vertices) == 32 * 4 && "Draw2dImage: vertex buffer size mismatch");
-    
     id<MTLBuffer> vertexBuffer = [m_renderer->m_device newBufferWithBytes:vertices
                                                                     length:sizeof(vertices)
                                                                    options:MTLResourceStorageModeShared];
-    
-    assert(vertexBuffer != nil && "Draw2dImage: vertex buffer creation should not fail with valid device");
     
     if (!vertexBuffer)
     {
@@ -234,6 +221,50 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     
     // Set vertex buffer
     [m_renderer->m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    
+    // Use appropriate pipeline state based on whether we have a texture
+    if (hasTexture && texture)
+    {
+        // Set up 2D rendering state with texture
+        if (m_spritePipelineState)
+        {
+            [m_renderer->m_renderEncoder setRenderPipelineState:m_spritePipelineState];
+        }
+        
+        // Bind texture
+        [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
+    }
+    else
+    {
+        // Solid color rendering (no texture)
+        // Use sprite pipeline state with a white texture, or create a solid color pipeline state
+        if (m_spritePipelineState)
+        {
+            [m_renderer->m_renderEncoder setRenderPipelineState:m_spritePipelineState];
+        }
+        
+        // Bind a white 1x1 texture for solid color rendering (shader will use vertex color)
+        // The sprite_fragment shader multiplies texture color by vertex color, so white texture = vertex color
+        assert(m_textureManager != nullptr && "Draw2dImage: texture manager required for solid color rendering");
+        
+        if (m_textureManager)
+        {
+            id<MTLTexture> whiteTexture = m_textureManager->GetWhiteTexture();
+            if (!whiteTexture)
+            {
+                // Ensure white texture exists
+                m_textureManager->SetWhiteTexture();
+                whiteTexture = m_textureManager->GetWhiteTexture();
+            }
+            
+            assert(whiteTexture != nil && "Draw2dImage: white texture creation failed - cannot render solid color quad");
+            
+            if (whiteTexture)
+            {
+                [m_renderer->m_renderEncoder setFragmentTexture:whiteTexture atIndex:0];
+            }
+        }
+    }
     
     // Draw triangle strip (4 vertices = 2 triangles)
     [m_renderer->m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
@@ -246,11 +277,6 @@ void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, 
 {
     assert(w > 0.0f && "DrawImage: width must be positive");
     assert(h > 0.0f && "DrawImage: height must be positive");
-    
-    if (texture_id < 0) {
-        // Skip drawing with invalid texture
-        return;
-    }
     assert(s0 >= 0.0f && s0 <= 1.0f && "DrawImage: s0 must be in range [0,1]");
     assert(t0 >= 0.0f && t0 <= 1.0f && "DrawImage: t0 must be in range [0,1]");
     assert(s1 >= 0.0f && s1 <= 1.0f && "DrawImage: s1 must be in range [0,1]");
@@ -261,6 +287,7 @@ void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, 
     assert(a >= 0.0f && a <= 1.0f && "DrawImage: alpha component must be in range [0,1]");
     
     // DrawImage is a simplified version of Draw2dImage (no angle or z parameter)
+    // texture_id can be -1 for solid color quads
     Draw2dImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1, 0.0f, r, g, b, a, 1.0f);
 }
 
@@ -777,44 +804,29 @@ float CMetalUtilityRenderer::EF_GetWaterZElevation(float fX, float fY)
 // Protected methods
 void CMetalUtilityRenderer::CreateDebugPipelineState()
 {
-    if (!m_renderer || !m_renderer->m_device)
-        return;
-        
-    // Create debug pipeline state
-    MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-    
-    NSError* error = nil;
-    m_debugPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
-    if (!m_debugPipelineState)
-    {
-        iLog->Log("Error: Failed to create debug pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
-    }
+    // Debug pipeline state creation deferred - not needed for UI rendering
+    // Will be implemented when debug rendering is needed
 }
 
 void CMetalUtilityRenderer::CreateTextPipelineState()
 {
-    if (!m_renderer || !m_renderer->m_device)
-        return;
-        
-    // Create text pipeline state
-    MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-    
-    NSError* error = nil;
-    m_textPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
-    if (!m_textPipelineState)
-    {
-        iLog->Log("Error: Failed to create text pipeline state: %s", error ? [[error localizedDescription] UTF8String] : "Unknown error");
-    }
+    // Text pipeline state creation deferred - not needed for UI rendering
+    // Will be implemented when text rendering is needed
 }
 
 void CMetalUtilityRenderer::CreateSpritePipelineState()
 {
+    // Lazy initialization: Create sprite pipeline state on first use
+    // This is deferred from constructor because shaders may not be loaded yet at initialization time
+    // The sprite pipeline is required for all 2D UI rendering (both textured and solid color quads)
+    
+    assert(m_renderer != nullptr && "CreateSpritePipelineState: renderer cannot be null");
+    assert(m_renderer->m_device != nil && "CreateSpritePipelineState: Metal device cannot be nil");
+    
     if (!m_renderer || !m_renderer->m_device)
+    {
         return;
+    }
         
     // Create sprite pipeline state descriptor
     MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
@@ -858,44 +870,70 @@ void CMetalUtilityRenderer::CreateSpritePipelineState()
     
     descriptor.vertexDescriptor = vertexDescriptor;
     
-    // Try to load shader functions from default library
+    // Try to load shader functions from SpriteShaders.metallib
     NSError* error = nil;
-    id<MTLLibrary> defaultLibrary = [m_renderer->m_device newDefaultLibrary];
+    id<MTLLibrary> spriteLibrary = nil;
     
-    if (defaultLibrary)
+    // Try loading from app bundle Resources
+    NSBundle* bundle = [NSBundle mainBundle];
+    NSString* shaderPath = [bundle pathForResource:@"SpriteShaders" ofType:@"metallib"];
+    
+    if (shaderPath)
     {
-        id<MTLFunction> vertexFunction = [defaultLibrary newFunctionWithName:@"sprite_vertex"];
-        id<MTLFunction> fragmentFunction = [defaultLibrary newFunctionWithName:@"sprite_fragment"];
+        spriteLibrary = [m_renderer->m_device newLibraryWithFile:shaderPath error:&error];
+    }
+    
+    if (!spriteLibrary)
+    {
+        // Try loading from app bundle MacOS directory (where we copy the metallibs)
+        NSString* exePath = [[NSBundle mainBundle] executablePath];
+        NSString* exeDir = [exePath stringByDeletingLastPathComponent];
+        NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"SpriteShaders.metallib"];
         
-        if (vertexFunction && fragmentFunction)
-        {
-            assert(vertexFunction != nil && "CreateSpritePipelineState: sprite_vertex function should be loaded");
-            assert(fragmentFunction != nil && "CreateSpritePipelineState: sprite_fragment function should be loaded");
-            
-            descriptor.vertexFunction = vertexFunction;
-            descriptor.fragmentFunction = fragmentFunction;
-        }
-        else
-        {
-            iLog->Log("Warning: Sprite shader functions not found in default library, pipeline may not work\n");
-        }
+        spriteLibrary = [m_renderer->m_device newLibraryWithFile:metallibPath error:&error];
     }
-    else
+    
+    if (!spriteLibrary)
     {
-        assert(defaultLibrary != nil && "CreateSpritePipelineState: default library should be available");
-        iLog->Log("Warning: Could not load default Metal library\n");
+        // Fallback to default library (may contain sprite shaders if compiled in)
+        spriteLibrary = [m_renderer->m_device newDefaultLibrary];
     }
+    
+    assert(spriteLibrary != nil && "CreateSpritePipelineState: Failed to load SpriteShaders.metallib - check CMake build configuration");
+    
+    if (!spriteLibrary)
+    {
+        iLog->Log("Error: Could not load SpriteShaders library: %s\n", 
+               error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        return;
+    }
+    
+    id<MTLFunction> vertexFunction = [spriteLibrary newFunctionWithName:@"sprite_vertex"];
+    id<MTLFunction> fragmentFunction = [spriteLibrary newFunctionWithName:@"sprite_fragment"];
+    
+    assert(vertexFunction != nil && "CreateSpritePipelineState: sprite_vertex function not found in library");
+    assert(fragmentFunction != nil && "CreateSpritePipelineState: sprite_fragment function not found in library");
+    
+    if (!vertexFunction || !fragmentFunction)
+    {
+        iLog->Log("Error: Sprite shader functions not found (vertex=%p, fragment=%p)\n", vertexFunction, fragmentFunction);
+        return;
+    }
+    
+    descriptor.vertexFunction = vertexFunction;
+    descriptor.fragmentFunction = fragmentFunction;
+    
+    // Double-check that descriptor has valid functions before creating pipeline state
+    assert(descriptor.vertexFunction != nil && "CreateSpritePipelineState: descriptor vertex function cannot be nil");
+    assert(descriptor.fragmentFunction != nil && "CreateSpritePipelineState: descriptor fragment function cannot be nil");
     
     m_spritePipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    
+    assert(m_spritePipelineState != nil && "CreateSpritePipelineState: pipeline state creation failed - check Metal shader compilation");
     
     if (!m_spritePipelineState)
     {
         iLog->Log("Error: Failed to create sprite pipeline state: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
-    }
-    else
-    {
-        assert(m_spritePipelineState != nil && "CreateSpritePipelineState: pipeline state should be valid after successful creation");
-        iLog->Log("MetalUtilityRenderer: Sprite pipeline state created successfully\n");
     }
 }
 
@@ -937,3 +975,4 @@ void CMetalUtilityRenderer::ReleaseRenderTargetId(int id)
 }
 
 #endif // __APPLE__ && __MACH__
+

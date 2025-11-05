@@ -758,17 +758,35 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 		if (!bInEditor)
 		{
 			//-------------------------------------------------------------------------------------------------
+				printf("CXGame::Init - Creating UI System (bInEditor=%d, m_bDedicatedServer=%d)\n", bInEditor ? 1 : 0, m_bDedicatedServer ? 1 : 0);
+				fflush(stdout);
 				m_pUISystem = new CUISystem;
 
 				if (m_pUISystem)
 				{
-					m_pUISystem->Create(this, m_pSystem, m_pScriptSystem, "Scripts/MenuScreens/UISystem.lua", 1);
-					m_pLog->Log("CXGame::Init - UI System created successfully");
+					printf("CXGame::Init - UI System object created, calling Create()\n");
+					fflush(stdout);
+					int createResult = m_pUISystem->Create(this, m_pSystem, m_pScriptSystem, "Scripts/MenuScreens/UISystem.lua", 1);
+					if (createResult)
+					{
+						printf("CXGame::Init - UI System created successfully\n");
+						fflush(stdout);
+						m_pLog->Log("CXGame::Init - UI System created successfully\n");
+					}
+					else
+					{
+						printf("CXGame::Init - UI System Create() returned 0 (script file may be missing: Scripts/MenuScreens/UISystem.lua)\n");
+						fflush(stdout);
+						m_pLog->Log("CXGame::Init - UI System Create() returned 0 (script file may be missing: Scripts/MenuScreens/UISystem.lua)\n");
+						m_pLog->Log("CXGame::Init - UI System will not function properly without the script file\n");
+					}
 				}
 				else
 				{
-					m_pLog->Log("Failed to create UI System!");
-			}
+					printf("CXGame::Init - Failed to create UI System!\n");
+					fflush(stdout);
+					m_pLog->Log("Failed to create UI System!\n");
+				}
 			//------------------------------------------------------------------------------------------------- 
 		}
 
@@ -1097,10 +1115,37 @@ bool CXGame::Update()
 	{
 		FRAME_PROFILER("GameUpdate:UI", m_pSystem, PROFILE_GAME);
 
+		printf("CXGame::Update - UI System check: m_pUISystem=%p, IsEnabled=%d, m_bMenuOverlay=%d, m_bUIOverlay=%d\n",
+			m_pUISystem, m_pUISystem->IsEnabled(), m_bMenuOverlay, m_bUIOverlay);
+		fflush(stdout);
+
 		if (m_bMenuOverlay || m_bUIOverlay)
 		{
+			printf("CXGame::Update - Drawing UI (m_bMenuOverlay=%d, m_bUIOverlay=%d)\n", m_bMenuOverlay, m_bUIOverlay);
+			fflush(stdout);
+			m_pLog->Log("CXGame::Update - Drawing UI (m_bMenuOverlay=%d, m_bUIOverlay=%d)\n", m_bMenuOverlay, m_bUIOverlay);
 			m_pUISystem->Update();			
 			m_pUISystem->Draw();
+		}
+		else
+		{
+			static int uiLogCounter = 0;
+			if (uiLogCounter++ < 5) {
+				printf("CXGame::Update - UI enabled but menu overlay flags not set (m_bMenuOverlay=%d, m_bUIOverlay=%d)\n", m_bMenuOverlay, m_bUIOverlay);
+				fflush(stdout);
+				m_pLog->Log("CXGame::Update - UI enabled but menu overlay flags not set\n");
+			}
+		}
+	}
+	else
+	{
+		static int uiLogCounter = 0;
+		if (uiLogCounter++ < 5) {
+			printf("CXGame::Update - UI System not enabled (m_pUISystem=%p, IsEnabled=%d)\n", 
+				m_pUISystem, m_pUISystem ? m_pUISystem->IsEnabled() : 0);
+			fflush(stdout);
+			m_pLog->Log("CXGame::Update - UI System not enabled (m_pUISystem=%p, IsEnabled=%d)\n", 
+				m_pUISystem, m_pUISystem ? m_pUISystem->IsEnabled() : 0);
 		}
 	}
 

@@ -77,6 +77,7 @@ public:
     
     void SetTexture(int tnum, ETexType Type = eTT_Base);
     void SetWhiteTexture();
+    id<MTLTexture> GetWhiteTexture() const { return m_whiteTexture; }
     
     // Upload texture data from memory to GPU
     unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 

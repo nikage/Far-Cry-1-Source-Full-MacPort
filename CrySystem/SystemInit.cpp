@@ -46,6 +46,11 @@
 #include "DataProbe.h"
 #include "ApplicationHelper.h"				// CApplicationHelper
 
+// Forward declaration for font system
+struct ICryFont;
+typedef ICryFont* (*PFNCREATECRYFONTINTERFACE)(ISystem *pSystem);
+extern "C" ICryFont* CreateCryFontInterface(ISystem *pSystem);
+
 #define  PROFILE_WITH_VTUNE
 
 //////////////////////////////////////////////////////////////////////////
@@ -918,12 +923,21 @@ bool CSystem::InitFont()
 	}
 
 #ifdef __APPLE__
-	// Temporarily disable font loading on macOS to avoid hangs
-	GetILog()->LogToFile("Font system disabled for macOS - skipping font initialization");
-	return true;
-#endif
-
-#ifndef _XBOX
+	// Use static linking for macOS (like _XBOX)
+	m_pICryFont = CreateCryFontInterface(this);
+	if(!m_pICryFont)
+	{
+		Error( "Error creating CryFont interface on macOS");
+		return false;
+	}
+#elif defined(_XBOX)
+	m_pICryFont = CreateCryFontInterface(this);
+	if(!m_pICryFont)
+	{
+		Error( "Error loading CreateCryFontInstance" );
+		return false;
+	}
+#else
 	m_dll.hFont = LoadDLL(DLL_FONT);
 	if(!m_dll.hFont)
 		return (false);
@@ -941,13 +955,6 @@ bool CSystem::InitFont()
 		Error( "Error creating CryFont interface" );
 		return false;
 	}
-#else
-	m_pICryFont = CreateCryFontInterface(this);
-	if(!m_pICryFont)
-	{
-		Error( "Error loading CreateCryFontInstance" );
-		return false;
-	}
 #endif
 
 	// Load the default font
@@ -955,7 +962,7 @@ bool CSystem::InitFont()
 	m_pIFont = m_pICryFont->NewFont("Default");
 	if(!m_pIFont || !pConsoleFont)
 	{
-		Error( "Error creating the default fonts" );
+		Error("Error creating the default fonts");
 		return false;
 	}
 

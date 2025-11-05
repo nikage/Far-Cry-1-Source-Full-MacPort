@@ -114,6 +114,12 @@ bool CStringTableMgr::LoadExcelXmlSpreadsheet( const string &sFileName )
 
 	XDOM::IXMLDOMDocumentPtr pDoc=m_pSystem->CreateXMLDocument();
 	
+	// Check if XML document creation succeeded (may fail on macOS if XML system is not fully implemented)
+	if (!pDoc)
+	{
+		assert(false && "CStringTableMgr::LoadExcelXmlSpreadsheet - Failed to create XML document (XML system may not be implemented on this platform)");
+	}
+	
 	// load xml-file	
 	if (!pDoc->load(sPath.c_str()))
 		return (false);

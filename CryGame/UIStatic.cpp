@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - A Static Control
@@ -553,6 +553,12 @@ int CUIStatic::SetText(const wstring &szText)
 
 	IFFont *pFont = m_pUISystem->GetIFont(m_pFont);
 
+	if (!pFont)
+	{
+		assert(false && "CUIStatic::SetText - Font is NULL, cannot set text");
+		return 1;
+	}
+	
 	GetLineMetrics(&m_vLines[0], pFont);
 
 	return 1;

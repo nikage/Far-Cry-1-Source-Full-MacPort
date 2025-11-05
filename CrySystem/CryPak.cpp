@@ -69,6 +69,7 @@ m_mapMissingFiles ( std::less<string>(), MissingFileMapAllocator(g_pBigHeap) )
 	char szCurrentDir[0x800];
 	if (GetCurrentDirectory(sizeof(szCurrentDir), szCurrentDir))
 	{
+		m_pLog->Log("CCryPak::CCryPak - Current directory: %s\n", szCurrentDir);
 		// normalize it (lower-char with forward slashes and trailing slash)
 		char* p;
 		for (p = szCurrentDir; *p; ++p)

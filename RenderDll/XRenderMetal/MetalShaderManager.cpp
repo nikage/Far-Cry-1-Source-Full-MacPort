@@ -19,6 +19,7 @@
 #include "MetalBaseRenderer.h"
 #include "MetalTextureManager.h"
 #include "MetalRenderElements.h"  // For Metal render element classes
+#include "MetalVertexDescriptor.h"  // For CMetalVertexDescriptorHelper
 #include <Cocoa/Cocoa.h>
 #include <cassert>
 #include <iostream>
@@ -126,8 +127,23 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
         return nullptr;
     }
     
+    // Validate functions before creating pipeline state
+    if (!vertexFunction || !fragmentFunction)
+    {
+        iLog->Log("Error: Shader functions are nil for shader: %s (vertex=%p, fragment=%p)", name, vertexFunction, fragmentFunction);
+        return nullptr;
+    }
+    
+    // Create vertex descriptor (use a default one if nil is passed)
+    MTLVertexDescriptor* vertexDesc = CMetalVertexDescriptorHelper::CreateVertexDescriptor(VERTEX_FORMAT_P3F_N_COL4UB_TEX2F);
+    if (!vertexDesc)
+    {
+        iLog->Log("Error: Failed to create vertex descriptor for shader: %s", name);
+        return nullptr;
+    }
+    
     // Create pipeline state
-    id<MTLRenderPipelineState> pipelineState = CreatePipelineState(vertexFunction, fragmentFunction, nil);
+    id<MTLRenderPipelineState> pipelineState = CreatePipelineState(vertexFunction, fragmentFunction, vertexDesc);
     if (!pipelineState)
     {
         iLog->Log("Error: Failed to create pipeline state for shader: %s", name);

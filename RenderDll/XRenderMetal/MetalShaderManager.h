@@ -130,7 +130,7 @@ public:
     void ClearAllShaders();
     int GetShaderCount() const;
     void SetGlobalShaderTemplateId(int nTemplateId);
-    int GetGlobalShaderTemplateId();
+    int GetGlobalShaderTemplateId() const;
 
     // Pipeline state access methods
     id<MTLRenderPipelineState> GetPipelineStateForShader(const char* shaderName);

@@ -30,21 +30,21 @@
 #define UI_DEFAULTS							(UI_MOUSE_VISIBLE | UI_BACKGROUND_VISIBLE | UI_ENABLED)
 
 
-//------------------------------------------------------------------------------------------------- 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 CUISystem::CUISystem()
 : m_pGame(0), m_pSystem(0), m_pScriptSystem(0), m_pRenderer(0), m_pInput(0)
 {
 	Reset();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUISystem::~CUISystem()
 {
 }
 
-//------------------------------------------------------------------------------------------------- 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 // if message processed, return 1, else return 0
 LRESULT CUISystem::DefaultUpdate(CUIWidget *pWidget, unsigned int iMessage, WPARAM wParam, LPARAM lParam)
 {
@@ -75,7 +75,7 @@ LRESULT CUISystem::DefaultUpdate(CUIWidget *pWidget, unsigned int iMessage, WPAR
 			if (pWidget->GetFlags() & UIFLAG_VISIBLE)
 			{
 				int iRet = pWidget->Draw(wParam);
-				
+
 				return iRet;
 			}
 		}
@@ -186,7 +186,7 @@ LRESULT CUISystem::DefaultUpdate(CUIWidget *pWidget, unsigned int iMessage, WPAR
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::InitializeTemplates()
 {
 	CUIStatic::InitializeTemplate(m_pScriptSystem);
@@ -202,7 +202,7 @@ int CUISystem::InitializeTemplates()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ReleaseTemplates()
 {
 	CUIStatic::ReleaseTemplate();
@@ -219,7 +219,7 @@ int CUISystem::ReleaseTemplates()
 }
 
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int	CUISystem::Create(IGame *pGame, ISystem *pSystem, IScriptSystem *pScriptSystem, const string &szScriptFileName, bool bRunScriptFile)
 {
 	m_pGame = pGame;
@@ -228,6 +228,8 @@ int	CUISystem::Create(IGame *pGame, ISystem *pSystem, IScriptSystem *pScriptSyst
 	m_pRenderer = pSystem->GetIRenderer();
 	m_pInput = m_pSystem->GetIInput();
 	m_pLog = m_pSystem->GetILog();
+
+	m_pLog->Log("CUISystem::Create ENTRY - script file: '%s', bRunScriptFile=%d\n", szScriptFileName.c_str(), bRunScriptFile ? 1 : 0);
 
 	m_fVirtualToRealX = (double)m_pRenderer->GetWidth() / 800.0;
 	m_fVirtualToRealY = (double)m_pRenderer->GetHeight() / 600.0;
@@ -247,39 +249,40 @@ int	CUISystem::Create(IGame *pGame, ISystem *pSystem, IScriptSystem *pScriptSyst
 
 	m_pScriptObjectUI = new CScriptObjectUI;
 
-	if (!m_pScriptObjectUI)
-	{
-		return 0;
-	}
-	
+	assert(m_pScriptObjectUI != nullptr && "CUISystem::Create - Failed to create CScriptObjectUI");
+
 	m_pScriptObjectUI->Create(this);
 
 	InitializeTemplates();
 
 	if ((m_szScriptFileName.size()) && (bRunScriptFile))
 	{
+		m_pLog->Log("CUISystem::Create - Attempting to load script file: '%s'\n", m_szScriptFileName.c_str());
 		if (!m_pScriptSystem->ExecuteFile(m_szScriptFileName.c_str(), 1, 1))
 		{
-			m_pLog->Log("\001$4[Error]$1: Failed to load UISystem.lua! UI System functionality compromissed!");
+			m_pLog->Log("CUISystem::Create - Script file NOT FOUND or failed to execute: '%s'\n", m_szScriptFileName.c_str());
 
 			return 0;
 		}
-		else
+		m_pLog->Log("CUISystem::Create - Script file loaded successfully: '%s'\n", m_szScriptFileName.c_str());
+		if (m_pScriptObjectUI)
 		{
-			if (m_pScriptObjectUI)
-			{
-				m_pScriptObjectUI->OnInit();
-			}
+			m_pScriptObjectUI->OnInit();
 		}
+        }
+	else
+	{
+		assert(false && "CUISystem::Create - Skipping script file (empty filename or bRunScriptFile=false)\n");
 	}
 
 	// reset idle timer
 	m_fLastInput = m_pSystem->GetITimer()->GetCurrTime();
 
+	m_pLog->Log("CUISystem::Create - Returning success (IsEnabled=%d)\n", IsEnabled());
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ResetKeyRepeat()
 {
 	m_fRepeatTimer = 0;
@@ -289,14 +292,14 @@ int CUISystem::ResetKeyRepeat()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 void CUISystem::Update()
 {
 	// hack to get a background picture if not using any video player
 #if defined(NOT_USE_BINK_SDK) && defined(NOT_USE_DIVX_SDK)
 	ui_BackGroundVideo->Set(0);
 #endif
-	
+
 	FUNCTION_PROFILER( m_pSystem, PROFILE_GAME );
 
 	if (m_pRenderer && m_iReloadFrameID > -1 && m_pRenderer->GetFrameID() == m_iReloadFrameID)
@@ -336,7 +339,7 @@ void CUISystem::Update()
 		return;
 	}
 
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	if (m_iLastKey != XKEY_NULL)
 	{
 		float fTime = m_pSystem->GetITimer()->GetAsyncCurTime() * 1000.0f;
@@ -362,7 +365,7 @@ void CUISystem::Update()
 			m_fRepeatTimer += fNextTimer;
 		}
 	}
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 
 	// trigger UI:OnUpdate
 	if (ui_TriggerUIEvents->GetIVal() != 0)
@@ -427,9 +430,9 @@ void CUISystem::Update()
 		}
 	}
 
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	// MOUSE EVENTS
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 
 	// update idle timer
 	if (bMouseMoved)
@@ -501,7 +504,7 @@ void CUISystem::Update()
 		m_fToolTipOverStart = fTime;
 		m_fToolTipAlpha = 0.0f;
 	}
-	
+
 	// check if the widget is still "alive"
 	// it might be dead because of a call to release, or because of a call to Reload()
 	if (!WidgetExist(pMouseOver))
@@ -623,7 +626,7 @@ void CUISystem::Update()
 	{
 		m_iMouseCurrentCursor = -1;
 	}
-	
+
 	// save the current mouse postion
 	m_vMouseXY = vMouseXY;
 	m_bLMouseDown = bLMouseDown;
@@ -673,21 +676,22 @@ void CUISystem::Update()
 		}
 	}
 
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	if (ShouldSortTabStop())
 	{
 		SortTabStop();
 	}
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 void CUISystem::Draw()
 {
 	FUNCTION_PROFILER( m_pSystem, PROFILE_GAME );
 //	m_pRenderer->ClearDepthBuffer();
 
+
 	m_pRenderer->Set2DMode(1, m_pRenderer->GetWidth(), m_pRenderer->GetHeight());
-  m_pRenderer->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
+	m_pRenderer->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
 
 	int iCurrentFlags = m_iFlags;
 
@@ -744,19 +748,18 @@ void CUISystem::Draw()
 	}
 
 	m_pRenderer->Set2DMode(0, 0, 0);
-  m_pRenderer->SetState(GS_DEPTHWRITE);
-
+	m_pRenderer->SetState(GS_DEPTHWRITE);
 	m_bSortZ = 0;
 	m_bSortTabStop = 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 void CUISystem::ShutDown(bool bEditorMode)
 {
 	Release();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::Release()
 {
 	if(m_pLog)
@@ -785,7 +788,7 @@ int CUISystem::Release()
 				m_pScriptObjectUI->OnRelease();
 			}
 		}
-		
+
 		delete m_pScriptObjectUI;
 		m_pScriptObjectUI = 0;
 	}
@@ -797,13 +800,13 @@ int CUISystem::Release()
 	{
 		m_pInput->RemoveEventListener(this);
 	}
-	
+
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::Reset()
-{	
+{
 	m_pScriptObjectUI = 0;
 	m_pMouseCaptured = 0;
 	m_pMouseOver = 0;
@@ -833,7 +836,7 @@ int CUISystem::Reset()
 	m_fToolTipOverStart = 0;
 	m_szwToolTipText = L"";
 	m_iReloadFrameID = -1;
-	
+
 	m_pToolTipBorder.fSize = 1.0f;
 	m_pToolTipBorder.iStyle = UIBORDERSTYLE_FLAT;
 	m_pToolTipBorder.cColor = color4f(0.0f, 0.0f, 0.0f, 1.0f);
@@ -856,7 +859,7 @@ int CUISystem::Reset()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::Reload(int iFrameDelta)
 {
 	if (iFrameDelta > 0)
@@ -911,7 +914,7 @@ int CUISystem::Reload(int iFrameDelta)
 	m_pScriptObjectUI->Create(this);
 
 	m_pLog->LogToConsole("\001  Reloading scripts...");
-	
+
 	if (!m_pScriptSystem->ExecuteFile(m_szScriptFileName.c_str(), 1, 1))
 	{
 		Release();
@@ -934,7 +937,7 @@ int CUISystem::Reload(int iFrameDelta)
 
 	return 1;
 }
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::Enable()
 {
 	m_iFlags |= UI_ENABLED;
@@ -946,7 +949,7 @@ int CUISystem::Enable()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::Disable()
 {
 	m_iFlags &= ~UI_ENABLED;
@@ -954,32 +957,32 @@ int CUISystem::Disable()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::IsEnabled()
 {
 	return ((m_iFlags & UI_ENABLED) != 0);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 IScriptObject *CUISystem::GetWidgetScriptObject(CUIWidget *pWidget)
 {
 	return pWidget->GetScriptObject();
 }
 
-//------------------------------------------------------------------------------------------------- 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 CUIWidgetList *CUISystem::GetWidgetList()
 {
 	return &m_pWidgetList;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetWidget(int iIndex)
 {
 	return m_pWidgetList[iIndex];
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetWidget(const string &szName)
 {
 	for (CUIWidgetItor pItor = m_pWidgetList.begin(); pItor != m_pWidgetList.end(); pItor++)
@@ -993,7 +996,7 @@ CUIWidget *CUISystem::GetWidget(const string &szName)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetWidget(const string &szName, const string &szScreenName)
 {
 	CUIScreen *pScreen = GetScreen(szScreenName);
@@ -1014,31 +1017,31 @@ CUIWidget *CUISystem::GetWidget(const string &szName, const string &szScreenName
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int	CUISystem::GetWidgetCount()
 {
 	return m_pWidgetList.size();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::WidgetExist(CUIWidget *pWidget)
 {
 	return (std::find(m_pWidgetList.begin(), m_pWidgetList.end(), pWidget) == m_pWidgetList.end() ? 0 : 1);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIScreenList *CUISystem::GetScreenList()
 {
 	return &m_vScreenList;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIScreen *CUISystem::GetScreen(int iIndex)
 {
 	return m_vScreenList[iIndex];
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIScreen *CUISystem::GetScreen(const string &szName)
 {
 	for (CUIScreenItor pItor = m_vScreenList.begin(); pItor != m_vScreenList.end(); pItor++)
@@ -1052,13 +1055,13 @@ CUIScreen *CUISystem::GetScreen(const string &szName)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int	CUISystem::GetScreenCount()
 {
 	return m_vScreenList.size();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ActivateScreen(CUIScreen *pScreen)
 {
 	CUIScreenItor pItor = std::find(m_vScreenList.begin(), m_vScreenList.end(), pScreen);
@@ -1094,11 +1097,11 @@ int CUISystem::ActivateScreen(CUIScreen *pScreen)
 			return 1;
 		}
 	}
-  
+
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DeactivateScreen(CUIScreen *pScreen)
 {
 	CUIScreenItor pItor = std::find(m_vScreenList.begin(), m_vScreenList.end(), pScreen);
@@ -1131,13 +1134,13 @@ int CUISystem::DeactivateScreen(CUIScreen *pScreen)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::IsScreenActive(CUIScreen *pScreen)
 {
 	return pScreen->m_bActive;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetActiveScreenCount()
 {
 	int iCount = 0;
@@ -1152,7 +1155,7 @@ int CUISystem::GetActiveScreenCount()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DeactivateAllScreens()
 {
 	for (CUIScreenItor pItor = m_vScreenList.begin(); pItor != m_vScreenList.end(); ++pItor)
@@ -1167,7 +1170,7 @@ int CUISystem::DeactivateAllScreens()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ActivateAllScreens()
 {
 	// i need to call the Activate method, because i want it to call the OnActivate method
@@ -1179,19 +1182,19 @@ int CUISystem::ActivateAllScreens()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidgetList *CUISystem::GetChildList()
 {
 	return &m_pChildList;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetChild(int iIndex)
 {
 	return m_pChildList[iIndex];
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetChild(const string &szName)
 {
 	for (CUIWidgetItor pItor = m_pChildList.begin(); pItor != m_pChildList.end(); pItor++)
@@ -1205,13 +1208,13 @@ CUIWidget *CUISystem::GetChild(const string &szName)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetChildCount()
 {
 	return m_pChildList.size();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::AddChild(CUIWidget *pWidget)
 {
 	for (CUIWidgetItor pItor = m_pChildList.begin(); pItor != m_pChildList.end(); pItor++)
@@ -1227,7 +1230,7 @@ int CUISystem::AddChild(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DelChild(CUIWidget *pWidget)
 {
 	for (CUIWidgetItor pItor = m_pChildList.begin(); pItor != m_pChildList.end(); pItor++)
@@ -1243,13 +1246,13 @@ int CUISystem::DelChild(CUIWidget *pWidget)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DelChild(int iIndex)
 {
 	return DelChild(m_pChildList[iIndex]);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DelChild(const string &szName)
 {
 	for (CUIWidgetItor pItor = m_pChildList.begin(); pItor != m_pChildList.end(); pItor++)
@@ -1265,8 +1268,8 @@ int CUISystem::DelChild(const string &szName)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetBackground(int iBackgroundTexture)
 {
 	m_iBackgroundTextureID = iBackgroundTexture;
@@ -1274,13 +1277,13 @@ int CUISystem::SetBackground(int iBackgroundTexture)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetBackground()
 {
 	return m_iBackgroundTextureID;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetBackgroundColor(const color4f &cColor)
 {
 	m_cBackgroundColor = cColor;
@@ -1288,7 +1291,7 @@ int CUISystem::SetBackgroundColor(const color4f &cColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetBackgroundColor(color4f *pColor)
 {
 	*pColor = m_cBackgroundColor;
@@ -1296,7 +1299,7 @@ int CUISystem::GetBackgroundColor(color4f *pColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ShowBackground()
 {
 	m_iFlags |= UI_BACKGROUND_VISIBLE;
@@ -1304,7 +1307,7 @@ int CUISystem::ShowBackground()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::HideBackground()
 {
 	m_iFlags &= ~UI_BACKGROUND_VISIBLE;
@@ -1312,13 +1315,13 @@ int CUISystem::HideBackground()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 bool CUISystem::IsBackgroundVisible()
 {
 	return ((m_iFlags & UI_BACKGROUND_VISIBLE) != 0);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetGreyedColor(const color4f &cColor)
 {
 	m_cGreyedColor = cColor;
@@ -1326,7 +1329,7 @@ int CUISystem::SetGreyedColor(const color4f &cColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetGreyedColor(color4f *cColor)
 {
 	*cColor = m_cGreyedColor;
@@ -1334,7 +1337,7 @@ int CUISystem::GetGreyedColor(color4f *cColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetMouseCursor(int iTextureID)
 {
 	m_iMouseCursorTextureID = iTextureID;
@@ -1356,13 +1359,13 @@ int CUISystem::SetMouseCursor(int iTextureID)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetMouseCursor()
 {
 	return m_iMouseCursorTextureID;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetMouseCursorColor(const color4f &cColor)
 {
 	m_cMouseCursorColor = cColor;
@@ -1370,7 +1373,7 @@ int CUISystem::SetMouseCursorColor(const color4f &cColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetMouseCursorColor(color4f *pColor)
 {
 	*pColor = m_cMouseCursorColor;
@@ -1378,7 +1381,7 @@ int CUISystem::GetMouseCursorColor(color4f *pColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetMouseCursorSize(float fWidth, float fHeight)
 {
 	m_fMouseCursorWidth = fWidth;
@@ -1387,7 +1390,7 @@ int CUISystem::SetMouseCursorSize(float fWidth, float fHeight)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetMouseCursorSize(float *fWidth, float *fHeight)
 {
 	*fWidth = m_fMouseCursorWidth;
@@ -1396,7 +1399,7 @@ int CUISystem::GetMouseCursorSize(float *fWidth, float *fHeight)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ShowMouseCursor()
 {
 	m_iFlags |= UI_MOUSE_VISIBLE;
@@ -1404,7 +1407,7 @@ int CUISystem::ShowMouseCursor()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::HideMouseCursor()
 {
 	m_iFlags &= ~UI_MOUSE_VISIBLE;
@@ -1412,13 +1415,13 @@ int CUISystem::HideMouseCursor()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 bool CUISystem::IsMouseCursorVisible()
 {
 	return ((m_iFlags & UI_MOUSE_VISIBLE) != 0);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetMouseXY(float fX, float fY)
 {
 	m_pInput->GetIMouse()->SetVScreenX(fX);
@@ -1427,13 +1430,13 @@ int CUISystem::SetMouseXY(float fX, float fY)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 vector2f CUISystem::GetMouseXY()
 {
 	return vector2f(m_pInput->MouseGetVScreenX(), m_pInput->MouseGetVScreenY());
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CaptureMouse(CUIWidget *pWidget)
 {
 	if ((m_pMouseCaptured) && (m_pMouseCaptured != pWidget))
@@ -1446,7 +1449,7 @@ int CUISystem::CaptureMouse(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ReleaseMouse()
 {
 	m_pMouseCaptured = 0;
@@ -1454,13 +1457,13 @@ int CUISystem::ReleaseMouse()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 float CUISystem::GetIdleTime()
 {
 	return max((m_pSystem->GetITimer()->GetCurrTime() - m_fLastInput) - UI_DEFAULT_IDLETIME_START, 0.0f);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 LRESULT CUISystem::SendMessage(string &szName, const string &szScreenName, int iMessage, WPARAM wParam, LPARAM lParam)
 {
 	CUIWidget *pWidget = GetWidget(szName, szScreenName);
@@ -1473,7 +1476,7 @@ LRESULT CUISystem::SendMessage(string &szName, const string &szScreenName, int i
 	return SendMessage(pWidget, iMessage, wParam, lParam);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 LRESULT CUISystem::SendMessage(CUIWidget *pWidget, int iMessage, WPARAM wParam, LPARAM lParam)
 {
 	// check if the widget is still alive
@@ -1595,7 +1598,7 @@ LRESULT CUISystem::SendMessage(CUIWidget *pWidget, int iMessage, WPARAM wParam, 
 	return pWidget->Update(iMessage, wParam, lParam);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 LRESULT CUISystem::BroadcastMessage(int iMessage, WPARAM wParam, LPARAM lParam)
 {
 	CUIWidget *pWidget;
@@ -1603,7 +1606,7 @@ LRESULT CUISystem::BroadcastMessage(int iMessage, WPARAM wParam, LPARAM lParam)
 	for (CUIWidgetItor pItor = m_pWidgetList.begin(); pItor != m_pWidgetList.end(); ++pItor)
 	{
 		pWidget = (*pItor);
-		
+
 		if ((!pWidget->m_pScreen) || (IsScreenActive(pWidget->m_pScreen)))
 		{
 			SendMessage(pWidget, iMessage, wParam, lParam);
@@ -1613,13 +1616,13 @@ LRESULT CUISystem::BroadcastMessage(int iMessage, WPARAM wParam, LPARAM lParam)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetWidgetParent(CUIWidget *pWidget)
 {
 	return pWidget->m_pParent;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 wstring CUISystem::GetWidgetText(CUIWidget *pWidget)
 {
 	if (pWidget->GetClassName() == UICLASSNAME_STATIC)
@@ -1640,13 +1643,13 @@ wstring CUISystem::GetWidgetText(CUIWidget *pWidget)
 	}
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 UIRect &CUISystem::GetWidgetRect(CUIWidget *pWidget)
 {
 	return pWidget->m_pRect;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetTabStop(int iTabStop)
 {
 	assert(iTabStop >= 0 && iTabStop < (int)m_pTabStopList.size());
@@ -1654,7 +1657,7 @@ CUIWidget *CUISystem::GetTabStop(int iTabStop)
 	return m_pTabStopList[iTabStop];
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::FirstTabStop()
 {
 	if (!m_pTabStopList.size())
@@ -1670,7 +1673,7 @@ int CUISystem::FirstTabStop()
 	{
 		if (IsOnFocusScreen(pWidget))
 		{
-			SetFocus(pWidget);		
+			SetFocus(pWidget);
 
 			return 1;
 		}
@@ -1679,7 +1682,7 @@ int CUISystem::FirstTabStop()
 	return NextTabStop();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::NextTabStop()
 {
 	if (!m_pTabStopList.size())
@@ -1696,7 +1699,7 @@ int CUISystem::NextTabStop()
 	}
 
 	while (m_iCurrentTabStop != iStart)
-	{	
+	{
 		pWidget = m_pTabStopList[m_iCurrentTabStop];
 
 		if ((pWidget->GetFlags() & UIFLAG_ENABLED) && (pWidget->GetFlags() & UIFLAG_VISIBLE) && (pWidget->GetFlags() & UIFLAG_CANHAVEFOCUS))
@@ -1718,7 +1721,7 @@ int CUISystem::NextTabStop()
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::PrevTabStop()
 {
 	if (!m_pTabStopList.size())
@@ -1735,7 +1738,7 @@ int CUISystem::PrevTabStop()
 	}
 
 	while (m_iCurrentTabStop != iStart)
-	{	
+	{
 		pWidget = m_pTabStopList[m_iCurrentTabStop];
 
 		if ((pWidget->GetFlags() & UIFLAG_ENABLED) && (pWidget->GetFlags() & UIFLAG_VISIBLE) && (pWidget->GetFlags() & UIFLAG_CANHAVEFOCUS))
@@ -1757,7 +1760,7 @@ int CUISystem::PrevTabStop()
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::LastTabStop()
 {
 	if (!m_pTabStopList.size())
@@ -1782,7 +1785,7 @@ int CUISystem::LastTabStop()
 	return PrevTabStop();
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetTopMostWidget(const string &szName)
 {
 	CUIWidget *pWidget = GetChild(szName);
@@ -1795,7 +1798,7 @@ int CUISystem::SetTopMostWidget(const string &szName)
 	return SetTopMostWidget(pWidget);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetTopMostWidget(CUIWidget *pWidget)
 {
 	if (GetChildCount() < 2)
@@ -1808,13 +1811,13 @@ int CUISystem::SetTopMostWidget(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetTopMostWidget()
 {
 	return *(m_pChildList.end()-1);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetFocus(CUIWidget *pWidget)
 {
 	if (m_pFocus == pWidget)
@@ -1862,7 +1865,7 @@ int CUISystem::SetFocus(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetFocus(string &szName)
 {
 	CUIWidget *pWidget = GetWidget(szName);
@@ -1872,7 +1875,7 @@ int CUISystem::SetFocus(string &szName)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetFocus(string &szName, string &szScreenName)
 {
 	CUIWidget *pWidget = GetWidget(szName, szScreenName);
@@ -1882,13 +1885,13 @@ int CUISystem::SetFocus(string &szName, string &szScreenName)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::GetFocus()
 {
 	return m_pFocus;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetFocusScreen(CUIScreen *pScreen)
 {
 	m_pFocusScreen = pScreen;
@@ -1896,7 +1899,7 @@ int CUISystem::SetFocusScreen(CUIScreen *pScreen)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetFocusScreen(string &szScreenName)
 {
 	m_pFocusScreen = GetScreen(szScreenName);
@@ -1904,13 +1907,13 @@ int CUISystem::SetFocusScreen(string &szScreenName)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIScreen *CUISystem::GetFocusScreen()
 {
 	return m_pFocusScreen;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 color4f CUISystem::GetSelectionColor(const color4f &cBackground, const color4f &cTextcolor)
 {
 	color4f cColor = (color4f(1.0f, 1.0f, 1.0f, 1.0f) - 0.5f * cBackground + 0.5f * cTextcolor);
@@ -1920,19 +1923,28 @@ color4f CUISystem::GetSelectionColor(const color4f &cBackground, const color4f &
 	return cColor;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 IFFont *CUISystem::GetIFont(const UIFont &pFont)
 {
-	IFFont *pIFont = m_pSystem->GetICryFont()->GetFont(pFont.szFaceName.c_str());
+	ICryFont *pICryFont = m_pSystem->GetICryFont();
+	if (!pICryFont)
+	{
+		assert(false && "CUISystem::GetIFont - ICryFont is NULL, font system not available");
+		return nullptr;
+	}
+
+	IFFont *pIFont = pICryFont->GetFont(pFont.szFaceName.c_str());
 
 	if (!pIFont)
 	{
-		pIFont = m_pSystem->GetICryFont()->GetFont("Default");
+		pIFont = pICryFont->GetFont("Default");
 	}
 
 	if (!pIFont)
 	{
-		return 0;
+		m_pSystem->GetILog()->Log("CUISystem::GetIFont - Could not load font '%s' or 'Default'", pFont.szFaceName.c_str());
+		assert(false);
+		return nullptr;
 	}
 
 	pIFont->Reset();
@@ -1945,9 +1957,11 @@ IFFont *CUISystem::GetIFont(const UIFont &pFont)
 	return pIFont;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetAlignedTextXY(float *fNewX, float *fNewY, IFFont *pFont, const UIRect &pTextRect, const wchar_t *szString, int iAlignmentX, int iAlignmentY)
 {
+	assert(pFont != nullptr && "CUISystem::GetAlignedTextXY - pFont cannot be null");
+	
 	vector2f vTextSize = pFont->GetTextSizeW(szString);
 
 	vTextSize.x = (float)(vTextSize.x * m_fRealToVirtualX);
@@ -1997,7 +2011,7 @@ int CUISystem::GetAlignedTextXY(float *fNewX, float *fNewY, IFFont *pFont, const
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetAbsoluteXY(float *fNewX, float *fNewY, float fRelativeX, float fRelativeY, CUIWidget *pWidget)
 {
 	*fNewX = fRelativeX;
@@ -2019,7 +2033,7 @@ int CUISystem::GetAbsoluteXY(float *fNewX, float *fNewY, float fRelativeX, float
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetRelativeXY(float *fNewX, float *fNewY, float fAbsoluteX, float fAbsoluteY, CUIWidget *pWidget)
 {
 	GetAbsoluteXY(fNewX, fNewY, 0, 0, pWidget);
@@ -2030,7 +2044,7 @@ int CUISystem::GetRelativeXY(float *fNewX, float *fNewY, float fAbsoluteX, float
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::IntersectRect(UIRect *pNewRect, const UIRect pRect1, const UIRect pRect2)
 {
 	// do some checks first
@@ -2083,7 +2097,7 @@ int CUISystem::IntersectRect(UIRect *pNewRect, const UIRect pRect1, const UIRect
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::AdjustRect(UIRect *pNewRect, const UIRect pRect, float fBorderSize, bool bGrow)
 {
 	float fSizeX = AdjustWidth(fBorderSize);
@@ -2107,13 +2121,13 @@ int CUISystem::AdjustRect(UIRect *pNewRect, const UIRect pRect, float fBorderSiz
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 bool CUISystem::PointInRect(const UIRect &pRect, float fX, float fY)
 {
 	return (((fX >= pRect.fLeft) && (fX <= pRect.fLeft + pRect.fWidth)) && ((fY >= pRect.fTop) && (fY <= pRect.fTop + pRect.fHeight)));
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 CUIWidget *CUISystem::FindWidgetAt(float fX, float fY)
 {
 	UIRect						pRect;
@@ -2122,7 +2136,7 @@ CUIWidget *CUISystem::FindWidgetAt(float fX, float fY)
 	CUIWidget					*pTopMostChild = 0;
 	int								iMaxZ = -1000000000;
 //	std::vector<CUIWidget *>	pMouseOverList;
-	
+
 	// first go through every child
 	CUIWidgetItor pItor;
 
@@ -2194,7 +2208,7 @@ CUIWidget *CUISystem::FindWidgetAt(float fX, float fY)
 	}
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::BeginDraw(CUIWidget *pWidget)
 {
 	if (m_bDrawing)
@@ -2220,7 +2234,7 @@ int CUISystem::BeginDraw(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ResetDraw()
 {
 	if (m_bDrawing)
@@ -2237,7 +2251,7 @@ int CUISystem::ResetDraw()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::EndDraw()
 {
   m_pRenderer->SetState(GS_DEPTHWRITE);
@@ -2254,7 +2268,7 @@ int CUISystem::EndDraw()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 float CUISystem::AdjustWidth(float fBorderW)
 {
 	if ((fBorderW >= 1.0f) && (m_fVirtualToRealX * fBorderW < 1.0f))
@@ -2267,7 +2281,7 @@ float CUISystem::AdjustWidth(float fBorderW)
 	}
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 float CUISystem::AdjustHeight(float fBorderH)
 {
 	if ((fBorderH >= 1.0f) && (m_fVirtualToRealY * fBorderH < 1.0f))
@@ -2280,7 +2294,7 @@ float CUISystem::AdjustHeight(float fBorderH)
 	}
 };
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::GetWidgetCanvas(UIRect *pWidgetCanvas, CUIWidget *pWidget)
 {
 	if (pWidget->m_pParent)
@@ -2322,7 +2336,7 @@ int CUISystem::GetWidgetCanvas(UIRect *pWidgetCanvas, CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ShowWidget(CUIWidget *pWidget)
 {
 	pWidget->m_iFlags |= UIFLAG_VISIBLE;
@@ -2330,7 +2344,7 @@ int CUISystem::ShowWidget(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::HideWidget(CUIWidget *pWidget)
 {
 	pWidget->m_iFlags &= ~UIFLAG_VISIBLE;
@@ -2338,13 +2352,13 @@ int CUISystem::HideWidget(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::IsWidgetVisible(CUIWidget *pWidget)
 {
 	return (pWidget->m_iFlags & UIFLAG_VISIBLE);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::EnableWidget(CUIWidget *pWidget)
 {
 	pWidget->m_iFlags |= UIFLAG_ENABLED;
@@ -2352,7 +2366,7 @@ int CUISystem::EnableWidget(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DisableWidget(CUIWidget *pWidget)
 {
 	pWidget->m_iFlags &= ~UIFLAG_ENABLED;
@@ -2360,13 +2374,13 @@ int CUISystem::DisableWidget(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::IsWidgetEnabled(CUIWidget *pWidget)
 {
 	return (pWidget->m_iFlags & UIFLAG_ENABLED);
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetScissor(const UIRect *pRect)
 {
 	if (!pRect)
@@ -2413,12 +2427,23 @@ int CUISystem::SetScissor(const UIRect *pRect)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawBackground()
 {
 	//m_pRenderer->SetScissor();
 
-	DrawImage(UIRect(0, 0, 800, 600), m_iBackgroundTextureID, m_cBackgroundColor);
+	// Use actual screen dimensions instead of hardcoded 800x600
+	int screenWidth = m_pRenderer ? m_pRenderer->GetWidth() : 800;
+	int screenHeight = m_pRenderer ? m_pRenderer->GetHeight() : 600;
+
+	// DrawImage expects virtual coordinates (800x600 is the base resolution)
+	// So we should use the full virtual screen size (800x600), not convert from screen
+	// The scaling is handled by AdjustWidth/AdjustHeight in DrawImage
+	float virtualWidth = 800.0f;
+	float virtualHeight = 600.0f;
+
+
+	DrawImage(UIRect(0, 0, virtualWidth, virtualHeight), m_iBackgroundTextureID, m_cBackgroundColor);
 
 	return 1;
 }
@@ -2427,7 +2452,7 @@ int CUISystem::DrawMouseCursor(float fLeft, float fTop)
 {
   m_pRenderer->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
 
-	float vTexCoord[4] = 
+	float vTexCoord[4] =
 	{
 		m_iMouseCursorTexPixW * 0.5f,
 		1.0f - m_iMouseCursorTexPixH,
@@ -2443,11 +2468,11 @@ int CUISystem::DrawMouseCursor(float fLeft, float fTop)
 	{
 		DrawImage(UIRect(fLeft, fTop, m_fMouseCursorWidth, m_fMouseCursorHeight), m_iMouseCursorTextureID, vTexCoord, m_cMouseCursorColor);
 	}
-	
+
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawBorder(const UIRect &pRect, const UIBorder &pBorder)
 {
 	if (pBorder.fSize < 0.125f)
@@ -2467,7 +2492,7 @@ int CUISystem::DrawBorder(const UIRect &pRect, const UIBorder &pBorder)
 	{
 	case UIBORDERSTYLE_RAISED:
 	case UIBORDERSTYLE_SUNKEN:
-		
+
 		DrawEmboss(pRect, GET_HIGHLIGHT_COLOR(pBorder.cColor), GET_SHADOWED_COLOR(pBorder.cColor), pBorder.iStyle == UIBORDERSTYLE_SUNKEN, pBorder.fSize);
 		break;
 
@@ -2531,7 +2556,7 @@ int CUISystem::DrawBorder(const UIRect &pRect, const UIBorder &pBorder)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawQuad(const UIRect &pRect, const color4f &cColor)
 {
 	color4f cClampColor;
@@ -2546,7 +2571,7 @@ int CUISystem::DrawQuad(const UIRect &pRect, const color4f &cColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawGreyedQuad(const UIRect &pRect, const color4f &cColor, int iMode)
 {
 	if (iMode == UIBLEND_ADDITIVE)
@@ -2557,7 +2582,7 @@ int CUISystem::DrawGreyedQuad(const UIRect &pRect, const color4f &cColor, int iM
 	{
 		m_pRenderer->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
 	}
-	
+
 	DrawImage(pRect, -1, 0, cColor);
 
 	m_pRenderer->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
@@ -2565,9 +2590,11 @@ int CUISystem::DrawGreyedQuad(const UIRect &pRect, const color4f &cColor, int iM
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawText(const UIRect &pRect, int iHAlignment, int iVAlignment, IFFont *pFont, const wchar_t *szText, bool bTranslateEscapes)
 {
+	assert(pFont != nullptr && "CUISystem::DrawText - pFont cannot be null");
+
 	float fNewX, fNewY;
 
 	GetAlignedTextXY(&fNewX, &fNewY, pFont, pRect, szText, iHAlignment, iVAlignment);
@@ -2579,7 +2606,7 @@ int CUISystem::DrawText(const UIRect &pRect, int iHAlignment, int iVAlignment, I
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawImage(const UIRect &pRect, const UISkinTexture &pTexture, const color4f &cColor)
 {
 	DrawImage(pRect, pTexture.iTextureID, pTexture.vTexCoord, cColor);
@@ -2587,7 +2614,7 @@ int CUISystem::DrawImage(const UIRect &pRect, const UISkinTexture &pTexture, con
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawImage(const UIRect &pRect, int iTextureID, const float *vTexCoord, const color4f &cColor)
 {
 	if ((pRect.fWidth <= 0.0f) || (pRect.fHeight <= 0.0f))
@@ -2643,19 +2670,33 @@ int CUISystem::DrawImage(const UIRect &pRect, int iTextureID, const float *vTexC
 			vClippedTexCoord[3] = 0.0f + (fTexH * ((fB - (pRect.fTop + pRect.fHeight)) * fRcpHeight));
 		}
 
-		m_pRenderer->Draw2dImage(AdjustWidth(fX), AdjustHeight(fY), AdjustWidth(fR - fX), AdjustHeight(fB - fY),
+		// Convert virtual coordinates to screen coordinates
+		// AdjustWidth/AdjustHeight round back to virtual for pixel-perfect alignment, but we need actual screen coords
+		float screenX = (float)(fX * m_fVirtualToRealX);
+		float screenY = (float)(fY * m_fVirtualToRealY);
+		float screenW = (float)((fR - fX) * m_fVirtualToRealX);
+		float screenH = (float)((fB - fY) * m_fVirtualToRealY);
+
+
+		m_pRenderer->Draw2dImage(screenX, screenY, screenW, screenH,
 			iTextureID, vClippedTexCoord[0], vClippedTexCoord[1], vClippedTexCoord[2], vClippedTexCoord[3], 0, cColor.v[0], cColor.v[1], cColor.v[2], cColor.v[3], 0);
 	}
 	else
 	{
-		m_pRenderer->Draw2dImage(AdjustWidth(fX), AdjustHeight(fY), AdjustWidth(fR - fX), AdjustHeight(fB - fY),
-			-1, 0, 0, 0, 0, 0, cColor.v[0], cColor.v[1], cColor.v[2], cColor.v[3], 0);
+		// Convert virtual coordinates to screen coordinates
+		float screenX = (float)(fX * m_fVirtualToRealX);
+		float screenY = (float)(fY * m_fVirtualToRealY);
+		float screenW = (float)((fR - fX) * m_fVirtualToRealX);
+		float screenH = (float)((fB - fY) * m_fVirtualToRealY);
+
+		m_pRenderer->Draw2dImage(screenX, screenY, screenW, screenH,
+			-1, 0, 0, 1, 1, 0, cColor.v[0], cColor.v[1], cColor.v[2], cColor.v[3], 0);
 	}
 
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawSkin(const UIRect &pRect, const UISkinTexture &pTexture, const color4f &cColor, int iState)
 {
 	if ((iState & UISTATE_UP) || !((iState & UISTATE_DOWN) || (iState & UISTATE_CHECKED)))
@@ -2677,7 +2718,7 @@ int CUISystem::DrawSkin(const UIRect &pRect, const UISkinTexture &pTexture, cons
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawEmboss(const UIRect &pRect, const color4f &cHighlightColor, const color4f &cShadowedColor, bool bPressed, float fBorderSize)
 {
 	float fTwoBorderSize = fBorderSize + fBorderSize;
@@ -2700,7 +2741,7 @@ int CUISystem::DrawEmboss(const UIRect &pRect, const color4f &cHighlightColor, c
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawFocus(const UIRect &pRect, const color4f &cColor, float fBorderSize)
 {
 	UIBorder pBorder(UIBORDERSTYLE_FLAT, fBorderSize, cColor, 0xffff);
@@ -2710,7 +2751,7 @@ int CUISystem::DrawFocus(const UIRect &pRect, const color4f &cColor, float fBord
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawShadow(const UIRect &pRect, const color4f &cColor, float fBorderSize, CUIWidget *pWidget)
 {
 	if (pWidget)
@@ -2751,7 +2792,7 @@ int CUISystem::DrawShadow(const UIRect &pRect, const color4f &cColor, float fBor
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawButton(const UIRect &pRect, const color4f &cColor, float fEmbossSize, bool bPressed)
 {
 	UIRect pNewRect = pRect;
@@ -2763,7 +2804,7 @@ int CUISystem::DrawButton(const UIRect &pRect, const color4f &cColor, float fEmb
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DrawToolTip()
 {
 	if ((m_szwToolTipText.empty()) || (m_fToolTipAlpha < 0.0125f))
@@ -2772,7 +2813,7 @@ int CUISystem::DrawToolTip()
 	}
 
 	const float		fSpace = 4.0f;
-	
+
 	IFFont	*pFont = GetIFont(m_pToolTipFont);
 
 	assert(pFont);
@@ -2806,8 +2847,8 @@ int CUISystem::DrawToolTip()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateStatic(CUIStatic **pStatic, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle, const wstring &szText)
 {
 	*pStatic = new CUIStatic;
@@ -2829,7 +2870,7 @@ int CUISystem::CreateStatic(CUIStatic **pStatic, CUIWidget *pParent, const strin
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateButton(CUIButton **pButton, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle, const wstring &szText)
 {
 	*pButton = new CUIButton;
@@ -2847,7 +2888,7 @@ int CUISystem::CreateButton(CUIButton **pButton, CUIWidget *pParent, const strin
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateEditBox(CUIEditBox **pEditBox, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle, const wstring &szText)
 {
 	*pEditBox = new CUIEditBox;
@@ -2866,7 +2907,7 @@ int CUISystem::CreateEditBox(CUIEditBox **pEditBox, CUIWidget *pParent, const st
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateScrollBar(CUIScrollBar **pScrollBar, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle, int iType)
 {
 	*pScrollBar = new CUIScrollBar;
@@ -2895,7 +2936,7 @@ int CUISystem::CreateScrollBar(CUIScrollBar **pScrollBar, CUIWidget *pParent, co
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateListView(CUIListView **pListView, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle)
 {
 	*pListView = new CUIListView;
@@ -2912,7 +2953,7 @@ int CUISystem::CreateListView(CUIListView **pListView, CUIWidget *pParent, const
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateCheckBox(CUICheckBox **pCheckBox, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle)
 {
 	*pCheckBox = new CUICheckBox;
@@ -2929,7 +2970,7 @@ int CUISystem::CreateCheckBox(CUICheckBox **pCheckBox, CUIWidget *pParent, const
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateComboBox(CUIComboBox **pComboBox, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle)
 {
 	*pComboBox = new CUIComboBox;
@@ -2950,7 +2991,7 @@ int CUISystem::CreateComboBox(CUIComboBox **pComboBox, CUIWidget *pParent, const
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateVideoPanel(CUIVideoPanel **pVideoPanel, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle)
 {
 	*pVideoPanel = new CUIVideoPanel;
@@ -2967,7 +3008,7 @@ int CUISystem::CreateVideoPanel(CUIVideoPanel **pVideoPanel, CUIWidget *pParent,
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateScreen(CUIScreen **pScreen, const string &szName)
 {
 	*pScreen = new CUIScreen;
@@ -2988,7 +3029,7 @@ int CUISystem::CreateScreen(CUIScreen **pScreen, const string &szName)
 }
 
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 bool CUISystem::OnInputEvent(const SInputEvent &event)
 {
 	// if console is open, don't update anything
@@ -3004,9 +3045,9 @@ bool CUISystem::OnInputEvent(const SInputEvent &event)
 	// refresh idle timer
 	m_fLastInput = m_pSystem->GetITimer()->GetCurrTime();
 
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	// Mouse Scroll
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	if (IS_MOUSE_KEY(event.key))
 	{
 		if ((event.key == XKEY_MWHEEL_UP) && (event.type == SInputEvent::KEY_PRESS))
@@ -3025,9 +3066,9 @@ bool CUISystem::OnInputEvent(const SInputEvent &event)
 		}
 	}
 
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	// Keyboard events
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	if (IS_KEYBOARD_KEY(event.key))
 	{
 		if ((event.key == XKEY_TAB) && (event.type == SInputEvent::KEY_PRESS))
@@ -3040,11 +3081,11 @@ bool CUISystem::OnInputEvent(const SInputEvent &event)
 			{
 				NextTabStop();
 			}
-			
+
 			if (m_pFocus)
 			{
 				if (IsOnFocusScreen(m_pFocus))
-				{			
+				{
 					// find the top-parent
 					CUIWidget *pParent = m_pFocus;
 
@@ -3096,9 +3137,9 @@ bool CUISystem::OnInputEvent(const SInputEvent &event)
 		}
 	}
 
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	// Mouse events
-	//------------------------------------------------------------------------------------------------- 
+	//-------------------------------------------------------------------------------------------------
 	if (IS_MOUSE_KEY(event.key))
 	{
 		// mouse messages are processed all at once in Update()
@@ -3107,7 +3148,7 @@ bool CUISystem::OnInputEvent(const SInputEvent &event)
 	return false;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::InitializeWidget(CUIWidget *pWidget, CUIWidget *pParent, const string &szName, const UIRect &pRect, int iFlags, int iStyle)
 {
 	pWidget->m_pRect.fLeft = pRect.fLeft;
@@ -3147,7 +3188,7 @@ int CUISystem::InitializeWidget(CUIWidget *pWidget, CUIWidget *pParent, const st
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DestroyWidget(CUIWidget *pWidget)
 {
 	pWidget->OnRelease();
@@ -3169,7 +3210,7 @@ int CUISystem::DestroyWidget(CUIWidget *pWidget)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::DestroyScreen(CUIScreen *pScreen)
 {
 	pScreen->OnRelease();
@@ -3234,7 +3275,7 @@ int CUISystem::ReloadAllModels()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::StopAllVideo()
 {
 	for (CUIWidgetItor pItor = m_pWidgetList.begin(); pItor != m_pWidgetList.end(); ++pItor)
@@ -3250,7 +3291,7 @@ int CUISystem::StopAllVideo()
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ResetInput()
 {
 	m_pInput->GetIKeyboard()->ClearKeyState();
@@ -3258,7 +3299,7 @@ int CUISystem::ResetInput()
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::OnZChanged(CUIWidget *pWidget)
 {
 	m_bSortZ = 1;
@@ -3266,7 +3307,7 @@ int CUISystem::OnZChanged(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::OnTabStopChanged(CUIWidget *pWidget)
 {
 	m_bSortTabStop = 1;
@@ -3274,8 +3315,8 @@ int CUISystem::OnTabStopChanged(CUIWidget *pWidget)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SortChildrenByZ()
 {
 	if (m_pChildList.size() < 2)
@@ -3296,7 +3337,7 @@ int CUISystem::SortChildrenByZ()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SortTabStop()
 {
 	std::sort(m_pTabStopList.begin(), m_pTabStopList.end(), SortTabStopCallback);
@@ -3304,7 +3345,7 @@ int CUISystem::SortTabStop()
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::InheritParentAttributes(CUIWidget *pWidget, CUIWidget *pParent)
 {
 	if (!pParent || !pWidget)
@@ -3320,7 +3361,7 @@ int CUISystem::InheritParentAttributes(CUIWidget *pWidget, CUIWidget *pParent)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 #define CHECKATTRIBUTE(name, type)			((strcmp(szAttributeName, name) == 0) && (pObject->GetCurrentType() == (type)))
 int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidget)
 {
@@ -3398,7 +3439,7 @@ int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidge
 
 		strncpy(szFlags, szValue, 4);
 		strupr(szFlags);
-    
+
 		for (int i = 0; i < (int)min(strlen(szFlags), 4); i++)
 		{
 			if (szFlags[i] == 'L')
@@ -3483,7 +3524,7 @@ int CUISystem::RetrieveCommonAttribute(IScriptObject *pObject, CUIWidget *pWidge
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::RetrieveColor(color4f *pColor, char *szString)
 {
 	int iR, iG, iB, iA = 255;
@@ -3521,7 +3562,7 @@ int CUISystem::RetrieveColor(color4f *pColor, char *szString)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::RetrieveRect(UIRect *pRect, char *szString)
 {
 	float fLeft, fTop, fWidth, fHeight;
@@ -3551,7 +3592,7 @@ int CUISystem::RetrieveRect(UIRect *pRect, char *szString)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::RetrieveTexRect(float *pTexCoords, INT_PTR iTextureID, char *szTexRect)
 {
 	float fLeft, fTop, fWidth, fHeight;
@@ -3607,12 +3648,12 @@ int CUISystem::RetrieveTexRect(float *pTexCoords, INT_PTR iTextureID, char *szTe
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::RetrieveTextAttribute(CUIWidget *pWidget, IScriptObject *pObject, const string &szTextField)
 {
 	const char	*szKeyName;
 	char	szAttributeName[256];
-	
+
 	const char					*szValue;
 	wstring	szWValue;
 
@@ -3658,7 +3699,7 @@ int CUISystem::RetrieveTextAttribute(CUIWidget *pWidget, IScriptObject *pObject,
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::RetrieveTextureAttribute(UISkinTexture *pSkinTexture, IScriptObject *pObject, const char *szTextureField, const char *szTexRectField)
 {
 	char	szOverField[256];
@@ -3714,7 +3755,7 @@ int CUISystem::RetrieveTextureAttribute(UISkinTexture *pSkinTexture, IScriptObje
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateObjectFromTable(CUIWidget **pWidget, CUIWidget *pParent, CUIScreen *pScreen, IScriptObject *pObject, const string &szName)
 {
 	char				*szKeyName;
@@ -3771,7 +3812,7 @@ int CUISystem::CreateObjectFromTable(CUIWidget **pWidget, CUIWidget *pParent, CU
 			pObj->GetValue("width", pRect.fWidth);
 			pObj->GetValue("height", pRect.fHeight);
 
-			
+
 			pRect.fLeft = (float)(floor(m_fVirtualToRealX * pRect.fLeft) * m_fRealToVirtualX);
 			pRect.fTop = (float)(floor(m_fVirtualToRealY * pRect.fTop) * m_fRealToVirtualY);
 			pRect.fWidth = (float)(floor(m_fVirtualToRealX * pRect.fWidth) * m_fRealToVirtualX);
@@ -3859,7 +3900,7 @@ int CUISystem::CreateObjectFromTable(CUIWidget **pWidget, CUIWidget *pParent, CU
 			}
 
 			IScriptObject *pNewObject = m_pScriptSystem->CreateEmptyObject();
-		
+
 			pObject->GetCurrent(pNewObject);
 
 			if ((pScreen && (pScreen->GetWidget(szKeyName))) || ((!pScreen) && (GetWidget(szKeyName))))
@@ -3900,7 +3941,7 @@ int CUISystem::CreateObjectFromTable(CUIWidget **pWidget, CUIWidget *pParent, CU
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateStaticFromTable(CUIStatic **pStatic, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateStatic(pStatic, pParent, szName, pRect, UIFLAG_DEFAULT, 0, L""))
@@ -3911,7 +3952,7 @@ int CUISystem::CreateStaticFromTable(CUIStatic **pStatic, CUIWidget *pParent, co
 	InheritParentAttributes(*pStatic, pParent);
 
 	IScriptObject *pSkinObject = m_pScriptSystem->CreateEmptyObject();
-		
+
 	if (pObject->GetValue("skin", pSkinObject))
 	{
 		SetupStaticFromTable(*pStatic, pSkinObject);
@@ -3920,11 +3961,11 @@ int CUISystem::CreateStaticFromTable(CUIStatic **pStatic, CUIWidget *pParent, co
 	pSkinObject->Release();
 
 	SetupStaticFromTable(*pStatic, pObject);
-	
+
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupStaticFromTable(CUIStatic *pStatic, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4031,7 +4072,7 @@ int CUISystem::SetupStaticFromTable(CUIStatic *pStatic, IScriptObject *pObject)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateButtonFromTable(CUIButton **pButton, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateButton(pButton, pParent, szName, pRect, UIFLAG_DEFAULT, 0, L""))
@@ -4055,7 +4096,7 @@ int CUISystem::CreateButtonFromTable(CUIButton **pButton, CUIWidget *pParent, co
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupButtonFromTable(CUIButton *pButton, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4080,7 +4121,7 @@ int CUISystem::SetupButtonFromTable(CUIButton *pButton, IScriptObject *pObject)
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("halign", svtNumber))
 		{
 			pButton->m_iHAlignment = iValue;
@@ -4103,15 +4144,15 @@ int CUISystem::SetupButtonFromTable(CUIButton *pButton, IScriptObject *pObject)
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pButton->GetName().c_str(), szKeyName);
 		}
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 	}
-	
+
 	pObject->EndIteration();
 
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateEditBoxFromTable(CUIEditBox **pEditBox, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateEditBox(pEditBox, pParent, szName, pRect, UIFLAG_DEFAULT, 0, L""))
@@ -4135,7 +4176,7 @@ int CUISystem::CreateEditBoxFromTable(CUIEditBox **pEditBox, CUIWidget *pParent,
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupEditBoxFromTable(CUIEditBox *pEditBox, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4160,7 +4201,7 @@ int CUISystem::SetupEditBoxFromTable(CUIEditBox *pEditBox, IScriptObject *pObjec
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("leftspacing", svtNumber))
 		{
 			pEditBox->m_fLeftSpacing = fValue;
@@ -4231,7 +4272,7 @@ int CUISystem::SetupEditBoxFromTable(CUIEditBox *pEditBox, IScriptObject *pObjec
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pEditBox->GetName().c_str(), szKeyName);
 		}
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 	}
 
 	pObject->EndIteration();
@@ -4239,7 +4280,7 @@ int CUISystem::SetupEditBoxFromTable(CUIEditBox *pEditBox, IScriptObject *pObjec
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateScrollBarFromTable(CUIScrollBar **pScrollBar, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateScrollBar(pScrollBar, pParent, szName,pRect, UIFLAG_DEFAULT, 0))
@@ -4263,7 +4304,7 @@ int CUISystem::CreateScrollBarFromTable(CUIScrollBar **pScrollBar, CUIWidget *pP
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupScrollBarFromTable(CUIScrollBar *pScrollBar, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4288,7 +4329,7 @@ int CUISystem::SetupScrollBarFromTable(CUIScrollBar *pScrollBar, IScriptObject *
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("value", svtNumber))
 		{
 			pScrollBar->m_fValue = fValue;
@@ -4321,7 +4362,7 @@ int CUISystem::SetupScrollBarFromTable(CUIScrollBar *pScrollBar, IScriptObject *
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pScrollBar->GetName().c_str(), szKeyName);
 		}
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 	}
 
 	pObject->EndIteration();
@@ -4329,7 +4370,7 @@ int CUISystem::SetupScrollBarFromTable(CUIScrollBar *pScrollBar, IScriptObject *
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateListViewFromTable(CUIListView **pListView, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateListView(pListView, pParent, szName, pRect, UIFLAG_DEFAULT, 0))
@@ -4353,7 +4394,7 @@ int CUISystem::CreateListViewFromTable(CUIListView **pListView, CUIWidget *pPare
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupListViewFromTable(CUIListView *pListView, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4378,7 +4419,7 @@ int CUISystem::SetupListViewFromTable(CUIListView *pListView, IScriptObject *pOb
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("itemheight", svtNumber))
 		{
 			pListView->m_fItemHeight = fValue;
@@ -4427,7 +4468,7 @@ int CUISystem::SetupListViewFromTable(CUIListView *pListView, IScriptObject *pOb
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pListView->GetName().c_str(), szKeyName);
 		}
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 	}
 
 	pObject->EndIteration();
@@ -4435,7 +4476,7 @@ int CUISystem::SetupListViewFromTable(CUIListView *pListView, IScriptObject *pOb
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateCheckBoxFromTable(CUICheckBox **pCheckBox, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateCheckBox(pCheckBox, pParent, szName, pRect, UIFLAG_DEFAULT, 0))
@@ -4459,7 +4500,7 @@ int CUISystem::CreateCheckBoxFromTable(CUICheckBox **pCheckBox, CUIWidget *pPare
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupCheckBoxFromTable(CUICheckBox *pCheckBox, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4484,7 +4525,7 @@ int CUISystem::SetupCheckBoxFromTable(CUICheckBox *pCheckBox, IScriptObject *pOb
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("leftspacing", svtNumber))
 		{
 			pCheckBox->m_fLeftSpacing = fValue;
@@ -4515,7 +4556,7 @@ int CUISystem::SetupCheckBoxFromTable(CUICheckBox *pCheckBox, IScriptObject *pOb
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pCheckBox->GetName().c_str(), szKeyName);
 		}
-			//------------------------------------------------------------------------------------------------- 
+			//-------------------------------------------------------------------------------------------------
 	}
 
 	pObject->EndIteration();
@@ -4523,7 +4564,7 @@ int CUISystem::SetupCheckBoxFromTable(CUICheckBox *pCheckBox, IScriptObject *pOb
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateComboBoxFromTable(CUIComboBox **pComboBox, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateComboBox(pComboBox, pParent, szName, pRect, UIFLAG_DEFAULT, 0))
@@ -4547,7 +4588,7 @@ int CUISystem::CreateComboBoxFromTable(CUIComboBox **pComboBox, CUIWidget *pPare
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupComboBoxFromTable(CUIComboBox *pComboBox, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4572,7 +4613,7 @@ int CUISystem::SetupComboBoxFromTable(CUIComboBox *pComboBox, IScriptObject *pOb
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("buttonsize", svtNumber))
 		{
 			pComboBox->m_fButtonSize = fValue;
@@ -4622,7 +4663,7 @@ int CUISystem::SetupComboBoxFromTable(CUIComboBox *pComboBox, IScriptObject *pOb
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pComboBox->GetName().c_str(), szKeyName);
 		}
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 	}
 
 	pObject->EndIteration();
@@ -4630,7 +4671,7 @@ int CUISystem::SetupComboBoxFromTable(CUIComboBox *pComboBox, IScriptObject *pOb
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateVideoPanelFromTable(CUIVideoPanel **pVideoPanel, CUIWidget *pParent, const UIRect &pRect, IScriptObject *pObject, const string &szName)
 {
 	if (!CreateVideoPanel(pVideoPanel, pParent, szName, pRect, UIFLAG_DEFAULT, 0))
@@ -4654,7 +4695,7 @@ int CUISystem::CreateVideoPanelFromTable(CUIVideoPanel **pVideoPanel, CUIWidget 
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::SetupVideoPanelFromTable(CUIVideoPanel *pVideoPanel, IScriptObject *pObject)
 {
 	// get the specific attributes
@@ -4686,7 +4727,7 @@ int CUISystem::SetupVideoPanelFromTable(CUIVideoPanel *pVideoPanel, IScriptObjec
 		pObject->GetCurrent(fValue);
 		pObject->GetCurrent(iValue);
 
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 		if (CHECKATTRIBUTE("framerate", svtNumber))
 		{
 			iFrameRate = iValue;
@@ -4722,7 +4763,7 @@ int CUISystem::SetupVideoPanelFromTable(CUIVideoPanel *pVideoPanel, IScriptObjec
 		{
 			m_pLog->LogToConsole("\001$5[Warning]:$1 %s unknown attribute/value: '%s'", pVideoPanel->GetName().c_str(), szKeyName);
 		}
-		//------------------------------------------------------------------------------------------------- 
+		//-------------------------------------------------------------------------------------------------
 	}
 
 	pObject->EndIteration();
@@ -4748,7 +4789,7 @@ int CUISystem::SetupVideoPanelFromTable(CUIVideoPanel *pVideoPanel, IScriptObjec
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::CreateScreenFromTable(CUIScreen **pScreen, const string &szName, IScriptObject *pObject)
 {
 	if (!CreateScreen(pScreen, szName))
@@ -4817,7 +4858,7 @@ int CUISystem::CreateScreenFromTable(CUIScreen **pScreen, const string &szName, 
 				{
 					pObject->SetValue(pWidget->GetName().c_str(), GetWidgetScriptObject(pWidget));
 				}
-			}		
+			}
 			break;
 		}
 	}
@@ -4831,17 +4872,17 @@ int CUISystem::CreateScreenFromTable(CUIScreen **pScreen, const string &szName, 
 }
 #undef CHECKATTRIBUTE
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ConvertToWString(wstring &szWString, const char *szString)
 {
 	szWString.clear();
 
 	((CXGame *)m_pSystem->GetIGame())->m_StringTableMgr.Localize(szString, szWString);
-	
+
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ConvertToWString(wstring &szWString, IFunctionHandler *pH, int iParam)
 {
 	char *szString;
@@ -4862,7 +4903,7 @@ int CUISystem::ConvertToWString(wstring &szWString, IFunctionHandler *pH, int iP
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ConvertToWString(wstring &szWString, int iStrID)
 {
 	szWString = ((CXGame *)m_pSystem->GetIGame())->m_StringTableMgr.EnumString(iStrID);
@@ -4870,7 +4911,7 @@ int CUISystem::ConvertToWString(wstring &szWString, int iStrID)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ConvertToString(char *szString, const color4f &pColor)
 {
 	sprintf(szString, "%d, %d, %d, %d", (int)(pColor.v[0] * 255.0f), (int)(pColor.v[1] * 255.0f), (int)(pColor.v[2] * 255.0f), (int)(pColor.v[3] * 255.0f));
@@ -4878,7 +4919,7 @@ int CUISystem::ConvertToString(char *szString, const color4f &pColor)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ConvertToString(char *szString, const UIRect &pRect)
 {
 	sprintf(szString, "%f, %f, %f, %f", pRect.fLeft, pRect.fTop, pRect.fWidth, pRect.fHeight);
@@ -4933,7 +4974,7 @@ int CUISystem::ConvertToString(char *szString, const wstring &szWString, int iMa
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::ConvertToString(string &szString, const wstring &szWString)
 {
 	szString.clear();
@@ -4948,7 +4989,7 @@ int CUISystem::ConvertToString(string &szString, const wstring &szWString)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::StripControlCodes(wstring &szOutString, const wstring &szWString)
 {
 	szOutString.clear();
@@ -5011,7 +5052,7 @@ int CUISystem::StripControlCodes(string &szOutString, const wstring &szWString)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 int CUISystem::StripControlCodes(string &szOutString, const string &szString)
 {
 	szOutString.clear();
@@ -5043,13 +5084,13 @@ int CUISystem::StripControlCodes(string &szOutString, const string &szString)
 	return 1;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 void CUISystem::DeleteWidget(CUIWidget *pWidget)
 {
 	delete pWidget;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 bool CUISystem::IsReserved(const char *szName)
 {
 	if ((strcmp(szName, "user") == 0) ||
@@ -5060,7 +5101,7 @@ bool CUISystem::IsReserved(const char *szName)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------
 bool CUISystem::IsOnFocusScreen(CUIWidget *pWidget)
 {
 	if (m_pFocusScreen)
@@ -5075,4 +5116,4 @@ bool CUISystem::IsOnFocusScreen(CUIWidget *pWidget)
 	return 0;
 }
 
-//------------------------------------------------------------------------------------------------- 
+//-------------------------------------------------------------------------------------------------

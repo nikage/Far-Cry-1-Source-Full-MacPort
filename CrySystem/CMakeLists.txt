@@ -78,6 +78,7 @@ if(APPLE)
     target_link_libraries(CrySystem PRIVATE
         CryGame
         CryScriptSystem
+        CryFont  # Link CryFont for static CreateCryFontInterface call
         ${CORE_FOUNDATION_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
         "-framework Cocoa"

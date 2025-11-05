@@ -35,6 +35,18 @@ id<MTLRenderPipelineState> CMetalStateCache::GetOrCreatePipelineState(
     id<MTLFunction> fragmentFunction,
     MTLVertexDescriptor* vertexDescriptor)
 {
+    // Validate inputs before proceeding - these should never be nil in production
+    assert(vertexFunction != nil && "GetOrCreatePipelineState: vertex function cannot be nil");
+    assert(fragmentFunction != nil && "GetOrCreatePipelineState: fragment function cannot be nil");
+    assert(vertexDescriptor != nil && "GetOrCreatePipelineState: vertex descriptor cannot be nil");
+    
+    if (!vertexFunction || !fragmentFunction || !vertexDescriptor)
+    {
+        iLog->Log("Error: Cannot create pipeline state with nil functions (vertex=%p, fragment=%p, descriptor=%p)\n",
+               vertexFunction, fragmentFunction, vertexDescriptor);
+        return nil;
+    }
+    
     auto it = m_pipelineStateCache.find(key);
     if (it != m_pipelineStateCache.end())
     {
