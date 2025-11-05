@@ -21,8 +21,8 @@
 
 // Include all CryEngine infrastructure in proper order
 #include "MetalRenderPCH.h"
-#include "MetalStateCache.h"
-#include "MetalRenderElements.h"
+#include "MetalStateCache.m"
+#include "MetalRenderElements.m"
 #include <unordered_map>
 
 // Forward declarations

@@ -8,29 +8,36 @@ endif()
 # Metal renderer source files
 set(XRENDER_METAL_SOURCES
     MetalRenderer.mm
-    MetalRenderer.h
     MetalBaseRenderer.mm
-    MetalBaseRenderer.h
     MetalTextureManager.mm
-    MetalTextureManager.h
     MetalShaderManager.mm
-    MetalShaderManager.h
     MetalShaderLoader.mm
     MetalUtilityRenderer.mm
-    MetalUtilityRenderer.h
     MetalStateCache.mm
-    MetalStateCache.h
     MetalVertexDescriptor.mm
-    MetalVertexDescriptor.h
     MetalRenderElements.mm
-    MetalRenderElements.h
     MetalOptimizations.mm
-    MetalOptimizations.h
     MetalImageStubs.mm
 )
 
+# Metal renderer header files (not compiled, only included)
+set(XRENDER_METAL_HEADERS
+    MetalRenderer.m
+    MetalBaseRenderer.m
+    MetalTextureManager.m
+    MetalShaderManager.m
+    MetalUtilityRenderer.m
+    MetalStateCache.m
+    MetalVertexDescriptor.m
+    MetalRenderElements.m
+    MetalOptimizations.m
+)
+
 # Create the Metal renderer library
-add_library(XRenderMetal SHARED ${XRENDER_METAL_SOURCES} $<TARGET_OBJECTS:RenderCommonObj>)
+add_library(XRenderMetal SHARED ${XRENDER_METAL_SOURCES} ${XRENDER_METAL_HEADERS} $<TARGET_OBJECTS:RenderCommonObj>)
+
+# Mark .m files as headers so they're not compiled
+set_source_files_properties(${XRENDER_METAL_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 
 # Link CryCommon interface and RenderCommon base classes
 target_link_libraries(XRenderMetal PRIVATE 

@@ -9,8 +9,8 @@
 #include <Cocoa/Cocoa.h>
 #include <vector>
 #include <cassert>
-#include "MetalBaseRenderer.h"
-#include "MetalTextureManager.h"
+#include "MetalBaseRenderer.m"
+#include "MetalTextureManager.m"
 #include "IRenderer.h"
 
 // Forward declarations for CryEngine types

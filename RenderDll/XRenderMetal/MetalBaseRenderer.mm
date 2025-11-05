@@ -19,7 +19,7 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalBaseRenderer.h"
+#include "MetalBaseRenderer.m"
 #include "I3DEngine.h"
 #include "VertexFormats.h"
 #include <Cocoa/Cocoa.h>

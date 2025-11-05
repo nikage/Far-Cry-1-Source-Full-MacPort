@@ -15,8 +15,8 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalOptimizations.h"
-#include "MetalBaseRenderer.h"
+#include "MetalOptimizations.m"
+#include "MetalBaseRenderer.m"
 #include <cassert>
 
 //=========================================================================

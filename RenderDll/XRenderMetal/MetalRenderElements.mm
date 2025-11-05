@@ -15,9 +15,9 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalBaseRenderer.h"
-#include "MetalTextureManager.h"
-#include "MetalShaderManager.h"
+#include "MetalBaseRenderer.m"
+#include "MetalTextureManager.m"
+#include "MetalShaderManager.m"
 #include "I3DEngine.h"
 #include "ISystem.h"
 #include "LeafBuffer.h"

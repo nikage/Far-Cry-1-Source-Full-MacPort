@@ -15,11 +15,11 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalShaderManager.h"
-#include "MetalBaseRenderer.h"
-#include "MetalTextureManager.h"
-#include "MetalRenderElements.h"  // For Metal render element classes
-#include "MetalVertexDescriptor.h"  // For CMetalVertexDescriptorHelper
+#include "MetalShaderManager.m"
+#include "MetalBaseRenderer.m"
+#include "MetalTextureManager.m"
+#include "MetalRenderElements.m"  // For Metal render element classes
+#include "MetalVertexDescriptor.m"  // For CMetalVertexDescriptorHelper
 #include <Cocoa/Cocoa.h>
 #include <cassert>
 #include <iostream>

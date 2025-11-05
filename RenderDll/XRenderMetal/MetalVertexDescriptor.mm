@@ -15,7 +15,7 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalVertexDescriptor.h"
+#include "MetalVertexDescriptor.m"
 #include <cassert>
 
 MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptor(int vertexFormat)

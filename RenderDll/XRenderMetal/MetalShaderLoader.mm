@@ -16,10 +16,10 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalShaderManager.h"
-#include "MetalBaseRenderer.h"
-#include "MetalVertexDescriptor.h"
-#include "MetalStateCache.h"
+#include "MetalShaderManager.m"
+#include "MetalBaseRenderer.m"
+#include "MetalVertexDescriptor.m"
+#include "MetalStateCache.m"
 #include <Cocoa/Cocoa.h>
 #include <fstream>
 #include <sstream>
@@ -318,7 +318,7 @@ void CMetalShaderManager::SetGlobalShaderTemplateId(int nTemplateId)
     m_globalShaderTemplateId = nTemplateId;
 }
 
-int CMetalShaderManager::GetGlobalShaderTemplateId()
+int CMetalShaderManager::GetGlobalShaderTemplateId() const
 {
     return m_globalShaderTemplateId;
 }

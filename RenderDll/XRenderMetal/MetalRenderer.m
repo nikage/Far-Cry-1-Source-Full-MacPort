@@ -32,10 +32,10 @@
 #include "Cry_Camera.h"  // For CCamera member
 
 // Include specialized manager classes  
-#include "MetalBaseRenderer.h"
-#include "MetalTextureManager.h"
-#include "MetalShaderManager.h"
-#include "MetalUtilityRenderer.h"
+#include "MetalBaseRenderer.m"
+#include "MetalTextureManager.m"
+#include "MetalShaderManager.m"
+#include "MetalUtilityRenderer.m"
 
 // Forward declarations
 struct SSystemInitParams;

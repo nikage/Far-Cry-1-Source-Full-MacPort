@@ -15,10 +15,10 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalUtilityRenderer.h"
-#include "MetalBaseRenderer.h"
-#include "MetalTextureManager.h"
-#include "MetalShaderManager.h"
+#include "MetalUtilityRenderer.m"
+#include "MetalBaseRenderer.m"
+#include "MetalTextureManager.m"
+#include "MetalShaderManager.m"
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 

@@ -16,7 +16,7 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "MetalRenderPCH.h"
-#include "MetalStateCache.h"
+#include "MetalStateCache.m"
 #include <cstdio>
 
 CMetalStateCache::CMetalStateCache(id<MTLDevice> device)

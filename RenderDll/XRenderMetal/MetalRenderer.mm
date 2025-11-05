@@ -18,7 +18,7 @@
 
 // Include PCH first for proper type definitions
 #include "MetalRenderPCH.h"
-#include "MetalRenderer.h"
+#include "MetalRenderer.m"
 #include "I3DEngine.h"
 #include "../Common/Textures/dxtlib.h"  // For nvDXT function signatures
 

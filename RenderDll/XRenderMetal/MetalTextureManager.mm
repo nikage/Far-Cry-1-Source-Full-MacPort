@@ -15,11 +15,11 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-#include "MetalTextureManager.h"
+#include "MetalTextureManager.m"
 #include "../../CryFont/FBitmap.h"
 #include "I3DEngine.h"
 #include "ISystem.h"
-#include "MetalBaseRenderer.h"
+#include "MetalBaseRenderer.m"
 #include <Cocoa/Cocoa.h>
 #include <cmath>
 #import <CoreGraphics/CoreGraphics.h>
