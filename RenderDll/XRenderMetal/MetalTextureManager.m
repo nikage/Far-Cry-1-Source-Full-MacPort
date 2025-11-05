@@ -152,6 +152,7 @@ public:
     void ClearAllTextures();
     int GetTextureCount() const;
     size_t GetTotalTextureMemory() const;
+    void ShareCacheWith(CMetalTextureManager* other);
     
     // Gamma accessors for renderer
     float GetGammaValue() const { return m_gammaValue; }

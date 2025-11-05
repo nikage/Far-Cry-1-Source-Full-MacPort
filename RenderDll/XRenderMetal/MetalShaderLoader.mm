@@ -308,6 +308,36 @@ void CMetalShaderManager::ClearAllShaders()
     m_currentPipelineState = nil;
 }
 
+void CMetalShaderManager::ShareCacheWith(CMetalShaderManager* other)
+{
+    if (!other || other == this)
+        return;
+    
+    for (const auto& shaderPair : other->m_shaders) {
+        int shaderId = shaderPair.first;
+        const auto& shaderInfo = shaderPair.second;
+        
+        if (m_shaders.find(shaderId) == m_shaders.end()) {
+            m_shaders[shaderId] = shaderInfo;
+            if (!shaderInfo.name.empty()) {
+                m_shaderNameMap[shaderInfo.name] = shaderId;
+            }
+        }
+    }
+    
+    for (const auto& shaderPair : m_shaders) {
+        int shaderId = shaderPair.first;
+        const auto& shaderInfo = shaderPair.second;
+        
+        if (other->m_shaders.find(shaderId) == other->m_shaders.end()) {
+            other->m_shaders[shaderId] = shaderInfo;
+            if (!shaderInfo.name.empty()) {
+                other->m_shaderNameMap[shaderInfo.name] = shaderId;
+            }
+        }
+    }
+}
+
 int CMetalShaderManager::GetShaderCount() const
 {
     return static_cast<int>(m_shaders.size());

@@ -2302,6 +2302,38 @@ size_t CMetalTextureManager::GetTotalTextureMemory() const
     return m_totalTextureMemory;
 }
 
+void CMetalTextureManager::ShareCacheWith(CMetalTextureManager* other)
+{
+    if (!other || other == this)
+        return;
+    
+    for (const auto& texPair : other->m_textures) {
+        int texId = texPair.first;
+        const auto& texInfo = texPair.second;
+        
+        if (m_textures.find(texId) == m_textures.end()) {
+            m_textures[texId] = texInfo;
+            if (!texInfo.name.empty()) {
+                m_textureNameMap[texInfo.name] = texId;
+            }
+            m_totalTextureMemory += texInfo.memorySize;
+        }
+    }
+    
+    for (const auto& texPair : m_textures) {
+        int texId = texPair.first;
+        const auto& texInfo = texPair.second;
+        
+        if (other->m_textures.find(texId) == other->m_textures.end()) {
+            other->m_textures[texId] = texInfo;
+            if (!texInfo.name.empty()) {
+                other->m_textureNameMap[texInfo.name] = texId;
+            }
+            other->m_totalTextureMemory += texInfo.memorySize;
+        }
+    }
+}
+
 const CMetalTextureManager::TextureInfo* CMetalTextureManager::GetTextureInfo(int textureId) const
 {
     assert(textureId > 0 && "CMetalTextureManager: GetTextureInfo called with invalid ID!");

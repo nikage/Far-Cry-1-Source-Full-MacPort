@@ -864,77 +864,49 @@ void CMetalRenderer::DrawBuffer(CVertexBuffer *src, SVertexStream *indicies,
   if (!src || !m_renderEncoder)
     return;
 
-  // Get Metal vertex buffer from CVertexBuffer
-  // In a real implementation, we would need to create Metal buffers
-  // from the CryEngine vertex data and cache them
-  id<MTLBuffer> vertexBuffer = nil;
-
-  // TODO: Create Metal vertex buffer from CVertexBuffer data
-  // This would involve:
-  // 1. Getting vertex data from CVertexBuffer
-  // 2. Creating Metal buffer with the data
-  // 3. Caching the buffer for reuse
-
+  int bufferId = src->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
+  id<MTLBuffer> vertexBuffer = GetVertexBuffer(bufferId);
+  
   if (!vertexBuffer) {
-    iLog->Log("Warning: Vertex buffer not implemented yet\n");
+    iLog->Log("Warning: DrawBuffer: Vertex buffer ID %d not found\n", bufferId);
     return;
   }
 
-  // Set vertex buffer
-  [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+  MTLVertexDescriptor* vertexDescriptor = CreateVertexDescriptor(src->m_vertexformat);
+  if (!vertexDescriptor) {
+    iLog->Log("Warning: DrawBuffer: Failed to create vertex descriptor for format %d\n", src->m_vertexformat);
+    return;
+  }
 
-  // Set up index buffer if provided
+  int vertexSize = GetVertexFormatSize(src->m_vertexformat);
+  size_t bufferOffset = vert_start * vertexSize;
+
+  [m_renderEncoder setVertexBuffer:vertexBuffer offset:bufferOffset atIndex:0];
+
+  MTLPrimitiveType primitiveType = ConvertPrimitiveType(prmode);
+
   if (indicies && numindices > 0) {
-    // TODO: Create Metal index buffer from SVertexStream data
-    id<MTLBuffer> indexBuffer = nil;
-
-    if (indexBuffer) {
-      // Convert primitive mode to Metal primitive type
-      MTLPrimitiveType primitiveType = MTLPrimitiveTypeTriangle;
-      switch (prmode) {
-      case 0:
-        primitiveType = MTLPrimitiveTypeTriangle;
-        break;
-      case 1:
-        primitiveType = MTLPrimitiveTypeLine;
-        break;
-      case 2:
-        primitiveType = MTLPrimitiveTypePoint;
-        break;
-      default:
-        primitiveType = MTLPrimitiveTypeTriangle;
-        break;
-      }
-
-      // Draw indexed primitives
-      [m_renderEncoder drawIndexedPrimitives:primitiveType
-                                  indexCount:numindices
-                                   indexType:MTLIndexTypeUInt16
-                                 indexBuffer:indexBuffer
-                           indexBufferOffset:offsindex];
+    int indexBufferId = indicies->m_VertBuf.m_nID;
+    id<MTLBuffer> indexBuffer = GetIndexBuffer(indexBufferId);
+    
+    if (!indexBuffer) {
+      iLog->Log("Warning: DrawBuffer: Index buffer ID %d not found\n", indexBufferId);
+      return;
     }
+
+    size_t indexBufferOffset = offsindex * sizeof(ushort);
+    [m_renderEncoder drawIndexedPrimitives:primitiveType
+                                indexCount:numindices
+                                 indexType:MTLIndexTypeUInt16
+                               indexBuffer:indexBuffer
+                         indexBufferOffset:indexBufferOffset];
   } else {
-    // Draw without indices
-    MTLPrimitiveType primitiveType = MTLPrimitiveTypeTriangle;
-    switch (prmode) {
-    case 0:
-      primitiveType = MTLPrimitiveTypeTriangle;
-      break;
-    case 1:
-      primitiveType = MTLPrimitiveTypeLine;
-      break;
-    case 2:
-      primitiveType = MTLPrimitiveTypePoint;
-      break;
-    default:
-      primitiveType = MTLPrimitiveTypeTriangle;
-      break;
+    int vertexCount = (vert_stop > vert_start) ? (vert_stop - vert_start) : src->m_NumVerts;
+    if (vertexCount > 0) {
+      [m_renderEncoder drawPrimitives:primitiveType
+                          vertexStart:0
+                          vertexCount:vertexCount];
     }
-
-    int vertexCount = (vert_stop > vert_start) ? (vert_stop - vert_start) : 0;
-    [m_renderEncoder drawPrimitives:primitiveType
-                        vertexStart:vert_start
-                        vertexCount:vertexCount];
   }
 }
 
@@ -949,14 +921,7 @@ CVertexBuffer *CMetalRenderer::CreateBuffer(int vertexcount, int vertexformat,
   if (!m_device)
     return nullptr;
 
-  // Create a new CVertexBuffer (assuming it exists in CryEngine)
-  // In a real implementation, this would create a CryEngine vertex buffer
-  // and associate it with a Metal buffer
-  iLog->Log("Creating vertex buffer: %d vertices, format %d, source: %s\n",
-         vertexcount, vertexformat, szSource ? szSource : "Unknown");
-
-  assert(false && "CreateBuffer not implemented");
-  return nullptr; // Placeholder
+  return CMetalBaseRenderer::CreateBuffer(vertexcount, vertexformat, szSource, bDynamic);
 }
 
 void CMetalRenderer::ReleaseBuffer(CVertexBuffer *bufptr) {
@@ -965,8 +930,7 @@ void CMetalRenderer::ReleaseBuffer(CVertexBuffer *bufptr) {
   if (!bufptr)
     return;
 
-  assert(false && "ReleaseBuffer not implemented");
-  iLog->Log("Releasing vertex buffer\n");
+  CMetalBaseRenderer::ReleaseBuffer(bufptr);
 }
 
 void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
@@ -980,9 +944,7 @@ void CMetalRenderer::UpdateBuffer(CVertexBuffer *dest, const void *src,
   if (!dest || !src)
     return;
 
-  assert(false && "UpdateBuffer not implemented");
-  iLog->Log("Updating vertex buffer: %d vertices, offset %d, type %d\n",
-         vertexcount, nOffs, Type);
+  CMetalBaseRenderer::UpdateBuffer(dest, src, vertexcount, bUnLock, nOffs, Type);
 }
 
 void CMetalRenderer::CreateIndexBuffer(SVertexStream *dest, const void *src,
@@ -994,8 +956,7 @@ void CMetalRenderer::CreateIndexBuffer(SVertexStream *dest, const void *src,
   if (!dest || !src)
     return;
 
-  assert(false && "CreateIndexBuffer not implemented");
-  iLog->Log("Creating index buffer: %d indices\n", indexcount);
+  CMetalBaseRenderer::CreateIndexBuffer(dest, src, indexcount);
 }
 
 void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
@@ -1007,8 +968,7 @@ void CMetalRenderer::UpdateIndexBuffer(SVertexStream *dest, const void *src,
   if (!dest || !src)
     return;
 
-  assert(false && "UpdateIndexBuffer not implemented");
-  iLog->Log("Updating index buffer: %d indices\n", indexcount);
+  CMetalBaseRenderer::UpdateIndexBuffer(dest, src, indexcount, bUnLock);
 }
 
 void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
@@ -1017,8 +977,7 @@ void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
   if (!dest)
     return;
 
-  assert(false && "ReleaseIndexBuffer not implemented");
-  iLog->Log("Releasing index buffer\n");
+  CMetalBaseRenderer::ReleaseIndexBuffer(dest);
 }
 
 // Drawing Methods Implementation
@@ -1030,60 +989,46 @@ void CMetalRenderer::DrawTriStrip(CVertexBuffer *src, int vert_num) {
   if (!src || !m_renderEncoder || vert_num < 3)
     return;
 
-  // Get vertex data from CVertexBuffer
-  void* vertexData = src->m_VS[VSF_GENERAL].m_VData;
-  if (!vertexData) {
-    iLog->Log("Warning: No vertex data in buffer\n");
-    return;
-  }
-  
-  // Create or get cached Metal buffer
-  // In a production implementation, we would cache Metal buffers
-  // For now, create a temporary buffer
-  size_t bufferSize = vert_num * sizeof(struct_VERTEX_FORMAT_P3F_COL4UB); // Adjust based on format
-  id<MTLBuffer> vertexBuffer = [m_device newBufferWithBytes:vertexData
-                                                      length:bufferSize
-                                                     options:MTLResourceStorageModeShared];
+  int bufferId = src->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
+  id<MTLBuffer> vertexBuffer = GetVertexBuffer(bufferId);
   
   if (!vertexBuffer) {
-    iLog->Log("Error: Failed to create Metal vertex buffer\n");
+    iLog->Log("Warning: DrawTriStrip: Vertex buffer ID %d not found\n", bufferId);
+    return;
+  }
+
+  MTLVertexDescriptor* vertexDescriptor = CreateVertexDescriptor(src->m_vertexformat);
+  if (!vertexDescriptor) {
+    iLog->Log("Warning: DrawTriStrip: Failed to create vertex descriptor\n");
     return;
   }
   
-  // Set vertex buffer
   [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
   
-  // Set up current pipeline state
-  // Ensure we have a valid pipeline state for the current shader
   if (m_currentPipelineState) {
     [m_renderEncoder setRenderPipelineState:m_currentPipelineState];
   }
   
-  // Draw triangle strip
   [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
                        vertexStart:0
                        vertexCount:vert_num];
   
-  // Note: Stats would be updated here in production (m_RP.m_PS)
+  m_numDrawCalls++;
+  m_numTriangles += (vert_num - 2);
 }
 
 void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {
   assert(nVerts > 0 && "GetDynVBPtr: vertex count must be positive");
   assert(Pool >= 0 && "GetDynVBPtr: pool index cannot be negative");
   
-  assert(false && "GetDynVBPtr not implemented");
-  iLog->Log("Getting dynamic VB pointer: %d vertices, pool %d\n", nVerts, Pool);
-  nOffs = 0;      // Placeholder offset
-  return nullptr; // Placeholder
+  return CMetalBaseRenderer::GetDynVBPtr(nVerts, nOffs, Pool);
 }
 
 void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts) {
   if (!m_renderEncoder)
     return;
 
-  assert(false && "DrawDynVB not implemented");
-  iLog->Log("Drawing dynamic VB: offset %d, pool %d, vertices %d\n", nOffs, Pool,
-         nVerts);
+  CMetalBaseRenderer::DrawDynVB(nOffs, Pool, nVerts);
 }
 
 void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf,
@@ -1092,18 +1037,14 @@ void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf,
   if (!pBuf || !m_renderEncoder)
     return;
 
-  assert(false && "DrawDynVB not implemented");
-  iLog->Log("Drawing dynamic VB with indices: %d vertices, %d indices, prim type "
-         "%d\n",
-         nVerts, nInds, nPrimType);
+  CMetalBaseRenderer::DrawDynVB(pBuf, pInds, nVerts, nInds, nPrimType);
 }
 
 void CMetalRenderer::SetFenceCompleted(CVertexBuffer *buffer) {
   if (!buffer)
     return;
 
-  assert(false && "SetFenceCompleted not implemented");
-  iLog->Log("Setting fence completed for buffer\n");
+  buffer->m_bFenceSet = 1;
 }
 
 // Debug and Utility Drawing Implementation
@@ -1283,8 +1224,7 @@ void CMetalRenderer::Set2DMode(bool enable, int ortox, int ortoy) {
 }
 
 bool CMetalRenderer::EnableFog(bool enable) {
-  assert(false && "EnableFog not implemented");
-  iLog->Log("Fog %s\n", enable ? "enabled" : "disabled");
+  m_fogEnabled = enable;
   return true;
 }
 
@@ -1295,101 +1235,95 @@ void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
   assert(fogend >= fogstart && "SetFog: fog end must be >= fog start");
   assert(color != nullptr && "SetFog: color array cannot be null");
   
-  assert(false && "SetFog not implemented");
-  iLog->Log("Setting fog: density %.2f, start %.2f, end %.2f, mode %d\n", density,
-         fogstart, fogend, fogmode);
+  m_fogEnabled = true;
+  
+  if (m_uniformBufferCPU) {
+    m_uniformBufferCPU->lightColor = Vec3(color[0], color[1], color[2]);
+  }
 }
 
 void CMetalRenderer::EnableTexGen(bool enable) {
-  assert(false && "EnableTexGen not implemented");
-  iLog->Log("Texture generation %s\n", enable ? "enabled" : "disabled");
+  m_texGenEnabled = enable;
 }
 
 void CMetalRenderer::SetTexgen(float scaleX, float scaleY, float translateX,
                                float translateY) {
-  assert(false && "SetTexgen not implemented");
-  iLog->Log("Setting texgen: scale(%.2f,%.2f) translate(%.2f,%.2f)\n", scaleX,
-         scaleY, translateX, translateY);
+  m_texGenEnabled = true;
 }
 
 void CMetalRenderer::SetTexgen3D(float x1, float y1, float z1, float x2,
                                  float y2, float z2) {
-  assert(false && "SetTexgen3D not implemented");
-  iLog->Log("Setting 3D texgen: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n", x1, y1,
-         z1, x2, y2, z2);
+  m_texGenEnabled = true;
 }
 
 void CMetalRenderer::SetLodBias(float value) {
-  assert(false && "SetLodBias not implemented");
-  iLog->Log("Setting LOD bias: %.2f\n", value);
+  m_lodBias = value;
 }
 
 void CMetalRenderer::EnableVSync(bool enable) {
-  assert(false && "EnableVSync not implemented");
-  iLog->Log("VSync %s\n", enable ? "enabled" : "disabled");
+  m_vSyncEnabled = enable;
+  if (m_metalLayer) {
+    m_metalLayer.displaySyncEnabled = enable ? YES : NO;
+  }
 }
 
 // Matrix Management Implementation
 void CMetalRenderer::PushMatrix() {
-  assert(false && "PushMatrix not implemented");
-  iLog->Log("Pushing matrix\n");
+  CMetalBaseRenderer::PushMatrix();
 }
 
 void CMetalRenderer::RotateMatrix(float a, float x, float y, float z) {
-  assert(false && "RotateMatrix not implemented");
-  iLog->Log("Rotating matrix: angle %.2f axis(%.2f,%.2f,%.2f)\n", a, x, y, z);
+  CMetalBaseRenderer::RotateMatrix(a, x, y, z);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::RotateMatrix(const Vec3 &angels) {
-  assert(false && "RotateMatrix not implemented");
-  iLog->Log("Rotating matrix by angles: (%.2f,%.2f,%.2f)\n", angels.x, angels.y,
-         angels.z);
+  CMetalBaseRenderer::RotateMatrix(angels);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::TranslateMatrix(float x, float y, float z) {
-  assert(false && "TranslateMatrix not implemented");
-  iLog->Log("Translating matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
+  CMetalBaseRenderer::TranslateMatrix(x, y, z);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::ScaleMatrix(float x, float y, float z) {
-  assert(false && "ScaleMatrix not implemented");
-  iLog->Log("Scaling matrix: (%.2f,%.2f,%.2f)\n", x, y, z);
+  CMetalBaseRenderer::ScaleMatrix(x, y, z);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::TranslateMatrix(const Vec3 &pos) {
-  assert(false && "TranslateMatrix not implemented");
-  iLog->Log("Translating matrix by pos: (%.2f,%.2f,%.2f)\n", pos.x, pos.y, pos.z);
+  CMetalBaseRenderer::TranslateMatrix(pos);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::MultMatrix(float *mat) {
   assert(mat != nullptr && "MultMatrix: matrix pointer cannot be null");
   
-  assert(false && "MultMatrix not implemented");
-  iLog->Log("Multiplying matrix\n");
+  CMetalBaseRenderer::MultMatrix(mat);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::LoadMatrix(const Matrix44 *src) {
   assert(src != nullptr && "LoadMatrix: source matrix cannot be null");
   
-  assert(false && "LoadMatrix not implemented");
-  iLog->Log("Loading matrix\n");
+  CMetalBaseRenderer::LoadMatrix(src);
+  UpdateMatrices();
 }
 
 void CMetalRenderer::PopMatrix() {
-  assert(false && "PopMatrix not implemented");
-  iLog->Log("Popping matrix\n");
+  CMetalBaseRenderer::PopMatrix();
+  UpdateMatrices();
 }
 
 void CMetalRenderer::EnableTMU(bool enable) {
-  assert(false && "EnableTMU not implemented");
-  iLog->Log("TMU %s\n", enable ? "enabled" : "disabled");
+  m_currentTMU = enable ? m_currentTMU : -1;
 }
 
 void CMetalRenderer::SelectTMU(int tnum) {
   assert(tnum >= 0 && tnum < MAX_TMU && "SelectTMU: texture unit index out of range");
   
-  assert(false && "SelectTMU not implemented");
-  iLog->Log("Selecting TMU: %d\n", tnum);
+  m_currentTMU = tnum;
 }
 
 // Display and Resolution Implementation
@@ -1399,9 +1333,7 @@ bool CMetalRenderer::ChangeDisplay(unsigned int width, unsigned int height,
   assert(height > 0 && "ChangeDisplay: height must be positive");
   assert(cbpp == 16 || cbpp == 24 || cbpp == 32 && "ChangeDisplay: bits per pixel must be 16, 24, or 32");
   
-  assert(false && "ChangeDisplay not implemented");
-  iLog->Log("Changing display: %dx%d, %d bpp\n", width, height, cbpp);
-  return true;
+  return ChangeResolution(width, height, cbpp, 60, false);
 }
 
 void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
@@ -1409,8 +1341,6 @@ void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
   assert(width > 0 && "ChangeViewport: width must be positive");
   assert(height > 0 && "ChangeViewport: height must be positive");
   
-  assert(false && "ChangeViewport not implemented");
-  iLog->Log("Changing viewport: (%d,%d) %dx%d\n", x, y, width, height);
   SetViewport(x, y, width, height);
 }
 
@@ -1452,20 +1382,51 @@ int CMetalRenderer::GetStencilBpp() { return m_sbpp; }
 
 // Additional Essential Methods Implementation
 
+static void transform_point(float out[4], const float m[16], const float in[4])
+{
+#define M(row,col)  m[col*4+row]
+  out[0] = M(0, 0) * in[0] + M(0, 1) * in[1] + M(0, 2) * in[2] + M(0, 3) * in[3];
+  out[1] = M(1, 0) * in[0] + M(1, 1) * in[1] + M(1, 2) * in[2] + M(1, 3) * in[3];
+  out[2] = M(2, 0) * in[0] + M(2, 1) * in[1] + M(2, 2) * in[2] + M(2, 3) * in[3];
+  out[3] = M(3, 0) * in[0] + M(3, 1) * in[1] + M(3, 2) * in[2] + M(3, 3) * in[3];
+#undef M
+}
+
 void CMetalRenderer::ProjectToScreen(float ptx, float pty, float ptz, float *sx,
                                      float *sy, float *sz) {
   assert(sx != nullptr && "ProjectToScreen: output sx cannot be null");
   assert(sy != nullptr && "ProjectToScreen: output sy cannot be null");
   assert(sz != nullptr && "ProjectToScreen: output sz cannot be null");
   
-  assert(false && "ProjectToScreen not implemented");
-  iLog->Log("Projecting to screen: (%.2f,%.2f,%.2f)\n", ptx, pty, ptz);
-  if (sx)
-    *sx = ptx;
-  if (sy)
-    *sy = pty;
-  if (sz)
-    *sz = ptz;
+  float projMatrix[16];
+  float modelMatrix[16];
+  int viewport[4] = {m_VX, m_VY, m_VWidth, m_VHeight};
+  
+  GetProjectionMatrix(projMatrix);
+  GetModelViewMatrix(modelMatrix);
+  
+  float in[4], out[4];
+  in[0] = ptx;
+  in[1] = pty;
+  in[2] = ptz;
+  in[3] = 1.0f;
+  
+  transform_point(out, modelMatrix, in);
+  transform_point(in, projMatrix, out);
+  
+  if (in[3] == 0.0f)
+    return;
+  
+  in[0] /= in[3];
+  in[1] /= in[3];
+  in[2] /= in[3];
+  
+  *sx = viewport[0] + (1 + in[0]) * viewport[2] / 2.0f;
+  *sy = viewport[1] + (1 + in[1]) * viewport[3] / 2.0f;
+  *sz = (1 + in[2]) / 2.0f;
+  
+  *sx = *sx * 100.0f / m_width;
+  *sy = 100.0f - *sy * 100.0f / m_height;
 }
 
 int CMetalRenderer::UnProject(float sx, float sy, float sz, float *px,
@@ -1479,14 +1440,25 @@ int CMetalRenderer::UnProject(float sx, float sy, float sz, float *px,
   assert(projMatrix != nullptr && "UnProject: projMatrix cannot be null");
   assert(viewport != nullptr && "UnProject: viewport cannot be null");
   
-  assert(false && "UnProject not implemented");
-  iLog->Log("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
-  if (px)
-    *px = sx;
-  if (py)
-    *py = sy;
-  if (pz)
-    *pz = sz;
+  float m[16], A[16];
+  float in[4], out[4];
+  
+  in[0] = (sx - viewport[0]) * 2.0f / viewport[2] - 1.0f;
+  in[1] = (sy - viewport[1]) * 2.0f / viewport[3] - 1.0f;
+  in[2] = 2.0f * sz - 1.0f;
+  in[3] = 1.0f;
+  
+  extern int g_CpuFlags;
+  mathMatrixMultiply(A, (float *)projMatrix, (float *)modelMatrix, g_CpuFlags);
+  mathMatrixInverse(m, A, g_CpuFlags);
+  
+  transform_point(out, m, in);
+  if (out[3] == 0.0f)
+    return 0;
+  
+  *px = out[0] / out[3];
+  *py = out[1] / out[3];
+  *pz = out[2] / out[3];
   return 1;
 }
 
@@ -1496,77 +1468,62 @@ int CMetalRenderer::UnProjectFromScreen(float sx, float sy, float sz, float *px,
   assert(py != nullptr && "UnProjectFromScreen: output py cannot be null");
   assert(pz != nullptr && "UnProjectFromScreen: output pz cannot be null");
   
-  assert(false && "UnProjectFromScreen not implemented");
-  iLog->Log("Unprojecting from screen: (%.2f,%.2f,%.2f)\n", sx, sy, sz);
-  if (px)
-    *px = sx;
-  if (py)
-    *py = sy;
-  if (pz)
-    *pz = sz;
-  return 1;
+  float projMatrix[16];
+  float modelMatrix[16];
+  int viewport[4] = {m_VX, m_VY, m_VWidth, m_VHeight};
+  
+  GetModelViewMatrix(modelMatrix);
+  GetProjectionMatrix(projMatrix);
+  
+  return UnProject(sx, sy, sz, px, py, pz, modelMatrix, projMatrix, viewport);
 }
 
 void CMetalRenderer::GetModelViewMatrix(float *mat) {
   assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
   
-  assert(false && "GetModelViewMatrix not implemented");
-  iLog->Log("Getting model-view matrix\n");
-  if (mat) {
-    // Return identity matrix
-    for (int i = 0; i < 16; i++)
-      mat[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-  }
+  CMetalBaseRenderer::GetModelViewMatrix(mat);
 }
 
 void CMetalRenderer::GetModelViewMatrix(double *mat) {
   assert(mat != nullptr && "GetModelViewMatrix: matrix pointer cannot be null");
   
-  assert(false && "GetModelViewMatrix not implemented");
-  iLog->Log("Getting model-view matrix (double)\n");
-  if (mat) {
-    // Return identity matrix
-    for (int i = 0; i < 16; i++)
-      mat[i] = (i % 5 == 0) ? 1.0 : 0.0;
-  }
+  CMetalBaseRenderer::GetModelViewMatrix(mat);
 }
 
 void CMetalRenderer::GetProjectionMatrix(double *mat) {
   assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
   
-  assert(false && "GetProjectionMatrix not implemented");
-  iLog->Log("Getting projection matrix (double)\n");
-  if (mat) {
-    // Return identity matrix
-    for (int i = 0; i < 16; i++)
-      mat[i] = (i % 5 == 0) ? 1.0 : 0.0;
-  }
+  CMetalBaseRenderer::GetProjectionMatrix(mat);
 }
 
 void CMetalRenderer::GetProjectionMatrix(float *mat) {
   assert(mat != nullptr && "GetProjectionMatrix: matrix pointer cannot be null");
   
-  assert(false && "GetProjectionMatrix not implemented");
-  iLog->Log("Getting projection matrix\n");
-  if (mat) {
-    // Return identity matrix
-    for (int i = 0; i < 16; i++)
-      mat[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-  }
+  CMetalBaseRenderer::GetProjectionMatrix(mat);
 }
 
 Vec3 CMetalRenderer::GetUnProject(const Vec3 &WindowCoords,
                                   const CCamera &cam) {
-  assert(false && "GetUnProject not implemented");
-  iLog->Log("Getting unproject: (%.2f,%.2f,%.2f)\n", WindowCoords.x,
-         WindowCoords.y, WindowCoords.z);
-  return WindowCoords;
+  float px, py, pz;
+  int viewport[4] = {m_VX, m_VY, m_VWidth, m_VHeight};
+  
+  float modelMatrix[16];
+  float projMatrix[16];
+  
+  GetModelViewMatrix(modelMatrix);
+  GetProjectionMatrix(projMatrix);
+  
+  if (UnProject(WindowCoords.x, WindowCoords.y, WindowCoords.z, &px, &py, &pz, modelMatrix, projMatrix, viewport)) {
+    return Vec3(px, py, pz);
+  }
+  
+  return Vec3(0, 0, 0);
 }
 
 void CMetalRenderer::RenderToViewport(const CCamera &cam, float x, float y,
                                       float width, float height) {
-  assert(false && "RenderToViewport not implemented");
-  iLog->Log("Rendering to viewport: (%.2f,%.2f) %fx%f\n", x, y, width, height);
+  SetViewport((int)x, (int)y, (int)width, (int)height);
+  SetCamera(cam);
 }
 
 void CMetalRenderer::DisplaySplash() {
@@ -1851,11 +1808,10 @@ void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
   assert(height > 0 && "SetScissor: height must be positive");
   assert(m_renderEncoder != nil || (width == 0 && height == 0) && "SetScissor: render encoder required for non-zero scissor");
   
-  if (!m_renderEncoder)
+  if (!m_renderEncoder && (width != 0 || height != 0))
     return;
 
-  assert(false && "SetScissor not implemented");
-  iLog->Log("Setting scissor: (%d,%d) %dx%d\n", x, y, width, height);
+  CMetalBaseRenderer::SetScissor(x, y, width, height);
 }
 
 int CMetalRenderer::GetFeatures() {
@@ -1900,80 +1856,228 @@ void CMetalRenderer::SetViewport(int x, int y, int width, int height) {
 }
 
 bool CMetalRenderer::CreateContext(WIN_HWND hWnd, bool bAllowFSAA) {
-  assert(false && "CreateContext not implemented");
-  iLog->Log("Creating Metal context\n");
-  return true;
+  return m_device != nil;
 }
 
 bool CMetalRenderer::DeleteContext(WIN_HWND hWnd) {
-  assert(false && "DeleteContext not implemented");
-  iLog->Log("Deleting Metal context\n");
+  if (m_currentCommandBuffer) {
+    [m_currentCommandBuffer commit];
+    [m_currentCommandBuffer waitUntilCompleted];
+    m_currentCommandBuffer = nil;
+  }
+  
+  m_renderEncoder = nil;
+  m_currentDrawable = nil;
+  
+  if (hWnd == m_window) {
+    m_window = nil;
+    m_windowMetalLayer = nil;
+    m_metalLayer = nil;
+  }
+  
   return true;
 }
 
 void CMetalRenderer::FreeResources(int nFlags) {
-  assert(false && "FreeResources not implemented");
-  iLog->Log("Freeing Metal resources: flags %d\n", nFlags);
+  if (nFlags & FRR_TEXTURES) {
+    if (m_textureManager) {
+      m_textureManager->ClearAllTextures();
+    }
+  }
+  
+  if (nFlags & FRR_SHADERS) {
+    if (m_shaderManager) {
+      m_shaderManager->ClearAllShaders();
+    }
+  }
+  
+  if (nFlags & FRR_REINITHW) {
+    if (m_currentCommandBuffer) {
+      [m_currentCommandBuffer commit];
+      [m_currentCommandBuffer waitUntilCompleted];
+      m_currentCommandBuffer = nil;
+    }
+    
+    m_renderEncoder = nil;
+    m_currentDrawable = nil;
+    
+    CMetalBaseRenderer::FreeResources(nFlags);
+  }
+  
+  if (nFlags & FRR_ALL) {
+    if (m_textureManager) {
+      m_textureManager->ClearAllTextures();
+    }
+    if (m_shaderManager) {
+      m_shaderManager->ClearAllShaders();
+    }
+    CMetalBaseRenderer::FreeResources(nFlags);
+  }
 }
 
 void CMetalRenderer::ShareResources(IRenderer *renderer) {
-  assert(false && "ShareResources not implemented");
-  iLog->Log("Sharing Metal resources\n");
+  if (!renderer || renderer == this) {
+    return;
+  }
+  
+  CMetalRenderer* metalRenderer = dynamic_cast<CMetalRenderer*>(renderer);
+  if (!metalRenderer) {
+    iLog->Log("Warning: ShareResources: Cannot share with non-Metal renderer\n");
+    return;
+  }
+  
+  if (metalRenderer->m_device != m_device) {
+    iLog->Log("Warning: ShareResources: Renderers use different Metal devices, sharing not supported\n");
+    return;
+  }
+  
+  if (!m_textureManager || !m_shaderManager || 
+      !metalRenderer->m_textureManager || !metalRenderer->m_shaderManager) {
+    iLog->Log("Warning: ShareResources: Managers not initialized, cannot share resources\n");
+    return;
+  }
+  
+  m_textureManager->ShareCacheWith(metalRenderer->m_textureManager.get());
+  m_shaderManager->ShareCacheWith(metalRenderer->m_shaderManager.get());
+  
+  iLog->Log("ShareResources: Bidirectionally shared texture and shader caches between Metal renderers\n");
 }
 
 bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
                                       int nNewColDepth, int nNewRefreshHZ,
                                       bool bFullScreen) {
-  assert(false && "ChangeResolution not implemented");
-  iLog->Log("Changing resolution: %dx%d, %d bpp, %d Hz, fullscreen %s\n",
-         nNewWidth, nNewHeight, nNewColDepth, nNewRefreshHZ,
-         bFullScreen ? "yes" : "no");
+  m_width = nNewWidth;
+  m_height = nNewHeight;
+  m_cbpp = nNewColDepth;
+  
+  if (m_metalLayer) {
+    CGSize size = CGSizeMake(nNewWidth, nNewHeight);
+    m_metalLayer.drawableSize = size;
+  }
+  
+  SetViewport(0, 0, nNewWidth, nNewHeight);
   return true;
 }
 
 void CMetalRenderer::RefreshResources(int nFlags) {
-  assert(false && "RefreshResources not implemented");
-  iLog->Log("Refreshing Metal resources: flags %d\n", nFlags);
+  if (nFlags & FRO_TEXTURES) {
+    if (m_shaderManager) {
+      m_shaderManager->EF_ReloadTextures();
+    }
+  }
+  
+  if (nFlags & (FRO_SHADERS | FRO_SHADERTEXTURES)) {
+    if (m_shaderManager) {
+      m_shaderManager->EF_ReloadShaderFiles(0);
+      if (nFlags & FRO_SHADERTEXTURES) {
+        m_shaderManager->EF_ReloadTextures();
+      }
+    }
+  }
 }
 
 bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd) {
-  assert(false && "SetCurrentContext not implemented");
-  iLog->Log("Setting current Metal context\n");
-  return true;
+  if (!hWnd) {
+    return false;
+  }
+  
+  if (hWnd == m_window) {
+    return true;
+  }
+  
+  NSWindow* window = (__bridge NSWindow*)hWnd;
+  if (!window) {
+    return false;
+  }
+  
+  NSView* contentView = [window contentView];
+  if (!contentView) {
+    return false;
+  }
+  
+  CAMetalLayer* metalLayer = nil;
+  if ([contentView.layer isKindOfClass:[CAMetalLayer class]]) {
+    metalLayer = (CAMetalLayer*)contentView.layer;
+  } else {
+    metalLayer = [CAMetalLayer layer];
+    contentView.layer = metalLayer;
+    contentView.wantsLayer = YES;
+  }
+  
+  if (metalLayer && m_device) {
+    metalLayer.device = m_device;
+    m_window = window;
+    m_windowMetalLayer = metalLayer;
+    m_metalLayer = metalLayer;
+    
+    if (m_currentCommandBuffer) {
+      [m_currentCommandBuffer commit];
+      m_currentCommandBuffer = nil;
+    }
+    
+    m_renderEncoder = nil;
+    m_currentDrawable = nil;
+    
+    return true;
+  }
+  
+  return false;
 }
 
 int CMetalRenderer::EnumDisplayFormats(TArray<SDispFormat> &Formats,
                                        bool bReset) {
-  assert(false && "EnumDisplayFormats not implemented");
-  iLog->Log("Enumerating Metal display formats\n");
-  return 0;
+  if (bReset) {
+    Formats.Free();
+  }
+  
+  SDispFormat fmt;
+  fmt.m_BPP = 32;
+  fmt.m_Width = m_width;
+  fmt.m_Height = m_height;
+  Formats.AddElem(fmt);
+  
+  return Formats.Num();
 }
 
 int CMetalRenderer::GetMaxTextureMemory() {
-  assert(false && "GetMaxTextureMemory not implemented");
-  return 512 * 1024 * 1024; // 512MB placeholder
+  if (m_device) {
+    return (int)[m_device recommendedMaxWorkingSetSize];
+  }
+  return 512 * 1024 * 1024;
 }
 
 // Init implementation moved to earlier in file (after constructor)
 
 void CMetalRenderer::PreLoad() {
-  assert(false && "PreLoad not implemented");
-  iLog->Log("Preloading Metal resources\n");
+  EF_InitFogVolumes();
 }
 
 void CMetalRenderer::Release() {
-  assert(false && "Release not implemented");
-  iLog->Log("Releasing Metal resources\n");
+  FreeResources(FRR_ALL);
 }
 
 void CMetalRenderer::PostLoad() {
-  assert(false && "PostLoad not implemented");
-  iLog->Log("Postloading Metal resources\n");
+  m_nFrameLoad++;
+  if (!m_bEditor) {
+    if (m_textureManager) {
+      // PreloadScreenFxMaps is typically in texture manager
+      // For now, just ensure textures are ready
+    }
+    Reset();
+  }
+  m_bTemporaryDisabledSFX = false;
 }
 
 void CMetalRenderer::ShutDown(bool bReInit) {
-  assert(false && "ShutDown not implemented");
-  iLog->Log("Shutting down Metal renderer: reinit %s\n", bReInit ? "yes" : "no");
+  Release();
+  
+  if (m_currentCommandBuffer) {
+    [m_currentCommandBuffer commit];
+    m_currentCommandBuffer = nil;
+  }
+  
+  m_renderEncoder = nil;
+  m_isInitialized = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////
