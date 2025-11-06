@@ -20,8 +20,11 @@
 #include "I3DEngine.h"
 #include "ISystem.h"
 #include "MetalBaseRenderer.m"
+#include "../Common/Textures/Image/CImage.h"
 #include <Cocoa/Cocoa.h>
 #include <cmath>
+#include <cstring>
+#include <algorithm>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -2542,108 +2545,6 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
     return LoadTextureData(filename, data, width, height, format);
 }
 
-bool CMetalTextureManager::CreateFallbackTexture(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
-{
-    assert(filename && "CreateFallbackTexture: filename cannot be null!");
-    assert(filename[0] != '\0' && "CreateFallbackTexture: filename cannot be empty!");
-    
-    if (!filename || !filename[0])
-        return false;
-    
-    std::string nameStr(filename);
-    
-    const int FALLBACK_SIZE = 64;
-    const int BYTES_PER_PIXEL = 4;
-    
-    // Create fallback textures for common missing textures
-    if (nameStr == "black.tga" || nameStr == "black")
-    {
-        width = FALLBACK_SIZE;
-        height = FALLBACK_SIZE;
-        format = eTF_8888;
-        data.resize(width * height * BYTES_PER_PIXEL);
-        assert(!data.empty() && "CreateFallbackTexture: Failed to allocate memory for black texture!");
-        assert(data.data() && "CreateFallbackTexture: data.data() returned null!");
-        memset(data.data(), 0, data.size());
-        iLog->Log("CreateFallbackTexture: Created black texture (64x64)\n");
-        return true;
-    }
-    else if (nameStr == "diskette.tga" || nameStr == "diskette")
-    {
-        width = FALLBACK_SIZE;
-        height = FALLBACK_SIZE;
-        format = eTF_8888;
-        data.resize(width * height * BYTES_PER_PIXEL);
-        assert(!data.empty() && "CreateFallbackTexture: Failed to allocate memory for diskette texture!");
-        unsigned char* pixels = data.data();
-        assert(pixels && "CreateFallbackTexture: data.data() returned null for diskette texture!");
-        assert(width > 0 && height > 0 && "CreateFallbackTexture: Invalid dimensions for diskette texture!");
-        assert((width * height * BYTES_PER_PIXEL) <= (int)data.size() && "CreateFallbackTexture: Data buffer too small!");
-        
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                int idx = (y * width + x) * BYTES_PER_PIXEL;
-                assert(idx >= 0 && idx + BYTES_PER_PIXEL <= (int)data.size() && "CreateFallbackTexture: pixel index out of bounds!");
-                pixels[idx + 0] = 100;
-                pixels[idx + 1] = 100;
-                pixels[idx + 2] = 150;
-                pixels[idx + 3] = 255;
-            }
-        }
-        iLog->Log("CreateFallbackTexture: Created diskette icon texture (64x64)\n");
-        return true;
-    }
-    else if (nameStr == "spot_shadow.tga" || nameStr == "spot_shadow")
-    {
-        width = FALLBACK_SIZE;
-        height = FALLBACK_SIZE;
-        format = eTF_8888;
-        data.resize(width * height * BYTES_PER_PIXEL);
-        assert(!data.empty() && "CreateFallbackTexture: Failed to allocate memory for spot shadow texture!");
-        unsigned char* pixels = data.data();
-        assert(pixels && "CreateFallbackTexture: data.data() returned null for spot shadow texture!");
-        assert(width > 0 && height > 0 && "CreateFallbackTexture: Invalid dimensions for spot shadow texture!");
-        assert((width * height * BYTES_PER_PIXEL) <= (int)data.size() && "CreateFallbackTexture: Data buffer too small!");
-        
-        int centerX = width / 2;
-        int centerY = height / 2;
-        int radius = width / 2;
-        assert(radius > 0 && "CreateFallbackTexture: radius must be greater than zero!");
-        
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                int idx = (y * width + x) * BYTES_PER_PIXEL;
-                assert(idx >= 0 && idx + BYTES_PER_PIXEL <= (int)data.size() && "CreateFallbackTexture: pixel index out of bounds!");
-                
-                int dx = x - centerX;
-                int dy = y - centerY;
-                int distSq = dx * dx + dy * dy;
-                assert(distSq >= 0 && "CreateFallbackTexture: distance squared cannot be negative!");
-                
-                float dist = sqrtf((float)distSq);
-                assert(dist >= 0.0f && "CreateFallbackTexture: distance cannot be negative!");
-                
-                float alpha = 1.0f - (dist / radius);
-                if (alpha < 0.0f) alpha = 0.0f;
-                if (alpha > 1.0f) alpha = 1.0f;
-                unsigned char a = (unsigned char)(alpha * 255.0f);
-                pixels[idx + 0] = 0;
-                pixels[idx + 1] = 0;
-                pixels[idx + 2] = 0;
-                pixels[idx + 3] = a;
-            }
-        }
-        iLog->Log("CreateFallbackTexture: Created spot shadow texture (64x64)\n");
-        return true;
-    }
-    
-    return false;
-}
-
 bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
 {
     if (!filename || !filename[0])
@@ -2655,77 +2556,211 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
     if (!m_renderer || !m_renderer->m_device)
         return false;
     
+    if (!iSystem)
+        assert(false);
+        return false;
+    
+    FILE* pFile = iSystem->GetIPak()->FOpen(filename, "rb");
+    if (pFile)
+    {
+        iSystem->GetIPak()->FSeek(pFile, 0, SEEK_END);
+        long fileSize = iSystem->GetIPak()->FTell(pFile);
+        iSystem->GetIPak()->FSeek(pFile, 0, SEEK_SET);
+        
+        if (fileSize > 0)
+        {
+            std::vector<byte> fileData(fileSize);
+            size_t bytesRead = iSystem->GetIPak()->FRead(fileData.data(), 1, fileSize, pFile);
+            iSystem->GetIPak()->FClose(pFile);
+            
+            if (bytesRead == fileSize)
+            {
+                const char* baseName = strrchr(filename, '/');
+                if (!baseName) baseName = strrchr(filename, '\\');
+                if (!baseName) baseName = filename;
+                else baseName++;
+                
+                strncpy(CImageFile::m_CurFileName, baseName, sizeof(CImageFile::m_CurFileName) - 1);
+                CImageFile::m_CurFileName[sizeof(CImageFile::m_CurFileName) - 1] = '\0';
+                strlwr(CImageFile::m_CurFileName);
+                
+                CImageFile* pImageFile = CImageFile::mfLoad_file(fileData.data(), fileSize);
+                EImFileError imageError = CImageFile::mfGet_error();
+                if (pImageFile && imageError == eIFE_OK)
+                {
+                    width = pImageFile->mfGet_width();
+                    height = pImageFile->mfGet_height();
+                    
+                    byte* pImageData = pImageFile->mfGet_image();
+                    int imgSize = pImageFile->mfGet_ImageSize();
+                    if (pImageData && width > 0 && height > 0 && imgSize > 0)
+                    {
+                        int bps = pImageFile->mfGet_bps();
+                        int expectedSize = width * height * (bps / 8);
+                        
+                        if (imgSize >= expectedSize)
+                        {
+                            size_t dataSize = width * height * 4;
+                            data.resize(dataSize);
+                            
+                            if (bps == 32)
+                            {
+                                auto* pPixels = (SRGBPixel*)pImageData;
+                                for (int i = 0; i < width * height; i++)
+                                {
+                                    data[i * 4 + 0] = pPixels[i].red;
+                                    data[i * 4 + 1] = pPixels[i].green;
+                                    data[i * 4 + 2] = pPixels[i].blue;
+                                    data[i * 4 + 3] = pPixels[i].alpha;
+                                }
+                            }
+                            else
+                            {
+                                size_t copySize = (imgSize < dataSize) ? imgSize : dataSize;
+                                memcpy(data.data(), pImageData, copySize);
+                            }
+                            
+                            format = eTF_8888;
+                            delete pImageFile;
+                            return true;
+                        }
+                        else
+                        {
+                            iLog->Log("LoadTextureData: Invalid image size for %s - expected %d bytes, got %d bytes (width=%d, height=%d, bps=%d)\n", 
+                                     filename, expectedSize, imgSize, width, height, bps);
+                        }
+                    }
+                    else
+                    {
+                        iLog->Log("LoadTextureData: Invalid image data for %s - pImageData=%p, width=%d, height=%d, imgSize=%d\n", 
+                                 filename, pImageData, width, height, imgSize);
+                    }
+                }
+                else
+                {
+                    const char* errorDetail = CImageFile::mfGet_error_detail();
+                    const char* errorMsg = "";
+                    switch (imageError)
+                    {
+                        case eIFE_IOerror:
+                            errorMsg = "IO error";
+                            break;
+                        case eIFE_OutOfMemory:
+                            errorMsg = "Out of memory";
+                            break;
+                        case eIFE_BadFormat:
+                            errorMsg = "Bad format";
+                            break;
+                        default:
+                            errorMsg = "Unknown error";
+                            break;
+                    }
+                    iLog->Log("LoadTextureData: CImageFile failed to parse %s - %s%s%s\n", 
+                             filename, errorMsg, 
+                             errorDetail && errorDetail[0] ? " - " : "", 
+                             errorDetail && errorDetail[0] ? errorDetail : "");
+                }
+
+                delete pImageFile;
+            }
+            else
+            {
+                iLog->Log("LoadTextureData: Failed to read file %s - expected %ld bytes, read %zu bytes\n", 
+                         filename, fileSize, bytesRead);
+            }
+        }
+        else
+        {
+            iLog->Log("LoadTextureData: File %s has zero or negative size (%ld bytes)\n", filename, fileSize);
+            iSystem->GetIPak()->FClose(pFile);
+        }
+    }
+    else
+    {
+        iLog->Log("LoadTextureData: CryPak failed to open file %s\n", filename);
+    }
+    
     @autoreleasepool
     {
         NSString* filePathStr = [NSString stringWithUTF8String:filename];
         NSURL* fileURL = [NSURL fileURLWithPath:filePathStr];
         
-        if (!fileURL || ![[NSFileManager defaultManager] fileExistsAtPath:filePathStr])
+        if (fileURL && [[NSFileManager defaultManager] fileExistsAtPath:filePathStr])
         {
-            if (CreateFallbackTexture(filename, data, width, height, format))
+            NSError* error = nil;
+            MTKTextureLoader* textureLoader = [[MTKTextureLoader alloc] initWithDevice:m_renderer->m_device];
+            
+            NSDictionary* options = @{
+                MTKTextureLoaderOptionTextureUsage: @(MTLTextureUsageShaderRead),
+                MTKTextureLoaderOptionTextureStorageMode: @(MTLStorageModeShared),
+                MTKTextureLoaderOptionSRGB: @(NO),
+                MTKTextureLoaderOptionGenerateMipmaps: @(NO)
+            };
+            
+            id<MTLTexture> loadedTexture = [textureLoader newTextureWithContentsOfURL:fileURL
+                                                                               options:options
+                                                                                 error:&error];
+            
+            if (loadedTexture && !error)
             {
+                width = (int)[loadedTexture width];
+                height = (int)[loadedTexture height];
+                MTLPixelFormat pixelFormat = [loadedTexture pixelFormat];
+                
+                format = ConvertFromMetalFormat(pixelFormat);
+                
+                int bytesPerPixel = 4;
+                switch (pixelFormat)
+                {
+                    case MTLPixelFormatRGBA8Unorm:
+                    case MTLPixelFormatBGRA8Unorm:
+                        bytesPerPixel = 4;
+                        format = eTF_8888;
+                        break;
+                    case MTLPixelFormatRG8Unorm:
+                        bytesPerPixel = 2;
+                        format = eTF_0088;
+                        break;
+                    case MTLPixelFormatR8Unorm:
+                        bytesPerPixel = 1;
+                        format = eTF_8000;
+                        break;
+                    default:
+                        bytesPerPixel = 4;
+                        format = eTF_8888;
+                        break;
+                }
+                
+                size_t dataSize = width * height * bytesPerPixel;
+                data.resize(dataSize);
+                
+                [loadedTexture getBytes:data.data()
+                            bytesPerRow:width * bytesPerPixel
+                             fromRegion:MTLRegionMake2D(0, 0, width, height)
+                            mipmapLevel:0];
+                
                 return true;
             }
-            return false;
+            else
+            {
+                if (error)
+                {
+                    NSString* errorDesc = [error localizedDescription];
+                    iLog->Log("LoadTextureData: MTKTextureLoader failed for %s - %s\n", 
+                             filename, errorDesc ? [errorDesc UTF8String] : "Unknown error");
+                }
+                else
+                {
+                    iLog->Log("LoadTextureData: MTKTextureLoader returned nil texture for %s\n", filename);
+                }
+            }
         }
-        
-        NSError* error = nil;
-        MTKTextureLoader* textureLoader = [[MTKTextureLoader alloc] initWithDevice:m_renderer->m_device];
-        
-        NSDictionary* options = @{
-            MTKTextureLoaderOptionTextureUsage: @(MTLTextureUsageShaderRead),
-            MTKTextureLoaderOptionTextureStorageMode: @(MTLStorageModeShared),
-            MTKTextureLoaderOptionSRGB: @(NO),
-            MTKTextureLoaderOptionGenerateMipmaps: @(NO)
-        };
-        
-        id<MTLTexture> loadedTexture = [textureLoader newTextureWithContentsOfURL:fileURL
-                                                                           options:options
-                                                                             error:&error];
-        
-        if (!loadedTexture || error)
+        else
         {
-            // Texture loading failed (error details in 'error' object if available)
-            return false;
+            iLog->Log("LoadTextureData: File does not exist at path %s\n", filename);
         }
         
-        width = (int)[loadedTexture width];
-        height = (int)[loadedTexture height];
-        MTLPixelFormat pixelFormat = [loadedTexture pixelFormat];
-        
-        format = ConvertFromMetalFormat(pixelFormat);
-        
-        int bytesPerPixel = 4;
-        switch (pixelFormat)
-        {
-            case MTLPixelFormatRGBA8Unorm:
-            case MTLPixelFormatBGRA8Unorm:
-                bytesPerPixel = 4;
-                format = eTF_8888;
-                break;
-            case MTLPixelFormatRG8Unorm:
-                bytesPerPixel = 2;
-                format = eTF_0088;
-                break;
-            case MTLPixelFormatR8Unorm:
-                bytesPerPixel = 1;
-                format = eTF_8000;
-                break;
-            default:
-                bytesPerPixel = 4;
-                format = eTF_8888;
-                break;
-        }
-        
-        size_t dataSize = width * height * bytesPerPixel;
-        data.resize(dataSize);
-        
-        [loadedTexture getBytes:data.data()
-                    bytesPerRow:width * bytesPerPixel
-                     fromRegion:MTLRegionMake2D(0, 0, width, height)
-                    mipmapLevel:0];
-        
-        return true;
+        return false;
     }
 }
 

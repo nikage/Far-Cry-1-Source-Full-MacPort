@@ -11,6 +11,10 @@
 //               Apple's Metal graphics API provides low-level GPU access
 // -------------------------------------------------------------------------
 //  History:
+//  11/05/2025 - Updated utility renderer methods (WriteXY, Draw2dText, etc.) to use
+//               assert() instead of if-checks for m_utilityRenderer. This ensures
+//               fail-fast behavior consistent with texture/shader manager methods,
+//               catching initialization order bugs early rather than silently failing.
 //
 ////////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +73,8 @@ class STexPic;
  * 1. Construction: Creates renderer instance, initializes manager pointers to null
  * 2. Init(): Creates Metal device, command queue, and initializes all managers
  * 3. Rendering: Delegates texture/shader/drawing calls to managers
+ *    - All manager-dependent methods (texture, shader, utility) assert if called before Init()
+ *    - This fail-fast behavior ensures initialization bugs are caught early
  * 4. Shutdown: Cleans up managers and Metal resources
  * 
  * @threading
@@ -234,12 +240,33 @@ public:
                                              bool bOnlyVideoBuffer=false, bool bPrecache=true) override;
     void DeleteLeafBuffer(CLeafBuffer * pLBuffer) override;
     
-    // 2D drawing methods
+    /**
+     * @brief 2D drawing and utility rendering methods
+     * 
+     * These methods delegate to CMetalUtilityRenderer for text rendering, 2D image drawing,
+     * and utility operations. All methods assert that m_utilityRenderer is initialized
+     * (i.e., Init() has been called successfully) before delegating.
+     * 
+     * @precondition Init() must be called successfully before any of these methods are invoked.
+     *              If called before initialization, these methods will assert and terminate
+     *              the program, ensuring initialization bugs are caught early.
+     * 
+     * @note This fail-fast behavior differs from silent failure patterns. The assert ensures
+     *       consistency with texture/shader manager methods and helps catch initialization
+     *       order bugs during development.
+     * 
+     * @see CMetalUtilityRenderer for implementation details
+     * @see InitializeManagers() for initialization logic
+     */
     void WriteXY(CXFont *currfont,int x,int y, float xscale,float yscale,float r,float g,float b,float a,const char *message, ...) override;
     void Draw2dText(float posX,float posY,const char *szText,SDrawTextInfo &info) override;
     void Draw2dImage(float xpos,float ypos,float w,float h,int texture_id,float s0=0,float t0=0,float s1=1,float t1=1,float angle=0,float r=1,float g=1,float b=1,float a=1,float z=1) override;
     void DrawImage(float xpos,float ypos,float w,float h,int texture_id,float s0,float t0,float s1,float t1,float r,float g,float b,float a) override;
     int SetPolygonMode(int mode) override;
+    void TransformTextureMatrix(float x, float y, float angle, float scale) override;
+    void ResetTextureMatrix() override;
+    void SetMaterialColor(float r, float g, float b, float a) override;
+    void FlushTextMessages() override;
     
     // Vertex/Index buffer management (from CRenderer/IRenderer)
     void* GetDynVBPtr(int nVerts, int &nOffs, int Pool) override;

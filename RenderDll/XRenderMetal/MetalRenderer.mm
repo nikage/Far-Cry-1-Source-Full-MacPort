@@ -647,42 +647,99 @@ void CMetalRenderer::DeleteLeafBuffer(CLeafBuffer *pLBuffer) {
   m_shaderManager->DeleteLeafBuffer(pLBuffer);
 }
 
+// Helper macro for enhanced assertion messages with variable context
+#define ASSERT_UTILITY_RENDERER_INIT() \
+  do { \
+    if (!m_utilityRenderer) { \
+      char msg[512]; \
+      snprintf(msg, sizeof(msg), \
+               "%s: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, m_textureManager=%p, m_shaderManager=%p - Init() must complete successfully", \
+               __FUNCTION__, m_utilityRenderer.get(), m_isInitialized, m_device, \
+               m_textureManager.get(), m_shaderManager.get()); \
+      assert(false && msg); \
+    } \
+  } while(0)
+
 // Utility rendering delegation
 void CMetalRenderer::WriteXY(CXFont *currfont, int x, int y, float xscale,
                              float yscale, float r, float g, float b, float a,
                              const char *message, ...) {
-  if (m_utilityRenderer)
-    m_utilityRenderer->WriteXY(currfont, x, y, xscale, yscale, r, g, b, a,
+  ASSERT_UTILITY_RENDERER_INIT();
+  m_utilityRenderer->WriteXY(currfont, x, y, xscale, yscale, r, g, b, a,
                                message);
 }
 
 void CMetalRenderer::Draw2dText(float posX, float posY, const char *szText,
                                 SDrawTextInfo &info) {
-  if (m_utilityRenderer)
-    m_utilityRenderer->Draw2dText(posX, posY, szText, info);
+  ASSERT_UTILITY_RENDERER_INIT();
+  m_utilityRenderer->Draw2dText(posX, posY, szText, info);
 }
 
 void CMetalRenderer::Draw2dImage(float xpos, float ypos, float w, float h,
                                  int texture_id, float s0, float t0, float s1,
                                  float t1, float angle, float r, float g,
                                  float b, float a, float z) {
-  if (m_utilityRenderer)
-    m_utilityRenderer->Draw2dImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1,
+  if (!m_utilityRenderer) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "Draw2dImage: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, texture_id=%d, viewport=(%d,%d,%d,%d) - Init() must complete successfully",
+             m_utilityRenderer.get(), m_isInitialized, m_device, texture_id,
+             m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight);
+    assert(false && msg);
+  }
+  m_utilityRenderer->Draw2dImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1,
                                    angle, r, g, b, a, z);
 }
 
 void CMetalRenderer::DrawImage(float xpos, float ypos, float w, float h,
                                int texture_id, float s0, float t0, float s1,
                                float t1, float r, float g, float b, float a) {
-  if (m_utilityRenderer)
-    m_utilityRenderer->DrawImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1,
+  if (!m_utilityRenderer) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "DrawImage: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, texture_id=%d, pos=(%.1f,%.1f), size=(%.1f,%.1f) - Init() must complete successfully",
+             m_utilityRenderer.get(), m_isInitialized, m_device, texture_id, xpos, ypos, w, h);
+    assert(false && msg);
+  }
+  m_utilityRenderer->DrawImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1,
                                  r, g, b, a);
 }
 
 int CMetalRenderer::SetPolygonMode(int mode) {
-  if (m_utilityRenderer)
-    return m_utilityRenderer->SetPolygonMode(mode);
-  return 0;
+  if (!m_utilityRenderer) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetPolygonMode: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, mode=%d (valid: 0=point,1=wireframe,2=solid) - Init() must complete successfully",
+             m_utilityRenderer.get(), m_isInitialized, m_device, mode);
+    assert(false && msg);
+  }
+  return m_utilityRenderer->SetPolygonMode(mode);
+}
+
+void CMetalRenderer::TransformTextureMatrix(float x, float y, float angle, float scale) {
+  ASSERT_UTILITY_RENDERER_INIT();
+  m_utilityRenderer->TransformTextureMatrix(x, y, angle, scale);
+}
+
+void CMetalRenderer::ResetTextureMatrix() {
+  ASSERT_UTILITY_RENDERER_INIT();
+  m_utilityRenderer->ResetTextureMatrix();
+}
+
+void CMetalRenderer::SetMaterialColor(float r, float g, float b, float a) {
+  if (!m_utilityRenderer) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetMaterialColor: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, rgba=(%.3f,%.3f,%.3f,%.3f) - Init() must complete successfully",
+             m_utilityRenderer.get(), m_isInitialized, m_device, r, g, b, a);
+    assert(false && msg);
+  }
+  m_utilityRenderer->SetMaterialColor(r, g, b, a);
+}
+
+void CMetalRenderer::FlushTextMessages() {
+  ASSERT_UTILITY_RENDERER_INIT();
+  m_utilityRenderer->FlushTextMessages();
 }
 
 // Additional utility methods would be delegated similarly...
@@ -1660,54 +1717,36 @@ void CMetalRenderer::BeginFrame() {
   
   // Get next drawable from window layer
   if (m_windowMetalLayer) {
-    iLog->Log("BeginFrame: Have layer, getting drawable\n");
-    
     // Note: Previous drawable is released in command buffer completion handler
     // Don't release it here as it may still be in use by a previous frame
     
     // Check if layer is valid and has a non-zero size
     CGSize layerSize = m_windowMetalLayer.drawableSize;
-    iLog->Log("BeginFrame: Layer size: %.0fx%.0f\n", layerSize.width, layerSize.height);
-
     
     if (layerSize.width > 0 && layerSize.height > 0) {
-      iLog->Log("BeginFrame: About to call nextDrawable\n");
-
       m_currentDrawable = [[m_windowMetalLayer nextDrawable] retain];
-      iLog->Log("BeginFrame: Got drawable = %p\n", m_currentDrawable);
-
       
       if (!m_currentDrawable) {
-        iLog->Log("BeginFrame: ERROR - Failed to get drawable!\n");
-
+        iLog->Log("BeginFrame: ERROR - Failed to get drawable (layer size: %.0fx%.0f)\n", 
+                  layerSize.width, layerSize.height);
       }
     } else {
-      iLog->Log("BeginFrame: Layer has zero size!\n");
-
+      iLog->Log("BeginFrame: ERROR - Layer has zero size (%.0fx%.0f)!\n", 
+                layerSize.width, layerSize.height);
     }
   } else {
     iLog->Log("BeginFrame: ERROR - No metal layer!\n");
   }
   
   // Call base class BeginFrame to set up command buffer
-  iLog->Log("BeginFrame: Calling base class BeginFrame\n");
-
   CMetalBaseRenderer::BeginFrame();
-  iLog->Log("BeginFrame: Base class returned, cmd buffer = %p\n", m_currentCommandBuffer);
-
   
   // Create render pass descriptor with drawable texture and depth/stencil
   if (m_currentDrawable && m_currentCommandBuffer) {
-    iLog->Log("BeginFrame: Creating render encoder\n");
-
-    
     @autoreleasepool {
-      iLog->Log("BeginFrame: m_currentFrameIndex=%d, MAX_FRAMES_IN_FLIGHT=%d\n", m_currentFrameIndex, MAX_FRAMES_IN_FLIGHT);
-
-      
       if (m_currentFrameIndex >= MAX_FRAMES_IN_FLIGHT || m_currentFrameIndex < 0) {
-        iLog->Log("BeginFrame: ERROR - Invalid frame index %d!\n", m_currentFrameIndex);
-
+        iLog->Log("BeginFrame: ERROR - Invalid frame index %d (valid range: 0-%d)!\n", 
+                  m_currentFrameIndex, MAX_FRAMES_IN_FLIGHT - 1);
         return;
       }
       
@@ -1716,6 +1755,7 @@ void CMetalRenderer::BeginFrame() {
       m_renderPassDescriptor = CreateRenderPassDescriptor(m_currentDrawable.texture, depthStencilTexture);
       
       if (!m_renderPassDescriptor) {
+        iLog->Log("BeginFrame: ERROR - Failed to create render pass descriptor!\n");
         return;
       }
       
@@ -1725,43 +1765,33 @@ void CMetalRenderer::BeginFrame() {
       // m_renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
       
       m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
-      iLog->Log("BeginFrame: Created render encoder = %p\n", m_renderEncoder);
-
       
       if (!m_renderEncoder) {
-        iLog->Log("BeginFrame: ERROR - Failed to create encoder!\n");
-
+        iLog->Log("BeginFrame: ERROR - Failed to create render encoder (drawable=%p, cmdBuffer=%p)!\n",
+                  m_currentDrawable, m_currentCommandBuffer);
       }
     }
   } else {
-    iLog->Log("BeginFrame: WARNING - No drawable (%p) or command buffer (%p)\n", m_currentDrawable, m_currentCommandBuffer);
-
+    // Only log warning if this is unexpected (not during shutdown)
+    if (m_windowMetalLayer) {
+      iLog->Log("BeginFrame: WARNING - No drawable (%p) or command buffer (%p)\n", 
+                m_currentDrawable, m_currentCommandBuffer);
+    }
   }
-  iLog->Log("BeginFrame: EXIT\n");
-
 }
 
 void CMetalRenderer::Update() {
-  iLog->Log("CMetalRenderer::Update ENTRY\n");
-
-  
   // Don't process events here - System::Update handles that via ProcessMacOSEvents
   // Just call base class Update which calls EndFrame
   CMetalBaseRenderer::Update();
   
-  iLog->Log("CMetalRenderer::Update EXIT\n");
-
+  // Flush text messages at end of frame (for UI rendering)
+  FlushTextMessages();
 }
 
 void CMetalRenderer::EndFrame() {
-  iLog->Log("CMetalRenderer::EndFrame ENTRY (encoder=%p, drawable=%p, cmd=%p)\n",
-         m_renderEncoder, m_currentDrawable, m_currentCommandBuffer);
-
-  
   // End rendering
   if (m_renderEncoder) {
-    iLog->Log("EndFrame: Ending render encoder\n");
-
     [m_renderEncoder endEncoding];
     [m_renderEncoder release];
     m_renderEncoder = nil;
@@ -1769,8 +1799,6 @@ void CMetalRenderer::EndFrame() {
   
   // Present drawable
   if (m_currentDrawable && m_currentCommandBuffer) {
-    iLog->Log("EndFrame: Presenting drawable\n");
-
     [m_currentCommandBuffer presentDrawable:m_currentDrawable];
     
     // Release our retain - command buffer will retain it until completion
@@ -1780,8 +1808,6 @@ void CMetalRenderer::EndFrame() {
   
   // Commit command buffer
   if (m_currentCommandBuffer) {
-    iLog->Log("EndFrame: Tracking and committing command buffer\n");
-
     TrackCommandBuffer(m_currentCommandBuffer);
     [m_currentCommandBuffer commit];
     m_currentCommandBuffer = nil;
@@ -1796,17 +1822,44 @@ void CMetalRenderer::EndFrame() {
   // Update frame index
   m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
   m_currentDynamicVBPool = (m_currentDynamicVBPool + 1) % NUM_DYNAMIC_VB_POOLS;
-  
-  iLog->Log("EndFrame: EXIT\n");
-
 }
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
-  assert(x >= 0 && "SetScissor: x coordinate cannot be negative");
-  assert(y >= 0 && "SetScissor: y coordinate cannot be negative");
-  assert(width > 0 && "SetScissor: width must be positive");
-  assert(height > 0 && "SetScissor: height must be positive");
-  assert(m_renderEncoder != nil || (width == 0 && height == 0) && "SetScissor: render encoder required for non-zero scissor");
+  if (x < 0) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetScissor: x=%d (must be >= 0), y=%d, width=%d, height=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
+             x, y, width, height, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
+    assert(false && msg);
+  }
+  if (y < 0) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetScissor: y=%d (must be >= 0), x=%d, width=%d, height=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
+             y, x, width, height, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
+    assert(false && msg);
+  }
+  if (width <= 0) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetScissor: width=%d (must be > 0), x=%d, y=%d, height=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
+             width, x, y, height, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
+    assert(false && msg);
+  }
+  if (height <= 0) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetScissor: height=%d (must be > 0), x=%d, y=%d, width=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
+             height, x, y, width, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
+    assert(false && msg);
+  }
+  if (m_renderEncoder == nil && (width != 0 || height != 0)) {
+    char msg[512];
+    snprintf(msg, sizeof(msg),
+             "SetScissor: m_renderEncoder=%p (nil) required for non-zero scissor, x=%d, y=%d, width=%d, height=%d, m_isInitialized=%d, m_device=%p",
+             m_renderEncoder, x, y, width, height, m_isInitialized, m_device);
+    assert(false && msg);
+  }
   
   if (!m_renderEncoder && (width != 0 || height != 0))
     return;
@@ -1815,8 +1868,23 @@ void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
 }
 
 int CMetalRenderer::GetFeatures() {
-  assert(false && "GetFeatures not implemented");
-  return 0;
+  // Return feature flags based on Metal capabilities
+  // Metal supports most modern graphics features
+  int features = 0;
+  
+  // Basic features supported by Metal
+  features |= RFT_MULTITEXTURE;          // Metal supports multiple textures
+  features |= RFT_BUMP;                  // Bump mapping support
+  features |= RFT_COMPRESSTEXTURE;       // Metal supports compressed textures (BC/DXT)
+  features |= RFT_ALLOWANISOTROPIC;      // Anisotropic filtering support
+  features |= RFT_ALLOWRECTTEX;          // Non-power-of-two textures supported
+  features |= RFT_DETAILTEXTURE;         // Detail textures supported
+  features |= RFT_SUPPORTZBIAS;          // Depth bias support
+  
+  // Metal always supports these features
+  features |= RFT_DIRECTACCESSTOVIDEOMEMORY;  // Direct GPU memory access
+  
+  return features;
 }
 
 void CMetalRenderer::GetViewport(int *x, int *y, int *width, int *height) {
