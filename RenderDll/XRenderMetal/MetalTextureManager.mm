@@ -2560,6 +2560,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
         assert(false);
         return false;
     
+    iLog->Log("LoadTextureData: Attempting to open texture file: '%s'\n", filename);
     FILE* pFile = iSystem->GetIPak()->FOpen(filename, "rb");
     if (pFile)
     {

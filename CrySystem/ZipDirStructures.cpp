@@ -108,7 +108,7 @@ ZipDir::DirEntry* ZipDir::DirHeader::FindSubdirEntry(const char* szName)
 		DirEntry* pBegin = GetSubdirEntry(0);
 		DirEntry* pEnd = pBegin + this->numDirs;
 		DirEntry* pEntry = std::lower_bound(pBegin,pEnd, szName, pred);
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (pEntry != pEnd && !strcasecmp(szName, pEntry->GetName(pNamePool)))
 #else
 		if (pEntry != pEnd && !strcmp(szName, pEntry->GetName(pNamePool)))
@@ -130,7 +130,7 @@ ZipDir::FileEntry* ZipDir::DirHeader::FindFileEntry(const char* szName)
 		FileEntry* pBegin = GetFileEntry(0);
 		FileEntry* pEnd = pBegin + this->numFiles;
 		FileEntry* pEntry = std::lower_bound(pBegin,pEnd, szName, pred);
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (pEntry != pEnd && !strcasecmp(szName, pEntry->GetName(pNamePool)))
 #else
 		if (pEntry != pEnd && !strcmp(szName, pEntry->GetName(pNamePool)))

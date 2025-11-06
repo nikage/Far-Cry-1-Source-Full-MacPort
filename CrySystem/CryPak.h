@@ -26,6 +26,14 @@
 #include "StlUtils.h"
 #include "PakVars.h"
 
+#if (defined(__APPLE__) && defined(__MACH__)) && !defined(LINUX)
+#include <strings.h>
+inline int comparePathNames(const char* szPath1, const char* szPath2, size_t nLength)
+{
+	return strncasecmp(szPath1, szPath2, nLength);
+}
+#endif
+
 extern CMTSafeHeap* g_pSmallHeap;
 extern CMTSafeHeap* g_pBigHeap;
 
@@ -549,7 +557,7 @@ protected:
 			// you should access exactly the file under the directly in which the zip is situated
 			if (szFullPath[m_strBindRoot.length()] != '/' && szFullPath[m_strBindRoot.length()] != '\\')
 				return NULL;
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 			if (comparePathNames(szFullPath, m_strBindRoot.c_str(), m_strBindRoot.length()))
 #else
 			if (memicmp(szFullPath, m_strBindRoot.c_str(), m_strBindRoot.length()))

@@ -117,7 +117,14 @@ bool CStringTableMgr::LoadExcelXmlSpreadsheet( const string &sFileName )
 	// Check if XML document creation succeeded (may fail on macOS if XML system is not fully implemented)
 	if (!pDoc)
 	{
-		assert(false && "CStringTableMgr::LoadExcelXmlSpreadsheet - Failed to create XML document (XML system may not be implemented on this platform)");
+		m_pSystem->GetILog()->LogWarning("CStringTableMgr::LoadExcelXmlSpreadsheet - Failed to create XML document for '%s' (XML system not implemented on macOS)", sFileName.c_str());
+		return false;
+	}
+	
+	if (!m_pLanguageStriptObject)
+	{
+		m_pSystem->GetILog()->LogError("CStringTableMgr::LoadExcelXmlSpreadsheet - m_pLanguageStriptObject is NULL, Load() was not called");
+		return false;
 	}
 	
 	// load xml-file	

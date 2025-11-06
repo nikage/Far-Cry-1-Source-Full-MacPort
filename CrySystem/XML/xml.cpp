@@ -2,8 +2,10 @@
 
 #include <stdlib.h>
 
+#include <CryMemoryManager.h>
+
 #define XMLPARSEAPI(type) type
-#include "expat\expat.h"
+#include <expat.h>
 #include "xml.h"
 #include <string>
 

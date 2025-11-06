@@ -11,10 +11,12 @@
 #if !defined(LINUX)
 #include <assert.h>
 #endif
+#include <stdlib.h>
 
+#include <CryMemoryManager.h>
 
 #define XMLPARSEAPI(type) type
-#include "expat\expat.h"
+#include <expat.h>
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -38,8 +40,8 @@ void _XMLDOMParserImpl::StartDocument(bool unicode)
 
 void _XMLDOMParserImpl::StartElement( const char *name)
 {
-	XDOM::IXMLDOMNode *pParent=NULL;
-	XDOM::IXMLDOMNode *pNode=NULL;
+	XDOM::IXMLDOMNode *pParent = nullptr;
+	XDOM::IXMLDOMNode *pNode = nullptr;
 
 	if (!nodeStack.empty()) {
 		
@@ -85,7 +87,7 @@ void _XMLDOMParserImpl::Data( const char *data )
 
 void _XMLDOMParserImpl::Attribute( const char *name,const char *value)
 {
-	XDOM::IXMLDOMNode *pNode=NULL;
+	XDOM::IXMLDOMNode *pNode = nullptr;
 	if (!nodeStack.empty())
 	{
 		pNode=nodeStack.back();
@@ -95,7 +97,7 @@ void _XMLDOMParserImpl::Attribute( const char *name,const char *value)
 		pNode=m_pDoc;
 	}
 
-	XDOM::IXMLDOMNode *pAttr=NULL;
+	XDOM::IXMLDOMNode *pAttr = nullptr;
 	pAttr=m_pDoc->createNode(XDOM::NODE_ATTRIBUTE,name);
 	pAttr->setText(value);
 	pNode->appendChild(pAttr);
@@ -141,7 +143,7 @@ void _XMLDOMParserImpl::OnStartElement( const char *name, const char **atts )
 {
 	StartElement( name );
 	int i = 0;
-	while (atts[i] != 0)
+	while (atts[i] != nullptr)
 	{
 		Attribute( atts[i],atts[i+1] );
 		i += 2;
@@ -217,7 +219,7 @@ bool _XMLDOMParserImpl::parse( std::vector<unsigned char> &buffer,string &errorS
 	memHandler.realloc_fcn = CryModuleRealloc;
 	memHandler.free_fcn = CryModuleFree;
 
-	XML_Parser parser = XML_ParserCreate_MM(NULL,&memHandler,NULL);
+	XML_Parser parser = XML_ParserCreate_MM(nullptr, &memHandler, nullptr);
 
 	XML_SetUserData( parser, this );
 	XML_SetElementHandler( parser, EXPAT_XML_StartElement,EXPAT_XML_EndElement );

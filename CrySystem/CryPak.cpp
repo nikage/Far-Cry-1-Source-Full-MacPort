@@ -228,7 +228,6 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 	if (!result)
 	{
 		src = szNewSrc;
-#endif
 		if (src[0] == '.' && (src[1] == g_cNativeSlash || src[1] == g_cNonNativeSlash))
 			src+=2;
 #ifdef _XBOX
@@ -262,6 +261,40 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 			}
 		}
 	}
+#else
+	if (src[0] == '.' && (src[1] == g_cNativeSlash || src[1] == g_cNonNativeSlash))
+		src+=2;
+#ifdef _XBOX
+	if (src[0] && src[1] != ':')
+		strcpy (dst, "d:\\");
+	dst += 3;
+#endif
+	strcpy(dst, src);
+	size_t len = strlen(dst);
+	for (size_t n=0; dst[n]; n++)
+	{
+		if ( dst[n] == '\\' )
+			dst[n] = '/';
+
+		if (n > 8 && n+3 < len && dst[n] == '/' && dst[n+1] == '.' && dst[n+2] == '.')
+		{
+			size_t m = n+3;
+			n--;
+			while (dst[n] != '/')
+			{
+				n--;
+				if (!n)
+					break;
+			}
+			if (n)
+			{
+				memmove(&dst[n], &dst[m], len-m+1);
+				len -= m-n;
+				n--;
+			}
+		}
+	}
+#endif
 
 	char* pEnd = BeautifyPath(dst);
 
@@ -301,7 +334,7 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 	// now replace the root directory name (C:\Mastercd\)
 	// with the filesystem prefix ("" by default).
 	// try to search through the MOD directories, if it makes sense
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 	if (!(nFlags&FLAGS_IGNORE_MOD_DIRS) && nLength > m_strMasterCDRoot.length() && !comparePathNames(dst, m_strMasterCDRoot.c_str(), m_strMasterCDRoot.length()))
 #else
 	if (!(nFlags&FLAGS_IGNORE_MOD_DIRS) && nLength > m_strMasterCDRoot.length() && !memcmp(dst, m_strMasterCDRoot.c_str(), m_strMasterCDRoot.length()))
@@ -489,6 +522,11 @@ FILE *CCryPak::FOpen(const char *pName, const char *szMode,unsigned nFlags2)
 	}
 
 	const char *szFullPath = AdjustFileName(pName, szFullPathBuf, 0);
+	
+	if (strstr(pName, "mousecursor") || strstr(pName, "MouseCursor"))
+	{
+		m_pLog->Log("CCryPak::FOpen - DEBUG: Requested path='%s', Adjusted path='%s'\n", pName, szFullPath);
+	}
 
 	if (!nVarPakPriority) // if the file system files have priority now..
 	{
@@ -586,6 +624,10 @@ FILE *CCryPak::FOpen(const char *pName, const char *szMode,unsigned nFlags2)
 	CCachedFileData_AutoPtr pFileData = GetFileData (szFullPath);
 	if (!pFileData)
 	{
+		if (strstr(pName, "mousecursor") || strstr(pName, "MouseCursor"))
+		{
+			m_pLog->Log("CCryPak::FOpen - DEBUG: GetFileData failed for path='%s' (adjusted='%s')\n", pName, szFullPath);
+		}
 		if (nVarPakPriority) // if the pak files had more priority, we didn't attempt fopen before- try it now
 		{
 			fp = fopen (szFullPath, szMode);
@@ -641,16 +683,29 @@ CCachedFileDataPtr CCryPak::GetFileData(const char* szName)
 	for (ZipArray::reverse_iterator itZip = m_arrZips.rbegin(); itZip != m_arrZips.rend(); ++itZip)
 	{
 		size_t nBindRootLen = itZip->strBindRoot.length();
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szName, nBindRootLen))
 #else
 		if (nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szName, nBindRootLen))
 #endif
 		{
-			//const char	*szDebug1=itZip->strBindRoot.c_str();
-			//const char	*szDebug2=itZip->pZip->GetFilePath();
+			if (strstr(szName, "mousecursor") || strstr(szName, "MouseCursor"))
+			{
+				m_pLog->Log("CCryPak::GetFileData - DEBUG: Found matching bind root. szName='%s', bindRoot='%s' (len=%zu), looking for '%s'\n", 
+					szName, itZip->strBindRoot.c_str(), nBindRootLen, szName+nBindRootLen);
+			}
 
-			ZipDir::FileEntry* pFileEntry = itZip->pZip->FindFile (szName+nBindRootLen);
+			const char* szRelativePath = szName+nBindRootLen;
+			ZipDir::FileEntry* pFileEntry = itZip->pZip->FindFile (szRelativePath);
+			if (pFileEntry && (strstr(szName, "mousecursor") || strstr(szName, "MouseCursor")))
+			{
+				m_pLog->Log("CCryPak::GetFileData - DEBUG: Found file entry for '%s'\n", szName+nBindRootLen);
+			}
+			else if ((strstr(szName, "mousecursor") || strstr(szName, "MouseCursor")))
+			{
+				m_pLog->Log("CCryPak::GetFileData - DEBUG: FindFile returned NULL for '%s' in PAK '%s'\n", 
+					szName+nBindRootLen, itZip->pZip->GetFilePath());
+			}
 			if (pFileEntry)
 			{
 				CCachedFileData Result(NULL, itZip->pZip, pFileEntry);
@@ -684,7 +739,7 @@ bool CCryPak::HasFileEntry (const char* szPath)
 		size_t nBindRootLen = itZip->strBindRoot.length();
 		//const char	*szDebug1=itZip->strBindRoot.c_str();
 		//const char	*szDebug2=itZip->pZip->GetFilePath();
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szPath, nBindRootLen))
 #else
 		if (nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szPath, nBindRootLen))
@@ -1445,7 +1500,7 @@ void CCryPakFindData::ScanZips (CCryPak* pPak, const char* szDir)
 	{
 		size_t nBindRootLen = it->strBindRoot.length();
 
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (nLen > nBindRootLen && !comparePathNames(szDir, it->strBindRoot.c_str(), nBindRootLen))
 #else
 		if (nLen > nBindRootLen && !memcmp(szDir, it->strBindRoot.c_str(), nBindRootLen))

@@ -24,7 +24,14 @@ if(APPLE)
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*HTTPDownloader.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*DownloadManager.*")
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*LuaDebugger.*")
-    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*XML.*")
+    # Exclude bundled Expat XML library files and use system Expat instead
+    list(REMOVE_ITEM CRYSYSTEM_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/XML/Expat/xmlparse.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/XML/Expat/xmlrole.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/XML/Expat/xmltok.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/XML/Expat/xmltok_impl.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/XML/Expat/xmltok_ns.c"
+    )
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*getdxver.*")
     # Temporarily exclude MacOSFileSystem due to Carbon framework conflicts
     # TODO: Fix Foundation.h include conflict with GetCurrentThread
@@ -57,6 +64,29 @@ add_library(CrySystem SHARED ${CRYSYSTEM_SOURCES} ${CRYSYSTEM_HEADERS})
 
 # Link CryCommon interface
 target_link_libraries(CrySystem PUBLIC CryCommon)
+
+# Find and link system Expat library
+find_library(EXPAT_LIBRARY expat)
+find_path(EXPAT_INCLUDE_DIR expat.h
+    PATHS
+        /usr/include
+        /usr/local/include
+        /opt/homebrew/include
+    PATH_SUFFIXES
+        expat
+)
+if(EXPAT_LIBRARY)
+    target_link_libraries(CrySystem PUBLIC ${EXPAT_LIBRARY})
+    message(STATUS "Found Expat library: ${EXPAT_LIBRARY}")
+    if(EXPAT_INCLUDE_DIR)
+        target_include_directories(CrySystem PUBLIC ${EXPAT_INCLUDE_DIR})
+        message(STATUS "Found Expat headers: ${EXPAT_INCLUDE_DIR}")
+    else()
+        message(STATUS "Expat headers not explicitly found, using system defaults")
+    endif()
+else()
+    message(FATAL_ERROR "Expat library not found. Please install it with: brew install expat")
+endif()
 
 # Include directories
 target_include_directories(CrySystem PUBLIC
