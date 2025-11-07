@@ -198,4 +198,62 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/Levels
         COMMENT "Creating Levels directory in Resources"
     )
+    
+    # Copy FCData directory to Resources (contains all PAK files)
+    # FCData contains all game assets (textures, sounds, scripts, localized content) in PAK archives
+    # It should be located in the project root directory
+    set(FCData_FOUND FALSE)
+    set(FCData_PATH "")
+    
+    # Check primary location: project root
+    if(EXISTS ${CMAKE_SOURCE_DIR}/FCData)
+        set(FCData_FOUND TRUE)
+        set(FCData_PATH ${CMAKE_SOURCE_DIR}/FCData)
+        message(STATUS "Found FCData directory at: ${FCData_PATH}")
+    # Check alternative location: build directory (for development)
+    elseif(EXISTS ${CMAKE_BINARY_DIR}/FCData)
+        set(FCData_FOUND TRUE)
+        set(FCData_PATH ${CMAKE_BINARY_DIR}/FCData)
+        message(STATUS "Found FCData directory at: ${FCData_PATH}")
+    # Check if FCData exists but with different case (macOS case-insensitive filesystem)
+    elseif(EXISTS ${CMAKE_SOURCE_DIR}/fcdata)
+        set(FCData_FOUND TRUE)
+        set(FCData_PATH ${CMAKE_SOURCE_DIR}/fcdata)
+        message(STATUS "Found FCData directory (case variant) at: ${FCData_PATH}")
+    else()
+        message(WARNING "")
+        message(WARNING "================================================================================")
+        message(WARNING "FCData directory not found - Game assets will not be available!")
+        message(WARNING "================================================================================")
+        message(WARNING "")
+        message(WARNING "The FCData directory contains all game assets (textures, sounds, scripts,")
+        message(WARNING "localized content) packaged in PAK archive files.")
+        message(WARNING "")
+        message(WARNING "Expected locations:")
+        message(WARNING "  - ${CMAKE_SOURCE_DIR}/FCData")
+        message(WARNING "  - ${CMAKE_BINARY_DIR}/FCData")
+        message(WARNING "")
+        message(WARNING "To resolve this issue:")
+        message(WARNING "  1. Ensure you have the Far Cry game assets (FCData directory)")
+        message(WARNING "  2. Place the FCData directory in the project root: ${CMAKE_SOURCE_DIR}/")
+        message(WARNING "  3. The FCData directory should contain:")
+        message(WARNING "     - Localized/ (with language PAK files)")
+        message(WARNING "     - *.pak files (Textures.pak, Sounds.pak, Scripts.pak, etc.)")
+        message(WARNING "")
+        message(WARNING "Note: The game will run but will not be able to load textures, sounds,")
+        message(WARNING "scripts, or other assets without the FCData directory.")
+        message(WARNING "")
+        message(WARNING "================================================================================")
+        message(WARNING "")
+    endif()
+    
+    if(FCData_FOUND)
+        add_custom_command(TARGET FarCryWorking POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/FCData
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${FCData_PATH}
+                ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/FCData
+            COMMENT "Copying FCData directory with PAK files to Resources"
+        )
+    endif()
 endif()

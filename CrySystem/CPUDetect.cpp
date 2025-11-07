@@ -118,19 +118,120 @@ static double measure_clock_speed(double& SecondsPerCycle )
 }
 
 #if defined(__APPLE__) && defined(__MACH__)
-static void* DetectProcessorMacOS(void* arg)
+
+// Cache for CPU frequency detection (same for all cores on same CPU)
+// This avoids redundant sysctlbyname calls and expensive clock measurement
+static double g_CachedSecondsPerCycle = 0.0;
+static bool g_CachedFrequencyValid = false;
+
+// Helper function to detect CPU frequency with fallback chain
+// Returns seconds per cycle, or default value if all methods fail
+// Results are cached to avoid redundant system calls
+static double DetectCPUFrequencyMacOS()
 {
-  SCpu* p = (SCpu*)arg;
+  // Return cached value if available (frequency is same for all cores)
+  if (g_CachedFrequencyValid)
+  {
+    return g_CachedSecondsPerCycle;
+  }
   
+  uint64_t freq = 0;
+  size_t size = sizeof(freq);
+  
+  // Try hw.cpufrequency_max first (most accurate for Apple Silicon)
+  if (sysctlbyname("hw.cpufrequency_max", &freq, &size, NULL, 0) == 0 && freq > 0)
+  {
+    double freqMHz = (double)freq / 1.0e6;
+    g_CachedSecondsPerCycle = 1.0e-6 / freqMHz;
+    g_CachedFrequencyValid = true;
+    return g_CachedSecondsPerCycle;
+  }
+  
+  // Fallback to hw.cpufrequency
+  size = sizeof(freq);
+  if (sysctlbyname("hw.cpufrequency", &freq, &size, NULL, 0) == 0 && freq > 0)
+  {
+    double freqMHz = (double)freq / 1.0e6;
+    g_CachedSecondsPerCycle = 1.0e-6 / freqMHz;
+    g_CachedFrequencyValid = true;
+    return g_CachedSecondsPerCycle;
+  }
+  
+  // Final fallback: measure clock speed (expensive, so cache result)
+  double dummy = 0.0;
+  double freqMHz = measure_clock_speed(dummy);
+  if (freqMHz > 0.0 && freqMHz < 10000.0)
+  {
+    g_CachedSecondsPerCycle = 1.0e-6 / freqMHz;
+    g_CachedFrequencyValid = true;
+    return g_CachedSecondsPerCycle;
+  }
+  
+  // Default fallback value
+  g_CachedSecondsPerCycle = 1.0e-9;
+  g_CachedFrequencyValid = true;
+  return g_CachedSecondsPerCycle;
+}
+
+// Detect Apple Silicon (ARM64) CPU characteristics
+static void DetectProcessorARM64(SCpu* p)
+{
   memset(p, 0, sizeof(SCpu));
   
-  size_t size = 0;
+  // Batch CPU identification queries
+  char brand[256] = {0};
+  size_t size = sizeof(brand);
+  
+  // Try brand string first, fallback to hw.model
+  if (sysctlbyname("machdep.cpu.brand_string", brand, &size, NULL, 0) != 0)
+  {
+    size = sizeof(brand);
+    sysctlbyname("hw.model", brand, &size, NULL, 0);
+  }
+  
+  // Set vendor and CPU type
+  strncpy(p->mVendor, "Apple", sizeof(p->mVendor) - 1);
+  if (brand[0] != '\0')
+  {
+    strncpy(p->mCpuType, brand, sizeof(p->mCpuType) - 1);
+  }
+  else
+  {
+    strncpy(p->mCpuType, "Apple Silicon", sizeof(p->mCpuType) - 1);
+  }
+  
+  // Get CPU family
+  int family = 0;
+  size = sizeof(family);
+  sysctlbyname("hw.cpufamily", &family, &size, NULL, 0);
+  p->mFamily = family;
+  p->mModel = 0;
+  p->mStepping = 0;
+  
+  // Set standard ARM64 features
+  p->mFeatures |= CFI_FPUEMULATION;
+  strcpy(p->mFpuType, "on-chip");
+  
+  // Detect frequency using helper function
+  p->m_SecondsPerCycle = DetectCPUFrequencyMacOS();
+  
+  p->mbSerialPresent = false;
+}
+
+// Detect Intel x86_64 CPU characteristics
+static void DetectProcessorIntel(SCpu* p)
+{
+  memset(p, 0, sizeof(SCpu));
+  
+  // Batch all CPU identification queries
   char brand[256] = {0};
   char vendor[64] = {0};
   int family = 0, model = 0, stepping = 0;
   uint64_t features = 0;
   uint64_t features_ext = 0;
+  size_t size;
   
+  // Query all CPU identification attributes
   size = sizeof(brand);
   sysctlbyname("machdep.cpu.brand_string", brand, &size, NULL, 0);
   
@@ -146,18 +247,21 @@ static void* DetectProcessorMacOS(void* arg)
   size = sizeof(stepping);
   sysctlbyname("machdep.cpu.stepping", &stepping, &size, NULL, 0);
   
+  // Query CPU features in batch
   size = sizeof(features);
   sysctlbyname("machdep.cpu.features", &features, &size, NULL, 0);
   
   size = sizeof(features_ext);
   sysctlbyname("machdep.cpu.extfeatures", &features_ext, &size, NULL, 0);
   
+  // Set CPU identification
   strncpy(p->mVendor, vendor, sizeof(p->mVendor) - 1);
   strncpy(p->mCpuType, brand, sizeof(p->mCpuType) - 1);
   p->mFamily = family;
   p->mModel = model;
   p->mStepping = stepping;
   
+  // Process feature flags
   if (features & 0x00800000)
     p->mFeatures |= CFI_MMX;
   if (features & 0x02000000)
@@ -168,21 +272,22 @@ static void* DetectProcessorMacOS(void* arg)
   p->mFeatures |= CFI_FPUEMULATION;
   strcpy(p->mFpuType, "on-chip");
   
-  uint64_t freq = 0;
-  size = sizeof(freq);
-  if (sysctlbyname("hw.cpufrequency", &freq, &size, NULL, 0) == 0 && freq > 0)
-  {
-    double freqMHz = (double)freq / 1.0e6;
-    p->m_SecondsPerCycle = 1.0e-6 / freqMHz;
-  }
-  else
-  {
-    double dummy = 0.0;
-    double freqMHz = measure_clock_speed(dummy);
-    p->m_SecondsPerCycle = 1.0e-6 / freqMHz;
-  }
+  // Detect frequency using helper function
+  p->m_SecondsPerCycle = DetectCPUFrequencyMacOS();
   
   p->mbSerialPresent = false;
+}
+
+// Main macOS CPU detection entry point
+static void* DetectProcessorMacOS(void* arg)
+{
+  SCpu* p = (SCpu*)arg;
+  
+#if defined(__aarch64__) || defined(__arm64__)
+  DetectProcessorARM64(p);
+#else
+  DetectProcessorIntel(p);
+#endif
   
   return NULL;
 }

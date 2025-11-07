@@ -44,6 +44,8 @@ extern "C" {
 #elif defined(__APPLE__) && defined(__MACH__)
 #include <dirent.h>    // macOS directory functions
 #include <unistd.h>    // macOS I/O functions
+#include <mach-o/dyld.h>
+#include <sys/stat.h>
 #else
 #	include <direct.h>
 #	include <io.h>
@@ -67,17 +69,66 @@ m_pPakVars (pPakVars?pPakVars:&g_PakVars),
 m_mapMissingFiles ( std::less<string>(), MissingFileMapAllocator(g_pBigHeap) )
 {
 	char szCurrentDir[0x800];
+#if defined(__APPLE__) && defined(__MACH__)
+	// On macOS, try to use bundle Resources directory first
+	// Get executable path and construct Resources path
+	char exePath[1024];
+	uint32_t size = sizeof(exePath);
+	if (_NSGetExecutablePath(exePath, &size) == 0)
+	{
+		// Check if we're in a bundle (path contains .app/Contents/MacOS/)
+		char* appBundle = strstr(exePath, ".app/Contents/MacOS/");
+		if (appBundle)
+		{
+			// Replace MacOS with Resources
+			*appBundle = '\0';
+			strcat(exePath, ".app/Contents/Resources");
+			
+			// Check if Resources directory exists
+			struct stat st;
+			if (stat(exePath, &st) == 0 && S_ISDIR(st.st_mode))
+			{
+				strncpy(szCurrentDir, exePath, sizeof(szCurrentDir) - 1);
+				szCurrentDir[sizeof(szCurrentDir) - 1] = '\0';
+				m_pLog->Log("CCryPak::CCryPak - Using bundle Resources directory: %s\n", szCurrentDir);
+				goto normalize_path;
+			}
+		}
+	}
+	
+	// Fallback to current directory
+	if (GetCurrentDirectory(sizeof(szCurrentDir), szCurrentDir))
+	{
+		m_pLog->Log("CCryPak::CCryPak - Using current directory: %s\n", szCurrentDir);
+	}
+	else
+	{
+		strcpy(szCurrentDir, ".");
+		m_pLog->Log("CCryPak::CCryPak - Using default directory: %s\n", szCurrentDir);
+	}
+#else
 	if (GetCurrentDirectory(sizeof(szCurrentDir), szCurrentDir))
 	{
 		m_pLog->Log("CCryPak::CCryPak - Current directory: %s\n", szCurrentDir);
+	}
+	else
+	{
+		strcpy(szCurrentDir, ".");
+	}
+#endif
+normalize_path:
+	if (szCurrentDir[0] != '\0')
+	{
 		// normalize it (lower-char with forward slashes and trailing slash)
 		char* p;
-		for (p = szCurrentDir; *p; ++p)
+		for (p = szCurrentDir; *p;  ++p)
 		{
 			if (*p == g_cNonNativeSlash)
 				*p = g_cNativeSlash;
+#if !defined(__APPLE__) && !defined(LINUX)
 			else
 				*p = tolower(*p);
+#endif
 		}
 		// add the trailing slash if needed
 #if defined(LINUX)
@@ -214,86 +265,231 @@ char* CCryPak::BeautifyPath(char* dst)
 }
 
 //////////////////////////////////////////////////////////////////////////
+// Utility functions for path manipulation
+//////////////////////////////////////////////////////////////////////////
+
+// Check if a path is absolute (starts with / or \ on Unix/macOS, or drive letter on Windows)
+static bool IsAbsolutePath(const char* path)
+{
+	if (!path || !path[0])
+		return false;
+	
+#if defined(__APPLE__) || defined(LINUX)
+	return (path[0] == '/' || path[0] == '\\');
+#else
+	// Windows: check for drive letter (C:\) or UNC path (\\)
+	return ((path[0] >= 'A' && path[0] <= 'Z' || path[0] >= 'a' && path[0] <= 'z') && path[1] == ':') ||
+	       (path[0] == '\\' && path[1] == '\\');
+#endif
+}
+
+// Safely copy string with bounds checking
+static size_t SafeStringCopy(char* dst, size_t dstSize, const char* src)
+{
+	if (!dst || dstSize == 0)
+		return 0;
+	
+	if (!src)
+	{
+		dst[0] = '\0';
+		return 0;
+	}
+	
+	size_t srcLen = strlen(src);
+	size_t copyLen = (srcLen < dstSize - 1) ? srcLen : dstSize - 1;
+	strncpy(dst, src, copyLen);
+	dst[copyLen] = '\0';
+	return copyLen;
+}
+
+// Safely concatenate strings with bounds checking
+static size_t SafeStringCat(char* dst, size_t dstSize, const char* src)
+{
+	if (!dst || dstSize == 0 || !src)
+		return 0;
+	
+	size_t dstLen = strlen(dst);
+	size_t remaining = dstSize - dstLen - 1;
+	if (remaining == 0)
+		return dstLen;
+	
+	size_t srcLen = strlen(src);
+	size_t copyLen = (srcLen < remaining) ? srcLen : remaining;
+	strncat(dst, src, copyLen);
+	dst[dstLen + copyLen] = '\0';
+	return dstLen + copyLen;
+}
+
+// Resolve relative path by prepending master CD root
+// Returns true on success, false if buffer would overflow
+static bool ResolveRelativePath(const char* relativePath, const std::string& masterRoot, char* fullPath, size_t fullPathSize)
+{
+	if (!relativePath || !fullPath || fullPathSize == 0)
+		return false;
+	
+	// Copy master root
+	size_t rootLen = SafeStringCopy(fullPath, fullPathSize, masterRoot.c_str());
+	if (rootLen == 0 && masterRoot.length() > 0)
+		return false; // Buffer too small
+	
+	// Ensure trailing slash
+	if (rootLen > 0 && fullPath[rootLen - 1] != '/' && fullPath[rootLen - 1] != '\\')
+	{
+		if (rootLen >= fullPathSize - 1)
+			return false; // No room for slash
+		fullPath[rootLen] = '/';
+		fullPath[rootLen + 1] = '\0';
+		rootLen++;
+	}
+	
+	// Append relative path
+	size_t totalLen = SafeStringCat(fullPath, fullPathSize, relativePath);
+	return (totalLen < fullPathSize - 1); // Success if we didn't truncate
+}
+
+// Normalize path separators (convert backslashes to forward slashes)
+static void NormalizePathSeparators(char* path)
+{
+	if (!path)
+		return;
+	
+	for (char* p = path; *p; ++p)
+	{
+		if (*p == '\\')
+			*p = '/';
+	}
+}
+
+// Resolve .. components in path (simplified - handles basic cases)
+static void ResolveDotDotPaths(char* path)
+{
+	if (!path)
+		return;
+	
+	size_t len = strlen(path);
+	if (len < 3)
+		return; // Too short to contain ..
+	
+	// Simple .. resolution: find /.. and remove preceding component
+	for (size_t n = 0; n < len - 2; ++n)
+	{
+		if (path[n] == '/' && path[n + 1] == '.' && path[n + 2] == '.')
+		{
+			// Found /.. - find previous component
+			size_t m = n + 3;
+			if (n > 0)
+			{
+				// Find start of previous component
+				size_t prevStart = n;
+				while (prevStart > 0 && path[prevStart - 1] != '/')
+					prevStart--;
+				
+				// Remove previous component and /..
+				if (prevStart < n)
+				{
+					size_t removeLen = m - prevStart;
+					memmove(&path[prevStart], &path[m], len - m + 1);
+					len -= removeLen;
+					n = (prevStart > 0) ? prevStart - 1 : 0;
+				}
+				else
+				{
+					// Can't resolve, skip
+					n = m;
+				}
+			}
+			else
+			{
+				// At start, can't resolve
+				n = m;
+			}
+		}
+	}
+}
+
+// Remove leading ./ from path
+static const char* SkipLeadingDotSlash(const char* path)
+{
+	if (!path)
+		return path;
+	
+	if (path[0] == '.' && (path[1] == '/' || path[1] == '\\'))
+		return path + 2;
+	
+	return path;
+}
+
+//////////////////////////////////////////////////////////////////////////
 // given the source relative path, constructs the full path to the file according to the flags
 const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,bool *bFoundInPak)
 {
-	// in many cases, the path will not be long, so there's no need to allocate so much..
-	// I'd use _alloca, but I don't like non-portable solutions. besides, it tends to confuse new developers. So I'm just using a big enough array
+	if (!src || !dst)
+		return dst;
+	
+	// Normalize input path
 	char szNewSrc[g_nMaxPath];
-	strcpy(szNewSrc, src);
+	SafeStringCopy(szNewSrc, sizeof(szNewSrc), src);
 	BeautifyPath(szNewSrc);
 	
+	// Handle platform-specific path resolution
 #if defined(__APPLE__) || defined(LINUX)
-	char* result = realpath(szNewSrc, dst);
-	if (!result)
+	char fullPath[g_nMaxPath];
+	bool pathResolved = false;
+	
+	// Resolve relative paths by prepending master CD root
+	if (!IsAbsolutePath(szNewSrc))
 	{
-		src = szNewSrc;
-		if (src[0] == '.' && (src[1] == g_cNativeSlash || src[1] == g_cNonNativeSlash))
-			src+=2;
-#ifdef _XBOX
-		if (src[0] && src[1] != ':')
-			strcpy (dst, "d:\\");
-		dst += 3;
-#endif
-		strcpy(dst, src);
-		size_t len = strlen(dst);
-		for (size_t n=0; dst[n]; n++)
+		pathResolved = ResolveRelativePath(szNewSrc, m_strMasterCDRoot, fullPath, sizeof(fullPath));
+	}
+	else
+	{
+		SafeStringCopy(fullPath, sizeof(fullPath), szNewSrc);
+		pathResolved = true;
+	}
+	
+	// Try to resolve absolute path using realpath
+	if (pathResolved)
+	{
+		char* result = realpath(fullPath, dst);
+		if (result)
 		{
-			if ( dst[n] == '\\' )
-				dst[n] = '/';
-
-			if (n > 8 && n+3 < len && dst[n] == '/' && dst[n+1] == '.' && dst[n+2] == '.')
-			{
-				size_t m = n+3;
-				n--;
-				while (dst[n] != '/')
-				{
-					n--;
-					if (!n)
-						break;
-				}
-				if (n)
-				{
-					memmove(&dst[n], &dst[m], len-m+1);
-					len -= m-n;
-					n--;
-				}
-			}
+			// realpath succeeded - path is resolved
 		}
+		else
+		{
+			// realpath failed - use constructed path and normalize manually
+			const char* processedSrc = SkipLeadingDotSlash(fullPath);
+			SafeStringCopy(dst, g_nMaxPath, processedSrc);
+			NormalizePathSeparators(dst);
+			ResolveDotDotPaths(dst);
+		}
+	}
+	else
+	{
+		// Path resolution failed - use input as-is (with bounds checking)
+		SafeStringCopy(dst, g_nMaxPath, szNewSrc);
 	}
 #else
-	if (src[0] == '.' && (src[1] == g_cNativeSlash || src[1] == g_cNonNativeSlash))
-		src+=2;
+	// Windows/Xbox path handling
+	const char* processedSrc = SkipLeadingDotSlash(src);
+	
 #ifdef _XBOX
-	if (src[0] && src[1] != ':')
-		strcpy (dst, "d:\\");
-	dst += 3;
-#endif
-	strcpy(dst, src);
-	size_t len = strlen(dst);
-	for (size_t n=0; dst[n]; n++)
+	// Xbox-specific path prefix handling
+	if (processedSrc[0] && processedSrc[1] != ':')
 	{
-		if ( dst[n] == '\\' )
-			dst[n] = '/';
-
-		if (n > 8 && n+3 < len && dst[n] == '/' && dst[n+1] == '.' && dst[n+2] == '.')
-		{
-			size_t m = n+3;
-			n--;
-			while (dst[n] != '/')
-			{
-				n--;
-				if (!n)
-					break;
-			}
-			if (n)
-			{
-				memmove(&dst[n], &dst[m], len-m+1);
-				len -= m-n;
-				n--;
-			}
-		}
+		SafeStringCopy(dst, g_nMaxPath, "d:\\");
+		size_t prefixLen = strlen(dst);
+		SafeStringCat(dst, g_nMaxPath - prefixLen, processedSrc);
 	}
+	else
+#endif
+	{
+		SafeStringCopy(dst, g_nMaxPath, processedSrc);
+	}
+	
+	// Normalize path separators and resolve .. components
+	NormalizePathSeparators(dst);
+	ResolveDotDotPaths(dst);
 #endif
 
 	char* pEnd = BeautifyPath(dst);
