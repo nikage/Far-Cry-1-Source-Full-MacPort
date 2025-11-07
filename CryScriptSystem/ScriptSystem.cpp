@@ -833,12 +833,9 @@ bool CScriptSystem::_ExecuteFile(const char *sFileName, bool bRaiseError)
 	
 	m_strCurrentFile = sFileName;
 	
-//#ifdef USE_CRYPAK
 	ICryPak *pPak=GetISystem()->GetIPak();
 	pFile = pPak->FOpen(sFileName, "rb");
-//#else
-//	pFile = fxopen(sFileName, "rb"); 
-//#endif
+
 
 	if (!pFile)
 	{

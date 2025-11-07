@@ -173,6 +173,8 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         info.name = shader.name;
         info.shaderClass = eSH_World;
         info.isLoaded = true;
+        info.nMaskGen = 0;
+        info.shaderWrapper = new CMetalShader(shaderId, this);
         
         m_shaders[shaderId] = info;
         m_shaderNameMap[shader.name] = shaderId;
@@ -295,12 +297,33 @@ void CMetalShaderManager::ReleaseShaderId(int id)
     auto it = m_shaders.find(id);
     if (it != m_shaders.end())
     {
+        ShaderInfo& info = it->second;
+        info.shaderWrapper = nullptr;
+        
+        std::string nameToRemove = info.name;
         m_shaders.erase(it);
+        
+        auto nameIt = m_shaderNameMap.find(nameToRemove);
+        if (nameIt != m_shaderNameMap.end() && nameIt->second == id)
+        {
+            m_shaderNameMap.erase(nameIt);
+        }
     }
 }
 
 void CMetalShaderManager::ClearAllShaders()
 {
+    for (auto& pair : m_shaders)
+    {
+        ShaderInfo& info = pair.second;
+        if (info.shaderWrapper)
+        {
+            info.shaderWrapper->m_manager = nullptr;
+            info.shaderWrapper->Release(true);
+            info.shaderWrapper = nullptr;
+        }
+    }
+    
     m_shaders.clear();
     m_shaderNameMap.clear();
     m_nextShaderId = 1;
@@ -314,25 +337,31 @@ void CMetalShaderManager::ShareCacheWith(CMetalShaderManager* other)
         return;
     
     for (const auto& shaderPair : other->m_shaders) {
-        int shaderId = shaderPair.first;
-        const auto& shaderInfo = shaderPair.second;
+        const ShaderInfo& shaderInfo = shaderPair.second;
         
-        if (m_shaders.find(shaderId) == m_shaders.end()) {
-            m_shaders[shaderId] = shaderInfo;
-            if (!shaderInfo.name.empty()) {
-                m_shaderNameMap[shaderInfo.name] = shaderId;
+        if (!shaderInfo.name.empty()) {
+            auto nameIt = m_shaderNameMap.find(shaderInfo.name);
+            if (nameIt == m_shaderNameMap.end()) {
+                int newShaderId = AllocateShaderId();
+                ShaderInfo info = shaderInfo;
+                info.shaderWrapper = new CMetalShader(newShaderId, this);
+                m_shaders[newShaderId] = info;
+                m_shaderNameMap[shaderInfo.name] = newShaderId;
             }
         }
     }
     
     for (const auto& shaderPair : m_shaders) {
-        int shaderId = shaderPair.first;
-        const auto& shaderInfo = shaderPair.second;
+        const ShaderInfo& shaderInfo = shaderPair.second;
         
-        if (other->m_shaders.find(shaderId) == other->m_shaders.end()) {
-            other->m_shaders[shaderId] = shaderInfo;
-            if (!shaderInfo.name.empty()) {
-                other->m_shaderNameMap[shaderInfo.name] = shaderId;
+        if (!shaderInfo.name.empty()) {
+            auto nameIt = other->m_shaderNameMap.find(shaderInfo.name);
+            if (nameIt == other->m_shaderNameMap.end()) {
+                int newShaderId = other->AllocateShaderId();
+                ShaderInfo info = shaderInfo;
+                info.shaderWrapper = new CMetalShader(newShaderId, other);
+                other->m_shaders[newShaderId] = info;
+                other->m_shaderNameMap[shaderInfo.name] = newShaderId;
             }
         }
     }

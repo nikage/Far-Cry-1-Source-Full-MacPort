@@ -229,7 +229,7 @@ bool CEntityClassRegistry::LoadRegistryEntry(EntityClass * pClass,bool bForceRel
 
 	if (!m_pScriptSystem || pClass->strScriptFile.size()==0)
 		return true;	// no script attached (entities like cameras etc...)
-#if defined(LINUX)
+#if defined(LINUX) || defined(__APPLE__)
 	bool bStartsWithSlash = false;
 	if(m_sGameType.size() > 0)
 		if((m_sGameType.c_str()[0] == '/') || (m_sGameType.c_str()[0] == '\\'))
@@ -265,20 +265,41 @@ bool CEntityClassRegistry::LoadRegistryEntry(EntityClass * pClass,bool bForceRel
 	return true;
 }
 
+// Initializes the entity class registry by loading and parsing ClassRegistry.lua script.
+// Loads the script file using platform-specific path separators (forward slashes for Linux/macOS, backslashes for Windows).
+// Parses the EntityClassRegistry Lua table and registers all entity classes found within it.
+// Each registry entry should contain: entity_type, tablename, clsid, and scriptfile.
+// @return true if initialization succeeded, false if the EntityClassRegistry table is not found
 //////////////////////////////////////////////////////////////////////////
 bool CEntityClassRegistry::InitRegistry()
 {
 	m_pSystem->GetILog()->Log("<EntityClassRegistry> Initializing");
 
+#if defined(LINUX) || defined(__APPLE__)
 	const char *sFilename = "Scripts/ClassRegistry.lua";
+#else
+	const char *sFilename = "Scripts\\ClassRegistry.lua";
+#endif
 	// load registry lua script.
-	m_pScriptSystem->ExecuteFile(sFilename);
+	if (!m_pScriptSystem->ExecuteFile(sFilename))
+	{
+		m_pSystem->GetILog()->LogWarning("<EntityClassRegistry> Failed to execute %s, trying alternative paths", sFilename);
+#if defined(LINUX) || defined(__APPLE__)
+		const char *sAltFilename = "Scripts/ClassRegistry.lua";
+#else
+		const char *sAltFilename = "Scripts\\ClassRegistry.lua";
+#endif
+		if (!m_pScriptSystem->ExecuteFile(sAltFilename))
+		{
+			m_pSystem->GetILog()->LogWarning("<EntityClassRegistry> Failed to execute %s as well", sAltFilename);
+		}
+	}
 
 	_SmartScriptObject pTable(m_pScriptSystem,true);
 	_SmartScriptObject pLineObj(m_pScriptSystem,true);
 	if (!m_pScriptSystem->GetGlobalValue("EntityClassRegistry",*pTable))
 	{
-		CryError("Cannot find EntityClassRegistry table in scripts (wrong working folder?)");
+		m_pSystem->GetILog()->LogWarning("Cannot find EntityClassRegistry table in scripts (wrong working folder?). Game may not function correctly.");
 		return false;
 	}
 	int i=0;

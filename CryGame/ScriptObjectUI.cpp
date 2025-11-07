@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - Make UI functions available from script as UI:Func(param)
@@ -969,7 +969,11 @@ int CScriptObjectUI::SetBackground(IFunctionHandler *pH)
 	int iCookie = 0;
 	INT_PTR iTextureID = -1;
 
-	pH->GetParamUDVal(1, iTextureID, iCookie);
+	if (!pH->GetParamUDVal(1, iTextureID, iCookie) || (iCookie != USER_DATA_TEXTURE))
+	{
+		m_pScriptSystem->RaiseError("UI:SetBackground() invalid texture parameter!");
+		return pH->EndFunctionNull();
+	}
 
 	m_pUISystem->SetBackground(iTextureID);
 
@@ -1101,12 +1105,23 @@ int CScriptObjectUI::GetMouseXY(IFunctionHandler *pH)
 int CScriptObjectUI::SetMouseCursor(IFunctionHandler *pH)
 {
 	CHECK_SCRIPT_FUNCTION_PARAMCOUNT(m_pScriptSystem, "UI", SetMouseCursor, 1);
+	
+	if (pH->GetParamType(1) == svtNull)
+	{
+		m_pUISystem->SetMouseCursor(-1);
+		return pH->EndFunctionNull();
+	}
+	
 	CHECK_SCRIPT_FUNCTION_PARAMTYPE(m_pScriptSystem, "UI", SetMouseCursor, 1, svtUserData);
 
 	int iCookie = 0;
 	INT_PTR iTextureID = -1;
 
-	pH->GetParamUDVal(1, iTextureID, iCookie);
+	if (!pH->GetParamUDVal(1, iTextureID, iCookie) || (iCookie != USER_DATA_TEXTURE))
+	{
+		m_pScriptSystem->RaiseError("UI:SetMouseCursor() invalid texture parameter!");
+		return pH->EndFunctionNull();
+	}
 
 	m_pUISystem->SetMouseCursor((int)iTextureID);
 

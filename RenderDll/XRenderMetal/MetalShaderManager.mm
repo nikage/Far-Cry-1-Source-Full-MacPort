@@ -28,6 +28,381 @@
 // Render element implementations moved to MetalRenderElements.cpp to avoid duplicates
 // Constructor and destructor are in MetalShaderLoader.cpp to avoid duplicates
 
+static void ConvertDOSToUnixName(char* dst, const char* src)
+{
+    while (*src)
+    {
+        if (*src == '\\')
+            *dst = '/';
+        else
+            *dst = *src;
+        dst++;
+        src++;
+    }
+    *dst = 0;
+}
+
+static const char* GetExtension(const char* filename)
+{
+    if (!filename)
+        return nullptr;
+    
+    const char* ext = nullptr;
+    const char* p = filename;
+    while (*p)
+    {
+        if (*p == '.')
+            ext = p;
+        p++;
+    }
+    return ext;
+}
+
+static std::string NormalizeShaderName(const char* name)
+{
+    if (!name)
+        return "";
+    
+    char normalized[256];
+    strncpy(normalized, name, sizeof(normalized) - 1);
+    normalized[sizeof(normalized) - 1] = 0;
+    
+    ConvertDOSToUnixName(normalized, normalized);
+    ::strlwr(normalized);
+    
+    return std::string(normalized);
+}
+
+CMetalShader::CMetalShader(int shaderId, CMetalShaderManager* manager)
+    : m_shaderId(shaderId)
+    , m_manager(manager)
+    , m_refCount(1)
+    , m_flags(0)
+    , m_flags2(0)
+    , m_flags3(0)
+    , m_renderFlags(0)
+    , m_sort(eS_Unknown)
+    , m_cull(eCULL_Back)
+    , m_templates(nullptr)
+    , m_shaderGenParams(nullptr)
+    , m_pGenShader(nullptr)
+    , m_LMFlags(0)
+{
+    assert(manager != nullptr && "CMetalShader: manager cannot be null!");
+    assert(shaderId > 0 && "CMetalShader: shaderId must be positive!");
+}
+
+CMetalShader::~CMetalShader()
+{
+    if (m_templates)
+    {
+        if (m_templates->m_TemplShaders.Num() > 0)
+        {
+            for (int i = 0; i < m_templates->m_TemplShaders.Num(); i++)
+            {
+                IShader* shader = reinterpret_cast<IShader*>(m_templates->m_TemplShaders[i]);
+                if (shader && shader != this)
+                {
+                    shader->Release();
+                }
+            }
+        }
+        delete m_templates;
+        m_templates = nullptr;
+    }
+    
+    if (m_shaderGenParams)
+    {
+        for (int i = 0; i < m_shaderGenParams->m_BitMask.Num(); i++)
+        {
+            SShaderGenBit* bit = m_shaderGenParams->m_BitMask[i];
+            if (bit)
+            {
+                delete bit;
+            }
+        }
+        delete m_shaderGenParams;
+        m_shaderGenParams = nullptr;
+    }
+    
+    m_pGenShader = nullptr;
+}
+
+int CMetalShader::GetID()
+{
+    return m_shaderId;
+}
+
+void CMetalShader::AddRef()
+{
+    assert(m_refCount > 0 && "CMetalShader: Invalid ref count!");
+    m_refCount++;
+}
+
+void CMetalShader::Release(bool bForce)
+{
+    assert(m_refCount > 0 && "CMetalShader: Release called on object with zero ref count!");
+    
+    m_refCount--;
+    if (m_refCount <= 0 || bForce)
+    {
+        CMetalShaderManager* manager = m_manager;
+        int shaderId = m_shaderId;
+        m_manager = nullptr;
+        
+        if (manager)
+        {
+            manager->ReleaseShaderId(shaderId);
+        }
+        delete this;
+    }
+}
+
+int CMetalShader::GetRefCount()
+{
+    return m_refCount;
+}
+
+const char* CMetalShader::GetName()
+{
+    if (!m_manager)
+    {
+        assert(false);
+        return "";
+    }
+    
+    auto it = m_manager->m_shaders.find(m_shaderId);
+    if (it != m_manager->m_shaders.end())
+    {
+        return it->second.name.c_str();
+    }
+    iLog->LogWarning("Shader %d not found in shader manager!", m_shaderId);
+    return "";
+}
+
+EF_Sort CMetalShader::GetSort()
+{
+    return m_sort;
+}
+
+int CMetalShader::GetFlags()
+{
+    return m_flags;
+}
+
+int CMetalShader::GetFlags2()
+{
+    return m_flags2;
+}
+
+int CMetalShader::GetFlags3()
+{
+    return m_flags3;
+}
+
+int CMetalShader::GetRenderFlags()
+{
+    return m_renderFlags;
+}
+
+void CMetalShader::SetRenderFlags(int nFlags)
+{
+    m_renderFlags = nFlags;
+}
+
+int CMetalShader::GetLFlags()
+{
+    return m_LMFlags;
+}
+
+int CMetalShader::GetCull()
+{
+    return m_cull;
+}
+
+uint CMetalShader::GetPreprocessFlags()
+{
+    return 0;
+}
+
+void CMetalShader::SetFlags3(int Flags)
+{
+    m_flags3 |= Flags;
+}
+
+bool CMetalShader::Reload(int nFlags)
+{
+    return true;
+}
+
+TArray<CRendElement*>* CMetalShader::GetREs()
+{
+    return &m_renderElements;
+}
+
+bool CMetalShader::AddTemplate(SRenderShaderResources* Res, int& TemplId, const char* Name, bool bSetPreferred, uint64 nMaskGen)
+{
+    if (m_flags2 & (EF2_TEMPLATE | EF_SYSTEM))
+        return false;
+    
+    if (!m_templates)
+    {
+        m_templates = new SEfTemplates;
+    }
+    
+    if (TemplId < 0)
+    {
+        if (!Name || !Name[0])
+            return false;
+        
+        for (int i = EFT_USER_FIRST; i < m_templates->m_TemplShaders.Num(); i++)
+        {
+            IShader* sh = reinterpret_cast<IShader*>(m_templates->m_TemplShaders[i]);
+            if (sh && !strcmp(Name, sh->GetName()))
+            {
+                TemplId = i;
+                return true;
+            }
+        }
+        TemplId = m_templates->m_TemplShaders.Num();
+    }
+    
+    if (TemplId >= m_templates->m_TemplShaders.Num())
+    {
+        m_templates->m_TemplShaders.ReserveNew(TemplId + 1);
+        while (m_templates->m_TemplShaders.Num() <= TemplId)
+        {
+            m_templates->m_TemplShaders.AddElem(nullptr);
+        }
+    }
+    
+    if (Name && Name[0] && m_manager)
+    {
+        IShader* templateShader = m_manager->EF_LoadShader(Name, eSH_Misc, 0, nMaskGen);
+        if (templateShader)
+        {
+            IShader* oldShader = reinterpret_cast<IShader*>(m_templates->m_TemplShaders[TemplId]);
+            if (oldShader && oldShader != this)
+            {
+                oldShader->Release();
+            }
+            m_templates->m_TemplShaders[TemplId] = reinterpret_cast<SShader*>(templateShader);
+            
+            if (bSetPreferred)
+            {
+                m_templates->m_Preferred = reinterpret_cast<SShader*>(templateShader);
+                m_templates->m_nPreferred = TemplId;
+            }
+            
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+void CMetalShader::RemoveTemplate(int TemplId)
+{
+    if (!m_templates || TemplId < 0 || TemplId >= m_templates->m_TemplShaders.Num())
+        return;
+    
+    if (!m_templates->m_TemplShaders[TemplId])
+        return;
+    
+    IShader* shader = reinterpret_cast<IShader*>(m_templates->m_TemplShaders[TemplId]);
+    if (shader && shader != this)
+    {
+        shader->Release();
+    }
+    
+    m_templates->m_TemplShaders[TemplId] = nullptr;
+    
+    if (m_templates->m_nPreferred == TemplId)
+    {
+        m_templates->m_Preferred = nullptr;
+        m_templates->m_nPreferred = -1;
+    }
+}
+
+IShader* CMetalShader::GetTemplate(int num)
+{
+    if (!m_templates)
+        return this;
+    
+    if (num >= 0 && num < m_templates->m_TemplShaders.Num() && m_templates->m_TemplShaders[num])
+    {
+        return reinterpret_cast<IShader*>(m_templates->m_TemplShaders[num]);
+    }
+    
+    if (m_templates->m_Preferred)
+    {
+        return reinterpret_cast<IShader*>(m_templates->m_Preferred);
+    }
+    
+    return this;
+}
+
+SEfTemplates* CMetalShader::GetTemplates()
+{
+    return m_templates;
+}
+
+TArray<SShaderParam>& CMetalShader::GetPublicParams()
+{
+    return m_publicParams;
+}
+
+int CMetalShader::GetTexId()
+{
+    return 0;
+}
+
+ITexPic* CMetalShader::GetBaseTexture(int* nPass, int* nTU)
+{
+    if (nPass)
+        *nPass = 0;
+    if (nTU)
+        *nTU = 0;
+    return nullptr;
+}
+
+unsigned int CMetalShader::GetUsedTextureTypes(void)
+{
+    return 0;
+}
+
+int CMetalShader::GetVertexFormat(void)
+{
+    return 0;
+}
+
+int CMetalShader::Size(int Flags)
+{
+    return 0;
+}
+
+uint64 CMetalShader::GetGenerationMask()
+{
+    if (!m_manager)
+        return 0;
+    
+    auto it = m_manager->m_shaders.find(m_shaderId);
+    if (it != m_manager->m_shaders.end())
+    {
+        return it->second.nMaskGen;
+    }
+    return 0;
+}
+
+SShaderGen* CMetalShader::GetGenerationParams()
+{
+    if (m_shaderGenParams)
+        return m_shaderGenParams;
+    if (m_pGenShader)
+        return m_pGenShader->m_shaderGenParams;
+    return nullptr;
+}
+
 // Shader System Interface (EF_ methods)
 bool CMetalShaderManager::EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags)
 {
@@ -93,80 +468,89 @@ void CMetalShaderManager::EF_AddPolyToScene2D(SShaderItem si, int nTempl, int nu
 // Shader Management
 IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, int flags, uint64 nMaskGen)
 {
-    if (!name)
+    if (!name || !name[0])
         return nullptr;
-        
-    // Check if shader is already loaded
-    std::string nameStr(name);
-    auto nameIt = m_shaderNameMap.find(nameStr);
+    
+    std::string normalizedName = NormalizeShaderName(name);
+    if (normalizedName.empty())
+        return nullptr;
+    
+    std::string lookupName = normalizedName;
+    if (nMaskGen != 0)
+    {
+        char nameWithMask[512];
+        snprintf(nameWithMask, sizeof(nameWithMask), "%s(%llx)", normalizedName.c_str(), (unsigned long long)nMaskGen);
+        lookupName = nameWithMask;
+    }
+    
+    auto nameIt = m_shaderNameMap.find(lookupName);
     if (nameIt != m_shaderNameMap.end())
     {
         auto shaderIt = m_shaders.find(nameIt->second);
         if (shaderIt != m_shaders.end())
         {
-            // Return existing shader interface
-            return nullptr; // Would need to implement IShader interface
+            ShaderInfo& info = shaderIt->second;
+            if (info.shaderWrapper)
+            {
+                if (!(flags & 1))
+                {
+                    info.shaderWrapper->AddRef();
+                    if (flags != 0)
+                    {
+                        info.shaderWrapper->m_flags |= flags;
+                    }
+                    return info.shaderWrapper;
+                }
+            }
         }
     }
     
-    // Load shader from file
-    std::string source;
-    if (!LoadShaderFromFile(name, source))
+    if (flags & 1)
     {
-        iLog->Log("Error: Failed to load shader: %s", name);
-        return nullptr;
+        if (nameIt != m_shaderNameMap.end())
+        {
+            int shaderId = nameIt->second;
+            auto shaderIt = m_shaders.find(shaderId);
+            if (shaderIt != m_shaders.end())
+            {
+                ShaderInfo& info = shaderIt->second;
+                if (info.shaderWrapper)
+                {
+                    info.shaderWrapper->Release(true);
+                }
+                m_shaders.erase(shaderIt);
+                m_shaderNameMap.erase(nameIt);
+            }
+        }
     }
     
-    // Compile shader
-    id<MTLFunction> vertexFunction = nil;
-    id<MTLFunction> fragmentFunction = nil;
-    
-    if (!CompileShader(source, vertexFunction) || !CompileShader(source, fragmentFunction))
+    auto defaultIt = m_shaderNameMap.find(normalizedName);
+    if (defaultIt != m_shaderNameMap.end())
     {
-        iLog->Log("Error: Failed to compile shader: %s", name);
-        return nullptr;
+        auto shaderIt = m_shaders.find(defaultIt->second);
+        if (shaderIt != m_shaders.end())
+        {
+            ShaderInfo& baseInfo = shaderIt->second;
+            
+            int shaderId = AllocateShaderId();
+            ShaderInfo info = baseInfo;
+            info.name = lookupName;
+            info.nMaskGen = nMaskGen;
+            info.shaderWrapper = new CMetalShader(shaderId, this);
+            
+            if (nMaskGen != 0 && baseInfo.shaderWrapper)
+            {
+                info.shaderWrapper->m_pGenShader = baseInfo.shaderWrapper;
+            }
+            
+            m_shaders[shaderId] = info;
+            m_shaderNameMap[lookupName] = shaderId;
+            
+            return info.shaderWrapper;
+        }
     }
     
-    // Validate functions before creating pipeline state
-    if (!vertexFunction || !fragmentFunction)
-    {
-        iLog->Log("Error: Shader functions are nil for shader: %s (vertex=%p, fragment=%p)", name, vertexFunction, fragmentFunction);
-        return nullptr;
-    }
-    
-    // Create vertex descriptor (use a default one if nil is passed)
-    MTLVertexDescriptor* vertexDesc = CMetalVertexDescriptorHelper::CreateVertexDescriptor(VERTEX_FORMAT_P3F_N_COL4UB_TEX2F);
-    if (!vertexDesc)
-    {
-        iLog->Log("Error: Failed to create vertex descriptor for shader: %s", name);
-        return nullptr;
-    }
-    
-    // Create pipeline state
-    id<MTLRenderPipelineState> pipelineState = CreatePipelineState(vertexFunction, fragmentFunction, vertexDesc);
-    if (!pipelineState)
-    {
-        iLog->Log("Error: Failed to create pipeline state for shader: %s", name);
-        return nullptr;
-    }
-    
-    // Store shader
-    int shaderId = AllocateShaderId();
-    if (shaderId == -1)
-        return nullptr;
-        
-    ShaderInfo info;
-    info.vertexFunction = vertexFunction;
-    info.fragmentFunction = fragmentFunction;
-    info.pipelineState = pipelineState;
-    info.name = name;
-    info.shaderClass = Class;
-    info.isLoaded = true;
-    
-    m_shaders[shaderId] = info;
-    m_shaderNameMap[nameStr] = shaderId;
-    
-    return nullptr; // Would need to implement IShader interface
+    return nullptr;
 }
 
 SShaderItem CMetalShaderManager::EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags, SInputShaderResources* Res, uint64 nMaskGen)
@@ -434,53 +818,98 @@ void CMetalShaderManager::DeleteLeafBuffer(CLeafBuffer* pLBuffer)
 // Protected methods
 bool CMetalShaderManager::LoadShaderFromFile(const char* filename, std::string& source)
 {
-    if (!filename)
-        return false;
-        
-    // Try to load shader source from file
-    // For now, we'll create a basic Metal shader template
-    // In a real implementation, this would load from .metal files or other formats
-    
-    std::string shaderName = filename;
-    if (shaderName.find(".metal") == std::string::npos)
+    if (!filename || !filename[0])
     {
-        shaderName += ".metal";
+        iLog->Log("CMetalShaderManager::LoadShaderFromFile: Invalid filename\n");
+        return false;
     }
     
-    // Create a basic Metal shader template
-    source = R"(
-#include <metal_stdlib>
-using namespace metal;
-
-struct VertexIn {
-    float3 position [[attribute(0)]];
-    float3 normal [[attribute(1)]];
-    float2 texCoord [[attribute(2)]];
-};
-
-struct VertexOut {
-    float4 position [[position]];
-    float3 normal;
-    float2 texCoord;
-};
-
-vertex VertexOut vertex_main(VertexIn in [[stage_in]])
-{
-    VertexOut out;
-    out.position = float4(in.position, 1.0);
-    out.normal = in.normal;
-    out.texCoord = in.texCoord;
-    return out;
-}
-
-fragment float4 fragment_main(VertexOut in [[stage_in]],
-                             texture2d<float> baseTexture [[texture(0)]])
-{
-    constexpr sampler textureSampler(mag_filter::linear, min_filter::linear);
-    float4 color = baseTexture.sample(textureSampler, in.texCoord);
-    return color;
-}
-)";
+    source.clear();
+    
+    std::string shaderPath = filename;
+    ConvertDOSToUnixName(const_cast<char*>(shaderPath.c_str()), const_cast<char*>(shaderPath.c_str()));
+    
+    const char* ext = GetExtension(shaderPath.c_str());
+    bool hasMetalExt = ext && !stricmp(ext, ".metal");
+    
+    if (!hasMetalExt)
+    {
+        shaderPath += ".metal";
+    }
+    
+    FILE* fp = nullptr;
+    std::string fullPath;
+    
+    if (shaderPath[0] == '/' || (shaderPath.length() > 1 && shaderPath[1] == ':'))
+    {
+        fullPath = shaderPath;
+        fp = GetISystem()->GetIPak()->FOpen(fullPath.c_str(), "rb");
+    }
+    
+    if (!fp)
+    {
+        const char* searchPaths[] = {
+            "Shaders/Metal/",
+            "Shaders/HWScripts/Metal/",
+            "Shaders/HWScripts/Declarations/Metal/",
+            "Shaders/",
+            ""
+        };
+        
+        for (auto & searchPath : searchPaths)
+        {
+            fullPath = searchPath;
+            if (!fullPath.empty())
+            {
+                fullPath += shaderPath;
+            }
+            else
+            {
+                fullPath = shaderPath;
+            }
+            
+            ConvertDOSToUnixName(const_cast<char*>(fullPath.c_str()), const_cast<char*>(fullPath.c_str()));
+            fp = GetISystem()->GetIPak()->FOpen(fullPath.c_str(), "rb");
+            
+            if (fp)
+            {
+                break;
+            }
+        }
+    }
+    
+    if (!fp)
+    {
+        iLog->Log("CMetalShaderManager::LoadShaderFromFile: Could not find shader file '%s'\n", filename);
+        return false;
+    }
+    
+    GetISystem()->GetIPak()->FSeek(fp, 0, SEEK_END);
+    long fileSize = GetISystem()->GetIPak()->FTell(fp);
+    
+    if (fileSize <= 0)
+    {
+        GetISystem()->GetIPak()->FClose(fp);
+        iLog->Log("CMetalShaderManager::LoadShaderFromFile: Shader file '%s' is empty\n", fullPath.c_str());
+        return false;
+    }
+    
+    GetISystem()->GetIPak()->FSeek(fp, 0, SEEK_SET);
+    
+    source.resize(fileSize);
+    size_t bytesRead = GetISystem()->GetIPak()->FRead(&source[0], 1, fileSize, fp);
+    GetISystem()->GetIPak()->FClose(fp);
+    
+    if (bytesRead != static_cast<size_t>(fileSize))
+    {
+        iLog->Log("CMetalShaderManager::LoadShaderFromFile: Failed to read entire shader file '%s' (read %zu of %ld bytes)\n", 
+                  fullPath.c_str(), bytesRead, fileSize);
+        source.clear();
+        return false;
+    }
+    
+    iLog->Log("CMetalShaderManager::LoadShaderFromFile: Successfully loaded shader from '%s' (%ld bytes)\n", 
+              fullPath.c_str(), fileSize);
     
     return true;
 }

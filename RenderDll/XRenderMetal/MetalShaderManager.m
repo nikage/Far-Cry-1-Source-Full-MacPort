@@ -33,10 +33,69 @@
 // Forward declarations
 class CMetalBaseRenderer;
 class CMetalTextureManager;
+class CMetalShaderManager;
+
+class CMetalShader : public IShader
+{
+    friend class CMetalShaderManager;
+    
+public:
+    CMetalShader(int shaderId, CMetalShaderManager* manager);
+    virtual ~CMetalShader();
+    
+    virtual int GetID();
+    virtual void AddRef();
+    virtual void Release(bool bForce = false);
+    virtual int GetRefCount();
+    virtual const char* GetName();
+    virtual EF_Sort GetSort();
+    virtual int GetFlags();
+    virtual int GetFlags2();
+    virtual int GetFlags3();
+    virtual int GetRenderFlags();
+    virtual void SetRenderFlags(int nFlags);
+    virtual int GetLFlags();
+    virtual int GetCull();
+    virtual uint GetPreprocessFlags();
+    virtual void SetFlags3(int Flags);
+    virtual bool Reload(int nFlags);
+    virtual TArray<CRendElement*>* GetREs();
+    virtual bool AddTemplate(SRenderShaderResources* Res, int& TemplId, const char* Name = NULL, bool bSetPreferred = false, uint64 nMaskGen = 0);
+    virtual void RemoveTemplate(int TemplId);
+    virtual IShader* GetTemplate(int num);
+    virtual SEfTemplates* GetTemplates();
+    virtual TArray<SShaderParam>& GetPublicParams();
+    virtual int GetTexId();
+    virtual ITexPic* GetBaseTexture(int* nPass, int* nTU);
+    virtual unsigned int GetUsedTextureTypes(void);
+    virtual int GetVertexFormat(void);
+    virtual int Size(int Flags);
+    virtual uint64 GetGenerationMask();
+    virtual SShaderGen* GetGenerationParams();
+    
+private:
+    int m_shaderId;
+    CMetalShaderManager* m_manager;
+    int m_refCount;
+    uint m_flags;
+    uint m_flags2;
+    uint m_flags3;
+    int m_renderFlags;
+    EF_Sort m_sort;
+    ECull m_cull;
+    TArray<SShaderParam> m_publicParams;
+    TArray<CRendElement*> m_renderElements;
+    SEfTemplates* m_templates;
+    SShaderGen* m_shaderGenParams;
+    CMetalShader* m_pGenShader;
+    int m_LMFlags;
+};
 
 // Metal shader manager class
 class CMetalShaderManager
 {
+    friend class CMetalShader;
+    
 public:
     CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTextureManager* textureManager);
     virtual ~CMetalShaderManager();
@@ -159,6 +218,8 @@ protected:
         std::string name;
         EShClass shaderClass;
         bool isLoaded;
+        CMetalShader* shaderWrapper;
+        uint64 nMaskGen;
     };
     
     std::unordered_map<int, ShaderInfo> m_shaders;
