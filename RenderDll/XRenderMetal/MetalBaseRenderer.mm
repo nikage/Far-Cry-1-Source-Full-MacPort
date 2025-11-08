@@ -1884,7 +1884,17 @@ id<MTLBuffer> CMetalBaseRenderer::GetIndexBuffer(int bufferId)
 
 void CMetalBaseRenderer::SetType(char type)
 {
-    m_type = type;
+    const char resolvedType = type == R_METAL_RENDERER ? type : R_METAL_RENDERER;
+
+    if (type != R_METAL_RENDERER)
+    {
+        if (iLog)
+        {
+            iLog->Log("MetalBaseRenderer: forcing renderer type to R_METAL_RENDERER (requested: %d)\n", type);
+        }
+    }
+
+    CRenderer::SetType(resolvedType);
 }
 
 #endif

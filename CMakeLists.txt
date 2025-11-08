@@ -84,7 +84,7 @@ add_subdirectory(RenderDll)
 add_subdirectory(CryGame)
 
 # Just compile the Main.cpp which we know works
-set(FARCRY_WORKING_SOURCES
+set(FARCRY_SOURCES
     FARCRY/Main.cpp
 )
 
@@ -96,7 +96,7 @@ if(APPLE)
 endif()
 
 # Create the working Far Cry executable
-add_executable(FarCry ${FARCRY_WORKING_SOURCES})
+add_executable(FarCry ${FARCRY_SOURCES})
 
 # Link all CryEngine libraries (excluding CryNetwork as requested)
 target_link_libraries(FarCry PRIVATE
