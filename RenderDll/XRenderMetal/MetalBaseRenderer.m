@@ -157,7 +157,7 @@ public:
     virtual char GetType() { return R_METAL_RENDERER; }
     virtual char* GetVertexProfile(bool bSupportedProfile) { assert(false && "GetVertexProfile not implemented"); return nullptr; }
     virtual char* GetPixelProfile(bool bSupportedProfile) { assert(false && "GetPixelProfile not implemented"); return nullptr; }
-    virtual void SetType(char type) { assert(false && "SetType not implemented"); }
+    virtual void SetType(char type);
     virtual float ScaleCoordX(float value) { return value; }
     virtual float ScaleCoordY(float value) { return value; }
     virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) { assert(false && "SetColorOp not implemented"); }

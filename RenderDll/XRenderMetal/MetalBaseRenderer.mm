@@ -1882,5 +1882,10 @@ id<MTLBuffer> CMetalBaseRenderer::GetIndexBuffer(int bufferId)
     return nil;
 }
 
+void CMetalBaseRenderer::SetType(char type)
+{
+    m_type = type;
+}
+
 #endif
 

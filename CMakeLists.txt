@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(FarCryWorking VERSION 1.34 LANGUAGES C CXX OBJCXX)
+project(FarCry VERSION 1.34 LANGUAGES C CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -96,10 +96,10 @@ if(APPLE)
 endif()
 
 # Create the working Far Cry executable
-add_executable(FarCryWorking ${FARCRY_WORKING_SOURCES})
+add_executable(FarCry ${FARCRY_WORKING_SOURCES})
 
 # Link all CryEngine libraries (excluding CryNetwork as requested)
-target_link_libraries(FarCryWorking PRIVATE
+target_link_libraries(FarCry PRIVATE
     CrySystem
     Cry3DEngine
     CryEntitySystem
@@ -119,7 +119,7 @@ target_link_libraries(FarCryWorking PRIVATE
 
 # Link frameworks  
 if(APPLE)
-    target_link_libraries(FarCryWorking PRIVATE
+    target_link_libraries(FarCry PRIVATE
         ${COCOA_FRAMEWORK}
         ${METAL_FRAMEWORK}
         ${CORE_AUDIO_FRAMEWORK}
@@ -131,7 +131,7 @@ if(APPLE)
     )
     
     # Configure as macOS app bundle
-    set_target_properties(FarCryWorking PROPERTIES
+    set_target_properties(FarCry PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Far Cry"
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
@@ -143,17 +143,17 @@ endif()
 
 # Install
 if(APPLE)
-    install(TARGETS FarCryWorking BUNDLE DESTINATION .)
+    install(TARGETS FarCry BUNDLE DESTINATION .)
     
     # Use @executable_path for dylib lookup so they can be found in the app bundle
-    set_target_properties(FarCryWorking PROPERTIES
+    set_target_properties(FarCry PROPERTIES
         BUILD_RPATH "@executable_path"
         INSTALL_RPATH "@executable_path"
     )
     
-    # Copy all dylibs and Metal shader libraries to the app bundle whenever FarCryWorking or any dylib is rebuilt
-    add_custom_command(TARGET FarCryWorking POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
+    # Copy all dylibs and Metal shader libraries to the app bundle whenever FarCry or any dylib is rebuilt
+    add_custom_command(TARGET FarCry POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
         COMMAND ${CMAKE_COMMAND} -E copy 
             $<TARGET_FILE:CrySystem>
             $<TARGET_FILE:Cry3DEngine>
@@ -168,34 +168,34 @@ if(APPLE)
             $<TARGET_FILE:CrySoundSystem>
             $<TARGET_FILE:CryGame>
             $<TARGET_FILE:XRenderMetal>
-            ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
+            ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
         COMMENT "Copying all dylibs to app bundle"
     )
     
     # Copy Metal shader libraries separately with explicit dependency on MetalShaders target
-    add_custom_command(TARGET FarCryWorking POST_BUILD
+    add_custom_command(TARGET FarCry POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/BasicShaders.metallib
             ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/SpriteShaders.metallib
-            ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/MacOS/
+            ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
         COMMENT "Copying Metal shader libraries to app bundle"
         DEPENDS MetalShaders
     )
     
     # Copy game assets to Resources directory
     if(EXISTS ${CMAKE_SOURCE_DIR}/fcsplash.bmp)
-        add_custom_command(TARGET FarCryWorking POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${CMAKE_SOURCE_DIR}/fcsplash.bmp
-                ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/fcsplash.bmp
+                ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/fcsplash.bmp
             COMMENT "Copying splash screen asset to Resources"
         )
     endif()
     
     # Create Levels directory in Resources
-    add_custom_command(TARGET FarCryWorking POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/Levels
+    add_custom_command(TARGET FarCry POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/Levels
         COMMENT "Creating Levels directory in Resources"
     )
     
@@ -248,11 +248,11 @@ if(APPLE)
     endif()
     
     if(FCData_FOUND)
-        add_custom_command(TARGET FarCryWorking POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/FCData
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/FCData
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${FCData_PATH}
-                ${CMAKE_BINARY_DIR}/FarCryWorking.app/Contents/Resources/FCData
+                ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/FCData
             COMMENT "Copying FCData directory with PAK files to Resources"
         )
     endif()
