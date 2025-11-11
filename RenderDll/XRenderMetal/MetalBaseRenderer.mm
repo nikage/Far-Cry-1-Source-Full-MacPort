@@ -99,6 +99,9 @@ CMetalBaseRenderer::CMetalBaseRenderer()
         m_dynamicVBPools[i].offset = 0;
         m_dynamicVBPools[i].cpuData = nullptr;
     }
+
+    m_nFrameID = 0;
+    m_nFrameUpdateID = 0;
 }
 
 CMetalBaseRenderer::~CMetalBaseRenderer()
@@ -552,6 +555,14 @@ void CMetalBaseRenderer::BeginFrame()
     if (!m_isInitialized || !m_device || !m_commandQueue)
         return;
     
+    m_cEF.mfBeginFrame();
+
+    m_nPolygons = 0;
+    m_nShadowVolumePolys = 0;
+    m_nFrameID++;
+    m_nFrameUpdateID++;
+    m_frameID = m_nFrameID;
+
     dispatch_semaphore_wait(m_frameSemaphores[m_currentFrameIndex], DISPATCH_TIME_FOREVER);
     
     m_currentCommandBuffer = [m_commandQueue commandBuffer];
@@ -570,8 +581,6 @@ void CMetalBaseRenderer::BeginFrame()
     
     m_numDrawCalls = 0;
     m_numTriangles = 0;
-    
-    m_frameID++;
 }
 
 void CMetalBaseRenderer::Update()
@@ -1880,6 +1889,11 @@ id<MTLBuffer> CMetalBaseRenderer::GetIndexBuffer(int bufferId)
     if (bufferId > 0 && bufferId < (int)m_indexBuffers.size())
         return m_indexBuffers[bufferId];
     return nil;
+}
+
+int CMetalBaseRenderer::GetFrameID(bool bIncludeRecursiveCalls)
+{
+    return CRenderer::GetFrameID(bIncludeRecursiveCalls);
 }
 
 void CMetalBaseRenderer::SetType(char type)

@@ -371,12 +371,4 @@ inline void free(void *p) { _CryFree(p); };
 //#endif // CRYSYSTEM_EXPORTS
 #endif //LINUX
 
-// NOTE: On macOS, do not override operator new/delete globally as it causes
-// heap corruption with libc++ std::string and other standard library types.
-// The macOS standard library allocates memory internally using the system allocator,
-// creating an ABI mismatch when we override new/delete to use CryModuleMalloc.
-// This was discovered via AddressSanitizer showing heap-buffer-overflow in
-// std::string destructor when memory allocated by libc++ system allocator 
-// was freed by CryModuleFree.
-
 #endif //_CRY_MEMORY_MANAGER_H_

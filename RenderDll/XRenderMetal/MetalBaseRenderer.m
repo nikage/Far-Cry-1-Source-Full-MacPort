@@ -176,7 +176,7 @@ public:
     virtual int GetPolyCount() { assert(false && "GetPolyCount not implemented"); return 0; }
     virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { assert(false && "GetPolyCount not implemented"); nPolygons = 0; nShadowVolPolys = 0; }
     virtual void SetClearColor(const Vec3& vColor) { assert(false && "SetClearColor not implemented"); }
-    virtual int GetFrameID(bool bIncludeRecursiveCalls = true) { assert(false && "GetFrameID not implemented"); return 0; }
+    virtual int GetFrameID(bool bIncludeRecursiveCalls = true);
     virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) { assert(false && "MakeMatrix not implemented"); }
     
     // Stub implementations for complex methods (to be implemented by specialized classes)

@@ -1227,56 +1227,78 @@ void CMetalRenderer::SetCullMode(int mode) {
 }
 
 void CMetalRenderer::Set2DMode(bool enable, int ortox, int ortoy) {
-    assert(ortox > 0 && ortoy > 0 && "Set2DMode: invalid orthographic dimensions!");
-    
     if (enable) {
-        // Entering 2D mode: save current matrices and set up orthographic projection
-        assert(!m_2DMode && "Set2DMode: Already in 2D mode! Mismatched enable/disable calls!");
-        
-        // Save current projection and view matrices
+        if (m_2DMode) {
+            if (iLog) {
+                iLog->Log("Set2DMode: request ignored because renderer is already in 2D mode\n");
+            }
+            return;
+        }
+
+        const int resolvedWidth = (ortox > 0) ? ortox
+            : ((m_viewportWidth > 0) ? m_viewportWidth : ((m_width > 0) ? m_width : 1));
+        const int resolvedHeight = (ortoy > 0) ? ortoy
+            : ((m_viewportHeight > 0) ? m_viewportHeight : ((m_height > 0) ? m_height : 1));
+
+        if (resolvedWidth <= 0 || resolvedHeight <= 0) {
+            if (iLog) {
+                iLog->Log("Set2DMode: unable to resolve valid orthographic dimensions (requested %d x %d)\n", ortox, ortoy);
+            }
+            return;
+        }
+
         m_2DProjectionStack.push_back(m_projectionMatrix);
         m_2DViewStack.push_back(m_viewMatrix);
-        
-        // Set up orthographic projection matrix (left-handed, like D3D)
-        // Orthographic projection: (0,0) top-left to (ortox, ortoy) bottom-right
+
+        const float invWidth = 2.0f / static_cast<float>(resolvedWidth);
+        const float invHeight = -2.0f / static_cast<float>(resolvedHeight);
+
         m_projectionMatrix.SetIdentity();
-        m_projectionMatrix(0,0) = 2.0f / (float)ortox;  // Scale X
-        m_projectionMatrix(1,1) = -2.0f / (float)ortoy; // Scale Y (negative for Y-down)
-        m_projectionMatrix(2,2) = 1.0f;                 // Scale Z
-        m_projectionMatrix(3,0) = -1.0f;                // Translate X
-        m_projectionMatrix(3,1) = 1.0f;                 // Translate Y
-        m_projectionMatrix(3,2) = 0.0f;                // Translate Z
-        m_projectionMatrix(3,3) = 1.0f;                // W
-        
-        // Set identity view matrix for 2D rendering
+        m_projectionMatrix(0,0) = invWidth;
+        m_projectionMatrix(1,1) = invHeight;
+        m_projectionMatrix(2,2) = 1.0f;
+        m_projectionMatrix(3,0) = -1.0f;
+        m_projectionMatrix(3,1) = 1.0f;
+        m_projectionMatrix(3,2) = 0.0f;
+        m_projectionMatrix(3,3) = 1.0f;
+
         m_viewMatrix.SetIdentity();
-        
+
         m_2DMode = true;
-        m_2DOriginX = ortox;
-        m_2DOriginY = ortoy;
+        m_2DOriginX = resolvedWidth;
+        m_2DOriginY = resolvedHeight;
         m_matrixDirty = true;
-        
-        iLog->Log("Set2DMode: Enabled 2D mode (%dx%d)\n", ortox, ortoy);
+
+        if (iLog) {
+            iLog->Log("Set2DMode: Enabled 2D mode (%dx%d)\n", resolvedWidth, resolvedHeight);
+        }
     } else {
-        // Exiting 2D mode: restore saved matrices
-        assert(m_2DMode && "Set2DMode: Not in 2D mode! Mismatched enable/disable calls!");
-        assert(!m_2DProjectionStack.empty() && "Set2DMode: Projection stack empty!");
-        assert(!m_2DViewStack.empty() && "Set2DMode: View stack empty!");
-        
-        // Restore saved matrices
-        m_projectionMatrix = m_2DProjectionStack.back();
-        m_2DProjectionStack.pop_back();
-        
-        m_viewMatrix = m_2DViewStack.back();
-        m_2DViewStack.pop_back();
-        
+        if (!m_2DMode) {
+            return;
+        }
+
+        if (!m_2DProjectionStack.empty()) {
+            m_projectionMatrix = m_2DProjectionStack.back();
+            m_2DProjectionStack.pop_back();
+        } else {
+            m_projectionMatrix.SetIdentity();
+        }
+
+        if (!m_2DViewStack.empty()) {
+            m_viewMatrix = m_2DViewStack.back();
+            m_2DViewStack.pop_back();
+        } else {
+            m_viewMatrix.SetIdentity();
+        }
+
         m_2DMode = false;
         m_matrixDirty = true;
-        
-        iLog->Log("Set2DMode: Disabled 2D mode\n");
+
+        if (iLog) {
+            iLog->Log("Set2DMode: Disabled 2D mode\n");
+        }
     }
-    
-    // Update uniform buffer with new matrices
+
     UpdateUniformBuffer();
 }
 
