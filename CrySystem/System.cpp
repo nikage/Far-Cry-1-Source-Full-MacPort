@@ -946,8 +946,8 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 	
 	static bool sysUpdateFirstCall = true;
 	if (sysUpdateFirstCall) {
-		printf("System::Update - FIRST CALL - system update loop started\n");
-		fflush(stdout);
+		// //printf("System::Update - FIRST CALL - system update loop started\n");
+		// // fflush(stdout);
 		sysUpdateFirstCall = false;
 	}
 
@@ -969,37 +969,37 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
   }
 #elif defined(__APPLE__) && defined(__MACH__)
 	{
-		printf("System::Update - BEFORE FRAME_PROFILER\n");
-		fflush(stdout);
+		//printf("System::Update - BEFORE FRAME_PROFILER\n");
+		// fflush(stdout);
 		FRAME_PROFILER( "SysUpdate:NSAppEvents",this,PROFILE_SYSTEM );
-		printf("System::Update - AFTER FRAME_PROFILER, before ProcessMacOSEvents\n");
-		fflush(stdout);
+		//printf("System::Update - AFTER FRAME_PROFILER, before ProcessMacOSEvents\n");
+		// fflush(stdout);
 		ProcessMacOSEvents();
-		printf("System::Update - AFTER ProcessMacOSEvents\n");
-		fflush(stdout);
+		//printf("System::Update - AFTER ProcessMacOSEvents\n");
+		// fflush(stdout);
 	}
-	printf("System::Update - AFTER event processing block\n");
-	fflush(stdout);
+	//printf("System::Update - AFTER event processing block\n");
+	// fflush(stdout);
 #endif
 #endif
 
-	printf("System::Update - About to measure time WndMess\n");
-	fflush(stdout);
+	//printf("System::Update - About to measure time WndMess\n");
+	// fflush(stdout);
 	m_Time.MeasureTime("WndMess");
-	printf("System::Update - AFTER MeasureTime WndMess\n");
-	fflush(stdout);
+	//printf("System::Update - AFTER MeasureTime WndMess\n");
+	// fflush(stdout);
 
 	//////////////////////////////////////////////////////////////////////
 	//update time subsystem	
-	printf("System::Update - About to m_Time.Update()\n");
-	fflush(stdout);
+	//printf("System::Update - About to m_Time.Update()\n");
+	// fflush(stdout);
 	m_Time.Update();
-	printf("System::Update - AFTER m_Time.Update()\n");
-	fflush(stdout);
+	//printf("System::Update - AFTER m_Time.Update()\n");
+	// fflush(stdout);
 
 	float fFrameTime = m_Time.GetFrameTime();
-	printf("System::Update - Got frame time: %f\n", fFrameTime);
-	fflush(stdout);
+	//printf("System::Update - Got frame time: %f\n", fFrameTime);
+	// fflush(stdout);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Update script system.

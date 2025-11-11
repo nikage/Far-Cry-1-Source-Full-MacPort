@@ -16,6 +16,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <algorithm>
+#include <cctype>
 #include "CryPak.h"
 #include <ilog.h>
 #include <StringUtils.h>
@@ -154,7 +156,11 @@ void CCryPak::AddMod(const char* szMod)
 		if (*it==g_cNonNativeSlash)
 			*it = g_cNativeSlash;
 		else
+		{
+#if !(defined(__APPLE__) && defined(__MACH__))
 			*it = tolower(*it);
+#endif
+		}
 	}
 #if defined(LINUX)
 	if (!strPrepend.empty() && (strPrepend[strPrepend.length()-1] != g_cNativeSlash && strPrepend[strPrepend.length()-1] != g_cNonNativeSlash))
@@ -254,11 +260,23 @@ char* CCryPak::BeautifyPath(char* dst)
 			while(*p == g_cNonNativeSlash || *p == g_cNativeSlash)
 				++p; // skip the extra slashes
 		}
+#if defined(__APPLE__) && defined(__MACH__)
 		else
 		{
-			*q = tolower (*p);
+			*q = *p;
 			++q,++p;
 		}
+#else
+		else
+		{
+#if defined(__APPLE__) && defined(__MACH__)
+			*q = *p;
+#else
+			*q = tolower (*p);
+#endif
+			++q,++p;
+		}
+#endif
 	}
 	*q = '\0';
 	return q;
@@ -1343,8 +1361,11 @@ bool CCryPak::OpenPacksCommon(const char* szDir, char *cWork, unsigned nFlags)
 		std::vector<string> files;
 		do {
 			strcpy (pDestName, fd.name);
-			std::string sfile = strlwr(cWork);
-			files.push_back(strlwr(cWork));
+			std::string sfile = cWork;
+#if !(defined(__APPLE__) && defined(__MACH__))
+			std::transform(sfile.begin(), sfile.end(), sfile.begin(), ::tolower);
+#endif
+			files.push_back(sfile);
 		}
 		while(0 == _findnext64 (h, &fd));
 

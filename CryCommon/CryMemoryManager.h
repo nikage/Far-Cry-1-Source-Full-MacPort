@@ -354,15 +354,7 @@ inline void free(void *p) { _CryFree(p); };
 #define realloc_size		CryModuleReallocSize
 #define free_size			CryModuleFreeSize
 
-#ifdef __cplusplus
-	// Do NOT override operator new/delete on macOS - causes heap corruption with libc++ std::string
-	#if !defined(__APPLE__) && !defined(GAMECUBE)
-		inline void * __cdecl operator new   (size_t  size) { return CryModuleMalloc(size); } 
-		inline void * __cdecl operator new[](size_t size) { return CryModuleMalloc(size); }; 
-		inline void __cdecl operator delete  (void *p) { CryModuleFree(p); };
-		inline void __cdecl operator delete[](void *p) { CryModuleFree(p); };
-	#endif //!__APPLE__ && !GAMECUBE
-#endif //__cplusplus
+
 
 #endif // USE_NEWPOOL
 

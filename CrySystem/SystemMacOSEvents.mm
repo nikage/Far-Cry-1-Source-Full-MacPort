@@ -11,28 +11,28 @@
 static bool s_firstCall = true;
 
 extern "C" void ProcessMacOSEvents() {
-    NSLog(@"ProcessMacOSEvents: ENTRY");
+//     NSLog(@"ProcessMacOSEvents: ENTRY");
     
     if (!NSApp) {
-        NSLog(@"ProcessMacOSEvents: NSApp is nil, returning");
+        // NSLog(@"ProcessMacOSEvents: NSApp is nil, returning");
         return;
     }
     
-    NSLog(@"ProcessMacOSEvents: NSApp is valid");
+    // NSLog(@"ProcessMacOSEvents: NSApp is valid");
     
     @autoreleasepool {
         if (s_firstCall) {
-            NSLog(@"ProcessMacOSEvents: First call - event loop is running");
+            // NSLog(@"ProcessMacOSEvents: First call - event loop is running");
             s_firstCall = false;
         }
         
-        NSLog(@"ProcessMacOSEvents: About to start event loop");
+        // NSLog(@"ProcessMacOSEvents: About to start event loop");
         
         NSEvent *event;
         int eventCount = 0;
         const int MAX_EVENTS_PER_FRAME = 100;
         
-        NSLog(@"ProcessMacOSEvents: About to call nextEventMatchingMask");
+        // NSLog(@"ProcessMacOSEvents: About to call nextEventMatchingMask");
         
         while (eventCount < MAX_EVENTS_PER_FRAME && 
                (event = [NSApp nextEventMatchingMask:NSEventMaskAny
@@ -40,33 +40,33 @@ extern "C" void ProcessMacOSEvents() {
                                               inMode:NSDefaultRunLoopMode
                                              dequeue:YES]))
         {
-            NSLog(@"ProcessMacOSEvents: Got event #%d", eventCount);
+            // NSLog(@"ProcessMacOSEvents: Got event #%d", eventCount);
             @try {
                 [NSApp sendEvent:event];
-                NSLog(@"ProcessMacOSEvents: sendEvent completed for event #%d", eventCount);
+                // NSLog(@"ProcessMacOSEvents: sendEvent completed for event #%d", eventCount);
                 [NSApp updateWindows];
-                NSLog(@"ProcessMacOSEvents: updateWindows completed for event #%d", eventCount);
+                // NSLog(@"ProcessMacOSEvents: updateWindows completed for event #%d", eventCount);
                 eventCount++;
             }
             @catch (NSException *exception) {
-                NSLog(@"ProcessMacOSEvents: Exception processing event: %@", exception);
+                // NSLog(@"ProcessMacOSEvents: Exception processing event: %@", exception);
                 break;
             }
         }
         
-        NSLog(@"ProcessMacOSEvents: Event loop completed, processed %d events", eventCount);
+        // NSLog(@"ProcessMacOSEvents: Event loop completed, processed %d events", eventCount);
         
         static int callCount = 0;
         static int totalEvents = 0;
         totalEvents += eventCount;
         
         if (++callCount % 500 == 0) {
-            NSLog(@"ProcessMacOSEvents: Called %d times (avg %.2f events/frame)", 
+            // NSLog(@"ProcessMacOSEvents: Called %d times (avg %.2f events/frame)",
                   callCount, (double)totalEvents / callCount);
         }
     }
     
-    NSLog(@"ProcessMacOSEvents: EXIT");
+    // NSLog(@"ProcessMacOSEvents: EXIT");
 }
 
 #endif
