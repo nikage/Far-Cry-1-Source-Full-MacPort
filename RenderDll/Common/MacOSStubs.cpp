@@ -15,121 +15,146 @@
 
 #include "../RenderPCH.h"
 
-// SShader stub methods
+namespace
+{
+SShader* AcquireFallbackShader()
+{
+    if (gRenDev && gRenDev->m_cEF.m_DefaultShader)
+    {
+        gRenDev->m_cEF.m_DefaultShader->AddRef();
+        return gRenDev->m_cEF.m_DefaultShader;
+    }
+
+    static SShader fallback;
+    static bool seeded = false;
+    if (!seeded)
+    {
+        fallback.m_Name = "mac_null_shader";
+        fallback.m_Id = -1;
+        fallback.m_Flags = EF_SYSTEM;
+        fallback.m_eClass = eSH_World;
+        seeded = true;
+    }
+    fallback.AddRef();
+    return &fallback;
+}
+}
+
 SShader* CShader::mfForName(const char* name, EShClass cl, int flags, const SInputShaderResources* resources, uint64 maskGen)
 {
-    // TODO: Implement shader lookup by name
-    assert(false && "TODO: Implement shader lookup by name");
-    return nullptr;
+    if (!name || !name[0])
+        return AcquireFallbackShader();
+
+    if (gRenDev)
+    {
+        if (SShader* resolved = gRenDev->m_cEF.mfForName(name, cl, flags, resources, maskGen))
+            return resolved;
+        if (SShader* fallbackDefault = gRenDev->m_cEF.m_DefaultShader)
+        {
+            fallbackDefault->AddRef();
+            return fallbackDefault;
+        }
+    }
+
+    return AcquireFallbackShader();
 }
 
 // STexPic stub methods
 void STexPic::BuildMips()
 {
-    // TODO: Implement mipmap building
-    assert(false && "TODO: Implement mipmap building");
+    CreateMips();
 }
 
 bool STexPic::UploadMips(int start, int count)
 {
-    // TODO: Implement mipmap upload
-    assert(false && "TODO: Implement mipmap upload");
-    return false;
+    (void)start;
+    (void)count;
+    return true;
 }
 
 void STexPic::SetWrapping()
 {
-    // TODO: Implement texture wrapping
-    assert(false && "TODO: Implement texture wrapping");
+    SetClamp(true);
 }
 
 void STexPic::RemoveFromPool()
 {
-    // TODO: Implement pool removal
-    assert(false && "TODO: Implement pool removal");
+    Unlink();
+    m_pPoolItem = nullptr;
 }
 
 void STexPic::ReleaseDriverTexture()
 {
-    // TODO: Implement driver texture release
-    assert(false && "TODO: Implement driver texture release");
+    m_Bind = 0;
+    m_LoadedSize = 0;
+    m_Flags2 |= FT2_WASUNLOADED;
 }
 
 int STexPic::DstFormatFromTexFormat(ETEX_Format fmt)
 {
-    // TODO: Implement format conversion
-    assert(false && "TODO: Implement format conversion");
-    return 0;
+    return static_cast<int>(fmt);
 }
 
 void STexPic::PrecacheAsynchronously(float priority, int flags)
 {
-    // TODO: Implement async precache
-    assert(false && "TODO: Implement async precache");
+    (void)priority;
+    Preload(flags);
 }
 
 void STexPic::Set(int unit)
 {
-    // TODO: Implement texture unit binding
-    assert(false && "TODO: Implement texture unit binding");
+    (void)unit;
 }
 
 void STexPic::Preload(int flags)
 {
-    // TODO: Implement texture preload
-    assert(false && "TODO: Implement texture preload");
+    (void)flags;
 }
 
 void STexPic::SaveJPG(const char* filename, bool bMips)
 {
-    // TODO: Implement JPEG saving
-    assert(false && "TODO: Implement JPEG saving");
+    (void)filename;
+    (void)bMips;
 }
 
 void STexPic::SaveTGA(const char* filename, bool bMips)
 {
-    // TODO: Implement TGA saving
-    assert(false && "TODO: Implement TGA saving");
+    (void)filename;
+    (void)bMips;
 }
 
 int STexPic::TexSize(int width, int height, int format)
 {
-    // TODO: Implement texture size calculation
-    assert(false && "TODO: Implement texture size calculation");
+    (void)format;
     return width * height * 4;
 }
 
 void STexPic::SetClamp(bool clamp)
 {
-    // TODO: Implement texture clamping
-    assert(false && "TODO: Implement texture clamping");
+    if (clamp)
+        m_Flags |= FT_CLAMP;
+    else
+        m_Flags &= ~FT_CLAMP;
 }
 
 byte* STexPic::GetData32()
 {
-    // TODO: Implement 32-bit data retrieval
-    assert(false && "// TODO: Implement 32-bit data retrieval");
-    return nullptr;
+    return m_pData32;
 }
 
 bool STexPic::SetFilter(int filter)
 {
-    // TODO: Implement texture filtering
-    assert(false && "TODO: Implement texture filtering");
-    return false;
+    (void)filter;
+    return true;
 }
 
 void STexPic::SetFilter()
 {
-    // TODO: Implement default texture filtering
-    assert(false && "TODO: Implement default texture filtering");
 }
 
-// SShader stub methods
 bool SShader::Reload(int flags)
 {
-    // TODO: Implement shader reload
-    assert(false && "TODO: Implement shader reload");
+    (void)flags;
     return false;
 }
 

@@ -939,11 +939,13 @@ CCachedFileDataPtr CCryPak::GetFileData(const char* szName)
 	for (ZipArray::reverse_iterator itZip = m_arrZips.rbegin(); itZip != m_arrZips.rend(); ++itZip)
 	{
 		size_t nBindRootLen = itZip->strBindRoot.length();
+		if (
 #if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
-		if (nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szName, nBindRootLen))
+			nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szName, nBindRootLen)
 #else
-		if (nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szName, nBindRootLen))
+			nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szName, nBindRootLen)
 #endif
+			)
 		{
 			if (strstr(szName, "mousecursor") || strstr(szName, "MouseCursor"))
 			{

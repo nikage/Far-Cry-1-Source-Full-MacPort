@@ -112,6 +112,45 @@ target_compile_definitions(XRenderMetal PRIVATE
     XRENDERMETAL_EXPORTS=1
 )
 
+find_program(DART_EXECUTABLE dart)
+set(GENERATED_METAL_METALLIB "")
+if(DART_EXECUTABLE)
+    set(SHADER_PORT_ROOT ${CMAKE_SOURCE_DIR})
+    set(SHADER_PARSER ${SHADER_PORT_ROOT}/tools/shader_port/lib/parser.dart)
+    set(SHADER_METAL_GENERATOR ${SHADER_PORT_ROOT}/tools/shader_port/lib/metal_generator.dart)
+    set(GENERATED_STAMP ${CMAKE_CURRENT_BINARY_DIR}/generated_shaders.stamp)
+
+    add_custom_command(
+        OUTPUT ${GENERATED_STAMP}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/Generated
+        COMMAND ${DART_EXECUTABLE} ${SHADER_PARSER} ${SHADER_PORT_ROOT}
+        COMMAND ${DART_EXECUTABLE} ${SHADER_METAL_GENERATOR} ${SHADER_PORT_ROOT}
+        COMMAND ${CMAKE_COMMAND} -E touch ${GENERATED_STAMP}
+        DEPENDS ${SHADER_PARSER} ${SHADER_METAL_GENERATOR}
+        WORKING_DIRECTORY ${SHADER_PORT_ROOT}
+        COMMENT "Generating Metal shader sources from Cry scripts"
+        VERBATIM
+    )
+
+    add_custom_target(GenerateMetalShaderSources ALL DEPENDS ${GENERATED_STAMP})
+
+    set(GENERATED_METAL_METALLIB ${CMAKE_CURRENT_BINARY_DIR}/GeneratedShaders.metallib)
+    set(GENERATED_AIR_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated_air)
+    set(METAL_BUILD_SCRIPT ${SHADER_PORT_ROOT}/tools/shader_port/lib/build_metal.dart)
+    add_custom_command(
+        OUTPUT ${GENERATED_METAL_METALLIB}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_AIR_DIR}
+        COMMAND ${DART_EXECUTABLE} ${METAL_BUILD_SCRIPT} ${SHADER_PORT_ROOT} ${CMAKE_CURRENT_SOURCE_DIR}/Generated ${GENERATED_AIR_DIR} ${GENERATED_METAL_METALLIB}
+        DEPENDS ${GENERATED_STAMP} ${METAL_BUILD_SCRIPT}
+        COMMENT "Compiling generated Metal shaders"
+        VERBATIM
+    )
+    add_custom_target(GeneratedMetalShaders ALL DEPENDS ${GENERATED_METAL_METALLIB})
+    add_dependencies(GeneratedMetalShaders GenerateMetalShaderSources)
+else()
+    message(WARNING "Dart executable not found; skipping generated Metal shader integration")
+endif()
+
 # Compile Metal shaders at build time  
 # Note: Do NOT pass C++ include paths to Metal compiler
 add_custom_command(
@@ -137,6 +176,10 @@ add_custom_target(MetalShaders ALL
             ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
 )
 
+if(GENERATED_METAL_METALLIB)
+    add_dependencies(MetalShaders GeneratedMetalShaders)
+endif()
+
 add_dependencies(XRenderMetal MetalShaders)
 
 # Install target
@@ -150,4 +193,11 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
               ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
     DESTINATION lib
 )
+
+if(GENERATED_METAL_METALLIB)
+install(FILES ${GENERATED_METAL_METALLIB}
+              ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
+    DESTINATION lib
+)
+endif()
 

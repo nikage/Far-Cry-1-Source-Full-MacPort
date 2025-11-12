@@ -73,6 +73,124 @@ static std::string NormalizeShaderName(const char* name)
     return std::string(normalized);
 }
 
+void CMetalShaderManager::InitializeShaderFallbacks()
+{
+    if (iLog)
+        iLog->Log("MetalShaderManager: InitializeShaderFallbacks begin\n");
+    struct AliasEntry { const char* alias; const char* target; };
+    const AliasEntry entries[] = {
+        {"<Stencil>", "basic"},
+        {"BinocularDistortMask", "colortex"},
+        {"BumpSunGlow", "basic"},
+        {"ClearStencil", "basic"},
+        {"CryLight", "basic"},
+        {"Decal_2D_VP", "colortex"},
+        {"Decal_VP", "colortex"},
+        {"DecalCharacter", "colortex"},
+        {"Default", "basic"},
+        {"FarTreeSprites", "basic"},
+        {"FogLayer", "basic"},
+        {"FrontCull", "basic"},
+        {"GlowingMonkeyEyes", "basic"},
+        {"InfRedGal", "sky"},
+        {"NoZTestState", "basic"},
+        {"ObjectColor_VP", "colortex"},
+        {"OcclusionTest", "colortex"},
+        {"OutSpace", "sky"},
+        {"ParticleLight", "basic"},
+        {"RainMap", "basic"},
+        {"ScreenDistort", "colortex"},
+        {"ScreenProcess", "colortex"},
+        {"ScreenTexMap", "colortex"},
+        {"ShadowMapGen", "basic"},
+        {"SniperDistortMask", "colortex"},
+        {"StateNoCull", "basic"},
+        {"StencilState", "basic"},
+        {"StencilState_FrontCull", "basic"},
+        {"StencilState_Terrain", "terrain"},
+        {"StencilStateInv", "basic"},
+        {"TemplDecalAdd", "colortex"},
+        {"TerrainCaustics", "terrain"},
+        {"TerrainDetailLayers", "terrain"},
+        {"TerrainDetailObjects", "terrain"},
+        {"TerrainDetailTextureLayers", "terrain"},
+        {"TerrainLayer", "terrain"},
+        {"TerrainLightPass", "terrain"},
+        {"TerrainLowLOD", "terrain"},
+        {"TerrainParticles", "terrain"},
+        {"TerrainShadowPass", "terrain"},
+        {"TerrainVP", "terrain"},
+        {"TerrainWaterBottomSimple", "terrain"},
+        {"TerrainWater_FP", "terrain"},
+        {"TerrainWaterBeach", "terrain"},
+        {"TerrainWithDefaultDetailTexture", "terrain"},
+        {"TerrainWithFog", "terrain"},
+        {"WaterVolume", "terrain"},
+        {"ZBuffPassVP", "basic"},
+        {"ZTestGreaterState", "basic"},
+        {"terrainwater", "terrain"},
+        {"terrainwaterbottom", "terrain"},
+        {"default", "basic"}
+    };
+    for (const auto& entry : entries)
+        RegisterShaderAlias(entry.alias, entry.target);
+    if (iLog)
+        iLog->Log("MetalShaderManager: fallback alias count=%u, shader map size=%zu\n", static_cast<unsigned int>(sizeof(entries) / sizeof(entries[0])), m_shaderNameMap.size());
+}
+
+void CMetalShaderManager::RegisterShaderAlias(const char* alias, const char* target)
+{
+    if (!alias || !target)
+        return;
+    std::string normalizedAlias = NormalizeShaderName(alias);
+    std::string normalizedTarget = NormalizeShaderName(target);
+    if (normalizedAlias.empty() || normalizedTarget.empty())
+        return;
+    if (normalizedAlias == normalizedTarget)
+        return;
+    auto targetIt = m_shaderNameMap.find(normalizedTarget);
+    if (targetIt == m_shaderNameMap.end())
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: alias skipped '%s' -> '%s' (target missing)\n", normalizedAlias.c_str(), normalizedTarget.c_str());
+        return;
+    }
+    m_shaderNameMap[normalizedAlias] = targetIt->second;
+    if (iLog)
+        iLog->Log("MetalShaderManager: alias '%s' -> '%s' (id=%d)\n", normalizedAlias.c_str(), normalizedTarget.c_str(), targetIt->second);
+}
+
+int CMetalShaderManager::ResolveFallbackShaderId(const std::string& normalizedName, EShClass shaderClass)
+{
+    auto pick = [&](const char* base) -> int
+    {
+        std::string baseKey = NormalizeShaderName(base);
+        auto it = m_shaderNameMap.find(baseKey);
+        if (it == m_shaderNameMap.end())
+            return 0;
+        return it->second;
+    };
+    if (normalizedName.empty())
+        return 0;
+    auto existing = m_shaderNameMap.find(normalizedName);
+    if (existing != m_shaderNameMap.end())
+        return existing->second;
+    if (normalizedName.find("terrain") != std::string::npos || normalizedName.find("water") != std::string::npos)
+        return pick("terrain");
+    if (normalizedName.find("sky") != std::string::npos || normalizedName.find("space") != std::string::npos || normalizedName.find("sun") != std::string::npos)
+        return pick("sky");
+    if (normalizedName.find("screen") != std::string::npos || normalizedName.find("decal") != std::string::npos || normalizedName.find("mask") != std::string::npos || normalizedName.find("state") != std::string::npos || normalizedName.find("stencil") != std::string::npos || normalizedName.find("occlusion") != std::string::npos)
+        return pick("colortex");
+    if (normalizedName.find("light") != std::string::npos || normalizedName.find("glow") != std::string::npos || normalizedName.find("flare") != std::string::npos)
+        return pick("basic");
+    if (shaderClass == eSH_Screen)
+        return pick("colortex");
+    if (shaderClass == eSH_World || shaderClass == eSH_Misc)
+        return pick("basic");
+    return pick("basic");
+}
+
+
 CMetalShader::CMetalShader(int shaderId, CMetalShaderManager* manager)
     : m_shaderId(shaderId)
     , m_manager(manager)
@@ -472,6 +590,9 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
         return nullptr;
     
     std::string normalizedName = NormalizeShaderName(name);
+    printf("MetalShaderManager::EF_LoadShader name='%s' normalized='%s' class=%d flags=%d mask=%llu\n", name, normalizedName.c_str(), (int)Class, flags, (unsigned long long)nMaskGen);
+    if (iLog)
+        iLog->Log("MetalShaderManager::EF_LoadShader name='%s' normalized='%s' class=%d flags=%d mask=%llu", name, normalizedName.c_str(), (int)Class, flags, (unsigned long long)nMaskGen);
     if (normalizedName.empty())
         return nullptr;
     
@@ -550,6 +671,47 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
         }
     }
     
+    int fallbackId = ResolveFallbackShaderId(normalizedName, Class);
+    printf("MetalShaderManager::EF_LoadShader fallbackId=%d for '%s'\n", fallbackId, normalizedName.c_str());
+    if (iLog)
+        iLog->Log("MetalShaderManager::EF_LoadShader fallbackId=%d for '%s'", fallbackId, normalizedName.c_str());
+    if (fallbackId > 0)
+    {
+        auto fallbackIt = m_shaders.find(fallbackId);
+        if (fallbackIt != m_shaders.end())
+        {
+            ShaderInfo& baseInfo = fallbackIt->second;
+            if (baseInfo.shaderWrapper)
+            {
+                int shaderId = AllocateShaderId();
+                ShaderInfo info = baseInfo;
+                info.name = lookupName;
+                info.shaderClass = Class;
+                info.nMaskGen = nMaskGen;
+                info.shaderWrapper = new CMetalShader(shaderId, this);
+                info.shaderWrapper->m_flags = baseInfo.shaderWrapper->m_flags;
+                info.shaderWrapper->m_flags2 = baseInfo.shaderWrapper->m_flags2;
+                info.shaderWrapper->m_flags3 = baseInfo.shaderWrapper->m_flags3;
+                info.shaderWrapper->m_sort = baseInfo.shaderWrapper->m_sort;
+                info.shaderWrapper->m_cull = baseInfo.shaderWrapper->m_cull;
+                info.shaderWrapper->m_renderFlags = baseInfo.shaderWrapper->m_renderFlags;
+                info.shaderWrapper->m_LMFlags = baseInfo.shaderWrapper->m_LMFlags;
+                m_shaders[shaderId] = info;
+                m_shaderNameMap[lookupName] = shaderId;
+                if (iLog)
+                    iLog->Log("MetalShaderManager: Fallback shader '%s' mapped to '%s'", lookupName.c_str(), baseInfo.name.c_str());
+                printf("MetalShaderManager::EF_LoadShader created fallback shaderId=%d from base='%s'\n", shaderId, baseInfo.name.c_str());
+                if (iLog)
+                    iLog->Log("MetalShaderManager::EF_LoadShader created fallback shaderId=%d from base='%s'", shaderId, baseInfo.name.c_str());
+                return info.shaderWrapper;
+            }
+        }
+    }
+    if (iLog)
+        iLog->Log("MetalShaderManager: Failed to load shader '%s'", lookupName.c_str());
+    printf("MetalShaderManager::EF_LoadShader FAILED for '%s'\n", lookupName.c_str());
+    if (iLog)
+        iLog->Log("MetalShaderManager::EF_LoadShader FAILED for '%s'", lookupName.c_str());
     return nullptr;
 }
 

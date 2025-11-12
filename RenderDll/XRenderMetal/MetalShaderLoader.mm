@@ -34,6 +34,7 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer,
     , m_currentPipelineState(nil)
     , m_globalShaderTemplateId(0)
     , m_heatVisionEnabled(false)
+    , m_generatedLibrary(nil)
 {
     assert(renderer != nullptr && "CMetalShaderManager: renderer cannot be null!");
     assert(textureManager != nullptr && "CMetalShaderManager: textureManager cannot be null!");
@@ -113,6 +114,15 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     iLog->Log("Shader library loaded successfully\n");
     
     CreateDefaultShaders(defaultLibrary);
+    LoadGeneratedShaders(defaultLibrary);
+    if (iLog)
+    {
+        for (const auto& kv : m_shaderNameMap)
+        {
+            iLog->Log("MetalShaderManager: base shader '%s' has id=%d\n", kv.first.c_str(), kv.second);
+        }
+    }
+    InitializeShaderFallbacks();
     
     return true;
 }
@@ -186,6 +196,158 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
     }
     
     iLog->Log("Default shaders created: %zu shaders\n", m_shaders.size());
+}
+
+void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
+{
+    if (!m_renderer || !m_renderer->m_device)
+        return;
+
+    NSError* error = nil;
+    id<MTLLibrary> generatedLibrary = nil;
+    NSBundle* bundle = [NSBundle mainBundle];
+    if (bundle)
+    {
+        NSString* resourcePath = [bundle pathForResource:@"GeneratedShaders" ofType:@"metallib"];
+        if (resourcePath)
+        {
+            generatedLibrary = [m_renderer->m_device newLibraryWithFile:resourcePath error:&error];
+        }
+    }
+
+    if (!generatedLibrary)
+    {
+        NSString* exePath = [[NSBundle mainBundle] executablePath];
+        NSString* exeDir = [exePath stringByDeletingLastPathComponent];
+        NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"GeneratedShaders.metallib"];
+        generatedLibrary = [m_renderer->m_device newLibraryWithFile:metallibPath error:&error];
+        if (!generatedLibrary)
+        {
+            NSString* sourcePath = [NSString stringWithUTF8String:"RenderDll/XRenderMetal/Generated/GeneratedShaders.metallib"];
+            generatedLibrary = [m_renderer->m_device newLibraryWithFile:sourcePath error:&error];
+        }
+    }
+
+    if (!generatedLibrary)
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: Generated shader library not found (%s)\n", error ? [[error localizedDescription] UTF8String] : "unknown error");
+        return;
+    }
+
+    m_generatedLibrary = generatedLibrary;
+
+    NSString* manifestPath = nil;
+    if (bundle)
+    {
+        manifestPath = [bundle pathForResource:@"generated_manifest" ofType:@"json"];
+    }
+    if (!manifestPath)
+    {
+        NSString* exePath = [[NSBundle mainBundle] executablePath];
+        NSString* exeDir = [exePath stringByDeletingLastPathComponent];
+        NSString* candidate = [exeDir stringByAppendingPathComponent:@"generated_manifest.json"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:candidate])
+            manifestPath = candidate;
+        else
+            manifestPath = [NSString stringWithUTF8String:"RenderDll/XRenderMetal/Generated/generated_manifest.json"];
+    }
+
+    NSData* manifestData = manifestPath ? [NSData dataWithContentsOfFile:manifestPath] : nil;
+    if (!manifestData)
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: Generated shader manifest not found");
+        return;
+    }
+
+    NSError* jsonError = nil;
+    id manifestJson = [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:&jsonError];
+    if (!manifestJson || ![manifestJson isKindOfClass:[NSArray class]])
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: Failed to parse generated shader manifest (%s)", jsonError ? [[jsonError localizedDescription] UTF8String] : "unknown error");
+        return;
+    }
+
+    NSArray* entries = (NSArray*)manifestJson;
+    for (NSDictionary* entry in entries)
+    {
+        if (![entry isKindOfClass:[NSDictionary class]])
+            continue;
+
+        NSString* shaderName = entry[@"shader"];
+        NSString* normalizedName = entry[@"normalized"];
+        NSString* fragmentName = entry[@"fragment"];
+        NSNumber* textureCountValue = entry[@"textureCount"];
+
+        if (!shaderName || !fragmentName)
+            continue;
+
+        std::string normalizedKey;
+        if (normalizedName && [normalizedName length] > 0)
+            normalizedKey = NormalizeShaderName([normalizedName UTF8String]);
+        else
+            normalizedKey = NormalizeShaderName([shaderName UTF8String]);
+
+        id<MTLFunction> fragmentFunction = [generatedLibrary newFunctionWithName:fragmentName];
+        if (!fragmentFunction)
+        {
+            if (iLog)
+                iLog->Log("MetalShaderManager: Missing generated fragment function '%s'\n", [fragmentName UTF8String]);
+            continue;
+        }
+
+        int textureCount = textureCountValue ? textureCountValue.intValue : 0;
+        NSString* vertexFunctionName = textureCount > 0 ? @"colortex_vertex" : @"color_vertex";
+        int vertexFormat = textureCount > 0 ? VERTEX_FORMAT_P3F_COL4UB_TEX2F : VERTEX_FORMAT_P3F_COL4UB;
+        id<MTLFunction> vertexFunction = nil;
+
+        if (vertexLibrary)
+        {
+            vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
+            if (!vertexFunction)
+                vertexFunction = [vertexLibrary newFunctionWithName:@"basic_vertex"];
+        }
+
+        if (!vertexFunction)
+        {
+            if (iLog)
+                iLog->Log("MetalShaderManager: Missing generated vertex function for shader '%s'\n", [shaderName UTF8String]);
+            continue;
+        }
+
+        MTLVertexDescriptor* descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
+        if (!descriptor)
+            continue;
+
+        id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor);
+        if (!pipelineState)
+            continue;
+
+        auto existing = m_shaderNameMap.find(normalizedKey);
+        if (existing != m_shaderNameMap.end())
+        {
+            ReleaseShaderId(existing->second);
+        }
+
+        int shaderId = AllocateShaderId();
+        ShaderInfo info;
+        info.vertexFunction = vertexFunction;
+        info.fragmentFunction = fragmentFunction;
+        info.pipelineState = pipelineState;
+        info.name = normalizedKey;
+        info.shaderClass = eSH_Misc;
+        info.isLoaded = true;
+        info.nMaskGen = 0;
+        info.shaderWrapper = new CMetalShader(shaderId, this);
+
+        m_shaders[shaderId] = info;
+        m_shaderNameMap[normalizedKey] = shaderId;
+
+        if (iLog)
+            iLog->Log("MetalShaderManager: Registered generated shader '%s' (id=%d)\n", [shaderName UTF8String], shaderId);
+    }
 }
 
 id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions(

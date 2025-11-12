@@ -200,6 +200,7 @@ protected:
     // Metal-specific shader management
     bool InitializeDefaultShaderLibrary();
     void CreateDefaultShaders(id<MTLLibrary> library);
+    void LoadGeneratedShaders(id<MTLLibrary> vertexLibrary);
     id<MTLFunction> LoadMetalShader(const char* name, const char* source);
     id<MTLRenderPipelineState> CreatePipelineState(id<MTLFunction> vertexFunction, 
                                                    id<MTLFunction> fragmentFunction,
@@ -242,6 +243,7 @@ protected:
     // Reference to base renderer and texture manager
     CMetalBaseRenderer* m_renderer;
     CMetalTextureManager* m_textureManager;
+    id<MTLLibrary> m_generatedLibrary;
     
     // Internal methods
     int AllocateShaderId();
@@ -250,6 +252,9 @@ protected:
     bool CompileShader(const std::string& source, id<MTLFunction>& function);
     void SetShaderParameters(id<MTLRenderCommandEncoder> encoder, IShader* shader);
     void BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader);
+    void InitializeShaderFallbacks();
+    void RegisterShaderAlias(const char* alias, const char* target);
+    int ResolveFallbackShaderId(const std::string& normalizedName, EShClass shaderClass);
 };
 
 #endif // __APPLE__ && __MACH__
