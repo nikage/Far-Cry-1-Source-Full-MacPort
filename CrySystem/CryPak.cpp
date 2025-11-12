@@ -16,6 +16,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <stdio.h>
+#include <strings.h>
 #include <algorithm>
 #include <cctype>
 #include "CryPak.h"
@@ -142,7 +144,32 @@ normalize_path:
 			*p=g_cNativeSlash;
 			*++p = '\0';
 		}
+#if defined(__APPLE__) && defined(__MACH__)
+		char basePath[sizeof(szCurrentDir)];
+		strncpy(basePath, szCurrentDir, sizeof(basePath) - 1);
+		basePath[sizeof(basePath) - 1] = '\0';
+		size_t baseLen = strlen(basePath);
+		if (baseLen && (basePath[baseLen - 1] == '/' || basePath[baseLen - 1] == '\\'))
+		{
+			basePath[baseLen - 1] = '\0';
+			baseLen--;
+		}
+		char fcDataPath[sizeof(szCurrentDir)];
+		if (snprintf(fcDataPath, sizeof(fcDataPath), "%s/FCData/", basePath) < (int)sizeof(fcDataPath))
+		{
+			struct stat stFCData;
+			if (stat(fcDataPath, &stFCData) == 0 && S_ISDIR(stFCData.st_mode))
+			{
+				strncpy(szCurrentDir, fcDataPath, sizeof(szCurrentDir) - 1);
+				szCurrentDir[sizeof(szCurrentDir) - 1] = '\0';
+			}
+		}
+#endif
 		m_strMasterCDRoot = szCurrentDir;
+#if defined(__APPLE__) && defined(__MACH__)
+		if (m_pLog)
+			m_pLog->Log("CCryPak::CCryPak - Master root resolved to %s", m_strMasterCDRoot.c_str());
+#endif
 	}
 }
 
@@ -360,8 +387,23 @@ static bool ResolveRelativePath(const char* relativePath, const std::string& mas
 		rootLen++;
 	}
 	
+	const char* relPtr = relativePath ? relativePath : "";
+#if defined(__APPLE__) && defined(__MACH__)
+	const char fcPrefix[] = "FCData/";
+	const size_t fcLen = sizeof(fcPrefix) - 1;
+	if (!masterRoot.empty())
+	{
+		size_t rootLen = masterRoot.length();
+		if (rootLen >= fcLen && strncasecmp(masterRoot.c_str() + rootLen - fcLen, fcPrefix, fcLen) == 0)
+		{
+			if (strncasecmp(relPtr, fcPrefix, fcLen) == 0)
+				relPtr += fcLen;
+		}
+	}
+#endif
+
 	// Append relative path
-	size_t totalLen = SafeStringCat(fullPath, fullPathSize, relativePath);
+	size_t totalLen = SafeStringCat(fullPath, fullPathSize, relPtr);
 	return (totalLen < fullPathSize - 1); // Success if we didn't truncate
 }
 
@@ -1344,6 +1386,10 @@ bool CCryPak::OpenPacks(const char* szBindRoot, const char *pWildcardIn, unsigne
 bool CCryPak::OpenPacksCommon(const char* szDir, char *cWork, unsigned nFlags)
 {
 	__finddata64_t fd;
+#if defined(__APPLE__) && defined(__MACH__)
+	if (m_pLog)
+		m_pLog->Log("OpenPacksCommon: szDir='%s' pattern='%s'", szDir, cWork);
+#endif
 	intptr_t h = _findfirst64 (cWork, &fd);
 
 	// where to copy the filenames to form the path in cWork
@@ -1371,6 +1417,10 @@ bool CCryPak::OpenPacksCommon(const char* szDir, char *cWork, unsigned nFlags)
 
 		// Open files in alphabet order.
 		std::sort( files.begin(),files.end() );
+#if defined(__APPLE__) && defined(__MACH__)
+		if (m_pLog)
+			m_pLog->Log("OpenPacksCommon: %zu entries matched for %s", files.size(), szDir);
+#endif
 		for (int i = 0; i < files.size(); i++)
 		{
 			OpenPackCommon(szDir, files[i].c_str(), nFlags);

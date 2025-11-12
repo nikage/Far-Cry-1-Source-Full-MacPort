@@ -49,7 +49,7 @@ extern "C" void ProcessMacOSEvents() {
                 eventCount++;
             }
             @catch (NSException *exception) {
-                // NSLog(@"ProcessMacOSEvents: Exception processing event: %@", exception);
+                NSLog(@"ProcessMacOSEvents: Exception processing event: %@", exception);
                 break;
             }
         }
@@ -59,11 +59,7 @@ extern "C" void ProcessMacOSEvents() {
         static int callCount = 0;
         static int totalEvents = 0;
         totalEvents += eventCount;
-        
-        if (++callCount % 500 == 0) {
-            // NSLog(@"ProcessMacOSEvents: Called %d times (avg %.2f events/frame)",
-                  callCount, (double)totalEvents / callCount);
-        }
+        ++callCount;
     }
     
     // NSLog(@"ProcessMacOSEvents: EXIT");

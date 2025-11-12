@@ -38,9 +38,12 @@
 #include <pthread.h>
 #include <stdlib.h>  // for malloc/free on macOS
 #include <mach/mach_time.h>
+#include <dirent.h>
+#include <fnmatch.h>
+#include <string.h>
+#include <limits.h>
 #include <mach/mach.h>
 #include <mach-o/dyld.h>  // for _NSGetExecutablePath
-#include <string.h>       // for string functions
 #include <stdio.h>        // for FILE type
 #include <dlfcn.h>        // for dlopen/dlsym
 #include <fcntl.h>        // for O_* file flags
@@ -571,18 +574,124 @@ struct _finddata_t {
 #endif
 
 // Windows file search functions
+typedef struct FindHandle64 {
+    DIR* dir;
+    char directory[PATH_MAX];
+    char pattern[PATH_MAX];
+} FindHandle64;
+
+inline bool FillFindData64(FindHandle64* state, struct __finddata64_t* fileinfo) {
+    if (!state || !state->dir || !fileinfo)
+        return false;
+
+    struct dirent* entry = NULL;
+    while ((entry = readdir(state->dir)) != NULL) {
+        const char* name = entry->d_name;
+        if (!name || name[0] == '\0')
+            continue;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+            continue;
+        if (fnmatch(state->pattern, name, FNM_CASEFOLD) != 0)
+            continue;
+
+        char fullPath[PATH_MAX * 2];
+        size_t len = strlen(state->directory);
+        strncpy(fullPath, state->directory, sizeof(fullPath) - 1);
+        fullPath[sizeof(fullPath) - 1] = '\0';
+        if (len > 0 && state->directory[len - 1] != '/')
+            strncat(fullPath, "/", sizeof(fullPath) - strlen(fullPath) - 1);
+        strncat(fullPath, name, sizeof(fullPath) - strlen(fullPath) - 1);
+
+        struct stat st;
+        if (stat(fullPath, &st) != 0)
+            continue;
+
+        memset(fileinfo, 0, sizeof(*fileinfo));
+        fileinfo->attrib = S_ISDIR(st.st_mode) ? _A_SUBDIR : 0;
+        fileinfo->time_create = (int64_t)st.st_ctimespec.tv_sec;
+        fileinfo->time_access = (int64_t)st.st_atimespec.tv_sec;
+        fileinfo->time_write = (int64_t)st.st_mtimespec.tv_sec;
+        fileinfo->size = (int64_t)st.st_size;
+        strncpy(fileinfo->name, name, sizeof(fileinfo->name) - 1);
+        fileinfo->name[sizeof(fileinfo->name) - 1] = '\0';
+        return true;
+    }
+
+    return false;
+}
+
 inline intptr_t _findfirst64(const char* filespec, struct __finddata64_t* fileinfo) {
-    // Simplified implementation using opendir/readdir
-    // This is complex to implement properly, return error for now
-    return -1;
+    if (!filespec || !fileinfo)
+        return -1;
+
+    char directory[PATH_MAX];
+    char pattern[PATH_MAX];
+    const char* sep = strrchr(filespec, '/');
+    const char* sepAlt = strrchr(filespec, '\\');
+    if (!sep || (sepAlt && sepAlt > sep))
+        sep = sepAlt;
+
+    if (!sep) {
+        strcpy(directory, ".");
+        strncpy(pattern, filespec, sizeof(pattern) - 1);
+        pattern[sizeof(pattern) - 1] = '\0';
+    } else {
+        size_t dirLen = (size_t)(sep - filespec);
+        if (dirLen >= sizeof(directory))
+            dirLen = sizeof(directory) - 1;
+        memcpy(directory, filespec, dirLen);
+        directory[dirLen] = '\0';
+        strncpy(pattern, sep + 1, sizeof(pattern) - 1);
+        pattern[sizeof(pattern) - 1] = '\0';
+        if (directory[0] == '\0')
+            strcpy(directory, ".");
+    }
+
+    DIR* dir = opendir(directory);
+    if (!dir)
+        return -1;
+
+    FindHandle64* state = (FindHandle64*)malloc(sizeof(FindHandle64));
+    if (!state) {
+        closedir(dir);
+        return -1;
+    }
+    state->dir = dir;
+    strncpy(state->directory, directory, sizeof(state->directory) - 1);
+    state->directory[sizeof(state->directory) - 1] = '\0';
+    if (pattern[0] == '\0')
+        strcpy(state->pattern, "*");
+    else {
+        strncpy(state->pattern, pattern, sizeof(state->pattern) - 1);
+        state->pattern[sizeof(state->pattern) - 1] = '\0';
+    }
+
+    if (!FillFindData64(state, fileinfo)) {
+        closedir(state->dir);
+        free(state);
+        return -1;
+    }
+
+    return (intptr_t)state;
 }
 
 inline int _findnext64(intptr_t handle, struct __finddata64_t* fileinfo) {
-    return -1;  // Not found
+    FindHandle64* state = (FindHandle64*)handle;
+    if (!state || !fileinfo)
+        return -1;
+    if (!FillFindData64(state, fileinfo))
+        return -1;
+    return 0;
 }
 
 inline int _findclose(intptr_t handle) {
-    return 0;   // Success
+    FindHandle64* state = (FindHandle64*)handle;
+    if (!state)
+        return -1;
+    if (state->dir)
+        closedir(state->dir);
+    free(state);
+    return 0;
 }
 
 // Windows overlapped I/O structures
