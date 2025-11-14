@@ -96,28 +96,53 @@ void main(List<String> rawArgs) {
 
   final String? d3d9CommandTemplate = options['d3d9-cmd'];
   final String? metalCommandTemplate = options['metal-cmd'];
+  final String? baselinePath = options['baseline-dir'];
+  final bool updateBaseline = options.containsKey('update-baseline');
+
+  Directory? baselineDir;
+  if (baselinePath != null) {
+    baselineDir = Directory(baselinePath);
+    baselineDir.createSync(recursive: true);
+  }
+  if (updateBaseline && baselineDir == null) {
+    stderr.writeln('--update-baseline requires --baseline-dir');
+    exit(64);
+  }
 
   final List<ScenarioResult> results = <ScenarioResult>[];
 
   for (final Scenario scenario in scenarios) {
     final File d3d9Output = File('${d3d9Dir.path}${sep}${scenario.filename}');
     final File metalOutput = File('${metalDir.path}${sep}${scenario.filename}');
+    final File? baselineOutput =
+        baselineDir != null ? File('${baselineDir.path}${sep}${scenario.filename}') : null;
 
     if (d3d9CommandTemplate != null) {
       _runCaptureCommand(d3d9CommandTemplate, scenario, d3d9Output, root);
+    }
+    File? referenceOutput;
+    if (d3d9CommandTemplate != null) {
+      referenceOutput = d3d9Output;
+    } else if (baselineOutput != null) {
+      referenceOutput = baselineOutput;
     }
     if (metalCommandTemplate != null) {
       _runCaptureCommand(metalCommandTemplate, scenario, metalOutput, root);
     }
 
-    if (!d3d9Output.existsSync() && !metalOutput.existsSync()) {
+    if (referenceOutput == null) {
+      stderr.writeln('No reference output available for ${scenario.name}');
+      exit(1);
+    }
+
+    if (!referenceOutput.existsSync() && !metalOutput.existsSync()) {
       results.add(ScenarioResult(scenario, 'missing',
           'Both renderer outputs are missing for ${scenario.filename}'));
       continue;
     }
-    if (!d3d9Output.existsSync()) {
+    if (!referenceOutput.existsSync()) {
       results.add(ScenarioResult(scenario, 'missing',
-          'D3D9 output missing at ${d3d9Output.path}')); 
+          'Reference output missing at ${referenceOutput.path}'));
       continue;
     }
     if (!metalOutput.existsSync()) {
@@ -126,13 +151,18 @@ void main(List<String> rawArgs) {
       continue;
     }
 
-    final FileComparison comparison = _compareFiles(d3d9Output, metalOutput);
+    final FileComparison comparison = _compareFiles(referenceOutput, metalOutput);
     if (comparison.equal) {
       results.add(ScenarioResult(scenario, 'match',
           'Outputs match (${comparison.length} bytes)'));
     } else {
       results.add(ScenarioResult(scenario, 'diff',
           'Mismatch at byte ${comparison.firstDifference} (sizes ${comparison.length} vs ${comparison.otherLength})'));
+    }
+
+    if (updateBaseline && baselineOutput != null && metalOutput.existsSync()) {
+      baselineOutput.parent.createSync(recursive: true);
+      metalOutput.copySync(baselineOutput.path);
     }
   }
 
@@ -199,3 +229,4 @@ FileComparison _compareFiles(File a, File b) {
   }
   return FileComparison(true, bytesA.length, bytesB.length, -1);
 }
+

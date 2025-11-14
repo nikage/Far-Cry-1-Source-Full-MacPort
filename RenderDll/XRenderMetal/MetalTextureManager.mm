@@ -222,6 +222,10 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     , m_savedBlendSrc(0)
     , m_savedBlendDst(0)
 {
+    for (auto& tex : m_boundFragmentTextures)
+    {
+        tex = nil;
+    }
 }
 
 CMetalTextureManager::~CMetalTextureManager()
@@ -273,6 +277,10 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
                     break;
             }
             [m_renderer->m_renderEncoder setFragmentTexture:m_currentTexture atIndex:textureIndex];
+            if (textureIndex >= 0 && textureIndex < static_cast<int>(m_boundFragmentTextures.size()))
+            {
+                m_boundFragmentTextures[textureIndex] = m_currentTexture;
+            }
         }
     }
     else
@@ -280,6 +288,7 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
         if (m_whiteTexture && m_renderer && m_renderer->m_renderEncoder)
         {
             [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
+            m_boundFragmentTextures[0] = m_whiteTexture;
         }
     }
 }
@@ -310,7 +319,15 @@ void CMetalTextureManager::SetWhiteTexture()
     if (m_renderer && m_renderer->m_renderEncoder)
     {
         [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
+        m_boundFragmentTextures[0] = m_whiteTexture;
     }
+}
+
+id<MTLTexture> CMetalTextureManager::GetBoundFragmentTexture(int index) const
+{
+    if (index < 0 || index >= static_cast<int>(m_boundFragmentTextures.size()))
+        return nil;
+    return m_boundFragmentTextures[index];
 }
 
 ////////////////////////////////////////////////////////////////////////////

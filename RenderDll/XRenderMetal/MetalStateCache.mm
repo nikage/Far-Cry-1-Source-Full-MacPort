@@ -18,6 +18,16 @@
 #include "MetalRenderPCH.h"
 #include "MetalStateCache.m"
 #include <cstdio>
+#include <cstdint>
+
+namespace {
+enum PipelineBlendMode : uint32_t
+{
+    kBlendNone = 0,
+    kBlendAlpha = 1,
+    kBlendAdditive = 2
+};
+}
 
 CMetalStateCache::CMetalStateCache(id<MTLDevice> device)
     : m_device(device)
@@ -61,20 +71,31 @@ id<MTLRenderPipelineState> CMetalStateCache::GetOrCreatePipelineState(
     descriptor.colorAttachments[0].pixelFormat = key.colorPixelFormat;
     descriptor.depthAttachmentPixelFormat = key.depthPixelFormat;
     
-    uint32_t blendState = (key.renderStateHash >> 16) & 0xFFFF;
-    if (blendState & 0x1)
+    uint32_t blendMode = (key.renderStateHash >> 16) & 0xFF;
+    switch (blendMode)
     {
-        descriptor.colorAttachments[0].blendingEnabled = YES;
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-    }
-    else
-    {
-        descriptor.colorAttachments[0].blendingEnabled = NO;
+        case kBlendAdditive:
+            descriptor.colorAttachments[0].blendingEnabled = YES;
+            descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+            descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+            descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+            descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+            descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+            descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+            break;
+        case kBlendNone:
+            descriptor.colorAttachments[0].blendingEnabled = NO;
+            break;
+        case kBlendAlpha:
+        default:
+            descriptor.colorAttachments[0].blendingEnabled = YES;
+            descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+            descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+            descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+            descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+            descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+            descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+            break;
     }
     
     NSError* error = nil;

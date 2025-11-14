@@ -24,6 +24,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <array>
 #include <cassert>
 
 // Include CryEngine interfaces
@@ -76,6 +77,7 @@ public:
     // Texture Management Interface
     
     void SetTexture(int tnum, ETexType Type = eTT_Base);
+    id<MTLTexture> GetBoundFragmentTexture(int index) const;
     void SetWhiteTexture();
     id<MTLTexture> GetWhiteTexture() const { return m_whiteTexture; }
     
@@ -221,6 +223,7 @@ protected:
     int m_currentTextureSlot;
     id<MTLTexture> m_currentTexture;
     id<MTLTexture> m_whiteTexture;
+    std::array<id<MTLTexture>, 16> m_boundFragmentTextures;
     
     // Display gamma correction
     float m_gammaValue;      // Gamma delta value (added to base gamma)

@@ -23,6 +23,11 @@
 #include <Cocoa/Cocoa.h>
 #include <cassert>
 #include <iostream>
+#include <algorithm>
+#include <functional>
+#include <cctype>
+#include <cstdlib>
+#include <strings.h>
 
 
 // Render element implementations moved to MetalRenderElements.cpp to avoid duplicates
@@ -73,6 +78,153 @@ static std::string NormalizeShaderName(const char* name)
     return std::string(normalized);
 }
 
+namespace
+{
+const SShaderParam* FindShaderParam(const TArray<SShaderParam>& params, const std::string& name)
+{
+    if (name.empty())
+        return nullptr;
+    for (int i = 0; i < params.Num(); ++i)
+    {
+        const SShaderParam& param = params[i];
+        if (param.m_Name[0] == '\0')
+            continue;
+#if defined(__APPLE__)
+        if (strcasecmp(param.m_Name, name.c_str()) == 0)
+            return &param;
+#else
+        if (_stricmp(param.m_Name, name.c_str()) == 0)
+            return &param;
+#endif
+    }
+    return nullptr;
+}
+
+int FindShaderParamIndex(const TArray<SShaderParam>& params, const std::string& name)
+{
+    if (name.empty())
+        return -1;
+    for (int i = 0; i < params.Num(); ++i)
+    {
+        const SShaderParam& param = params[i];
+        if (param.m_Name[0] == '\0')
+            continue;
+#if defined(__APPLE__)
+        if (strcasecmp(param.m_Name, name.c_str()) == 0)
+            return i;
+#else
+        if (_stricmp(param.m_Name, name.c_str()) == 0)
+            return i;
+#endif
+    }
+    return -1;
+}
+
+void ConvertShaderParamToFloat4(const SShaderParam& param, float(&out)[4])
+{
+    switch (param.m_Type)
+    {
+    case eType_FLOAT:
+        out[0] = out[1] = out[2] = param.m_Value.m_Float;
+        out[3] = 1.0f;
+        break;
+    case eType_INT:
+    case eType_SHORT:
+        out[0] = out[1] = out[2] = static_cast<float>(param.m_Value.m_Int);
+        out[3] = 1.0f;
+        break;
+    case eType_BYTE:
+        out[0] = out[1] = out[2] = static_cast<float>(param.m_Value.m_Byte);
+        out[3] = 1.0f;
+        break;
+    case eType_BOOL:
+        out[0] = out[1] = out[2] = param.m_Value.m_Bool ? 1.0f : 0.0f;
+        out[3] = 1.0f;
+        break;
+    case eType_VECTOR:
+        out[0] = param.m_Value.m_Vector[0];
+        out[1] = param.m_Value.m_Vector[1];
+        out[2] = param.m_Value.m_Vector[2];
+        out[3] = 0.0f;
+        break;
+    case eType_FCOLOR:
+        out[0] = param.m_Value.m_Color[0];
+        out[1] = param.m_Value.m_Color[1];
+        out[2] = param.m_Value.m_Color[2];
+        out[3] = param.m_Value.m_Color[3];
+        break;
+    default:
+        out[0] = out[1] = out[2] = 0.0f;
+        out[3] = 1.0f;
+        break;
+    }
+}
+
+void FillDefaultUniform(const CMetalShaderManager::GeneratedUniformBinding& binding, float(&out)[4])
+{
+    out[0] = out[1] = out[2] = 0.0f;
+    out[3] = 1.0f;
+    std::string lowerType = binding.type;
+    std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lowerType.find("float4") != std::string::npos)
+    {
+        out[0] = out[1] = out[2] = out[3] = 1.0f;
+    }
+    else if (lowerType.find("float3") != std::string::npos)
+    {
+        out[0] = out[1] = out[2] = 1.0f;
+    }
+    else if (lowerType.find("float2") != std::string::npos)
+    {
+        out[0] = out[1] = 1.0f;
+    }
+    else if (lowerType.find("float") != std::string::npos)
+    {
+        out[0] = out[1] = out[2] = 0.0f;
+        out[3] = 1.0f;
+    }
+}
+
+int SemanticToTextureSlot(const std::string& semantic, size_t fallbackIndex)
+{
+    if (!semantic.empty())
+    {
+        std::string lower = semantic;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const std::string tag = "texunit";
+        const size_t pos = lower.find(tag);
+        if (pos != std::string::npos)
+        {
+            const char* digits = lower.c_str() + pos + tag.size();
+            int slot = std::atoi(digits);
+            if (slot >= 0)
+                return slot;
+        }
+    }
+    return static_cast<int>(fallbackIndex);
+}
+
+size_t CombineHash(size_t seed, size_t value)
+{
+    seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+    return seed;
+}
+
+size_t ComputePublicParamSignature(const TArray<SShaderParam>& params)
+{
+    size_t hash = static_cast<size_t>(params.Num());
+    std::hash<std::string> stringHasher;
+    for (int i = 0; i < params.Num(); ++i)
+    {
+        const SShaderParam& param = params[i];
+        if (param.m_Name[0] == '\0')
+            continue;
+        hash = CombineHash(hash, stringHasher(std::string(param.m_Name)));
+        hash = CombineHash(hash, static_cast<size_t>(param.m_Type));
+    }
+    return hash;
+}
+}
 void CMetalShaderManager::InitializeShaderFallbacks()
 {
     if (iLog)
@@ -596,12 +748,39 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
     if (normalizedName.empty())
         return nullptr;
     
+    auto baseEntryIt = m_shaderNameMap.find(normalizedName);
+    ShaderInfo* baseInfoPtr = nullptr;
+    if (baseEntryIt != m_shaderNameMap.end())
+    {
+        auto baseShaderIt = m_shaders.find(baseEntryIt->second);
+        if (baseShaderIt != m_shaders.end())
+        {
+            baseInfoPtr = &baseShaderIt->second;
+        }
+    }
+    
     std::string lookupName = normalizedName;
     if (nMaskGen != 0)
     {
         char nameWithMask[512];
         snprintf(nameWithMask, sizeof(nameWithMask), "%s(%llx)", normalizedName.c_str(), (unsigned long long)nMaskGen);
         lookupName = nameWithMask;
+        if (baseInfoPtr && !baseInfoPtr->maskReferences.empty())
+        {
+            uint64 validMask = baseInfoPtr->maskReferences.size() >= 64
+                ? ~0ULL
+                : ((1ULL << baseInfoPtr->maskReferences.size()) - 1ULL);
+            if ((nMaskGen & ~validMask) != 0)
+            {
+                if (iLog)
+                {
+                    iLog->Log("MetalShaderManager: Shader '%s' requested mask 0x%llx outside supported range 0x%llx",
+                              normalizedName.c_str(),
+                              (unsigned long long)nMaskGen,
+                              (unsigned long long)validMask);
+                }
+            }
+        }
     }
     
     auto nameIt = m_shaderNameMap.find(lookupName);
@@ -645,10 +824,9 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
         }
     }
     
-    auto defaultIt = m_shaderNameMap.find(normalizedName);
-    if (defaultIt != m_shaderNameMap.end())
+    if (baseEntryIt != m_shaderNameMap.end())
     {
-        auto shaderIt = m_shaders.find(defaultIt->second);
+        auto shaderIt = m_shaders.find(baseEntryIt->second);
         if (shaderIt != m_shaders.end())
         {
             ShaderInfo& baseInfo = shaderIt->second;
@@ -658,6 +836,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
             info.name = lookupName;
             info.nMaskGen = nMaskGen;
             info.shaderWrapper = new CMetalShader(shaderId, this);
+            ResetRuntimeBindingState(info);
             
             if (nMaskGen != 0 && baseInfo.shaderWrapper)
             {
@@ -696,6 +875,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
                 info.shaderWrapper->m_cull = baseInfo.shaderWrapper->m_cull;
                 info.shaderWrapper->m_renderFlags = baseInfo.shaderWrapper->m_renderFlags;
                 info.shaderWrapper->m_LMFlags = baseInfo.shaderWrapper->m_LMFlags;
+                ResetRuntimeBindingState(info);
                 m_shaders[shaderId] = info;
                 m_shaderNameMap[lookupName] = shaderId;
                 if (iLog)
@@ -1094,20 +1274,179 @@ bool CMetalShaderManager::CompileShader(const std::string& source, id<MTLFunctio
     return function != nil;
 }
 
+void CMetalShaderManager::ResetRuntimeBindingState(ShaderInfo& info)
+{
+    info.uniformRuntimeBindings.clear();
+    info.textureRuntimeBindings.clear();
+    info.runtimeBindingsPrepared = false;
+    info.publicParamSignature = 0;
+}
+
+void CMetalShaderManager::PrepareRuntimeBindings(CMetalShader* shader, ShaderInfo& info)
+{
+    if (!shader)
+        return;
+
+    TArray<SShaderParam>& params = shader->GetPublicParams();
+    ResetRuntimeBindingState(info);
+
+    for (const GeneratedUniformBinding& binding : info.uniformBindings)
+    {
+        int index = FindShaderParamIndex(params, binding.name);
+        if (index == -1 && !binding.semantic.empty())
+        {
+            index = FindShaderParamIndex(params, binding.semantic);
+        }
+        ShaderInfo::UniformRuntimeBinding runtimeBinding;
+        runtimeBinding.paramIndex = index;
+        runtimeBinding.binding = binding;
+        info.uniformRuntimeBindings.push_back(runtimeBinding);
+    }
+
+    int fallbackIndex = 0;
+    for (const GeneratedTextureBinding& binding : info.textureBindings)
+    {
+        ShaderInfo::TextureRuntimeBinding runtimeBinding;
+        runtimeBinding.slot = SemanticToTextureSlot(binding.semantic, fallbackIndex);
+        runtimeBinding.binding = binding;
+        info.textureRuntimeBindings.push_back(runtimeBinding);
+        fallbackIndex++;
+    }
+
+    info.runtimeBindingsPrepared = true;
+    info.publicParamSignature = ComputePublicParamSignature(params);
+}
+
 void CMetalShaderManager::SetShaderParameters(id<MTLRenderCommandEncoder> encoder, IShader* shader)
 {
     if (!encoder || !shader)
         return;
-        
-    // Set shader parameters
+
+    int shaderId = shader->GetID();
+    auto it = m_shaders.find(shaderId);
+    if (it == m_shaders.end())
+        return;
+
+    ShaderInfo& info = it->second;
+    CMetalShader* metalShader = static_cast<CMetalShader*>(shader);
+    TArray<SShaderParam>& shaderParams = shader->GetPublicParams();
+    if (metalShader)
+    {
+        size_t currentSignature = ComputePublicParamSignature(shaderParams);
+        if (!info.runtimeBindingsPrepared || info.publicParamSignature != currentSignature)
+        {
+            PrepareRuntimeBindings(metalShader, info);
+        }
+    }
+    const bool hasUniformBindings = !info.uniformRuntimeBindings.empty();
+
+    if (m_renderer)
+    {
+        if (info.pipelineState)
+            m_renderer->m_currentPipelineState = info.pipelineState;
+
+        if (info.cullMode == MTLCullModeNone)
+            m_renderer->SetCullMode(R_CULL_DISABLE);
+        else if (info.cullMode == MTLCullModeFront)
+            m_renderer->SetCullMode(R_CULL_FRONT);
+        else
+            m_renderer->SetCullMode(R_CULL_BACK);
+
+        m_renderer->SetDepthTest(info.depthTestEnabled);
+        m_renderer->SetDepthWrite(info.depthWriteEnabled);
+        m_renderer->SetDepthFunction(info.depthCompareFunction);
+
+        if (info.blendEnabled)
+        {
+            m_renderer->SetBlending(true);
+            m_renderer->SetBlendFactors(info.sourceBlendFactor, info.destinationBlendFactor, info.blendOperation);
+        }
+        else
+        {
+            m_renderer->SetBlending(false);
+        }
+
+        m_renderer->ApplyRenderState();
+    }
+
+    if (!hasUniformBindings)
+        return;
+
+    std::vector<float> uniformValues;
+    uniformValues.reserve(info.uniformRuntimeBindings.size() * 4);
+
+    for (const auto& runtimeBinding : info.uniformRuntimeBindings)
+    {
+        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+        if (runtimeBinding.paramIndex >= 0 && runtimeBinding.paramIndex < shaderParams.Num())
+        {
+            const SShaderParam& param = shaderParams[runtimeBinding.paramIndex];
+            ConvertShaderParamToFloat4(param, values);
+        }
+        else
+        {
+            FillDefaultUniform(runtimeBinding.binding, values);
+        }
+
+        uniformValues.insert(uniformValues.end(), values, values + 4);
+    }
+
+    if (!uniformValues.empty())
+    {
+        const NSUInteger length = uniformValues.size() * sizeof(float);
+        [encoder setFragmentBytes:uniformValues.data() length:length atIndex:2];
+        [encoder setVertexBytes:uniformValues.data() length:length atIndex:2];
+    }
 }
 
 void CMetalShaderManager::BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader)
 {
-    if (!encoder || !shader)
+    if (!encoder || !shader || !m_textureManager)
         return;
-        
-    // Bind shader textures
+
+    int shaderId = shader->GetID();
+    auto it = m_shaders.find(shaderId);
+    if (it == m_shaders.end())
+        return;
+
+    ShaderInfo& info = it->second;
+    if (info.textureBindings.empty())
+        return;
+
+    CMetalShader* metalShader = static_cast<CMetalShader*>(shader);
+    if (metalShader)
+    {
+        TArray<SShaderParam>& shaderParams = shader->GetPublicParams();
+        size_t currentSignature = ComputePublicParamSignature(shaderParams);
+        if (!info.runtimeBindingsPrepared || info.publicParamSignature != currentSignature)
+        {
+            PrepareRuntimeBindings(metalShader, info);
+        }
+    }
+
+    if (info.textureRuntimeBindings.empty())
+        return;
+
+    size_t bindingIndex = 0;
+    for (const auto& runtimeBinding : info.textureRuntimeBindings)
+    {
+        int slot = runtimeBinding.slot;
+        if (slot < 0)
+        {
+            ++bindingIndex;
+            continue;
+        }
+        id<MTLTexture> texture = m_textureManager->GetBoundFragmentTexture(slot);
+        if (!texture)
+        {
+            texture = m_textureManager->GetWhiteTexture();
+        }
+        if (texture)
+        {
+            [encoder setFragmentTexture:texture atIndex:slot];
+        }
+        ++bindingIndex;
+    }
 }
 
 #endif // __APPLE__ && __MACH__

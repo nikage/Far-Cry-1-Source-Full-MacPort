@@ -210,25 +210,20 @@ typedef struct tagRECT {
 #define FALSE 0
 #endif
 
-// Memory debugging function for debug builds (renamed to avoid Carbon conflict)
 #ifdef __cplusplus
-inline int CryIsHeapValid()
+inline int IsHeapValid()
 {
 #ifdef _DEBUG
-    // On macOS, we can use malloc_zone_check_all for heap validation
-    // For now, just return true - can be enhanced with actual validation
-    return true;
+    return 1;
 #else
-    return true;
+    return 1;
 #endif
 }
 
-// Windows heap validation function - commented out due to conflict with system headers
-// inline BOOL IsHeapValid()
-// {
-//     // Stub implementation - assume heap is always valid on macOS
-//     return TRUE;
-// }
+inline int CryIsHeapValid()
+{
+    return IsHeapValid();
+}
 
 inline BOOL IsBadReadPtr(const void* lp, size_t ucb)
 {

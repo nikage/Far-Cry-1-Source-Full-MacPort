@@ -35,6 +35,9 @@
 #include "LMSerializationManager2.h"
 
 #include "brush.h"
+#include <stdint.h>
+#include <string.h>
+#include <string>
 
 ISystem * Cry3DEngineBase::m_pSys=0;
 IRenderer * Cry3DEngineBase::m_pRenderer=0;
@@ -56,6 +59,66 @@ bool Cry3DEngineBase::m_bIgnoreFakeMaterialsInCGF = false;
 bool Cry3DEngineBase::m_bEditorMode = false;
 ESystemConfigSpec Cry3DEngineBase::m_configSpec = CONFIG_VERYHIGH_SPEC;
 ESystemConfigSpec Cry3DEngineBase::m_LightConfigSpec = CONFIG_VERYHIGH_SPEC;
+
+static IShader* LoadRendererShaderSafe(const char* shaderName)
+{
+	if (!Cry3DEngineBase::m_pRenderer)
+	{
+		if (Cry3DEngineBase::m_pLog)
+			Cry3DEngineBase::m_pLog->LogWarning("Renderer unavailable while loading shader '%s'", shaderName);
+		return 0;
+	}
+
+	IShader* shader = Cry3DEngineBase::m_pRenderer->EF_LoadShader(shaderName, eSH_World, EF_SYSTEM);
+	if (shader)
+		return shader;
+
+	if (Cry3DEngineBase::m_pLog)
+		Cry3DEngineBase::m_pLog->LogError("Failed to load shader '%s'", shaderName);
+
+	if (shaderName && shaderName[0] && strcmp(shaderName, "Default") != 0)
+	{
+		IShader* fallback = Cry3DEngineBase::m_pRenderer->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
+		if (fallback)
+		{
+			if (Cry3DEngineBase::m_pLog)
+				Cry3DEngineBase::m_pLog->LogWarning("Using fallback shader 'Default' instead of '%s'", shaderName);
+			return fallback;
+		}
+	}
+
+	return 0;
+}
+
+static ITexPic* LoadRendererTextureSafe(const char* label, const char** baseNames)
+{
+	if (!Cry3DEngineBase::m_pRenderer)
+	{
+		if (Cry3DEngineBase::m_pLog)
+			Cry3DEngineBase::m_pLog->LogWarning("Renderer unavailable while loading texture '%s'", label);
+		return 0;
+	}
+
+	static const char* kTextureExtensions[] = { ".dds", ".tga", ".bmp", 0 };
+
+	for (int baseIndex = 0; baseNames && baseNames[baseIndex]; ++baseIndex)
+	{
+		const char* base = baseNames[baseIndex];
+		for (int extIndex = 0; kTextureExtensions[extIndex]; ++extIndex)
+		{
+			std::string candidate = base;
+			candidate += kTextureExtensions[extIndex];
+
+			ITexPic* tex = Cry3DEngineBase::m_pRenderer->EF_LoadTexture(candidate.c_str(), 0, 0, eTT_Base);
+			if (tex)
+				return tex;
+		}
+	}
+
+	if (Cry3DEngineBase::m_pLog)
+		Cry3DEngineBase::m_pLog->LogWarning("Failed to load texture for %s", label);
+	return 0;
+}
 
 
 #define LAST_POTENTIALLY_VISIBLE_TIME 2
@@ -128,104 +191,32 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   m_pTerrainWaterShader = m_pSunRoadShader = 0;
 	m_nWaterBottomTexId=0;
 
-  printf("C3DEngine constructor: calling GetRenderer()->EF_LoadShader for CryLight\n");
-  if (m_pRenderer) {
-    m_pSHLensFlares = m_pRenderer->EF_LoadShader("CryLight", eSH_World, EF_SYSTEM);
-    if (m_pSHLensFlares)
-      printf("C3DEngine constructor: CryLight shader loaded\n");
-    else
-      assert(false && "CryLight");
-  } else {
-    printf("WARNING: GetRenderer() returned nullptr for CryLight shader!\n");
-    m_pSHLensFlares = nullptr;
-  }
+  m_pSHLensFlares = LoadRendererShaderSafe("CryLight");
   m_vSunPosition = Vec3d(0, -10000.0f, 10000.0f);
-  printf("C3DEngine constructor: calling GetRenderer()->EF_LoadShader for Default\n");
-  if (Cry3DEngineBase::m_pRenderer) {
-    m_pSHDefault = Cry3DEngineBase::m_pRenderer->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
-    if (m_pSHDefault)
-      printf("C3DEngine constructor: Default shader loaded\n");
-    else
-      assert(false && "Default");
-  } else {
-    printf("WARNING: GetRenderer() returned nullptr for Default shader!\n");
-    m_pSHDefault = nullptr;
-  }
+  m_pSHDefault = LoadRendererShaderSafe("Default");
 
-  printf("C3DEngine constructor: about to initialize terrain and texture loading\n");
   m_pTerrain=0;	
 	m_bEnabled=1;
 
-  printf("C3DEngine constructor: setting up texture IDs to 0 (skipping texture loading)\n");
   m_nStreamingIconTexID = 0;
   m_nBlackTexID = 0;
   m_nShadowSpotTexId = 0;
-  printf("C3DEngine constructor: texture loading phase skipped\n");
+  {
+    const char* streamingIconBases[] = { "Textures/diskette", "diskette", 0 };
+    ITexPic* streamingIcon = LoadRendererTextureSafe("streaming icon texture", streamingIconBases);
+    if (streamingIcon)
+      m_nStreamingIconTexID = streamingIcon->GetTextureID();
 
-  /* Temporarily disable texture loading to isolate the issue
-	auto logTextureProbe = [&](const char* path)
-	{
-		if (!path || !path[0] || !Cry3DEngineBase::m_pCryPak)
-			return false;
-		FILE* test = Cry3DEngineBase::m_pCryPak->FOpen(path, "rb", ICryPak::FOPEN_HINT_QUIET);
-		if (test)
-		{
-			Cry3DEngineBase::m_pCryPak->FClose(test);
-			if (Cry3DEngineBase::m_pLog)
-				Cry3DEngineBase::m_pLog->Log("C3DEngine constructor: verified texture path '%s' exists", path);
-			return true;
-		}
-		if (Cry3DEngineBase::m_pLog)
-			Cry3DEngineBase::m_pLog->Log("C3DEngine constructor: texture path '%s' missing", path);
-		return false;
-	};
+    const char* blackBases[] = { "Textures/common/black", "black", 0 };
+    ITexPic* blackTexture = LoadRendererTextureSafe("black texture", blackBases);
+    if (blackTexture)
+      m_nBlackTexID = blackTexture->GetTextureID();
 
-	auto loadTextureWithExtensions = [&](const char* label, const char* const* baseNames) -> ITexPic*
-	{
-		if (!Cry3DEngineBase::m_pRenderer)
-		{
-			printf("C3DEngine constructor: WARNING - renderer unavailable while loading %s\n", label);
-			return nullptr;
-		}
-
-		static const char* kTextureExtensions[] = { ".dds", ".tga", ".bmp", nullptr };
-		char candidate[ICryPak::g_nMaxPath];
-
-		for (const char* const* base = baseNames; base && *base; ++base)
-		{
-			for (const char* const* ext = kTextureExtensions; *ext; ++ext)
-			{
-				int written = snprintf(candidate, sizeof(candidate), "%s%s", *base, *ext);
-				if (written < 0 || written >= static_cast<int>(sizeof(candidate)))
-					continue;
-
-				logTextureProbe(candidate);
-				ITexPic* tex = Cry3DEngineBase::m_pRenderer->EF_LoadTexture(candidate, 0, 0, eTT_Base);
-				if (tex)
-				{
-					printf("C3DEngine constructor: loaded %s (ID=%d)\n", candidate, tex->GetTextureID());
-					return tex;
-				}
-			}
-		}
-
-		printf("C3DEngine constructor: WARNING - failed to load %s, using default ID 0\n", label);
-		return nullptr;
-	};
-
-	const char* streamingIconBases[] = { "Textures/diskette", "diskette", nullptr };
-	ITexPic* pPic = loadTextureWithExtensions("streaming icon texture", streamingIconBases);
-	m_nStreamingIconTexID = pPic ? pPic->GetTextureID() : 0;
-
-	const char* blackBases[] = { "Textures/common/black", "black", nullptr };
-	pPic = loadTextureWithExtensions("black texture", blackBases);
-	m_nBlackTexID = pPic ? pPic->GetTextureID() : 0;
-
-	const char* spotShadowBases[] = { "Textures/spot_shadow", "spot_shadow", nullptr };
-	ITexPic* pPicSpot = loadTextureWithExtensions("spot shadow texture", spotShadowBases);
-	m_nShadowSpotTexId = pPicSpot ? pPicSpot->GetTextureID() : 0;
-	printf("C3DEngine constructor: texture loading phase completed\n");
-  */
+    const char* spotShadowBases[] = { "Textures/spot_shadow", "spot_shadow", 0 };
+    ITexPic* spotShadowTexture = LoadRendererTextureSafe("spot shadow texture", spotShadowBases);
+    if (spotShadowTexture)
+      m_nShadowSpotTexId = spotShadowTexture->GetTextureID();
+  }
 
   // create components
   m_pObjManager   = 0;//new CObjManager (m_pSystem);
@@ -241,12 +232,8 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   printf("C3DEngine constructor: created rain manager\n");
   m_pVisAreaManager   = 0;
   printf("C3DEngine constructor: set vis area manager\n");
-  // Temporarily disable CVars creation to avoid hang
-  // m_pCVars            = new CVars();
-  m_pCVars = nullptr;
-  printf("C3DEngine constructor: skipped CVars creation (temporary workaround)\n");
+  m_pCVars            = new CVars();
   Cry3DEngineBase::m_pCVars = m_pCVars;
-  printf("C3DEngine constructor: set CVars in base\n");
 
   // create REs
   printf("C3DEngine constructor: creating REs\n");
@@ -262,78 +249,22 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
   m_pREScreenProcess    = (CREScreenProcess*)   Cry3DEngineBase::m_pRenderer->EF_CreateRE(eDATA_ScreenProcess);
   printf("C3DEngine constructor: created REScreenProcess\n");
 
-  m_pSHScreenTexMap     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ScreenTexMap", eSH_World, EF_SYSTEM);
-  if (m_pSHScreenTexMap)
-    printf("C3DEngine constructor: loaded ScreenTexMap shader\n");
-  else
-    assert(false && "ScreenTexMap");
-  m_pSHScreenProcess    = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ScreenProcess", eSH_World, EF_SYSTEM);
-  if (m_pSHScreenProcess)
-    printf("C3DEngine constructor: loaded ScreenProcess shader\n");
-  else
-    assert(false && "ScreenProcess");
-  m_pSHOutSpace         = Cry3DEngineBase::m_pRenderer->EF_LoadShader("OutSpace", eSH_World, EF_SYSTEM);
-  if (m_pSHOutSpace)
-    printf("C3DEngine constructor: loaded OutSpace shader\n");
-  else
-    assert(false && "OutSpace");
-  m_pSHFarTreeSprites   = Cry3DEngineBase::m_pRenderer->EF_LoadShader("FarTreeSprites", eSH_World, EF_SYSTEM);
-  if (m_pSHFarTreeSprites)
-    printf("C3DEngine constructor: loaded FarTreeSprites shader\n");
-  else
-    assert(false && "FarTreeSprites");
-  m_pSHClearStencil     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ClearStencil", eSH_World, EF_SYSTEM);
-  if (m_pSHClearStencil)
-    printf("C3DEngine constructor: loaded ClearStencil shader\n");
-  else
-    assert(false && "ClearStencil");
-  m_pSHShadowMapGen     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ShadowMapGen", eSH_World, EF_SYSTEM);
-  if (m_pSHShadowMapGen)
-    printf("C3DEngine constructor: loaded ShadowMapGen shader\n");
-  else
-    assert(false && "ShadowMapGen");
-  m_pSHBinocularDistortMask = Cry3DEngineBase::m_pRenderer->EF_LoadShader("BinocularDistortMask", eSH_World, EF_SYSTEM);
-  if (m_pSHBinocularDistortMask)
-    printf("C3DEngine constructor: loaded BinocularDistortMask shader\n");
-  else
-    assert(false && "BinocularDistortMask");
-  m_pSHScreenDistort = Cry3DEngineBase::m_pRenderer->EF_LoadShader("ScreenDistort", eSH_World, EF_SYSTEM);
-  if (m_pSHScreenDistort)
-    printf("C3DEngine constructor: loaded ScreenDistort shader\n");
-  else
-    assert(false && "ScreenDistort");
-  m_pSHSniperDistortMask = Cry3DEngineBase::m_pRenderer->EF_LoadShader("SniperDistortMask", eSH_World, EF_SYSTEM);
-  if (m_pSHSniperDistortMask)
-    printf("C3DEngine constructor: loaded SniperDistortMask shader\n");
-  else
-    assert(false && "SniperDistortMask");
-  m_pSHRainMap          = Cry3DEngineBase::m_pRenderer->EF_LoadShader("RainMap", eSH_World, EF_SYSTEM);
-  if (m_pSHRainMap)
-    printf("C3DEngine constructor: loaded RainMap shader\n");
-  else
-    assert(false && "RainMap");
+  m_pSHScreenTexMap     = LoadRendererShaderSafe("ScreenTexMap");
+  m_pSHScreenProcess    = LoadRendererShaderSafe("ScreenProcess");
+  m_pSHOutSpace         = LoadRendererShaderSafe("OutSpace");
+  m_pSHFarTreeSprites   = LoadRendererShaderSafe("FarTreeSprites");
+  m_pSHClearStencil     = LoadRendererShaderSafe("ClearStencil");
+  m_pSHShadowMapGen     = LoadRendererShaderSafe("ShadowMapGen");
+  m_pSHBinocularDistortMask = LoadRendererShaderSafe("BinocularDistortMask");
+  m_pSHScreenDistort    = LoadRendererShaderSafe("ScreenDistort");
+  m_pSHSniperDistortMask = LoadRendererShaderSafe("SniperDistortMask");
+  m_pSHRainMap          = LoadRendererShaderSafe("RainMap");
 
-  m_pSHStencil          = Cry3DEngineBase::m_pRenderer->EF_LoadShader("<Stencil>", eSH_World, EF_SYSTEM);
-  if (m_pSHStencil)
-    printf("C3DEngine constructor: loaded Stencil shader\n");
-  else
-    assert(false && "<Stencil>");
-  m_pSHStencilState     = Cry3DEngineBase::m_pRenderer->EF_LoadShader("StencilState", eSH_World, EF_SYSTEM);
-  if (m_pSHStencilState)
-    printf("C3DEngine constructor: loaded StencilState shader\n");
-  else
-    assert(false && "StencilState");
-  m_pSHStencilStateInv  = Cry3DEngineBase::m_pRenderer->EF_LoadShader("StencilStateInv", eSH_World, EF_SYSTEM);
-  if (m_pSHStencilStateInv)
-    printf("C3DEngine constructor: loaded StencilStateInv shader\n");
-  else
-    assert(false && "StencilStateInv");
+  m_pSHStencil          = LoadRendererShaderSafe("<Stencil>");
+  m_pSHStencilState     = LoadRendererShaderSafe("StencilState");
+  m_pSHStencilStateInv  = LoadRendererShaderSafe("StencilStateInv");
 
-	m_pSHTerrainParticles = Cry3DEngineBase::m_pRenderer->EF_LoadShader("TerrainParticles", eSH_World, EF_SYSTEM);
-  if (m_pSHTerrainParticles)
-    printf("C3DEngine constructor: loaded TerrainParticles shader\n");
-  else
-    assert(false && "TerrainParticles");
+	m_pSHTerrainParticles = LoadRendererShaderSafe("TerrainParticles");
 
   m_pPhysMaterialEnumerator=0;
   printf("C3DEngine constructor: set phys material enumerator\n");
@@ -376,7 +307,7 @@ C3DEngine::C3DEngine(ISystem	* pSystem)
 //////////////////////////////////////////////////////////////////////
 C3DEngine::~C3DEngine()
 {
-	assert(CryIsHeapValid());
+	assert(IsHeapValid());
 
 	ShutDown();
 
@@ -1055,7 +986,10 @@ bool C3DEngine::PhysicalizeStaticObject(void *pForeignData,int iForeignData,int 
 	if (!m_pTerrain || !m_pObjManager)
 		return false;
 
-	int ix=(int)(intptr_t)pForeignData&0xFF, iy=(int)(intptr_t)pForeignData>>8&0xFF, iobj=(int)(intptr_t)pForeignData>>16&0xFFFF;
+	uintptr_t encoded = reinterpret_cast<uintptr_t>(pForeignData);
+	int ix = static_cast<int>(encoded & 0xFF);
+	int iy = static_cast<int>((encoded >> 8) & 0xFF);
+	int iobj = static_cast<int>((encoded >> 16) & 0xFFFF);
 	return 0;//m_pObjManager->PhysicalizeStatObjInst( &m_pTerrain->m_arrSecInfoTable[ix][iy]->m_lstStatObjects[iobj], true );
 }
 
@@ -2612,7 +2546,7 @@ void C3DEngine::CheckPhysicalized(const Vec3d & vBoxMin, const Vec3d & vBoxMax)
 
 void C3DEngine::CheckMemoryHeap()
 {
-	assert (CryIsHeapValid());
+	assert (IsHeapValid());
 }
 
 void C3DEngine::RecompileBeaches()

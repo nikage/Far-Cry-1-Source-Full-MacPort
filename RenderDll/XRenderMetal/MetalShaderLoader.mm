@@ -23,7 +23,187 @@
 #include <Cocoa/Cocoa.h>
 #include <fstream>
 #include <sstream>
+#include <cctype>
 #include <cassert>
+#include <strings.h>
+
+namespace
+{
+struct VertexLayoutInfo
+{
+    int format;
+    NSString* functionName;
+    bool hasTexCoords;
+};
+
+VertexLayoutInfo InferVertexLayout(NSArray* attributes, int textureCount)
+{
+    bool hasPosition = false;
+    bool hasNormal = false;
+    bool hasColor = false;
+    bool hasTex = textureCount > 0;
+
+    if (attributes && [attributes isKindOfClass:[NSArray class]])
+    {
+        for (id item in attributes)
+        {
+            if (![item isKindOfClass:[NSString class]])
+                continue;
+            NSString* attrString = [(NSString*)item lowercaseString];
+            if ([attrString containsString:@"position"])
+                hasPosition = true;
+            if ([attrString containsString:@"normal"])
+                hasNormal = true;
+            if ([attrString containsString:@"color"])
+                hasColor = true;
+            if ([attrString containsString:@"texcoord"])
+                hasTex = true;
+        }
+    }
+
+    VertexLayoutInfo info;
+    info.hasTexCoords = hasTex;
+
+    if (hasPosition && hasNormal && hasColor && hasTex)
+        info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+    else if (hasPosition && hasNormal && hasTex)
+        info.format = VERTEX_FORMAT_P3F_N_TEX2F;
+    else if (hasPosition && hasColor && hasTex)
+        info.format = VERTEX_FORMAT_P3F_COL4UB_TEX2F;
+    else if (hasPosition && hasTex)
+        info.format = VERTEX_FORMAT_P3F_TEX2F;
+    else if (hasPosition && hasNormal)
+        info.format = VERTEX_FORMAT_P3F_N;
+    else if (hasPosition && hasColor)
+        info.format = VERTEX_FORMAT_P3F_COL4UB;
+    else
+        info.format = VERTEX_FORMAT_P3F;
+
+    if (hasNormal)
+        info.functionName = @"basic_vertex";
+    else if (hasTex)
+        info.functionName = @"colortex_vertex";
+    else
+        info.functionName = @"color_vertex";
+
+    return info;
+}
+
+enum PipelineBlendMode : uint32
+{
+    kBlendNone = 0,
+    kBlendAlpha = 1,
+    kBlendAdditive = 2
+};
+
+struct PipelineStateConfig
+{
+    bool blendEnabled = true;
+    PipelineBlendMode blendMode = kBlendAlpha;
+    MTLBlendFactor sourceBlendFactor = MTLBlendFactorSourceAlpha;
+    MTLBlendFactor destinationBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    MTLBlendOperation blendOperation = MTLBlendOperationAdd;
+    bool depthTestEnabled = true;
+    bool depthWriteEnabled = false;
+    MTLCompareFunction depthCompareFunction = MTLCompareFunctionLessEqual;
+    MTLCullMode cullMode = MTLCullModeBack;
+};
+
+PipelineStateConfig DefaultPipelineConfig()
+{
+    return PipelineStateConfig();
+}
+
+void ApplyPipelineConfigFromManifest(PipelineStateConfig& config, NSDictionary* pipelineDict)
+{
+    if (!pipelineDict || ![pipelineDict isKindOfClass:[NSDictionary class]])
+        return;
+
+    NSNumber* blendEnabledValue = pipelineDict[@"blendEnabled"];
+    if (blendEnabledValue)
+        config.blendEnabled = blendEnabledValue.boolValue;
+
+    NSString* blendModeValue = pipelineDict[@"blendMode"];
+    if (blendModeValue)
+    {
+        NSString* lower = [blendModeValue lowercaseString];
+        if ([lower isEqualToString:@"none"])
+        {
+            config.blendEnabled = false;
+            config.blendMode = kBlendNone;
+        }
+        else if ([lower isEqualToString:@"add"] || [lower isEqualToString:@"additive"])
+        {
+            config.blendEnabled = true;
+            config.blendMode = kBlendAdditive;
+            config.sourceBlendFactor = MTLBlendFactorOne;
+            config.destinationBlendFactor = MTLBlendFactorOne;
+            config.blendOperation = MTLBlendOperationAdd;
+        }
+        else
+        {
+            config.blendEnabled = true;
+            config.blendMode = kBlendAlpha;
+            config.sourceBlendFactor = MTLBlendFactorSourceAlpha;
+            config.destinationBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+            config.blendOperation = MTLBlendOperationAdd;
+        }
+    }
+
+    NSNumber* depthTestValue = pipelineDict[@"depthTest"];
+    if (depthTestValue)
+        config.depthTestEnabled = depthTestValue.boolValue;
+
+    NSNumber* depthWriteValue = pipelineDict[@"depthWrite"];
+    if (depthWriteValue)
+        config.depthWriteEnabled = depthWriteValue.boolValue;
+
+    NSString* depthCompareValue = pipelineDict[@"depthCompare"];
+    if (depthCompareValue)
+    {
+        NSString* lower = [depthCompareValue lowercaseString];
+        if ([lower isEqualToString:@"less"])
+            config.depthCompareFunction = MTLCompareFunctionLess;
+        else if ([lower isEqualToString:@"always"])
+            config.depthCompareFunction = MTLCompareFunctionAlways;
+        else
+            config.depthCompareFunction = MTLCompareFunctionLessEqual;
+    }
+
+    NSString* cullValue = pipelineDict[@"cullMode"];
+    if (cullValue)
+    {
+        NSString* lower = [cullValue lowercaseString];
+        if ([lower isEqualToString:@"none"])
+            config.cullMode = MTLCullModeNone;
+        else if ([lower isEqualToString:@"front"])
+            config.cullMode = MTLCullModeFront;
+        else
+            config.cullMode = MTLCullModeBack;
+    }
+
+    if (!config.blendEnabled)
+        config.blendMode = kBlendNone;
+}
+
+static std::string NormalizeShaderName(const char* name)
+{
+    if (!name)
+        return "";
+
+    char normalized[256];
+    strncpy(normalized, name, sizeof(normalized) - 1);
+    normalized[sizeof(normalized) - 1] = 0;
+
+    for (char* p = normalized; *p; ++p)
+    {
+        if (*p == '\\')
+            *p = '/';
+        *p = static_cast<char>(std::tolower(static_cast<unsigned char>(*p)));
+    }
+    return std::string(normalized);
+}
+}
 
 CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer, 
                                         CMetalTextureManager* textureManager)
@@ -168,15 +348,25 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         MTLVertexDescriptor* vertexDesc = CMetalVertexDescriptorHelper::CreateVertexDescriptor(shader.vertexFormat);
         assert(vertexDesc != nil && "CreateDefaultShaders: Failed to create vertex descriptor - invalid vertex format");
         
+        ShaderInfo info;
+        info.blendEnabled = true;
+        info.blendMode = static_cast<uint32>(kBlendAlpha);
+        info.sourceBlendFactor = MTLBlendFactorSourceAlpha;
+        info.destinationBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        info.blendOperation = MTLBlendOperationAdd;
+        info.depthTestEnabled = true;
+        info.depthWriteEnabled = true;
+        info.depthCompareFunction = MTLCompareFunctionLessEqual;
+        info.cullMode = MTLCullModeBack;
+
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(
-            vertexFunc, fragmentFunc, vertexDesc);
+            vertexFunc, fragmentFunc, vertexDesc, &info);
         
         assert(pipelineState != nil && "CreateDefaultShaders: Failed to create pipeline state");
         
         int shaderId = AllocateShaderId();
         assert(shaderId > 0 && "CreateDefaultShaders: shader ID must be positive!");
         
-        ShaderInfo info;
         info.vertexFunction = vertexFunc;
         info.fragmentFunction = fragmentFunc;
         info.pipelineState = pipelineState;
@@ -279,7 +469,13 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         NSString* shaderName = entry[@"shader"];
         NSString* normalizedName = entry[@"normalized"];
         NSString* fragmentName = entry[@"fragment"];
+        NSArray* uniformArray = entry[@"uniforms"];
+        NSArray* textureArray = entry[@"textures"];
+        NSArray* vertexAttrArray = entry[@"vertexAttributes"];
         NSNumber* textureCountValue = entry[@"textureCount"];
+        NSArray* directiveArray = entry[@"directives"];
+        NSArray* maskArray = entry[@"maskReferences"];
+        NSDictionary* pipelineDict = entry[@"pipeline"];
 
         if (!shaderName || !fragmentName)
             continue;
@@ -299,9 +495,18 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         }
 
         int textureCount = textureCountValue ? textureCountValue.intValue : 0;
-        NSString* vertexFunctionName = textureCount > 0 ? @"colortex_vertex" : @"color_vertex";
-        int vertexFormat = textureCount > 0 ? VERTEX_FORMAT_P3F_COL4UB_TEX2F : VERTEX_FORMAT_P3F_COL4UB;
+        if (textureArray && [textureArray isKindOfClass:[NSArray class]])
+        {
+            textureCount = static_cast<int>([textureArray count]);
+        }
+
+        VertexLayoutInfo layout = InferVertexLayout(vertexAttrArray, textureCount);
+        NSString* vertexFunctionName = layout.functionName;
+        int vertexFormat = layout.format;
         id<MTLFunction> vertexFunction = nil;
+
+        PipelineStateConfig pipelineConfig = DefaultPipelineConfig();
+        ApplyPipelineConfigFromManifest(pipelineConfig, pipelineDict);
 
         if (vertexLibrary)
         {
@@ -321,7 +526,17 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         if (!descriptor)
             continue;
 
-        id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor);
+        ShaderInfo info;
+        info.blendEnabled = pipelineConfig.blendEnabled;
+        info.blendMode = static_cast<uint32>(pipelineConfig.blendMode);
+        info.sourceBlendFactor = pipelineConfig.sourceBlendFactor;
+        info.destinationBlendFactor = pipelineConfig.destinationBlendFactor;
+        info.blendOperation = pipelineConfig.blendOperation;
+        info.depthTestEnabled = pipelineConfig.depthTestEnabled;
+        info.depthWriteEnabled = pipelineConfig.depthWriteEnabled;
+        info.depthCompareFunction = pipelineConfig.depthCompareFunction;
+        info.cullMode = pipelineConfig.cullMode;
+        id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
         if (!pipelineState)
             continue;
 
@@ -332,15 +547,72 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         }
 
         int shaderId = AllocateShaderId();
-        ShaderInfo info;
-        info.vertexFunction = vertexFunction;
-        info.fragmentFunction = fragmentFunction;
-        info.pipelineState = pipelineState;
         info.name = normalizedKey;
         info.shaderClass = eSH_Misc;
         info.isLoaded = true;
         info.nMaskGen = 0;
         info.shaderWrapper = new CMetalShader(shaderId, this);
+        info.vertexFunction = vertexFunction;
+        info.fragmentFunction = fragmentFunction;
+        info.pipelineState = pipelineState;
+        if (uniformArray && [uniformArray isKindOfClass:[NSArray class]])
+        {
+            for (NSDictionary* uniformDict in uniformArray)
+            {
+                if (![uniformDict isKindOfClass:[NSDictionary class]])
+                    continue;
+                GeneratedUniformBinding binding;
+                NSString* uName = uniformDict[@"name"];
+                NSString* uType = uniformDict[@"type"];
+                NSString* uSemantic = uniformDict[@"semantic"];
+                if (uName)
+                    binding.name = [uName UTF8String];
+                if (uType)
+                    binding.type = [uType UTF8String];
+                if (uSemantic)
+                    binding.semantic = [uSemantic UTF8String];
+                info.uniformBindings.push_back(binding);
+            }
+        }
+        if (textureArray && [textureArray isKindOfClass:[NSArray class]])
+        {
+            for (NSDictionary* textureDict in textureArray)
+            {
+                if (![textureDict isKindOfClass:[NSDictionary class]])
+                    continue;
+                GeneratedTextureBinding binding;
+                NSString* tName = textureDict[@"name"];
+                NSString* tType = textureDict[@"type"];
+                NSString* tSemantic = textureDict[@"semantic"];
+                NSNumber* tSlot = textureDict[@"slot"];
+                if (tName)
+                    binding.name = [tName UTF8String];
+                if (tType)
+                    binding.type = [tType UTF8String];
+                if (tSemantic)
+                    binding.semantic = [tSemantic UTF8String];
+                binding.slot = tSlot ? tSlot.intValue : static_cast<int>(info.textureBindings.size());
+                info.textureBindings.push_back(binding);
+            }
+        }
+        if (directiveArray && [directiveArray isKindOfClass:[NSArray class]])
+        {
+            for (NSString* directive in directiveArray)
+            {
+                if (![directive isKindOfClass:[NSString class]])
+                    continue;
+                info.directives.emplace_back([directive UTF8String]);
+            }
+        }
+        if (maskArray && [maskArray isKindOfClass:[NSArray class]])
+        {
+            for (NSString* mask in maskArray)
+            {
+                if (![mask isKindOfClass:[NSString class]])
+                    continue;
+                info.maskReferences.emplace_back([mask UTF8String]);
+            }
+        }
 
         m_shaders[shaderId] = info;
         m_shaderNameMap[normalizedKey] = shaderId;
@@ -353,7 +625,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions(
     id<MTLFunction> vertexFunction,
     id<MTLFunction> fragmentFunction,
-    MTLVertexDescriptor* vertexDescriptor)
+    MTLVertexDescriptor* vertexDescriptor,
+    ShaderInfo* shaderInfo)
 {
     assert(vertexFunction != nil && "CreatePipelineStateWithFunctions: vertexFunction cannot be nil");
     assert(fragmentFunction != nil && "CreatePipelineStateWithFunctions: fragmentFunction cannot be nil");
@@ -368,11 +641,26 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     MTLPixelFormat colorFormat = MTLPixelFormatBGRA8Unorm;
     MTLPixelFormat depthFormat = MTLPixelFormatDepth32Float;
     
+    bool blendEnabled = true;
+    MTLBlendFactor srcBlend = MTLBlendFactorSourceAlpha;
+    MTLBlendFactor dstBlend = MTLBlendFactorOneMinusSourceAlpha;
+    MTLBlendOperation blendOp = MTLBlendOperationAdd;
+    uint32 blendModeEnum = static_cast<uint32>(kBlendAlpha);
+
+    if (shaderInfo)
+    {
+        blendEnabled = shaderInfo->blendEnabled;
+        srcBlend = shaderInfo->sourceBlendFactor;
+        dstBlend = shaderInfo->destinationBlendFactor;
+        blendOp = shaderInfo->blendOperation;
+        blendModeEnum = shaderInfo->blendMode;
+    }
+
     MetalPipelineStateKey key;
     key.vertexFunctionHash = (uint64_t)vertexFunction;
     key.fragmentFunctionHash = (uint64_t)fragmentFunction;
     key.vertexFormatHash = 0;
-    key.renderStateHash = 0;
+    key.renderStateHash = (blendModeEnum & 0xFF) << 16;
     key.colorPixelFormat = colorFormat;
     key.depthPixelFormat = depthFormat;
     
@@ -391,14 +679,17 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     descriptor.vertexDescriptor = vertexDescriptor;
     
     descriptor.colorAttachments[0].pixelFormat = colorFormat;
-    descriptor.colorAttachments[0].blendingEnabled = YES;
-    descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-    descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-    descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-    descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-    
+    descriptor.colorAttachments[0].blendingEnabled = blendEnabled ? YES : NO;
+    if (blendEnabled)
+    {
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = srcBlend;
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = dstBlend;
+        descriptor.colorAttachments[0].rgbBlendOperation = blendOp;
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = srcBlend;
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = dstBlend;
+        descriptor.colorAttachments[0].alphaBlendOperation = blendOp;
+    }
+ 
     descriptor.depthAttachmentPixelFormat = depthFormat;
     
     NSError* error = nil;
@@ -422,8 +713,8 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineState(
     assert(vertexFunction != nil && "CreatePipelineState: vertexFunction cannot be nil!");
     assert(fragmentFunction != nil && "CreatePipelineState: fragmentFunction cannot be nil!");
     assert(vertexDescriptor != nil && "CreatePipelineState: vertexDescriptor cannot be nil!");
-    
-    return CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, vertexDescriptor);
+ 
+    return CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, vertexDescriptor, nullptr);
 }
 
 void CMetalShaderManager::SetShaderUniforms(id<MTLRenderCommandEncoder> encoder, 

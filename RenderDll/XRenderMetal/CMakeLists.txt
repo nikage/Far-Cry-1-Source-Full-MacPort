@@ -199,5 +199,25 @@ install(FILES ${GENERATED_METAL_METALLIB}
               ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
     DESTINATION lib
 )
+
+    set(FARCRY_APP_BUNDLE_DIR "${CMAKE_BINARY_DIR}/bin/FarCry.app" CACHE PATH "Location of FarCry.app for resource staging")
+    set(FARCRY_APP_RESOURCES_DIR "${FARCRY_APP_BUNDLE_DIR}/Contents/Resources")
+
+    add_custom_command(
+        OUTPUT ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
+               ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_APP_RESOURCES_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_METAL_METALLIB} ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+        DEPENDS ${GENERATED_METAL_METALLIB} ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
+        COMMENT "Staging generated Metal shaders into FarCry.app resources"
+        VERBATIM
+    )
+
+    add_custom_target(GeneratedMetalBundleResources ALL
+        DEPENDS ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
+                ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json)
+    add_dependencies(GeneratedMetalBundleResources GeneratedMetalShaders)
+    add_dependencies(MetalShaders GeneratedMetalBundleResources)
 endif()
 

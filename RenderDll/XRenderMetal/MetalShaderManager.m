@@ -97,6 +97,60 @@ class CMetalShaderManager
     friend class CMetalShader;
     
 public:
+    struct GeneratedUniformBinding
+    {
+        std::string name;
+        std::string type;
+        std::string semantic;
+    };
+
+    struct GeneratedTextureBinding
+    {
+        std::string name;
+        std::string type;
+        std::string semantic;
+        int slot;
+    };
+
+    struct ShaderInfo
+    {
+        id<MTLFunction> vertexFunction;
+        id<MTLFunction> fragmentFunction;
+        id<MTLRenderPipelineState> pipelineState;
+        std::string name;
+        EShClass shaderClass;
+        bool isLoaded;
+        CMetalShader* shaderWrapper;
+        uint64 nMaskGen;
+        std::vector<GeneratedUniformBinding> uniformBindings;
+        std::vector<GeneratedTextureBinding> textureBindings;
+        std::vector<std::string> directives;
+        std::vector<std::string> maskReferences;
+        bool blendEnabled;
+        uint32 blendMode;
+        MTLBlendFactor sourceBlendFactor;
+        MTLBlendFactor destinationBlendFactor;
+        MTLBlendOperation blendOperation;
+        bool depthTestEnabled;
+        bool depthWriteEnabled;
+        MTLCompareFunction depthCompareFunction;
+        MTLCullMode cullMode;
+        struct UniformRuntimeBinding
+        {
+            int paramIndex;
+            GeneratedUniformBinding binding;
+        };
+        struct TextureRuntimeBinding
+        {
+            int slot;
+            GeneratedTextureBinding binding;
+        };
+        std::vector<UniformRuntimeBinding> uniformRuntimeBindings;
+        std::vector<TextureRuntimeBinding> textureRuntimeBindings;
+        size_t publicParamSignature = 0;
+        bool runtimeBindingsPrepared = false;
+    };
+
     CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTextureManager* textureManager);
     virtual ~CMetalShaderManager();
 
@@ -207,22 +261,13 @@ protected:
                                                    MTLVertexDescriptor* vertexDescriptor);
     id<MTLRenderPipelineState> CreatePipelineStateWithFunctions(id<MTLFunction> vertexFunction,
                                                                 id<MTLFunction> fragmentFunction,
-                                                                MTLVertexDescriptor* vertexDescriptor);
+                                                                MTLVertexDescriptor* vertexDescriptor,
+                                                                ShaderInfo* shaderInfo);
     void SetShaderUniforms(id<MTLRenderCommandEncoder> encoder, const SShaderParam& params);
-    
+    void PrepareRuntimeBindings(CMetalShader* shader, ShaderInfo& info);
+    void ResetRuntimeBindingState(ShaderInfo& info);
+
     // Shader caching and management
-    struct ShaderInfo
-    {
-        id<MTLFunction> vertexFunction;
-        id<MTLFunction> fragmentFunction;
-        id<MTLRenderPipelineState> pipelineState;
-        std::string name;
-        EShClass shaderClass;
-        bool isLoaded;
-        CMetalShader* shaderWrapper;
-        uint64 nMaskGen;
-    };
-    
     std::unordered_map<int, ShaderInfo> m_shaders;
     std::unordered_map<std::string, int> m_shaderNameMap;
     int m_nextShaderId;
