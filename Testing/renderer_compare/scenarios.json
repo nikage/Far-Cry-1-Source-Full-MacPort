@@ -1,0 +1,7 @@
+{
+  "scenarios": [
+    {"name": "island_intro"},
+    {"name": "training_start"},
+    {"name": "fort_sunrise"}
+  ]
+}
