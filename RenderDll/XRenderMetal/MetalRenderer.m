@@ -28,6 +28,7 @@
 #include <QuartzCore/CAMetalLayer.h>
 #include <Cocoa/Cocoa.h>
 #include <vector>
+#include <cstdint>
 #include <memory>
 
 // Include CryEngine interfaces
@@ -396,6 +397,34 @@ public:
     std::unique_ptr<CMetalTextureManager> m_textureManager;
     std::unique_ptr<CMetalShaderManager> m_shaderManager;
     std::unique_ptr<CMetalUtilityRenderer> m_utilityRenderer;
+    
+    struct DebugVertex
+    {
+        float position[3];
+        uint32_t color;
+    };
+    
+    struct DebugCommand
+    {
+        MTLPrimitiveType primitiveType;
+        std::vector<DebugVertex> vertices;
+        bool depthTest;
+        bool depthWrite;
+        bool blend;
+    };
+    
+    id<MTLRenderPipelineState> m_debugPipelineState;
+    std::vector<DebugCommand> m_debugCommands;
+    bool EnsureDebugPipelineState();
+    void QueueDebugCommand(MTLPrimitiveType primitive, const std::vector<DebugVertex>& verts,
+                           bool depthTest, bool depthWrite, bool blend);
+    void QueueDebugLine(const Vec3& a, const Vec3& b, const CFColor& color, int stateFlags);
+    void QueueDebugPoint(const Vec3& position, const CFColor& color, int stateFlags);
+    void QueueDebugBox(const Vec3& mins, const Vec3& maxs, const CFColor& color, bool solid);
+    void QueueDebugSphere(const Vec3& mins, const Vec3& maxs, const CFColor& color, bool solid);
+    void FlushDebugCommands();
+    void ApplyDebugRenderState(bool depthTest, bool depthWrite, bool blend);
+    void RestoreDefaultRenderState();
     
     // Window and rendering surface
     NSWindow* m_window;

@@ -50,6 +50,7 @@
 #include <sys/stat.h>     // for stat function
 #include <ctype.h>        // for tolower function
 #include <stdarg.h>       // for va_list
+#include <malloc/malloc.h> // for malloc_zone_check
 
 #ifdef __cplusplus
 
@@ -210,20 +211,17 @@ typedef struct tagRECT {
 #define FALSE 0
 #endif
 
-#ifdef __cplusplus
-inline int IsHeapValid()
-{
-#ifdef _DEBUG
-    return 1;
-#else
-    return 1;
-#endif
-}
-
+#if defined(_DEBUG)
 inline int CryIsHeapValid()
 {
-    return IsHeapValid();
+    malloc_zone_t *zone = malloc_default_zone();
+    if (!zone)
+        return 1;
+    return malloc_zone_check(zone) != 0;
 }
+#else
+inline int CryIsHeapValid() { return 1; }
+#endif
 
 inline BOOL IsBadReadPtr(const void* lp, size_t ucb)
 {
@@ -733,7 +731,7 @@ inline int QueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount) {
 }
 
 // Windows GetTickCount function - returns milliseconds since system start
-inline uint32_t GetTickCount() {
+static inline uint32_t GetTickCount() {
     // Use mach_absolute_time and convert to milliseconds
     static mach_timebase_info_data_t timebase = {0, 0};
     if (timebase.denom == 0) {
@@ -848,12 +846,14 @@ inline int MessageBox(void* hWnd, const char* lpText, const char* lpCaption, uin
 }
 
 // Windows debug output function
+#ifndef OutputDebugString
 inline void OutputDebugString(const char* lpOutputString) {
     // Print to console on macOS
     if (lpOutputString) {
         printf("[DEBUG] %s", lpOutputString);
     }
 }
+#endif
 
 // Windows file path functions
 inline char* _fullpath(char* absPath, const char* relPath, size_t maxLength) {
@@ -985,8 +985,6 @@ inline FILE* fopen_nocase(const char* file, const char* mode) {
     // macOS is case-sensitive like Linux, so just use regular fopen
     return fopen(file, mode); 
 }
-inline void fxclose(FILE* f) { fclose(f); }
-
 // String comparison functions
 #define stricmp strcasecmp
 #define strnicmp strncasecmp
@@ -1032,11 +1030,11 @@ inline uint64_t __rdtsc() { return mach_absolute_time(); }
 inline uint64_t __rdtsc() { return __builtin_ia32_rdtsc(); }
 #endif
 
+#ifdef __cplusplus
+}
 #endif
 
 #ifdef __cplusplus
-}
-
 
 // Atomic operations for multi-threading - template approach like Linux
 template<typename T>

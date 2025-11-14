@@ -21,6 +21,14 @@
 #include "MetalRenderer.m"
 #include "I3DEngine.h"
 #include "../Common/Textures/dxtlib.h"  // For nvDXT function signatures
+#include "CrySizer.h"
+#include <cmath>
+#include <algorithm>
+#include <vector>
+#include <cstring>
+#include <cstdio>
+#include <cstdint>
+#include <utility>
 
 // Global system pointers (defined here, declared as extern in CommonRender.h)
 // gRenDev is defined in RenderDll/Common/Renderer.cpp
@@ -35,6 +43,69 @@ ITimer *iTimer = nullptr;
 ISystem* GetISystem()
 {
     return iSystem;
+}
+
+namespace
+{
+    inline float Clamp01(float value)
+    {
+        if (value < 0.0f)
+            return 0.0f;
+        if (value > 1.0f)
+            return 1.0f;
+        return value;
+    }
+
+    inline uint32_t PackColor(const CFColor& color)
+    {
+        const float clampedR = Clamp01(color.r);
+        const float clampedG = Clamp01(color.g);
+        const float clampedB = Clamp01(color.b);
+        const float clampedA = Clamp01(color.a);
+
+        union
+        {
+            struct
+            {
+                uint8_t r, g, b, a;
+            };
+            uint32_t packed;
+        } converter;
+
+        converter.r = static_cast<uint8_t>(clampedR * 255.0f + 0.5f);
+        converter.g = static_cast<uint8_t>(clampedG * 255.0f + 0.5f);
+        converter.b = static_cast<uint8_t>(clampedB * 255.0f + 0.5f);
+        converter.a = static_cast<uint8_t>(clampedA * 255.0f + 0.5f);
+
+        return converter.packed;
+    }
+
+    inline bool NeedsBlend(const CFColor& color)
+    {
+        return color.a < 0.999f;
+    }
+
+    inline void DecodeLineFlags(int flags, const CFColor& color,
+                                bool& depthTest, bool& depthWrite, bool& blend)
+    {
+        int state = GS_NODEPTHTEST;
+        if (flags & 1)
+        {
+            state |= GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA;
+        }
+        else if (flags & 2)
+        {
+            state = GS_DEPTHWRITE;
+        }
+        else
+        {
+            state = flags | GS_NODEPTHTEST;
+        }
+
+        depthTest = (state & GS_NODEPTHTEST) == 0;
+        depthWrite = (state & GS_DEPTHWRITE) != 0;
+        blend = (state & (GS_BLSRC_MASK | GS_BLDST_MASK)) != 0 || NeedsBlend(color);
+    }
 }
 
 // NVDXT texture compression stubs (C++ linkage matching dxtlib.h declarations)
@@ -137,15 +208,419 @@ extern "C" void CryModuleFree(void* ptr)
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
-      m_currentDrawable(nil), m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0) {
+      m_currentDrawable(nil), m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0),
+      m_debugPipelineState(nil) {
   // Managers will be initialized in Init() after Metal device is created
 }
 
 CMetalRenderer::~CMetalRenderer() {
+  if (m_debugPipelineState) {
+    [m_debugPipelineState release];
+    m_debugPipelineState = nil;
+  }
+  m_debugCommands.clear();
   DestroyGameWindow();
   if (m_textureManager || m_shaderManager || m_utilityRenderer) {
     ShutdownManagers();
   }
+}
+
+bool CMetalRenderer::EnsureDebugPipelineState()
+{
+  if (m_debugPipelineState)
+    return true;
+
+  if (!m_device)
+    return false;
+
+  NSError *error = nil;
+  id<MTLLibrary> library = [m_device newDefaultLibrary];
+  if (!library)
+  {
+    NSString *shaderPath = nil;
+    NSBundle *bundle = [NSBundle mainBundle];
+    if (bundle)
+      shaderPath = [bundle pathForResource:@"BasicShaders" ofType:@"metallib"];
+    if (!shaderPath)
+    {
+      NSString *exePath = [[NSBundle mainBundle] executablePath];
+      NSString *exeDir = [exePath stringByDeletingLastPathComponent];
+      shaderPath = [exeDir stringByAppendingPathComponent:@"BasicShaders.metallib"];
+    }
+    if (shaderPath)
+      library = [m_device newLibraryWithFile:shaderPath error:&error];
+  }
+
+  if (!library)
+  {
+    iLog->Log("EnsureDebugPipelineState: Unable to load shader library (%s)\n",
+              error ? [[error localizedDescription] UTF8String] : "unknown error");
+    return false;
+  }
+
+  id<MTLFunction> vertexFunction = [library newFunctionWithName:@"color_vertex"];
+  id<MTLFunction> fragmentFunction = [library newFunctionWithName:@"simple_fragment"];
+
+  if (!vertexFunction || !fragmentFunction)
+  {
+    iLog->Log("EnsureDebugPipelineState: Missing Metal shader functions (vertex=%p fragment=%p)\n",
+              vertexFunction, fragmentFunction);
+    if (vertexFunction) [vertexFunction release];
+    if (fragmentFunction) [fragmentFunction release];
+    [library release];
+    return false;
+  }
+
+  MTLRenderPipelineDescriptor *descriptor = [[MTLRenderPipelineDescriptor alloc] init];
+  descriptor.vertexFunction = vertexFunction;
+  descriptor.fragmentFunction = fragmentFunction;
+  descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+  descriptor.colorAttachments[0].blendingEnabled = YES;
+  descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+  descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+  descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+  descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+  descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+  descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+  descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+  MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+  vertexDescriptor.attributes[0].format = MTLVertexFormatFloat3;
+  vertexDescriptor.attributes[0].offset = 0;
+  vertexDescriptor.attributes[0].bufferIndex = 0;
+  vertexDescriptor.attributes[1].format = MTLVertexFormatUChar4Normalized;
+  vertexDescriptor.attributes[1].offset = sizeof(float) * 3;
+  vertexDescriptor.attributes[1].bufferIndex = 0;
+  vertexDescriptor.layouts[0].stride = sizeof(DebugVertex);
+  vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+  descriptor.vertexDescriptor = vertexDescriptor;
+
+  m_debugPipelineState = [m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+  if (!m_debugPipelineState)
+  {
+    iLog->Log("EnsureDebugPipelineState: Failed to create pipeline (%s)\n",
+              error ? [[error localizedDescription] UTF8String] : "unknown error");
+    [vertexDescriptor release];
+    [descriptor release];
+    [vertexFunction release];
+    [fragmentFunction release];
+    [library release];
+    return false;
+  }
+
+  [vertexDescriptor release];
+  [descriptor release];
+  [vertexFunction release];
+  [fragmentFunction release];
+  [library release];
+
+  return true;
+}
+
+void CMetalRenderer::QueueDebugCommand(MTLPrimitiveType primitive,
+                                       const std::vector<DebugVertex> &verts,
+                                       bool depthTest, bool depthWrite, bool blend)
+{
+  if (verts.empty())
+    return;
+
+  DebugCommand cmd;
+  cmd.primitiveType = primitive;
+  cmd.vertices = verts;
+  cmd.depthTest = depthTest;
+  cmd.depthWrite = depthWrite;
+  cmd.blend = blend;
+  m_debugCommands.emplace_back(std::move(cmd));
+}
+
+void CMetalRenderer::QueueDebugLine(const Vec3& a, const Vec3& b, const CFColor& color, int stateFlags)
+{
+  bool depthTest = false;
+  bool depthWrite = false;
+  bool blend = false;
+  DecodeLineFlags(stateFlags, color, depthTest, depthWrite, blend);
+
+  std::vector<DebugVertex> vertices;
+  vertices.reserve(2);
+
+  DebugVertex va;
+  va.position[0] = a.x;
+  va.position[1] = a.y;
+  va.position[2] = a.z;
+  va.color = PackColor(color);
+
+  DebugVertex vb;
+  vb.position[0] = b.x;
+  vb.position[1] = b.y;
+  vb.position[2] = b.z;
+  vb.color = PackColor(color);
+
+  vertices.push_back(va);
+  vertices.push_back(vb);
+
+  QueueDebugCommand(MTLPrimitiveTypeLine, vertices, depthTest, depthWrite, blend);
+}
+
+void CMetalRenderer::QueueDebugPoint(const Vec3& position, const CFColor& color, int stateFlags)
+{
+  bool depthTest = false;
+  bool depthWrite = false;
+  bool blend = false;
+  DecodeLineFlags(stateFlags, color, depthTest, depthWrite, blend);
+
+  DebugVertex v;
+  v.position[0] = position.x;
+  v.position[1] = position.y;
+  v.position[2] = position.z;
+  v.color = PackColor(color);
+
+  std::vector<DebugVertex> vertices(1, v);
+  QueueDebugCommand(MTLPrimitiveTypePoint, vertices, depthTest, depthWrite, blend);
+}
+
+void CMetalRenderer::QueueDebugBox(const Vec3& mins, const Vec3& maxs, const CFColor& color, bool solid)
+{
+  const Vec3 corners[8] = {
+      Vec3(mins.x, mins.y, mins.z),
+      Vec3(maxs.x, mins.y, mins.z),
+      Vec3(maxs.x, maxs.y, mins.z),
+      Vec3(mins.x, maxs.y, mins.z),
+      Vec3(mins.x, mins.y, maxs.z),
+      Vec3(maxs.x, mins.y, maxs.z),
+      Vec3(maxs.x, maxs.y, maxs.z),
+      Vec3(mins.x, maxs.y, maxs.z)
+  };
+
+  const auto makeVertex = [&](const Vec3& p) -> DebugVertex {
+    DebugVertex v;
+    v.position[0] = p.x;
+    v.position[1] = p.y;
+    v.position[2] = p.z;
+    v.color = PackColor(color);
+    return v;
+  };
+
+  if (solid)
+  {
+    static const int faceIndices[12][3] = {
+        {0,1,2}, {0,2,3},
+        {4,5,6}, {4,6,7},
+        {0,1,5}, {0,5,4},
+        {2,3,7}, {2,7,6},
+        {1,2,6}, {1,6,5},
+        {0,3,7}, {0,7,4}
+    };
+
+    std::vector<DebugVertex> vertices;
+    vertices.reserve(12 * 3);
+    for (const auto& idx : faceIndices)
+    {
+      vertices.push_back(makeVertex(corners[idx[0]]));
+      vertices.push_back(makeVertex(corners[idx[1]]));
+      vertices.push_back(makeVertex(corners[idx[2]]));
+    }
+
+    bool depthTest = true;
+    bool depthWrite = false;
+    bool blend = NeedsBlend(color);
+    QueueDebugCommand(MTLPrimitiveTypeTriangle, vertices, depthTest, depthWrite, blend);
+  }
+  else
+  {
+    static const int edgeIndices[12][2] = {
+        {0,1}, {1,2}, {2,3}, {3,0},
+        {4,5}, {5,6}, {6,7}, {7,4},
+        {0,4}, {1,5}, {2,6}, {3,7}
+    };
+
+    std::vector<DebugVertex> vertices;
+    vertices.reserve(24);
+    for (const auto& edge : edgeIndices)
+    {
+      vertices.push_back(makeVertex(corners[edge[0]]));
+      vertices.push_back(makeVertex(corners[edge[1]]));
+    }
+
+    bool depthTest = true;
+    bool depthWrite = false;
+    bool blend = NeedsBlend(color);
+    QueueDebugCommand(MTLPrimitiveTypeLine, vertices, depthTest, depthWrite, blend);
+  }
+}
+
+void CMetalRenderer::QueueDebugSphere(const Vec3& mins, const Vec3& maxs, const CFColor& color, bool solid)
+{
+  const Vec3 center = (mins + maxs) * 0.5f;
+  const Vec3 radii = (maxs - mins) * 0.5f;
+
+  const float pi = 3.14159265359f;
+  const int slices = 24;
+  const int stacks = 12;
+
+  const auto makePosition = [&](float theta, float phi) -> Vec3 {
+    const float sinPhi = sinf(phi);
+    const float cosPhi = cosf(phi);
+    const float sinTheta = sinf(theta);
+    const float cosTheta = cosf(theta);
+    return Vec3(
+        center.x + radii.x * sinPhi * cosTheta,
+        center.y + radii.y * cosPhi,
+        center.z + radii.z * sinPhi * sinTheta);
+  };
+
+  if (solid)
+  {
+    std::vector<DebugVertex> vertices;
+    vertices.reserve(stacks * slices * 6);
+    const uint32_t packedColor = PackColor(color);
+
+    for (int stack = 0; stack < stacks; ++stack)
+    {
+      const float phi0 = pi * static_cast<float>(stack) / stacks;
+      const float phi1 = pi * static_cast<float>(stack + 1) / stacks;
+      for (int slice = 0; slice < slices; ++slice)
+      {
+        const float theta0 = 2.0f * pi * static_cast<float>(slice) / slices;
+        const float theta1 = 2.0f * pi * static_cast<float>(slice + 1) / slices;
+
+        const Vec3 p0 = makePosition(theta0, phi0);
+        const Vec3 p1 = makePosition(theta1, phi0);
+        const Vec3 p2 = makePosition(theta0, phi1);
+        const Vec3 p3 = makePosition(theta1, phi1);
+
+        DebugVertex v0{ {p0.x, p0.y, p0.z}, packedColor };
+        DebugVertex v1{ {p1.x, p1.y, p1.z}, packedColor };
+        DebugVertex v2{ {p2.x, p2.y, p2.z}, packedColor };
+        DebugVertex v3{ {p3.x, p3.y, p3.z}, packedColor };
+
+        vertices.push_back(v0);
+        vertices.push_back(v1);
+        vertices.push_back(v2);
+
+        vertices.push_back(v1);
+        vertices.push_back(v3);
+        vertices.push_back(v2);
+      }
+    }
+
+    bool depthTest = true;
+    bool depthWrite = false;
+    bool blend = NeedsBlend(color);
+    QueueDebugCommand(MTLPrimitiveTypeTriangle, vertices, depthTest, depthWrite, blend);
+  }
+  else
+  {
+    const uint32_t packedColor = PackColor(color);
+    const auto queueRing = [&](int axis) {
+      std::vector<DebugVertex> ringVertices;
+      ringVertices.reserve(slices + 1);
+
+      for (int slice = 0; slice <= slices; ++slice)
+      {
+        const float theta = 2.0f * pi * static_cast<float>(slice) / slices;
+        Vec3 point;
+        switch (axis)
+        {
+          case 0: // XY plane
+            point = Vec3(center.x + radii.x * cosf(theta),
+                         center.y + radii.y * sinf(theta),
+                         center.z);
+            break;
+          case 1: // XZ plane
+            point = Vec3(center.x + radii.x * cosf(theta),
+                         center.y,
+                         center.z + radii.z * sinf(theta));
+            break;
+          default: // YZ plane
+            point = Vec3(center.x,
+                         center.y + radii.y * cosf(theta),
+                         center.z + radii.z * sinf(theta));
+            break;
+        }
+
+        DebugVertex v;
+        v.position[0] = point.x;
+        v.position[1] = point.y;
+        v.position[2] = point.z;
+        v.color = packedColor;
+        ringVertices.push_back(v);
+      }
+
+      bool depthTest = true;
+      bool depthWrite = false;
+      bool blend = NeedsBlend(color);
+      QueueDebugCommand(MTLPrimitiveTypeLineStrip, ringVertices, depthTest, depthWrite, blend);
+    };
+
+    queueRing(0);
+    queueRing(1);
+    queueRing(2);
+  }
+}
+
+void CMetalRenderer::ApplyDebugRenderState(bool depthTest, bool depthWrite, bool blend)
+{
+  SetDepthTest(depthTest);
+  SetDepthWrite(depthWrite);
+  SetBlending(blend);
+  ApplyRenderState();
+}
+
+void CMetalRenderer::RestoreDefaultRenderState()
+{
+  SetDepthTest(true);
+  SetDepthWrite(true);
+  SetBlending(false);
+  ApplyRenderState();
+}
+
+void CMetalRenderer::FlushDebugCommands()
+{
+  if (m_debugCommands.empty())
+    return;
+
+  if (!m_renderEncoder)
+  {
+    m_debugCommands.clear();
+    return;
+  }
+
+  if (!EnsureDebugPipelineState())
+  {
+    m_debugCommands.clear();
+    return;
+  }
+
+  UpdateUniformBuffer();
+  if (m_uniformBuffer)
+  {
+    [m_renderEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:1];
+    [m_renderEncoder setFragmentBuffer:m_uniformBuffer offset:0 atIndex:0];
+  }
+
+  [m_renderEncoder setRenderPipelineState:m_debugPipelineState];
+  m_currentPipelineState = m_debugPipelineState;
+
+  for (const DebugCommand& cmd : m_debugCommands)
+  {
+    ApplyDebugRenderState(cmd.depthTest, cmd.depthWrite, cmd.blend);
+
+    id<MTLBuffer> buffer = [m_device newBufferWithBytes:cmd.vertices.data()
+                                                length:cmd.vertices.size() * sizeof(DebugVertex)
+                                               options:MTLResourceStorageModeShared];
+    if (!buffer)
+      continue;
+
+    [m_renderEncoder setVertexBuffer:buffer offset:0 atIndex:0];
+    [m_renderEncoder drawPrimitives:cmd.primitiveType
+                         vertexStart:0
+                         vertexCount:cmd.vertices.size()];
+
+    [buffer release];
+  }
+
+  RestoreDefaultRenderState();
+  m_debugCommands.clear();
 }
 
 WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int cbpp,
@@ -176,7 +651,7 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
   // Display splash screen (equivalent to D3D9 DisplaySplash timing)
   iLog->Log("CMetalRenderer::Init - Displaying splash screen\n");
   // Temporarily disabled to debug AddressSanitizer crash
-  // DisplaySplash();
+  DisplaySplash();
   
   // Now that Metal device is created, initialize managers
   iLog->Log("CMetalRenderer::Init - Initializing managers (device=%p)\n", m_device);
@@ -1115,22 +1590,43 @@ void CMetalRenderer::CheckError(const char *comment) {
 
 void CMetalRenderer::Draw3dBBox(const Vec3 &mins, const Vec3 &maxs,
                                 int nPrimType) {
-  if (!m_renderEncoder)
-    return;
-
-  assert(false && "Draw3dBBox not implemented");
-  iLog->Log("Drawing 3D bbox: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
-         mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
+  Draw3dPrim(mins, maxs, nPrimType, nullptr);
 }
 
 void CMetalRenderer::Draw3dPrim(const Vec3 &mins, const Vec3 &maxs,
                                 int nPrimType, const float *fRGBA) {
-  if (!m_renderEncoder)
-    return;
+  CFColor color;
+  if (fRGBA) {
+    color.Set(fRGBA[0], fRGBA[1], fRGBA[2], fRGBA[3]);
+  } else {
+    color.Set(1.0f, 1.0f, 1.0f, 1.0f);
+  }
 
-  assert(false && "Draw3dPrim not implemented");
-  iLog->Log("Drawing 3D prim: min(%.2f,%.2f,%.2f) max(%.2f,%.2f,%.2f) type %d\n",
-         mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z, nPrimType);
+  switch (nPrimType) {
+    case DPRIM_LINE:
+      QueueDebugLine(mins, maxs, color, 0);
+      break;
+
+    case DPRIM_WHIRE_BOX:
+      QueueDebugBox(mins, maxs, color, false);
+      break;
+
+    case DPRIM_SOLID_BOX:
+      QueueDebugBox(mins, maxs, color, true);
+      break;
+
+    case DPRIM_WHIRE_SPHERE:
+      QueueDebugSphere(mins, maxs, color, false);
+      break;
+
+    case DPRIM_SOLID_SPHERE:
+      QueueDebugSphere(mins, maxs, color, true);
+      break;
+
+    default:
+      iLog->Log("Draw3dPrim: Unsupported primitive type %d\n", nPrimType);
+      break;
+  }
 }
 
 // State Management Implementation
@@ -1425,15 +1921,10 @@ void CMetalRenderer::ChangeViewport(unsigned int x, unsigned int y,
 
 bool CMetalRenderer::SaveTga(unsigned char *sourcedata, int sourceformat, int w,
                              int h, const char *filename, bool flip) {
-  assert(sourcedata != nullptr && "SaveTga: source data cannot be null");
-  assert(w > 0 && "SaveTga: width must be positive");
-  assert(h > 0 && "SaveTga: height must be positive");
-  assert(filename != nullptr && "SaveTga: filename cannot be null");
-  
-  assert(false && "SaveTga not implemented");
-  iLog->Log("Saving TGA: %dx%d, format %d, file %s\n", w, h, sourceformat,
-         filename ? filename : "NULL");
-  return true;
+  if (!sourcedata || !filename || w <= 0 || h <= 0)
+    return false;
+
+  return CRenderer::SaveTga(sourcedata, sourceformat, w, h, filename, flip);
 }
 
 // Screen Information Implementation
@@ -1442,15 +1933,99 @@ int CMetalRenderer::GetWidth() { return m_width; }
 int CMetalRenderer::GetHeight() { return m_height; }
 
 void CMetalRenderer::GetMemoryUsage(ICrySizer *Sizer) {
-  assert(false && "GetMemoryUsage not implemented");
-  iLog->Log("Getting memory usage\n");
+  if (!Sizer)
+    return;
+
+  SIZER_COMPONENT_NAME(Sizer, "MetalRenderer");
+  Sizer->Add(*this);
+
+  size_t debugBytes = sizeof(DebugCommand) * m_debugCommands.size();
+  for (const DebugCommand& command : m_debugCommands) {
+    debugBytes += command.vertices.capacity() * sizeof(DebugVertex);
+  }
+  Sizer->AddObject(&m_debugCommands, debugBytes);
+
+  if (m_textureManager)
+    Sizer->AddObject(m_textureManager.get(), sizeof(*m_textureManager));
+
+  if (m_shaderManager)
+    Sizer->AddObject(m_shaderManager.get(), sizeof(*m_shaderManager));
+
+  if (m_utilityRenderer)
+    Sizer->AddObject(m_utilityRenderer.get(), sizeof(*m_utilityRenderer));
 }
 
 void CMetalRenderer::ScreenShot(const char *filename) {
-  assert(filename != nullptr && "ScreenShot: filename cannot be null");
-  
-  assert(false && "ScreenShot not implemented");
-  iLog->Log("Taking screenshot: %s\n", filename ? filename : "default");
+  char path[512] = {};
+
+  if (filename && filename[0] != '\0') {
+    size_t len = strlen(filename);
+    if (len >= sizeof(path))
+      len = sizeof(path) - 1;
+    memcpy(path, filename, len);
+    path[len] = '\0';
+  } else {
+    for (int i = 0; i < 10000; ++i) {
+      sprintf(path, "FarCry%04d.tga", i);
+      FILE* fp = fxopen(path, "rb");
+      if (!fp)
+        break;
+      fclose(fp);
+      path[0] = '\0';
+    }
+    if (path[0] == '\0') {
+      iLog->Log("ScreenShot: Unable to find free filename slot\n");
+      return;
+    }
+  }
+
+  if (!m_currentDrawable || !m_currentDrawable.texture) {
+    iLog->Log("ScreenShot: No drawable available\n");
+    return;
+  }
+
+  id<MTLTexture> texture = m_currentDrawable.texture;
+  const NSUInteger width = texture.width;
+  const NSUInteger height = texture.height;
+
+  if (width == 0 || height == 0) {
+    iLog->Log("ScreenShot: Invalid drawable dimensions (%lu x %lu)\n",
+              static_cast<unsigned long>(width),
+              static_cast<unsigned long>(height));
+    return;
+  }
+
+  const NSUInteger bytesPerPixel = 4;
+  const NSUInteger bytesPerRow = width * bytesPerPixel;
+  std::vector<uint8_t> bgra(width * height * bytesPerPixel);
+
+  MTLRegion region = MTLRegionMake2D(0, 0, width, height);
+  [texture getBytes:bgra.data()
+        bytesPerRow:bytesPerRow
+        fromRegion:region
+       mipmapLevel:0];
+
+  std::vector<uint8_t> rgba(bgra.size());
+  for (NSUInteger y = 0; y < height; ++y) {
+    uint8_t* bgraRow = bgra.data() + y * bytesPerRow;
+    uint8_t* rgbaRow = rgba.data() + y * bytesPerRow;
+    for (NSUInteger x = 0; x < width; ++x) {
+      const NSUInteger idx = x * bytesPerPixel;
+      rgbaRow[idx + 0] = bgraRow[idx + 2];
+      rgbaRow[idx + 1] = bgraRow[idx + 1];
+      rgbaRow[idx + 2] = bgraRow[idx + 0];
+      rgbaRow[idx + 3] = bgraRow[idx + 3];
+    }
+  }
+
+  if (!CRenderer::SaveTga(rgba.data(), FORMAT_32_BIT,
+                          static_cast<int>(width),
+                          static_cast<int>(height),
+                          path, true)) {
+    iLog->Log("ScreenShot: Failed to save %s\n", path);
+  } else {
+    iLog->Log("ScreenShot saved to %s\n", path);
+  }
 }
 
 int CMetalRenderer::GetColorBpp() { return m_cbpp; }
@@ -1813,6 +2388,8 @@ void CMetalRenderer::Update() {
 
 void CMetalRenderer::EndFrame() {
   // End rendering
+  FlushDebugCommands();
+
   if (m_renderEncoder) {
     [m_renderEncoder endEncoding];
     [m_renderEncoder release];
@@ -2461,22 +3038,75 @@ static IRenderer *(*g_PackageRenderConstructor)(
 //============================================================================
 
 void CMetalRenderer::DrawPoints(Vec3 v[], int nump, CFColor& col, int flags) {
-    assert(v != nullptr || nump == 0 && "DrawPoints: vertex array cannot be null when nump > 0");
-    assert(nump >= 0 && "DrawPoints: point count cannot be negative");
-    
-    if (!v || nump <= 0 || !m_renderEncoder)
-        return;
-    
-    assert(false && "DrawPoints not implemented");
-    SetState(GS_NODEPTHTEST);
+  if (!v || nump <= 0)
+    return;
+
+  bool depthTest = false;
+  bool depthWrite = false;
+  bool blend = false;
+  DecodeLineFlags(flags, col, depthTest, depthWrite, blend);
+
+  std::vector<DebugVertex> vertices;
+  vertices.reserve(nump);
+  const uint32_t packedColor = PackColor(col);
+
+  for (int i = 0; i < nump; ++i) {
+    DebugVertex dv;
+    dv.position[0] = v[i].x;
+    dv.position[1] = v[i].y;
+    dv.position[2] = v[i].z;
+    dv.color = packedColor;
+    vertices.push_back(dv);
+  }
+
+  QueueDebugCommand(MTLPrimitiveTypePoint, vertices, depthTest, depthWrite, blend);
 }
 
 void CMetalRenderer::DrawLines(Vec3 v[], int nump, CFColor& col, int flags, float fGround) {
-    if (!v || nump < 2 || !m_renderEncoder)
-        return;
-    
-    assert(false && "DrawLines not implemented");
-    SetState(GS_NODEPTHTEST);
+  if (!v || nump <= 0)
+    return;
+
+  bool depthTest = false;
+  bool depthWrite = false;
+  bool blend = false;
+  DecodeLineFlags(flags, col, depthTest, depthWrite, blend);
+
+  const uint32_t packedColor = PackColor(col);
+
+  if (fGround >= 0.0f) {
+    std::vector<DebugVertex> vertices;
+    vertices.reserve(nump * 2);
+
+    for (int i = 0; i < nump; ++i) {
+      const Vec3 groundPos(v[i].x, fGround, v[i].z);
+
+      DebugVertex vg{{groundPos.x, groundPos.y, groundPos.z}, packedColor};
+      DebugVertex vp{{v[i].x, v[i].y, v[i].z}, packedColor};
+
+      vertices.push_back(vg);
+      vertices.push_back(vp);
+    }
+
+    QueueDebugCommand(MTLPrimitiveTypeLine, vertices, depthTest, depthWrite, blend);
+    return;
+  }
+
+  if (nump < 2)
+    return;
+
+  std::vector<DebugVertex> vertices;
+  vertices.reserve(nump);
+
+  for (int i = 0; i < nump; ++i) {
+    DebugVertex dv;
+    dv.position[0] = v[i].x;
+    dv.position[1] = v[i].y;
+    dv.position[2] = v[i].z;
+    dv.color = packedColor;
+    vertices.push_back(dv);
+  }
+
+  QueueDebugCommand(MTLPrimitiveTypeLineStrip, vertices, depthTest, depthWrite, blend);
 }
 
 void CMetalRenderer::EF_Release(int nFlags) {
