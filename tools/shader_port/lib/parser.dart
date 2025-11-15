@@ -216,20 +216,32 @@ List<Map<String, dynamic>> extractTextureStages(List<Block> blocks) {
 List<Map<String, dynamic>> extractPassStates(List<Block> blocks) {
   final List<Map<String, dynamic>> states = [];
   for (final Block block in blocks) {
-    final String lower = block.name.toLowerCase();
-    if (!(lower.contains('pass') || lower.contains('state'))) {
-      continue;
-    }
     final List<Map<String, String>> statements = _extractAssignments(block.content);
     final List<Map<String, dynamic>> entries = _parseStateEntries(block.content);
     if (statements.isEmpty && entries.isEmpty) {
       continue;
     }
-    states.add({
+    final Map<String, dynamic> summary = _summarizePassState(statements, entries);
+    final bool blockNameSuggestsPass = _blockNameSuggestsPass(block.name);
+    final bool hasPassStateCall = entries.any((entry) {
+      if (entry['type'] != 'call') {
+        return false;
+      }
+      final String? value = entry['value'] as String?;
+      return value != null && _isPassStateCall(value);
+    });
+    if (summary.isEmpty && !blockNameSuggestsPass && !hasPassStateCall) {
+      continue;
+    }
+    final Map<String, dynamic> stateInfo = {
       'block': block.name,
       'statements': statements,
       'entries': entries,
-    });
+    };
+    if (summary.isNotEmpty) {
+      stateInfo['stateSummary'] = summary;
+    }
+    states.add(stateInfo);
   }
   return states;
 }
@@ -345,6 +357,505 @@ List<Map<String, dynamic>> _parseStateEntries(String content) {
     entries.add({'type': 'statement', 'value': line});
   }
   return entries;
+}
+
+class _PassStateKeyInfo {
+  const _PassStateKeyInfo(this.canonical, [this.index]);
+
+  final String canonical;
+  final int? index;
+}
+
+class _InlineStateAssignment {
+  _InlineStateAssignment(this.key, this.value);
+
+  final String key;
+  final String value;
+}
+
+const Map<String, String> _passStateKeyLookup = {
+  'alphablendenable': 'blendEnable',
+  'alphafunc': 'alphaFunc',
+  'alpharef': 'alphaRef',
+  'alphatest': 'alphaTest',
+  'blend': 'blendEnable',
+  'blendenable': 'blendEnable',
+  'blendfunc': 'blendFunc',
+  'blendfuncseparate': 'blendFuncSeparate',
+  'blendop': 'blendOp',
+  'blendopalpha': 'blendOpAlpha',
+  'colormask': 'colorMask',
+  'colorwriteenable': 'colorMask',
+  'cullmode': 'cullMode',
+  'depthbias': 'depthBias',
+  'depthfunc': 'depthFunc',
+  'depthtest': 'depthTest',
+  'depthwrite': 'depthWrite',
+  'destblend': 'destBlend',
+  'destblendalpha': 'destBlendAlpha',
+  'fogenable': 'fogEnable',
+  'mask': 'mask',
+  'shademode': 'shadeMode',
+  'slopebias': 'slopeDepthBias',
+  'srcblend': 'srcBlend',
+  'srcblendalpha': 'srcBlendAlpha',
+  'stencilenable': 'stencilEnable',
+  'stencilfail': 'stencilFail',
+  'stencilfailback': 'stencilFailBack',
+  'stencilfailfront': 'stencilFailFront',
+  'stencilfunc': 'stencilFunc',
+  'stencilfuncback': 'stencilFuncBack',
+  'stencilfuncfront': 'stencilFuncFront',
+  'stencilmask': 'stencilMask',
+  'stencilmaskback': 'stencilMaskBack',
+  'stencilmaskfront': 'stencilMaskFront',
+  'stencilpass': 'stencilPass',
+  'stencilpassback': 'stencilPassBack',
+  'stencilpassfront': 'stencilPassFront',
+  'stencilreffront': 'stencilRefFront',
+  'stencilrefback': 'stencilRefBack',
+  'stencilref': 'stencilRef',
+  'stencilwritemask': 'stencilWriteMask',
+  'stencilwritemaskback': 'stencilWriteMaskBack',
+  'stencilwritemaskfront': 'stencilWriteMaskFront',
+  'stencilzfail': 'stencilZFail',
+  'stencilzfailback': 'stencilZFailBack',
+  'stencilzfailfront': 'stencilZFailFront',
+  'zfunc': 'depthFunc',
+  'ztest': 'depthTest',
+  'zwrite': 'depthWrite',
+};
+
+const Map<String, String> _enumAliases = {
+  'ONE_MINUS_SRC_ALPHA': 'INVSRCALPHA',
+  'ONEMINUSSRCALPHA': 'INVSRCALPHA',
+  'ONE_MINUS_DEST_ALPHA': 'INVDSTALPHA',
+  'ONE_MINUS_DST_ALPHA': 'INVDSTALPHA',
+  'ONEMINUSDSTALPHA': 'INVDSTALPHA',
+  'ONE_MINUS_SRC_COLOR': 'INVSRCOLOR',
+  'ONE_MINUS_DEST_COLOR': 'INVDSTCOLOR',
+  'ONE_MINUS_DST_COLOR': 'INVDSTCOLOR',
+  'ONEMINUSSRCOLOR': 'INVSRCOLOR',
+  'ONEMINUSDSTCOLOR': 'INVDSTCOLOR',
+};
+
+bool _blockNameSuggestsPass(String name) {
+  final String lower = name.toLowerCase();
+  return lower.contains('pass') || lower.contains('state');
+}
+
+bool _isPassStateCall(String call) {
+  final String lowered = call.trim().toLowerCase();
+  return lowered.startsWith('settexture');
+}
+
+_PassStateKeyInfo? _identifyPassStateKey(String rawKey) {
+  String key = rawKey.replaceAll(RegExp(r'\s+'), '');
+  key = key.replaceAll(':', '');
+  final String lower = key.toLowerCase();
+  final RegExpMatch? match = RegExp(r'^([a-z_]+?)(\d+)$').firstMatch(lower);
+  int? index;
+  String lookupKey = lower;
+  if (match != null) {
+    lookupKey = match.group(1)!;
+    index = int.tryParse(match.group(2)!);
+  }
+  String? canonical = _passStateKeyLookup[lookupKey];
+  canonical ??= _passStateKeyLookup[lower];
+  if (canonical == null) {
+    return null;
+  }
+  return _PassStateKeyInfo(canonical, index);
+}
+
+Map<String, dynamic> _summarizePassState(
+  List<Map<String, String>> statements,
+  List<Map<String, dynamic>> entries,
+) {
+  final Map<String, dynamic> summary = {};
+  final Map<String, dynamic> blend = {};
+  final Map<String, Map<String, bool>> colorMasks = {};
+
+  for (final Map<String, String> statement in statements) {
+    String? lhs = statement['lhs'];
+    String? rhs = statement['rhs'];
+    if ((lhs == null || rhs == null) && statement.containsKey('raw')) {
+      final _InlineStateAssignment? inline = _parseInlineState(statement['raw']!);
+      if (inline != null) {
+        lhs = inline.key;
+        rhs = inline.value;
+      }
+    }
+    if (lhs == null || rhs == null) {
+      continue;
+    }
+    final _PassStateKeyInfo? keyInfo = _identifyPassStateKey(lhs);
+    if (keyInfo == null) {
+      continue;
+    }
+    final String value = rhs.trim();
+    switch (keyInfo.canonical) {
+      case 'alphaFunc':
+        summary['alphaFunc'] = _normalizeEnumValue(value);
+        break;
+      case 'alphaRef':
+        final num? numeric = _parseNumericValue(value);
+        if (numeric != null) {
+          summary['alphaRef'] = numeric;
+        }
+        break;
+      case 'alphaTest':
+        final bool? boolValue = _parseBoolValue(value);
+        if (boolValue != null) {
+          summary['alphaTest'] = boolValue;
+        } else {
+          summary['alphaTestMode'] = _normalizeEnumValue(value);
+        }
+        break;
+      case 'blendEnable':
+        final bool? boolValue = _parseBoolValue(value);
+        if (boolValue != null) {
+          blend['enabled'] = boolValue;
+        } else {
+          blend['mode'] = _normalizeEnumValue(value);
+        }
+        break;
+      case 'blendFunc':
+        final List<String> tokens = _splitStateValues(value);
+        if (tokens.length >= 2) {
+          blend['src'] = tokens[0];
+          blend['dst'] = tokens[1];
+        }
+        if (tokens.length >= 4) {
+          blend['srcAlpha'] = tokens[2];
+          blend['dstAlpha'] = tokens[3];
+        }
+        break;
+      case 'blendFuncSeparate':
+        final List<String> tokens = _splitStateValues(value);
+        if (tokens.length >= 2) {
+          blend['src'] = tokens[0];
+          blend['dst'] = tokens[1];
+        }
+        if (tokens.length >= 4) {
+          blend['srcAlpha'] = tokens[2];
+          blend['dstAlpha'] = tokens[3];
+        }
+        break;
+      case 'blendOp':
+        blend['op'] = _normalizeEnumValue(value);
+        break;
+      case 'blendOpAlpha':
+        blend['opAlpha'] = _normalizeEnumValue(value);
+        break;
+      case 'colorMask':
+        final Map<String, bool> mask = _parseColorMask(value);
+        final String key = keyInfo.index == null ? 'colorMask' : 'colorMask${keyInfo.index}';
+        colorMasks[key] = mask;
+        break;
+      case 'cullMode':
+        summary['cullMode'] = _normalizeEnumValue(value);
+        break;
+      case 'depthBias':
+        final num? numeric = _parseNumericValue(value);
+        if (numeric != null) {
+          summary['depthBias'] = numeric;
+        }
+        break;
+      case 'depthFunc':
+        summary['depthFunc'] = _normalizeEnumValue(value);
+        break;
+      case 'depthTest':
+        final bool? boolValue = _parseBoolValue(value);
+        if (boolValue != null) {
+          summary['depthTest'] = boolValue;
+        } else {
+          summary['depthFunc'] = _normalizeEnumValue(value);
+        }
+        break;
+      case 'depthWrite':
+        final bool? boolValue = _parseBoolValue(value);
+        if (boolValue != null) {
+          summary['depthWrite'] = boolValue;
+        }
+        break;
+      case 'destBlend':
+        blend['dst'] = _normalizeEnumValue(value);
+        break;
+      case 'destBlendAlpha':
+        blend['dstAlpha'] = _normalizeEnumValue(value);
+        break;
+      case 'fogEnable':
+        final bool? boolValue = _parseBoolValue(value);
+        if (boolValue != null) {
+          summary['fogEnable'] = boolValue;
+        }
+        break;
+      case 'mask':
+        summary['mask'] = _normalizeEnumValue(value);
+        break;
+      case 'shadeMode':
+        summary['shadeMode'] = _normalizeEnumValue(value);
+        break;
+      case 'slopeDepthBias':
+        final num? numeric = _parseNumericValue(value);
+        if (numeric != null) {
+          summary['slopeDepthBias'] = numeric;
+        }
+        break;
+      case 'srcBlend':
+        blend['src'] = _normalizeEnumValue(value);
+        break;
+      case 'srcBlendAlpha':
+        blend['srcAlpha'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilEnable':
+        final bool? boolValue = _parseBoolValue(value);
+        if (boolValue != null) {
+          summary['stencilEnable'] = boolValue;
+        }
+        break;
+      case 'stencilFail':
+        summary['stencilFail'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilFailBack':
+        summary['stencilFailBack'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilFailFront':
+        summary['stencilFailFront'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilFunc':
+        summary['stencilFunc'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilFuncBack':
+        summary['stencilFuncBack'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilFuncFront':
+        summary['stencilFuncFront'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilMask':
+        final num? numeric = _parseNumericValue(value);
+        if (numeric != null) {
+          summary['stencilMask'] = numeric;
+        }
+        break;
+      case 'stencilMaskBack':
+        final num? numericBack = _parseNumericValue(value);
+        if (numericBack != null) {
+          summary['stencilMaskBack'] = numericBack;
+        }
+        break;
+      case 'stencilMaskFront':
+        final num? numericFront = _parseNumericValue(value);
+        if (numericFront != null) {
+          summary['stencilMaskFront'] = numericFront;
+        }
+        break;
+      case 'stencilPass':
+        summary['stencilPass'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilPassBack':
+        summary['stencilPassBack'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilPassFront':
+        summary['stencilPassFront'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilRef':
+        final num? numeric = _parseNumericValue(value);
+        if (numeric != null) {
+          summary['stencilRef'] = numeric;
+        }
+        break;
+      case 'stencilRefBack':
+        final num? numericBack = _parseNumericValue(value);
+        if (numericBack != null) {
+          summary['stencilRefBack'] = numericBack;
+        }
+        break;
+      case 'stencilRefFront':
+        final num? numericFront = _parseNumericValue(value);
+        if (numericFront != null) {
+          summary['stencilRefFront'] = numericFront;
+        }
+        break;
+      case 'stencilWriteMask':
+        final num? numeric = _parseNumericValue(value);
+        if (numeric != null) {
+          summary['stencilWriteMask'] = numeric;
+        }
+        break;
+      case 'stencilWriteMaskBack':
+        final num? numericBack = _parseNumericValue(value);
+        if (numericBack != null) {
+          summary['stencilWriteMaskBack'] = numericBack;
+        }
+        break;
+      case 'stencilWriteMaskFront':
+        final num? numericFront = _parseNumericValue(value);
+        if (numericFront != null) {
+          summary['stencilWriteMaskFront'] = numericFront;
+        }
+        break;
+      case 'stencilZFail':
+        summary['stencilZFail'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilZFailBack':
+        summary['stencilZFailBack'] = _normalizeEnumValue(value);
+        break;
+      case 'stencilZFailFront':
+        summary['stencilZFailFront'] = _normalizeEnumValue(value);
+        break;
+    }
+  }
+
+  if (blend.isNotEmpty) {
+    summary['blend'] = blend;
+  }
+  if (colorMasks.isNotEmpty) {
+    summary.addAll(colorMasks);
+  }
+
+  return summary;
+}
+
+_InlineStateAssignment? _parseInlineState(String raw) {
+  final String cleaned = raw.replaceAll(';', '').trim();
+  if (cleaned.isEmpty) {
+    return null;
+  }
+  final int spaceIndex = cleaned.indexOf(RegExp(r'\s'));
+  if (spaceIndex == -1) {
+    return null;
+  }
+  final String key = cleaned.substring(0, spaceIndex).trim();
+  final String value = cleaned.substring(spaceIndex + 1).trim();
+  if (key.isEmpty || value.isEmpty) {
+    return null;
+  }
+  return _InlineStateAssignment(key, value);
+}
+
+bool? _parseBoolValue(String value) {
+  final String normalized = value.replaceAll(';', '').trim().toLowerCase();
+  switch (normalized) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'on':
+    case 'enable':
+    case 'enabled':
+      return true;
+    case '0':
+    case 'false':
+    case 'no':
+    case 'off':
+    case 'disable':
+    case 'disabled':
+      return false;
+    default:
+      return null;
+  }
+}
+
+num? _parseNumericValue(String value) {
+  final String normalized = value.replaceAll(';', '').trim();
+  if (normalized.isEmpty) {
+    return null;
+  }
+  if (normalized.startsWith('0x') || normalized.startsWith('0X')) {
+    return int.tryParse(normalized.substring(2), radix: 16);
+  }
+  final int? intValue = int.tryParse(normalized);
+  if (intValue != null) {
+    return intValue;
+  }
+  return double.tryParse(normalized);
+}
+
+String _normalizeEnumValue(String value) {
+  String normalized = value.replaceAll(';', '').trim();
+  if (normalized.isEmpty) {
+    return normalized;
+  }
+  normalized = normalized.replaceAll(RegExp(r'[-]+'), '_');
+  normalized = normalized.replaceAll(RegExp(r'\s+'), '_');
+  normalized = normalized.toUpperCase();
+  return _enumAliases[normalized] ?? normalized;
+}
+
+List<String> _splitStateValues(String raw) {
+  final String cleaned = raw.replaceAll(';', '').trim();
+  if (cleaned.isEmpty) {
+    return const [];
+  }
+  final List<String> tokens =
+      cleaned.split(RegExp(r'[,\s]+')).map((token) => token.trim()).where((token) => token.isNotEmpty).toList();
+  return tokens.map(_normalizeEnumValue).toList();
+}
+
+Map<String, bool> _parseColorMask(String value) {
+  final Map<String, bool> mask = {
+    'red': false,
+    'green': false,
+    'blue': false,
+    'alpha': false,
+  };
+  final String cleaned = value.replaceAll(';', '').trim();
+  if (cleaned.isEmpty) {
+    return mask;
+  }
+  final num? numeric = _parseNumericValue(cleaned);
+  if (numeric != null) {
+    final int bits = numeric.toInt();
+    mask['red'] = (bits & 0x1) != 0;
+    mask['green'] = (bits & 0x2) != 0;
+    mask['blue'] = (bits & 0x4) != 0;
+    mask['alpha'] = (bits & 0x8) != 0;
+    return mask;
+  }
+  final List<String> tokens = cleaned
+      .split(RegExp(r'[|,\s]+'))
+      .map((token) => token.trim())
+      .where((token) => token.isNotEmpty)
+      .map((token) => token.toUpperCase())
+      .toList();
+  if (tokens.isEmpty) {
+    return mask;
+  }
+  for (final String token in tokens) {
+    switch (token) {
+      case 'RGBA':
+      case 'RGB_A':
+      case 'ALL':
+        mask.updateAll((_, __) => true);
+        break;
+      case 'RGB':
+        mask['red'] = true;
+        mask['green'] = true;
+        mask['blue'] = true;
+        break;
+      case 'NONE':
+        mask.updateAll((_, __) => false);
+        break;
+      case 'RED':
+      case 'R':
+        mask['red'] = true;
+        break;
+      case 'GREEN':
+      case 'G':
+        mask['green'] = true;
+        break;
+      case 'BLUE':
+      case 'B':
+        mask['blue'] = true;
+        break;
+      case 'ALPHA':
+      case 'A':
+        mask['alpha'] = true;
+        break;
+    }
+  }
+  return mask;
 }
 
 List<String> extractVertexAttributes(List<Block> blocks) {

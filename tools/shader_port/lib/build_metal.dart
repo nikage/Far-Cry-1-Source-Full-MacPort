@@ -6,7 +6,6 @@ void main(List<String> args) {
     stderr.writeln('Usage: build_metal.dart <root> <generatedDir> <airDir> <outputMetallib>');
     exit(1);
   }
-  final Directory root = Directory(args[0]).absolute;
   final Directory generatedDir = Directory(args[1]);
   final Directory airDir = Directory(args[2]);
   final File metallibFile = File(args[3]);
@@ -41,6 +40,7 @@ void main(List<String> args) {
       '-sdk',
       'macosx',
       'metal',
+      // FIXME: compile to metal 4
       '-std=macos-metal2.0',
       '-c',
       metalFile.path,

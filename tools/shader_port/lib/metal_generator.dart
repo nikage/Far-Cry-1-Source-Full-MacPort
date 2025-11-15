@@ -42,6 +42,74 @@ class ShaderIrData {
   final List<String> maskReferences;
 }
 
+class ShaderIrParseResult {
+  ShaderIrParseResult({
+    required this.data,
+    required this.directives,
+    required this.vertexAttributes,
+  });
+
+  final ShaderIrData data;
+  final List<dynamic> directives;
+  final List<dynamic> vertexAttributes;
+}
+
+class ShaderIrParser {
+  ShaderIrParseResult parse(Map<String, dynamic> ir, String relative) {
+    final List<dynamic> blocks = ir['blocks'] as List<dynamic>? ?? [];
+    final Map<String, dynamic>? mainInputBlock = blocks.cast<Map<String, dynamic>?>().firstWhere(
+        (block) => block != null && (block['name'] as String?)?.toLowerCase() == 'maininput',
+        orElse: () => null);
+    final List<UniformBinding> uniforms = [];
+    final List<TextureBinding> textures = [];
+    final Set<String> uniformNames = <String>{};
+    final Set<String> textureNames = <String>{};
+    if (mainInputBlock != null) {
+      final String content = (mainInputBlock['content'] as String?) ?? '';
+      final RegExp pattern = RegExp(r'uniform\s+(\w+)\s+(\w+)(?:\s*:\s*([^,]+))?', multiLine: true);
+      int slot = 0;
+      for (final Match match in pattern.allMatches(content)) {
+        final String type = match.group(1) ?? '';
+        final String name = match.group(2) ?? '';
+        if (type.isEmpty || name.isEmpty) continue;
+        if (type.toLowerCase().startsWith('sampler')) {
+          if (textureNames.add(name)) {
+            final String semantic = (match.group(3) ?? '').trim();
+            textures.add(TextureBinding(type, name, slot, semantic));
+            slot++;
+          }
+        } else {
+          if (uniformNames.add(name)) {
+            final String semantic = (match.group(3) ?? '').trim();
+            uniforms.add(UniformBinding(type, name, semantic));
+          }
+        }
+      }
+    }
+    final List<dynamic> directives = ir['directives'] as List<dynamic>? ?? [];
+    final String shaderName = (ir['name'] as String? ?? '').isEmpty ? relative : ir['name'] as String;
+    final String normalized = normalizeName(shaderName);
+    final ShaderIrData data = ShaderIrData(
+      shaderName: shaderName,
+      normalizedName: normalized,
+      fragmentName: 'generated_${normalized}_fragment',
+      uniformStruct: '${normalized}_uniforms',
+      uniforms: uniforms,
+      textures: textures,
+      coreExpressions: _castMapList(ir['coreScriptExpressions'] as List<dynamic>?),
+      coreFlow: _castMapList(ir['coreScriptFlow'] as List<dynamic>?),
+      passStates: _castMapList(ir['passStates'] as List<dynamic>?),
+      maskReferences: _castStringList(ir['maskReferences'] as List<dynamic>?),
+    );
+    final List<dynamic> vertexAttributes = ir['vertexAttributes'] as List<dynamic>? ?? [];
+    return ShaderIrParseResult(
+      data: data,
+      directives: directives,
+      vertexAttributes: vertexAttributes,
+    );
+  }
+}
+
 void main(List<String> args) {
   final Directory root = (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
   final String sep = Platform.pathSeparator;
@@ -56,6 +124,7 @@ void main(List<String> args) {
   final File manifest = File(outDir.path + sep + 'generated_manifest.json');
   final List<Map<String, dynamic>> manifestEntries = [];
   int generated = 0;
+  final ShaderIrParser parser = ShaderIrParser();
   for (final FileSystemEntity entity in irDir.listSync(recursive: true, followLinks: false)) {
     if (entity is! File) continue;
     if (!entity.path.endsWith('.json')) continue;
@@ -65,87 +134,34 @@ void main(List<String> args) {
     final String extension = (ir['extension'] as String? ?? '').toLowerCase();
     if (extension != 'cryps' && extension != 'crycg') continue;
     final String relative = entity.path.substring(irDir.path.length + 1).replaceAll(RegExp(r'[\\/]'), '/');
-    final String shaderName = (ir['name'] as String? ?? '').isEmpty ? relative : ir['name'] as String;
-    final List<dynamic> blocks = ir['blocks'] as List<dynamic>? ?? [];
-    final Map<String, dynamic>? mainInputBlock = blocks.cast<Map<String, dynamic>?>().firstWhere(
-        (block) => block != null && (block['name'] as String?)?.toLowerCase() == 'maininput',
-        orElse: () => null);
-    final List<UniformBinding> uniforms = [];
-    final List<TextureBinding> textures = [];
-    final Set<String> uniformNames = <String>{};
-    final Set<String> textureNames = <String>{};
-    final List<dynamic> directivesRaw = ir['directives'] as List<dynamic>? ?? [];
-    if (mainInputBlock != null) {
-      final String content = (mainInputBlock['content'] as String?) ?? '';
-      final RegExp pattern = RegExp(r'uniform\s+(\w+)\s+(\w+)(?:\s*:\s*([^,]+))?', multiLine: true);
-      int slot = 0;
-      for (final Match match in pattern.allMatches(content)) {
-        final String type = match.group(1) ?? '';
-        final String name = match.group(2) ?? '';
-        if (type.isEmpty || name.isEmpty) continue;
-        if (type.toLowerCase().startsWith('sampler')) {
-          if (textureNames.add(name)) {
-          final String semantic = (match.group(3) ?? '').trim();
-          textures.add(TextureBinding(type, name, slot, semantic));
-            slot++;
-          }
-        } else {
-          if (uniformNames.add(name)) {
-          final String semantic = (match.group(3) ?? '').trim();
-          uniforms.add(UniformBinding(type, name, semantic));
-          }
-        }
-      }
-    }
-    final String normalized = normalizeName(shaderName);
-    final String fragmentName = 'generated_${normalized}_fragment';
-    final String uniformStruct = '${normalized}_uniforms';
-    final List<Map<String, dynamic>> coreExpressions =
-        _castMapList(ir['coreScriptExpressions'] as List<dynamic>?);
-    final List<Map<String, dynamic>> coreFlow =
-        _castMapList(ir['coreScriptFlow'] as List<dynamic>?);
-    final List<Map<String, dynamic>> passStates =
-        _castMapList(ir['passStates'] as List<dynamic>?);
-    final List<String> maskReferences =
-        _castStringList(ir['maskReferences'] as List<dynamic>?);
-    final ShaderIrData data = ShaderIrData(
-      shaderName: shaderName,
-      normalizedName: normalized,
-      fragmentName: fragmentName,
-      uniformStruct: uniformStruct,
-      uniforms: uniforms,
-      textures: textures,
-      coreExpressions: coreExpressions,
-      coreFlow: coreFlow,
-      passStates: passStates,
-      maskReferences: maskReferences,
-    );
+    final ShaderIrParseResult result = parser.parse(ir, relative);
+    final ShaderIrData data = result.data;
     final String metalFileName = '${relative.replaceAll('/', '_')}.metal';
     final File targetFile = File(outDir.path + sep + metalFileName);
     targetFile.parent.createSync(recursive: true);
     targetFile.writeAsStringSync(buildMetal(data));
-    final List<dynamic> vertexAttributes = ir['vertexAttributes'] as List<dynamic>? ?? [];
-    final Map<String, dynamic> pipeline = derivePipelineMetadata(shaderName, directivesRaw);
+    final Map<String, dynamic> pipeline =
+        derivePipelineMetadata(data.shaderName, result.directives, data.passStates);
     manifestEntries.add({
       'source': relative,
       'metal': metalFileName,
-      'shader': shaderName,
-      'normalized': normalized,
-      'fragment': fragmentName,
-      'uniformStruct': uniformStruct,
-      'uniformCount': uniforms.length,
-      'textureCount': textures.length,
-      'vertexAttributes': vertexAttributes,
-      'directives': directivesRaw,
+      'shader': data.shaderName,
+      'normalized': data.normalizedName,
+      'fragment': data.fragmentName,
+      'uniformStruct': data.uniformStruct,
+      'uniformCount': data.uniforms.length,
+      'textureCount': data.textures.length,
+      'vertexAttributes': result.vertexAttributes,
+      'directives': result.directives,
       'maskReferences': data.maskReferences,
-      'uniforms': uniforms
+      'uniforms': data.uniforms
           .map((u) => {
                 'name': u.name,
                 'type': u.type,
                 'semantic': u.semantic,
               })
           .toList(),
-      'textures': textures
+      'textures': data.textures
           .map((t) => {
                 'name': t.name,
                 'type': t.type,
@@ -159,6 +175,10 @@ void main(List<String> args) {
   }
   manifest.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifestEntries));
   stdout.writeln('Generated $generated Metal shader fragments');
+}
+
+String buildMetal(ShaderIrData data) {
+  return MetalFragmentBuilder(data).build();
 }
 
 String normalizeName(String input) {
@@ -178,12 +198,43 @@ String normalizeName(String input) {
   return normalized;
 }
 
-String buildMetal(ShaderIrData data) {
-  final StringBuffer buffer = StringBuffer();
-  buffer.writeln('#include <metal_stdlib>');
-  buffer.writeln('using namespace metal;');
-  buffer.writeln();
-  if (data.uniforms.isNotEmpty) {
+class MetalFragmentBuilder {
+  MetalFragmentBuilder(this.data)
+      : _analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow);
+
+  final ShaderIrData data;
+  final _InOutAnalyzer _analyzer;
+  late final ExpressionTranslator _translator = ExpressionTranslator(
+    data,
+    _analyzer,
+    <LineTransformer>[
+      TextureFunctionTransformer(),
+      SaturateTransformer(),
+    ],
+  );
+  late final String _inputStructName = '${data.normalizedName}_input';
+  late final String _outputStructName = '${data.normalizedName}_output';
+
+  String build() {
+    final StringBuffer buffer = StringBuffer();
+    _writePreamble(buffer);
+    _writeUniformStruct(buffer);
+    _writeInputStruct(buffer);
+    _writeOutputStruct(buffer);
+    _writeFragmentFunction(buffer);
+    return buffer.toString();
+  }
+
+  void _writePreamble(StringBuffer buffer) {
+    buffer.writeln('#include <metal_stdlib>');
+    buffer.writeln('using namespace metal;');
+    buffer.writeln();
+  }
+
+  void _writeUniformStruct(StringBuffer buffer) {
+    if (data.uniforms.isEmpty) {
+      return;
+    }
     buffer.writeln('struct ${data.uniformStruct} {');
     for (final UniformBinding uniform in data.uniforms) {
       buffer.writeln('  ${translateType(uniform.type)} ${uniform.name};');
@@ -192,58 +243,61 @@ String buildMetal(ShaderIrData data) {
     buffer.writeln();
   }
 
-  final _InOutAnalyzer analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow);
-  final String inputStructName = '${data.normalizedName}_input';
-  final String outputStructName = '${data.normalizedName}_output';
-
-  buffer.writeln('struct $inputStructName {');
-  buffer.writeln('  float4 position [[position]];');
-  for (final String field in analyzer.inputFields) {
-    buffer.writeln('  float4 $field;');
-  }
-  buffer.writeln('};');
-  buffer.writeln();
-  buffer.writeln('struct $outputStructName {');
-  for (final String field in analyzer.outputFields) {
-    buffer.writeln('  float4 $field;');
-  }
-  buffer.writeln('};');
-  buffer.writeln();
-
-  final List<String> params = [];
-  params.add('$inputStructName IN [[stage_in]]');
-  if (data.uniforms.isNotEmpty) {
-    params.add('constant ${data.uniformStruct}& uniforms [[buffer(0)]]');
-  }
-  for (final TextureBinding texture in data.textures) {
-    params.add('${translateTextureType(texture.type)} ${texture.name} [[texture(${texture.slot})]]');
-    params.add('sampler ${texture.name}Sampler [[sampler(${texture.slot})]]');
+  void _writeInputStruct(StringBuffer buffer) {
+    buffer.writeln('struct $_inputStructName {');
+    buffer.writeln('  float4 position [[position]];');
+    for (final String field in _analyzer.inputFields) {
+      buffer.writeln('  float4 $field;');
+    }
+    buffer.writeln('};');
+    buffer.writeln();
   }
 
-  buffer.writeln('fragment float4 ${data.fragmentName}(${params.join(', ')})');
-  buffer.writeln('{');
-  buffer.writeln('  $outputStructName OUT = $outputStructName();');
-
-  final ExpressionTranslator translator = ExpressionTranslator(data, analyzer);
-  for (final String line in translator.prologue) {
-    buffer.writeln('  $line');
-  }
-  for (final String line in translator.body) {
-    buffer.writeln('  $line');
+  void _writeOutputStruct(StringBuffer buffer) {
+    buffer.writeln('struct $_outputStructName {');
+    for (final String field in _analyzer.outputFields) {
+      buffer.writeln('  float4 $field;');
+    }
+    buffer.writeln('};');
+    buffer.writeln();
   }
 
-  buffer.writeln('  return ${translator.returnExpression};');
-  buffer.writeln('}');
-  return buffer.toString();
+  void _writeFragmentFunction(StringBuffer buffer) {
+    buffer.writeln('fragment float4 ${data.fragmentName}(${_buildParameters().join(', ')})');
+    buffer.writeln('{');
+    buffer.writeln('  $_outputStructName OUT = $_outputStructName();');
+    for (final String line in _translator.prologue) {
+      buffer.writeln('  $line');
+    }
+    for (final String line in _translator.body) {
+      buffer.writeln('  $line');
+    }
+    buffer.writeln('  return ${_translator.returnExpression};');
+    buffer.writeln('}');
+  }
+
+  List<String> _buildParameters() {
+    final List<String> params = <String>['$_inputStructName IN [[stage_in]]'];
+    if (data.uniforms.isNotEmpty) {
+      params.add('constant ${data.uniformStruct}& uniforms [[buffer(0)]]');
+    }
+    for (final TextureBinding texture in data.textures) {
+      params.add('${translateTextureType(texture.type)} ${texture.name} [[texture(${texture.slot})]]');
+      params.add('sampler ${texture.name}Sampler [[sampler(${texture.slot})]]');
+    }
+    return params;
+  }
 }
 
 class ExpressionTranslator {
-  ExpressionTranslator(this.data, this.analyzer) {
+  ExpressionTranslator(this.data, this.analyzer, List<LineTransformer> transformers)
+      : _transformers = transformers {
     _build();
   }
 
   final ShaderIrData data;
   final _InOutAnalyzer analyzer;
+  final List<LineTransformer> _transformers;
   final List<String> prologue = <String>[];
   final List<String> body = <String>[];
   late final String returnExpression;
@@ -272,48 +326,33 @@ class ExpressionTranslator {
 
   String _rewriteLine(String line) {
     String result = line;
-    result = _rewriteTextureFunctions(result);
-    result = _rewriteSaturate(result);
+    for (final LineTransformer transformer in _transformers) {
+      result = transformer.transform(result);
+    }
     return result;
   }
+}
 
-  String _rewriteTextureFunctions(String line) {
+abstract class LineTransformer {
+  String transform(String line);
+}
+
+class TextureFunctionTransformer implements LineTransformer {
+  @override
+  String transform(String line) {
     final StringBuffer buffer = StringBuffer();
     int index = 0;
     while (index < line.length) {
       final String? functionName = _detectTextureFunction(line, index);
       if (functionName != null) {
-        final _FunctionCall? call = _parseFunctionCall(line, index);
+        final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
         if (call == null) {
           buffer.write(line[index]);
           index++;
           continue;
         }
         final String original = line.substring(index, call.endIndex);
-        final String replacement = _translateTextureCall(original, call);
-        buffer.write(replacement);
-        index = call.endIndex;
-        continue;
-      }
-      buffer.write(line[index]);
-      index++;
-    }
-    return buffer.toString();
-  }
-
-  String _rewriteSaturate(String line) {
-    final StringBuffer buffer = StringBuffer();
-    int index = 0;
-    while (index < line.length) {
-      if (_matchesFunction(line, index, 'saturate')) {
-        final _FunctionCall? call = _parseFunctionCall(line, index);
-        if (call == null || call.args.isEmpty) {
-          buffer.write(line[index]);
-          index++;
-          continue;
-        }
-        final String argument = call.args.first.trim();
-        buffer.write('clamp($argument, 0.0, 1.0)');
+        buffer.write(_translateTextureCall(original, call));
         index = call.endIndex;
         continue;
       }
@@ -332,14 +371,62 @@ class ExpressionTranslator {
       'texCUBE',
     ];
     for (final String candidate in candidates) {
-      if (_matchesFunction(source, index, candidate)) {
+      if (_FunctionCallUtils.matches(source, index, candidate)) {
         return candidate;
       }
     }
     return null;
   }
 
-  bool _matchesFunction(String source, int index, String name) {
+  String _translateTextureCall(String original, _FunctionCall call) {
+    if (call.args.length < 2) {
+      return original;
+    }
+    final String texture = call.args[0].trim();
+    final String coordinate = call.args[1].trim();
+    final String sampler = '${texture}Sampler';
+    switch (call.name) {
+      case 'tex2D':
+      case 'texRECT':
+      case 'tex3D':
+      case 'texCUBE':
+        return '$texture.sample($sampler, $coordinate)';
+      case 'tex2Dproj':
+        final String projected = '(${coordinate}).xy / (${coordinate}).w';
+        return '$texture.sample($sampler, $projected)';
+      default:
+        return original;
+    }
+  }
+}
+
+class SaturateTransformer implements LineTransformer {
+  @override
+  String transform(String line) {
+    final StringBuffer buffer = StringBuffer();
+    int index = 0;
+    while (index < line.length) {
+      if (_FunctionCallUtils.matches(line, index, 'saturate')) {
+        final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
+        if (call == null || call.args.isEmpty) {
+          buffer.write(line[index]);
+          index++;
+          continue;
+        }
+        final String argument = call.args.first.trim();
+        buffer.write('clamp($argument, 0.0, 1.0)');
+        index = call.endIndex;
+        continue;
+      }
+      buffer.write(line[index]);
+      index++;
+    }
+    return buffer.toString();
+  }
+}
+
+class _FunctionCallUtils {
+  static bool matches(String source, int index, String name) {
     if (!source.startsWith(name, index)) {
       return false;
     }
@@ -359,7 +446,7 @@ class ExpressionTranslator {
     return true;
   }
 
-  _FunctionCall? _parseFunctionCall(String source, int start) {
+  static _FunctionCall? parse(String source, int start) {
     int nameEnd = start;
     while (nameEnd < source.length && _isIdentifierChar(source[nameEnd])) {
       nameEnd++;
@@ -420,28 +507,7 @@ class ExpressionTranslator {
     return _FunctionCall(name, args, index);
   }
 
-  String _translateTextureCall(String original, _FunctionCall call) {
-    if (call.args.length < 2) {
-      return original;
-    }
-    final String texture = call.args[0].trim();
-    final String coordinate = call.args[1].trim();
-    final String sampler = '${texture}Sampler';
-    switch (call.name) {
-      case 'tex2D':
-      case 'texRECT':
-      case 'tex3D':
-      case 'texCUBE':
-        return '$texture.sample($sampler, $coordinate)';
-      case 'tex2Dproj':
-        final String projected = '(${coordinate}).xy / (${coordinate}).w';
-        return '$texture.sample($sampler, $projected)';
-      default:
-        return original;
-    }
-  }
-
-  bool _isIdentifierChar(String char) {
+  static bool _isIdentifierChar(String char) {
     if (char.isEmpty) {
       return false;
     }
@@ -451,7 +517,7 @@ class ExpressionTranslator {
     return isLetter || isDigit || char == '_';
   }
 
-  int _skipString(String source, int index, String delimiter) {
+  static int _skipString(String source, int index, String delimiter) {
     int current = index + 1;
     while (current < source.length) {
       final String char = source[current];
@@ -612,19 +678,25 @@ List<String> _castStringList(List<dynamic>? source) {
   return result;
 }
 
-Map<String, dynamic> derivePipelineMetadata(String shaderName, List<dynamic> directivesRaw) {
+Map<String, dynamic> derivePipelineMetadata(
+    String shaderName, List<dynamic> directivesRaw, List<Map<String, dynamic>> passStates) {
   final String lowerName = shaderName.toLowerCase();
   final Set<String> directives = directivesRaw
       .whereType<String>()
       .map((d) => d.toLowerCase())
       .toSet();
 
-  bool blendEnabled = true;
-  String blendMode = 'alpha';
-  bool depthWrite = false;
-  bool depthTest = true;
-  String depthCompare = 'lessEqual';
-  String cullMode = directives.contains('twosided') ? 'none' : 'back';
+  final Map<String, dynamic>? summary = _extractPrimaryPassSummary(passStates);
+
+  bool blendEnabled = _summaryBlendEnabled(summary) ?? true;
+  String blendMode = _summaryBlendMode(summary) ?? 'alpha';
+  bool depthWrite = summary?['depthWrite'] as bool? ?? false;
+  bool depthTest = summary?['depthTest'] as bool? ?? true;
+  String depthCompare = _mapDepthFunc(summary?['depthFunc'] as String?) ?? 'lessEqual';
+  String cullMode =
+      _mapCullMode(summary?['cullMode'] as String?) ?? (directives.contains('twosided') ? 'none' : 'back');
+  final Map<String, dynamic> blendFactors = _summaryBlendFactors(summary);
+  final Map<String, dynamic>? colorMask = _summaryColorMask(summary);
 
   if (lowerName.contains('shadow') ||
       lowerName.contains('depth') ||
@@ -683,7 +755,7 @@ Map<String, dynamic> derivePipelineMetadata(String shaderName, List<dynamic> dir
     blendMode = 'none';
   }
 
-  return {
+  final Map<String, dynamic> result = <String, dynamic>{
     'blendEnabled': blendEnabled,
     'blendMode': blendMode,
     'depthWrite': depthWrite,
@@ -691,4 +763,148 @@ Map<String, dynamic> derivePipelineMetadata(String shaderName, List<dynamic> dir
     'depthCompare': depthCompare,
     'cullMode': cullMode,
   };
+  if (blendFactors.isNotEmpty) {
+    result['blendFactors'] = blendFactors;
+  }
+  if (colorMask != null && colorMask.isNotEmpty) {
+    result['colorMask'] = colorMask;
+  }
+  if (summary != null) {
+    if (summary.containsKey('alphaFunc')) {
+      result['alphaFunc'] = (summary['alphaFunc'] as String).toLowerCase();
+    }
+    if (summary.containsKey('alphaRef')) {
+      result['alphaRef'] = summary['alphaRef'];
+    }
+  }
+  return result;
+}
+
+Map<String, dynamic>? _extractPrimaryPassSummary(List<Map<String, dynamic>> passStates) {
+  for (final Map<String, dynamic> pass in passStates) {
+    final dynamic summary = pass['stateSummary'];
+    if (summary is Map<String, dynamic> && summary.isNotEmpty) {
+      return summary;
+    }
+  }
+  return null;
+}
+
+bool? _summaryBlendEnabled(Map<String, dynamic>? summary) {
+  final dynamic blend = summary?['blend'];
+  if (blend is Map<String, dynamic>) {
+    final dynamic enabled = blend['enabled'];
+    if (enabled is bool) {
+      return enabled;
+    }
+  }
+  return null;
+}
+
+String? _summaryBlendMode(Map<String, dynamic>? summary) {
+  final dynamic blend = summary?['blend'];
+  if (blend is Map<String, dynamic>) {
+    final dynamic mode = blend['mode'];
+    if (mode is String && mode.isNotEmpty) {
+      return mode.toLowerCase();
+    }
+    final String? src = _asUpper(blend['src']);
+    final String? dst = _asUpper(blend['dst']);
+    if (src != null && dst != null) {
+      if (src == 'ONE' && dst == 'ONE') {
+        return 'add';
+      }
+      if (src == 'SRCALPHA' && (dst == 'INVSRCALPHA' || dst == 'ONE_MINUS_SRC_ALPHA')) {
+        return 'alpha';
+      }
+      if (src == 'ONE' && dst == 'INVSRCALPHA') {
+        return 'premultiplied';
+      }
+    }
+  }
+  return null;
+}
+
+Map<String, dynamic> _summaryBlendFactors(Map<String, dynamic>? summary) {
+  final Map<String, dynamic> factors = <String, dynamic>{};
+  final dynamic blend = summary?['blend'];
+  if (blend is Map<String, dynamic>) {
+    final String? src = _asUpper(blend['src']);
+    final String? dst = _asUpper(blend['dst']);
+    final String? srcAlpha = _asUpper(blend['srcAlpha']);
+    final String? dstAlpha = _asUpper(blend['dstAlpha']);
+    final String? op = _asUpper(blend['op']);
+    final String? opAlpha = _asUpper(blend['opAlpha']);
+    if (src != null) factors['src'] = src;
+    if (dst != null) factors['dst'] = dst;
+    if (srcAlpha != null) factors['srcAlpha'] = srcAlpha;
+    if (dstAlpha != null) factors['dstAlpha'] = dstAlpha;
+    if (op != null) factors['op'] = op;
+    if (opAlpha != null) factors['opAlpha'] = opAlpha;
+  }
+  return factors;
+}
+
+Map<String, dynamic>? _summaryColorMask(Map<String, dynamic>? summary) {
+  Map<String, dynamic>? mask = summary?['colorMask'] as Map<String, dynamic>?;
+  if (mask == null || mask.isEmpty) {
+    mask = summary?['colourmask'] as Map<String, dynamic>?;
+  }
+  return mask?.map((String key, dynamic value) => MapEntry<String, dynamic>(key, value));
+}
+
+String? _mapDepthFunc(String? func) {
+  if (func == null || func.isEmpty) {
+    return null;
+  }
+  final String lower = func.toLowerCase();
+  switch (lower) {
+    case 'less':
+      return 'less';
+    case 'lessequal':
+    case 'less_equal':
+    case 'lequal':
+      return 'lessEqual';
+    case 'greater':
+      return 'greater';
+    case 'greaterequal':
+    case 'greater_equal':
+    case 'gequal':
+      return 'greaterEqual';
+    case 'equal':
+      return 'equal';
+    case 'always':
+      return 'always';
+    case 'never':
+      return 'never';
+    default:
+      return null;
+  }
+}
+
+String? _mapCullMode(String? mode) {
+  if (mode == null || mode.isEmpty) {
+    return null;
+  }
+  final String lower = mode.toLowerCase();
+  switch (lower) {
+    case 'none':
+    case 'disable':
+    case 'disabled':
+    case 'off':
+      return 'none';
+    case 'front':
+      return 'front';
+    case 'back':
+      return 'back';
+    default:
+      return null;
+  }
+}
+
+String? _asUpper(dynamic value) {
+  if (value is String && value.isNotEmpty) {
+    return value.toUpperCase();
+  }
+  return null;
 }

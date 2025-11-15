@@ -13,6 +13,12 @@ Pass0
 {
   CullMode = Back;
   AlphaTest = On;
+  DepthWrite = Off;
+  Blend = On;
+  BlendFunc = SrcAlpha, OneMinusSrcAlpha;
+  ColorWriteEnable = Red|Green|Blue;
+  ColorWriteEnable1 = 0;
+  AlphaRef = 0.5;
   SetTexture(0, baseMap);
 }
 
@@ -79,6 +85,35 @@ CoreScript
         entry['value'] == 'SetTexture(0, baseMap)'),
     'expected SetTexture call in pass entries',
   );
+
+  final Map<String, dynamic> summary =
+      (pass['stateSummary'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+  _check(summary['cullMode'] == 'BACK', 'expected cullMode summary');
+  _check(summary['alphaTest'] == true, 'expected alphaTest boolean summary');
+  _check(summary['depthWrite'] == false, 'expected depthWrite boolean summary');
+  final Map<String, dynamic> blend =
+      (summary['blend'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+  _check(blend['enabled'] == true, 'expected blend enabled');
+  final String? srcFactor = blend['src'] as String?;
+  final String? dstFactor = blend['dst'] as String?;
+  _check(srcFactor == 'SRCALPHA', 'expected src blend factor');
+  _check(
+    dstFactor == 'INVSRCALPHA' || dstFactor == 'ONE_MINUS_SRC_ALPHA',
+    'expected dst blend factor',
+  );
+  final Map<String, dynamic> colorMask =
+      (summary['colorMask'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+  _check(colorMask['red'] == true, 'expected red color mask');
+  _check(colorMask['green'] == true, 'expected green color mask');
+  _check(colorMask['blue'] == true, 'expected blue color mask');
+  _check(colorMask['alpha'] == false, 'expected alpha mask disabled');
+  final Map<String, dynamic> colorMask1 =
+      (summary['colorMask1'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+  _check(colorMask1.isNotEmpty, 'expected secondary color mask entry');
+  _check(colorMask1.values.every((dynamic value) => value == false),
+      'expected secondary color mask disabled');
+  final num alphaRef = summary['alphaRef'] as num? ?? -1;
+  _check((alphaRef - 0.5).abs() < 0.001, 'expected alphaRef summary');
 
   stdout.writeln('parser_test: all checks passed');
 }

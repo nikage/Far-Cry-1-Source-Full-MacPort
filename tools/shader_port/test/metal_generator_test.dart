@@ -77,6 +77,45 @@ void main() {
   );
   _check(code.contains('return OUT.Color;'), 'return statement missing');
 
+  final Map<String, dynamic> pipeline = derivePipelineMetadata(
+    shaderName,
+    const [],
+    <Map<String, dynamic>>[
+      {
+        'stateSummary': {
+          'blend': {
+            'enabled': true,
+            'src': 'SRCALPHA',
+            'dst': 'INVSRCALPHA',
+          },
+          'depthWrite': false,
+          'depthTest': true,
+          'depthFunc': 'LESS_EQUAL',
+          'cullMode': 'NONE',
+          'colorMask': {
+            'red': true,
+            'green': true,
+            'blue': true,
+            'alpha': false,
+          },
+        },
+      },
+    ],
+  );
+  _check(pipeline['blendEnabled'] == true, 'pipeline blendEnabled incorrect');
+  _check(pipeline['blendMode'] == 'alpha', 'pipeline blendMode incorrect');
+  final Map<String, dynamic> blendFactors =
+      (pipeline['blendFactors'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+  _check(blendFactors['src'] == 'SRCALPHA', 'pipeline src blend factor incorrect');
+  _check(blendFactors['dst'] == 'INVSRCALPHA', 'pipeline dst blend factor incorrect');
+  _check(pipeline['depthWrite'] == false, 'pipeline depthWrite incorrect');
+  _check(pipeline['depthTest'] == true, 'pipeline depthTest incorrect');
+  _check(pipeline['depthCompare'] == 'lessEqual', 'pipeline depthCompare incorrect');
+  _check(pipeline['cullMode'] == 'none', 'pipeline cull mode incorrect');
+  final Map<String, dynamic> colorMask =
+      (pipeline['colorMask'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+  _check(colorMask['red'] == true && colorMask['alpha'] == false, 'pipeline color mask incorrect');
+
   stdout.writeln('metal_generator_test: all checks passed');
 }
 
