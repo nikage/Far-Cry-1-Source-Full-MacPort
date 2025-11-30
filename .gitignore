@@ -67,6 +67,8 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+!tools/shader_port/bin/
+!tools/shader_port/bin/**
 
 # CMake build directories
 build/
@@ -4222,3 +4224,7 @@ RenderDll/XRenderMetal/Generated
 /RenderDll/XRenderMetal/generated_air_manual/Shaders_HWScripts_Declarations_CGPShaders_CGRefractCMap1_InvCol.crycg.json.air
 /RenderDll/XRenderMetal/generated_air_manual/Shaders_HWScripts_Declarations_CGPShaders_CGWaterVolumeReflCM.crycg.json.air
 /RenderDll/XRenderMetal/generated_air_manual/Shaders_HWScripts_Declarations_CGVShaders_CGVProgHeatVision_Source.crycg.json.air
+
+
+log.txt
+tools/shader_port/.dart_tool/

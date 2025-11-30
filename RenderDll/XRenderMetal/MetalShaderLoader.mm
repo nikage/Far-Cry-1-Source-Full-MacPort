@@ -995,11 +995,15 @@ int CMetalShaderManager::GetGlobalShaderTemplateId() const
 
 void CMetalShaderManager::EF_EnableHeatVision(bool bEnable)
 {
+    if (m_renderer)
+        m_renderer->CRenderer::EF_EnableHeatVision(bEnable);
     m_heatVisionEnabled = bEnable;
 }
 
 bool CMetalShaderManager::EF_GetHeatVision()
 {
+    if (m_renderer)
+        return m_renderer->CRenderer::EF_GetHeatVision();
     return m_heatVisionEnabled;
 }
 
