@@ -22,6 +22,7 @@
 #include <Metal/Metal.h>
 #include <unordered_map>
 #include <memory>
+#include "IRenderer.h"
 
 struct MetalPipelineStateKey
 {
@@ -114,9 +115,11 @@ public:
     size_t GetDepthStencilStateCacheSize() const { return m_depthStencilStateCache.size(); }
     size_t GetSamplerStateCacheSize() const { return m_samplerStateCache.size(); }
     
-    static MTLBlendFactor ConvertBlendFactor(int gsBlendFactor);
+    static MTLBlendFactor ConvertSourceBlendFactor(int state);
+    static MTLBlendFactor ConvertDestinationBlendFactor(int state);
     static MTLCompareFunction ConvertCompareFunction(int state);
     static MTLCullMode ConvertCullMode(int cullMode);
+    static MTLColorWriteMask ConvertColorMask(int state);
     static void ParseRenderState(int state, bool& depthTest, bool& depthWrite, 
                                  MTLBlendFactor& srcBlend, MTLBlendFactor& dstBlend,
                                  bool& blendEnabled, MTLCompareFunction& depthFunc);

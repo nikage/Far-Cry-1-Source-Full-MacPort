@@ -64,6 +64,10 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_sourceBlendFactor(MTLBlendFactorOne)
     , m_destBlendFactor(MTLBlendFactorZero)
     , m_blendOperation(MTLBlendOperationAdd)
+    , m_sourceAlphaBlendFactor(MTLBlendFactorOne)
+    , m_destAlphaBlendFactor(MTLBlendFactorZero)
+    , m_alphaBlendOperation(MTLBlendOperationAdd)
+    , m_colorWriteMask(MTLColorWriteMaskAll)
     , m_viewportX(0)
     , m_viewportY(0)
     , m_viewportWidth(0)
@@ -1196,8 +1200,14 @@ float CMetalBaseRenderer::GetUniformClipRefract() const
 CVertexBuffer* CMetalBaseRenderer::CreateBuffer(int vertexcount, int vertexformat, 
                                                 const char* szSource, bool bDynamic)
 {
-    if (vertexcount <= 0)
+    if (!m_device || vertexcount <= 0)
         return nullptr;
+    
+    const int vertexSize = GetVertexFormatSize(vertexformat);
+    if (vertexSize <= 0)
+        return nullptr;
+    
+    const size_t bufferSize = static_cast<size_t>(vertexcount) * static_cast<size_t>(vertexSize);
     
     CVertexBuffer* vb = new CVertexBuffer();
     if (!vb)
@@ -1206,13 +1216,11 @@ CVertexBuffer* CMetalBaseRenderer::CreateBuffer(int vertexcount, int vertexforma
     vb->m_NumVerts = vertexcount;
     vb->m_vertexformat = vertexformat;
     vb->m_bDynamic = bDynamic ? 1 : 0;
+    vb->m_VS[VSF_GENERAL].m_bDynamic = bDynamic;
+    vb->m_VS[VSF_GENERAL].m_bLocked = false;
+    vb->m_VS[VSF_GENERAL].m_nItems = vertexcount;
     
-    int vertexSize = GetVertexFormatSize(vertexformat);
-    size_t bufferSize = vertexcount * vertexSize;
-    
-    MTLResourceOptions options = bDynamic ? MTLResourceStorageModeShared : MTLResourceStorageModeManaged;
-    id<MTLBuffer> metalBuffer = [m_device newBufferWithLength:bufferSize options:options];
-    
+    id<MTLBuffer> metalBuffer = CreateMetalBuffer(nullptr, bufferSize, MTLResourceStorageModeShared);
     if (!metalBuffer)
     {
         delete vb;
@@ -1220,7 +1228,7 @@ CVertexBuffer* CMetalBaseRenderer::CreateBuffer(int vertexcount, int vertexforma
     }
     
     int bufferId = m_nextVertexBufferId++;
-    if (bufferId >= (int)m_vertexBuffers.size())
+    if (bufferId >= static_cast<int>(m_vertexBuffers.size()))
     {
         m_vertexBuffers.resize(bufferId + 1, nil);
     }
@@ -1228,8 +1236,7 @@ CVertexBuffer* CMetalBaseRenderer::CreateBuffer(int vertexcount, int vertexforma
     
     vb->m_VS[VSF_GENERAL].m_VertBuf.m_nID = bufferId;
     vb->m_VS[VSF_GENERAL].m_VData = [metalBuffer contents];
-    vb->m_VS[VSF_GENERAL].m_nItems = vertexcount;
-    vb->m_VS[VSF_GENERAL].m_bDynamic = bDynamic;
+    vb->m_bFenceSet = 0;
     
     return vb;
 }
@@ -1239,57 +1246,167 @@ void CMetalBaseRenderer::ReleaseBuffer(CVertexBuffer* bufptr)
     if (!bufptr)
         return;
     
-    int bufferId = bufptr->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
-    if (bufferId > 0 && bufferId < (int)m_vertexBuffers.size())
+    for (int stream = 0; stream < VSF_NUM; ++stream)
     {
-        m_vertexBuffers[bufferId] = nil;
+        int bufferId = bufptr->m_VS[stream].m_VertBuf.m_nID;
+        if (bufferId > 0 && bufferId < static_cast<int>(m_vertexBuffers.size()))
+        {
+            m_vertexBuffers[bufferId] = nil;
+        }
+        bufptr->m_VS[stream].m_VertBuf.m_nID = 0;
+        bufptr->m_VS[stream].m_VData = nullptr;
+        bufptr->m_VS[stream].m_nItems = 0;
+        bufptr->m_VS[stream].m_bLocked = false;
     }
     
     delete bufptr;
 }
 
+namespace
+{
+inline size_t StreamStride(const CVertexBuffer* buffer, int streamIndex, CMetalBaseRenderer* renderer)
+{
+    if (streamIndex == VSF_TANGENTS)
+        return sizeof(SPipTangents);
+    if (!buffer)
+        return 0;
+    return renderer->GetVertexFormatSize(buffer->m_vertexformat);
+}
+
+inline int ResolveStreamIndex(int typeValue)
+{
+    if (typeValue == VSF_GENERAL || typeValue == 0)
+        return VSF_GENERAL;
+    if (typeValue < VSF_NUM)
+        return typeValue;
+    for (int i = 0; i < VSF_NUM; ++i)
+    {
+        if (typeValue & (1 << i))
+            return i;
+    }
+    return VSF_GENERAL;
+}
+
+inline int ResolveStreamMask(int typeValue)
+{
+    if (typeValue == 0)
+        return (1 << VSF_GENERAL);
+    if (typeValue < VSF_NUM)
+        return (1 << typeValue);
+    return typeValue;
+}
+}
+
 void CMetalBaseRenderer::UpdateBuffer(CVertexBuffer* dest, const void* src, 
                                      int vertexcount, bool bUnLock, int nOffs, int Type)
 {
-    if (!dest || !src || vertexcount <= 0)
+    if (!dest)
         return;
     
-    int bufferId = dest->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
-    if (bufferId <= 0 || bufferId >= (int)m_vertexBuffers.size())
-        return;
+    auto getBufferForStream = [this, dest](int streamIndex) -> id<MTLBuffer> {
+        const int bufferId = dest->m_VS[streamIndex].m_VertBuf.m_nID;
+        if (bufferId > 0 && bufferId < static_cast<int>(m_vertexBuffers.size()))
+            return m_vertexBuffers[bufferId];
+        return nil;
+    };
     
-    id<MTLBuffer> metalBuffer = m_vertexBuffers[bufferId];
-    if (!metalBuffer)
-        return;
+    auto flushStream = [](id<MTLBuffer> buffer, size_t offset, size_t length) {
+        if (buffer && buffer.storageMode == MTLStorageModeManaged)
+        {
+            [buffer didModifyRange:NSMakeRange(offset, length)];
+        }
+    };
     
-    int vertexSize = GetVertexFormatSize(dest->m_vertexformat);
-    size_t copySize = vertexcount * vertexSize;
-    size_t offset = nOffs * vertexSize;
+    auto lockStream = [&](int streamIndex, bool unlock) {
+        SVertexStream& stream = dest->m_VS[streamIndex];
+        id<MTLBuffer> metalBuffer = getBufferForStream(streamIndex);
+        if (unlock)
+        {
+            if (stream.m_bLocked)
+            {
+                stream.m_bLocked = false;
+                if (metalBuffer)
+                {
+                    flushStream(metalBuffer, 0, [metalBuffer length]);
+                }
+            }
+            return;
+        }
+        
+        if (stream.m_bLocked)
+            return;
+        
+        uint8_t* basePtr = nullptr;
+        if (metalBuffer)
+            basePtr = static_cast<uint8_t*>([metalBuffer contents]);
+        else if (stream.m_VData)
+            basePtr = static_cast<uint8_t*>(stream.m_VData);
+        if (!basePtr)
+            return;
+        
+        const size_t stride = StreamStride(dest, streamIndex, this);
+        stream.m_VData = basePtr + static_cast<size_t>(nOffs) * stride;
+        stream.m_bLocked = true;
+    };
     
-    void* bufferData = (char*)[metalBuffer contents] + offset;
-    memcpy(bufferData, src, copySize);
-    
-    if (metalBuffer.storageMode == MTLStorageModeManaged)
+    if (!src)
     {
-        [metalBuffer didModifyRange:NSMakeRange(offset, copySize)];
+        const int mask = ResolveStreamMask(Type);
+        for (int i = 0; i < VSF_NUM; ++i)
+        {
+            if (mask & (1 << i))
+            {
+                lockStream(i, bUnLock);
+            }
+        }
+        return;
     }
+    
+    if (vertexcount <= 0)
+        return;
+    
+    const int streamIndex = ResolveStreamIndex(Type);
+    SVertexStream& stream = dest->m_VS[streamIndex];
+    id<MTLBuffer> metalBuffer = getBufferForStream(streamIndex);
+    
+    const size_t stride = StreamStride(dest, streamIndex, this);
+    if (stride == 0)
+        return;
+    
+    const size_t copySize = static_cast<size_t>(vertexcount) * stride;
+    const size_t offsetBytes = static_cast<size_t>(nOffs) * stride;
+    
+    uint8_t* dst = nullptr;
+    if (metalBuffer)
+        dst = static_cast<uint8_t*>([metalBuffer contents]);
+    else if (stream.m_VData)
+        dst = static_cast<uint8_t*>(stream.m_VData);
+    
+    if (!dst)
+        return;
+    
+    std::memcpy(dst + offsetBytes, src, copySize);
+    stream.m_VData = dst;
+    stream.m_bLocked = false;
+    stream.m_nItems = std::max(stream.m_nItems, nOffs + vertexcount);
+    dest->m_NumVerts = std::max(dest->m_NumVerts, nOffs + vertexcount);
+    
+    if (metalBuffer)
+        flushStream(metalBuffer, offsetBytes, copySize);
 }
 
 void CMetalBaseRenderer::CreateIndexBuffer(SVertexStream* dest, const void* src, int indexcount)
 {
-    if (!dest || !src || indexcount <= 0)
+    if (!dest || indexcount <= 0 || !m_device)
         return;
     
-    size_t bufferSize = indexcount * sizeof(unsigned short);
-    id<MTLBuffer> metalBuffer = [m_device newBufferWithBytes:src 
-                                                      length:bufferSize 
-                                                     options:MTLResourceStorageModeManaged];
-    
+    const size_t bufferSize = static_cast<size_t>(indexcount) * sizeof(unsigned short);
+    id<MTLBuffer> metalBuffer = CreateMetalBuffer(const_cast<void*>(src), bufferSize, MTLResourceStorageModeShared);
     if (!metalBuffer)
         return;
     
     int bufferId = m_nextIndexBufferId++;
-    if (bufferId >= (int)m_indexBuffers.size())
+    if (bufferId >= static_cast<int>(m_indexBuffers.size()))
     {
         m_indexBuffers.resize(bufferId + 1, nil);
     }
@@ -1298,30 +1415,71 @@ void CMetalBaseRenderer::CreateIndexBuffer(SVertexStream* dest, const void* src,
     dest->m_VertBuf.m_nID = bufferId;
     dest->m_VData = [metalBuffer contents];
     dest->m_nItems = indexcount;
-    dest->m_bDynamic = false;
 }
 
 void CMetalBaseRenderer::UpdateIndexBuffer(SVertexStream* dest, const void* src, 
                                           int indexcount, bool bUnLock)
 {
-    if (!dest || !src || indexcount <= 0)
+    if (!dest)
         return;
     
-    int bufferId = dest->m_VertBuf.m_nID;
-    if (bufferId <= 0 || bufferId >= (int)m_indexBuffers.size())
-        return;
+    auto getBuffer = [this, dest]() -> id<MTLBuffer> {
+        const int bufferId = dest->m_VertBuf.m_nID;
+        if (bufferId > 0 && bufferId < static_cast<int>(m_indexBuffers.size()))
+            return m_indexBuffers[bufferId];
+        return nil;
+    };
     
-    id<MTLBuffer> metalBuffer = m_indexBuffers[bufferId];
-    if (!metalBuffer)
-        return;
-    
-    size_t copySize = indexcount * sizeof(unsigned short);
-    memcpy([metalBuffer contents], src, copySize);
-    
-    if (metalBuffer.storageMode == MTLStorageModeManaged)
+    if (!src)
     {
-        [metalBuffer didModifyRange:NSMakeRange(0, copySize)];
+        id<MTLBuffer> buffer = getBuffer();
+        if (!bUnLock)
+        {
+            if (!dest->m_bLocked && buffer)
+            {
+                dest->m_VData = [buffer contents];
+                dest->m_bLocked = true;
+            }
+        }
+        else if (dest->m_bLocked)
+        {
+            if (buffer && buffer.storageMode == MTLStorageModeManaged)
+            {
+                [buffer didModifyRange:NSMakeRange(0, [buffer length])];
+            }
+            dest->m_bLocked = false;
+        }
+        return;
     }
+    
+    if (indexcount <= 0)
+        return;
+    
+    if (dest->m_nItems < indexcount || dest->m_VertBuf.m_nID <= 0)
+    {
+        ReleaseIndexBuffer(dest);
+        CreateIndexBuffer(dest, src, indexcount);
+        return;
+    }
+    
+    id<MTLBuffer> metalBuffer = getBuffer();
+    const size_t copySize = static_cast<size_t>(indexcount) * sizeof(unsigned short);
+    if (metalBuffer)
+    {
+        std::memcpy([metalBuffer contents], src, copySize);
+        if (metalBuffer.storageMode == MTLStorageModeManaged)
+        {
+            [metalBuffer didModifyRange:NSMakeRange(0, copySize)];
+        }
+        dest->m_VData = [metalBuffer contents];
+    }
+    else if (dest->m_VData)
+    {
+        std::memcpy(dest->m_VData, src, copySize);
+    }
+    
+    dest->m_nItems = std::max(dest->m_nItems, indexcount);
+    dest->m_bLocked = false;
 }
 
 void CMetalBaseRenderer::ReleaseIndexBuffer(SVertexStream* dest)
@@ -1573,6 +1731,9 @@ void CMetalBaseRenderer::SetBlendFactors(MTLBlendFactor source, MTLBlendFactor d
     m_sourceBlendFactor = source;
     m_destBlendFactor = dest;
     m_blendOperation = operation;
+    m_sourceAlphaBlendFactor = source;
+    m_destAlphaBlendFactor = dest;
+    m_alphaBlendOperation = operation;
 }
 
 void CMetalBaseRenderer::ApplyRenderState()

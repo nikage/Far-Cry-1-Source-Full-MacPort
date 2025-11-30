@@ -1638,67 +1638,32 @@ void CMetalRenderer::Draw3dPrim(const Vec3 &mins, const Vec3 &maxs,
 
 // State Management Implementation
 void CMetalRenderer::SetState(int State) {
-  assert(m_renderEncoder != nil || State == 0 && "SetState: render encoder must be valid for non-zero states");
-  
-  if (!m_renderEncoder)
+  if (m_currentState == State)
     return;
 
-  // Note: In production, we would cache current state to avoid redundant state changes
-  
-  // Map CryEngine state flags to Metal render states
-  // GS_ flags defined in IRenderer.h
-  
-  // Depth test (GS_NODEPTHTEST)
-  // Metal render state is set via pipeline state objects
-  // These states would be encoded when creating the render pipeline
-  
-  bool depthTestEnabled = !(State & GS_NODEPTHTEST);
-  bool depthWriteEnabled = !(State & GS_DEPTHWRITE);
-  
-  // In Metal, depth/stencil state is set via MTLDepthStencilState
-  // For now, we note the state for later pipeline state creation
-  
-  // Blending (GS_BLSRC_*, GS_BLDST_*)
-  if (State & (GS_BLSRC_MASK | GS_BLDST_MASK)) {
-    // Extract blend source and dest factors for debugging
-    int blendSrc = State & GS_BLSRC_MASK;
-    int blendDst = State & GS_BLDST_MASK;
-    
-    assert((blendSrc == 0 || blendSrc == GS_BLSRC_ZERO || blendSrc == GS_BLSRC_ONE || 
-            blendSrc == GS_BLSRC_DSTCOL || blendSrc == GS_BLSRC_ONEMINUSDSTCOL ||
-            blendSrc == GS_BLSRC_SRCALPHA || blendSrc == GS_BLSRC_ONEMINUSSRCALPHA ||
-            blendSrc == GS_BLSRC_DSTALPHA || blendSrc == GS_BLSRC_ONEMINUSDSTALPHA) && 
-           "SetState: invalid blend source factor");
-    
-    assert((blendDst == 0 || blendDst == GS_BLDST_ZERO || blendDst == GS_BLDST_ONE || 
-            blendDst == GS_BLDST_SRCCOL || blendDst == GS_BLDST_ONEMINUSSRCCOL ||
-            blendDst == GS_BLDST_SRCALPHA || blendDst == GS_BLDST_ONEMINUSSRCALPHA ||
-            blendDst == GS_BLDST_DSTALPHA || blendDst == GS_BLDST_ONEMINUSDSTALPHA) && 
-           "SetState: invalid blend destination factor");
-    
-    // Blending enabled
-    // In Metal, blend state is part of the pipeline state object
-    // Would need to be set during MTLRenderPipelineDescriptor configuration
-    // and applied when creating the pipeline state
-    iLog->Log("SetState: Blending enabled - src=0x%x dst=0x%x\n", blendSrc, blendDst);
+  m_currentState = State;
+
+  bool depthTestEnabled = (State & GS_NODEPTHTEST) == 0;
+  bool depthWriteEnabled = (State & GS_DEPTHWRITE) != 0;
+  MTLCompareFunction depthFunction = CMetalStateCache::ConvertCompareFunction(State);
+
+  SetDepthTest(depthTestEnabled);
+  SetDepthWrite(depthWriteEnabled);
+  SetDepthFunction(depthFunction);
+
+  bool blendEnabled = (State & GS_BLEND_MASK) != 0;
+  if (blendEnabled) {
+    MTLBlendFactor srcBlend = CMetalStateCache::ConvertSourceBlendFactor(State);
+    MTLBlendFactor dstBlend = CMetalStateCache::ConvertDestinationBlendFactor(State);
+    SetBlending(true);
+    SetBlendFactors(srcBlend, dstBlend, MTLBlendOperationAdd);
+  } else {
+    SetBlending(false);
   }
-  
-  // Color masking (GS_NOCOLMASK)
-  if (State & GS_NOCOLMASK) {
-    // No color writing - disable all color channels
-    // This would be set in pipeline state creation
-    iLog->Log("SetState: Color masking disabled\n");
-  }
-  
-  // Alpha test (GS_ALPHATEST_*)
-  if (State & GS_ALPHATEST_MASK) {
-    int alphaFunc = State & GS_ALPHATEST_MASK;
-    // Note: Alpha test function validation removed - constants not available in Metal renderer
-    iLog->Log("SetState: Alpha test enabled - func=0x%x\n", alphaFunc);
-  }
-  
-  // Note: State cache methods will be implemented when CMetalStateCache is fully developed
-  // For now, state changes are applied directly via render encoder
+
+  m_colorWriteMask = CMetalStateCache::ConvertColorMask(State);
+
+  ApplyRenderState();
 }
 
 void CMetalRenderer::SetCullMode(int mode) {

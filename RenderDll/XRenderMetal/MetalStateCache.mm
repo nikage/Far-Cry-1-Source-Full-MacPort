@@ -192,21 +192,48 @@ void CMetalStateCache::ClearCache()
     m_samplerStateCache.clear();
 }
 
-MTLBlendFactor CMetalStateCache::ConvertBlendFactor(int gsBlendFactor)
+MTLBlendFactor CMetalStateCache::ConvertSourceBlendFactor(int state)
 {
-    switch (gsBlendFactor)
+    switch (state & GS_BLSRC_MASK)
     {
-        case 0x1:  return MTLBlendFactorZero;
-        case 0x2:  return MTLBlendFactorOne;
-        case 0x3:  return MTLBlendFactorDestinationColor;
-        case 0x4:  return MTLBlendFactorOneMinusDestinationColor;
-        case 0x5:  return MTLBlendFactorSourceAlpha;
-        case 0x6:  return MTLBlendFactorOneMinusSourceAlpha;
-        case 0x7:  return MTLBlendFactorDestinationAlpha;
-        case 0x8:  return MTLBlendFactorOneMinusDestinationAlpha;
-        case 0x9:  return MTLBlendFactorSourceAlphaSaturated;
-        default:   return MTLBlendFactorOne;
+        case GS_BLSRC_ZERO: return MTLBlendFactorZero;
+        case GS_BLSRC_ONE: return MTLBlendFactorOne;
+        case GS_BLSRC_DSTCOL: return MTLBlendFactorDestinationColor;
+        case GS_BLSRC_ONEMINUSDSTCOL: return MTLBlendFactorOneMinusDestinationColor;
+        case GS_BLSRC_SRCALPHA: return MTLBlendFactorSourceAlpha;
+        case GS_BLSRC_ONEMINUSSRCALPHA: return MTLBlendFactorOneMinusSourceAlpha;
+        case GS_BLSRC_DSTALPHA: return MTLBlendFactorDestinationAlpha;
+        case GS_BLSRC_ONEMINUSDSTALPHA: return MTLBlendFactorOneMinusDestinationAlpha;
+        case GS_BLSRC_ALPHASATURATE: return MTLBlendFactorSourceAlphaSaturated;
+        default: return MTLBlendFactorOne;
     }
+}
+
+MTLBlendFactor CMetalStateCache::ConvertDestinationBlendFactor(int state)
+{
+    switch (state & GS_BLDST_MASK)
+    {
+        case GS_BLDST_ZERO: return MTLBlendFactorZero;
+        case GS_BLDST_ONE: return MTLBlendFactorOne;
+        case GS_BLDST_SRCCOL: return MTLBlendFactorSourceColor;
+        case GS_BLDST_ONEMINUSSRCCOL: return MTLBlendFactorOneMinusSourceColor;
+        case GS_BLDST_SRCALPHA: return MTLBlendFactorSourceAlpha;
+        case GS_BLDST_ONEMINUSSRCALPHA: return MTLBlendFactorOneMinusSourceAlpha;
+        case GS_BLDST_DSTALPHA: return MTLBlendFactorDestinationAlpha;
+        case GS_BLDST_ONEMINUSDSTALPHA: return MTLBlendFactorOneMinusDestinationAlpha;
+        default: return MTLBlendFactorZero;
+    }
+}
+
+MTLColorWriteMask CMetalStateCache::ConvertColorMask(int state)
+{
+    if (state & GS_NOCOLMASK)
+        return static_cast<MTLColorWriteMask>(0);
+    if (state & GS_COLMASKONLYALPHA)
+        return MTLColorWriteMaskAlpha;
+    if (state & GS_COLMASKONLYRGB)
+        return static_cast<MTLColorWriteMask>(MTLColorWriteMaskRed | MTLColorWriteMaskGreen | MTLColorWriteMaskBlue);
+    return MTLColorWriteMaskAll;
 }
 
 MTLCompareFunction CMetalStateCache::ConvertCompareFunction(int state)
@@ -238,19 +265,18 @@ void CMetalStateCache::ParseRenderState(int state, bool& depthTest, bool& depthW
                                         MTLBlendFactor& srcBlend, MTLBlendFactor& dstBlend,
                                         bool& blendEnabled, MTLCompareFunction& depthFunc)
 {
-    depthTest = !(state & 0x00020000);
-    depthWrite = (state & 0x00000100) != 0;
+    depthTest = (state & GS_NODEPTHTEST) == 0;
+    depthWrite = (state & GS_DEPTHWRITE) != 0;
     depthFunc = ConvertCompareFunction(state);
     
-    int srcFactor = state & 0xF;
-    int dstFactor = (state & 0xF0) >> 4;
-    
-    blendEnabled = (srcFactor != 0 || dstFactor != 0);
+    int srcFactor = state & GS_BLSRC_MASK;
+    int dstFactor = state & GS_BLDST_MASK;
+    blendEnabled = (srcFactor != 0) || (dstFactor != 0);
     
     if (blendEnabled)
     {
-        srcBlend = ConvertBlendFactor(srcFactor);
-        dstBlend = ConvertBlendFactor(dstFactor);
+        srcBlend = ConvertSourceBlendFactor(state);
+        dstBlend = ConvertDestinationBlendFactor(state);
     }
     else
     {
