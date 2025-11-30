@@ -9,6 +9,9 @@
 *.o
 *.obj
 
+# Renderer comparison artifacts
+Testing/renderer_compare/output/
+
 # Precompiled Headers
 *.gch
 *.pch

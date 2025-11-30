@@ -285,6 +285,9 @@ public:
     void SetGlobalShaderTemplateId(int nTemplateId);
     int GetGlobalShaderTemplateId() const;
     void ShareCacheWith(CMetalShaderManager* other);
+    void ApplyShaderPipelineState(IShader* shader);
+    ShaderInfo* FindShaderInfo(IShader* shader);
+    void ApplyPipelineStateInternal(ShaderInfo& info);
 
     // Pipeline state access methods
     id<MTLRenderPipelineState> GetPipelineStateForShader(const char* shaderName);

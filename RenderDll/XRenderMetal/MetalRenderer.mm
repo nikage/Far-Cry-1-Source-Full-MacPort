@@ -29,6 +29,11 @@
 #include <cstdio>
 #include <cstdint>
 #include <utility>
+#include <cstdlib>
+#include <fstream>
+#include <iomanip>
+#include <unistd.h>
+#include <limits.h>
 
 // Global system pointers (defined here, declared as extern in CommonRender.h)
 // gRenDev is defined in RenderDll/Common/Renderer.cpp
@@ -209,11 +214,12 @@ CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
       m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0),
-      m_debugPipelineState(nil) {
+      m_debugPipelineState(nil), m_metalDumpStatsFlag(0), m_diagOutputPath() {
   // Managers will be initialized in Init() after Metal device is created
 }
 
 CMetalRenderer::~CMetalRenderer() {
+  UnregisterMetalConsoleVariables();
   if (m_debugPipelineState) {
     [m_debugPipelineState release];
     m_debugPipelineState = nil;
@@ -663,6 +669,25 @@ WIN_HWND CMetalRenderer::Init(int x, int y, int width, int height, unsigned int 
   if (!InitializeManagers()) {
     iLog->Log("CMetalRenderer::Init - Failed to initialize managers\n");
     return nullptr;
+  }
+  
+  RegisterMetalConsoleVariables();
+  const char* autoDumpEnv = getenv("FARCRY_METAL_DUMPSTATS");
+  const bool autoDumpRequested = autoDumpEnv && autoDumpEnv[0] && autoDumpEnv[0] != '0';
+  const char* diagFileEnv = getenv("FARCRY_METAL_DUMPSTATS_FILE");
+  bool diagPathSet = false;
+  if (diagFileEnv && diagFileEnv[0])
+  {
+    m_diagOutputPath = diagFileEnv;
+    diagPathSet = true;
+  }
+  bool requestFileFound = false;
+  if (!diagPathSet)
+    diagPathSet = LoadDiagnosticsRequestFromFile(requestFileFound);
+  const bool autoDump = autoDumpRequested || requestFileFound;
+  if (autoDump)
+  {
+    DumpMetalDiagnostics();
   }
   
   iLog->Log("CMetalRenderer initialized successfully with managers and window\n");
@@ -1664,6 +1689,11 @@ void CMetalRenderer::SetState(int State) {
   m_colorWriteMask = CMetalStateCache::ConvertColorMask(State);
 
   ApplyRenderState();
+
+  if (m_shaderManager && m_RP.m_pShader) {
+    IShader *currentShader = static_cast<IShader *>(m_RP.m_pShader);
+    m_shaderManager->ApplyShaderPipelineState(currentShader);
+  }
 }
 
 void CMetalRenderer::SetCullMode(int mode) {
@@ -2290,6 +2320,162 @@ void CMetalRenderer::Update() {
 void CMetalRenderer::EndFrame() {
   FlushDebugCommands();
   CMetalBaseRenderer::EndFrame();
+  if (m_metalDumpStatsFlag > 0) {
+    DumpMetalDiagnostics();
+    m_metalDumpStatsFlag = 0;
+  }
+}
+
+void CMetalRenderer::RegisterMetalConsoleVariables()
+{
+  if (!iConsole)
+    return;
+  iConsole->Register("metal_dumpstats", &m_metalDumpStatsFlag, 0, 0,
+                     "Set to 1 to log Metal renderer diagnostics at the end of the next frame");
+}
+
+void CMetalRenderer::UnregisterMetalConsoleVariables()
+{
+  if (!iConsole)
+    return;
+  iConsole->UnregisterVariable("metal_dumpstats");
+}
+
+void CMetalRenderer::DumpMetalDiagnostics() const
+{
+  const int drawCalls = m_numDrawCalls;
+  const int triangles = m_numTriangles;
+  const int shaderCount = m_shaderManager ? m_shaderManager->GetShaderCount() : 0;
+  const int textureCount = m_textureManager ? m_textureManager->GetTextureCount() : 0;
+  const size_t textureBytes =
+      m_textureManager ? m_textureManager->GetTotalTextureMemory() : 0;
+  const double textureMB = textureBytes / (1024.0 * 1024.0);
+
+  size_t pipelineStates = 0;
+  size_t depthStates = 0;
+  size_t samplerStates = 0;
+  if (m_stateCache)
+  {
+    pipelineStates = m_stateCache->GetPipelineStateCacheSize();
+    depthStates = m_stateCache->GetDepthStencilStateCacheSize();
+    samplerStates = m_stateCache->GetSamplerStateCacheSize();
+  }
+
+  if (iLog)
+  {
+    iLog->Log("Metal diagnostics snapshot:");
+    iLog->Log("  Draw calls: %d | Triangles: %d", drawCalls, triangles);
+    iLog->Log("  Shaders loaded: %d", shaderCount);
+    iLog->Log("  Textures: %d (%.2f MB)", textureCount, textureMB);
+    iLog->Log("  Pipeline cache: %zu states (depth: %zu, sampler: %zu)",
+              pipelineStates, depthStates, samplerStates);
+  }
+
+  if (!m_diagOutputPath.empty())
+  {
+    WriteDiagnosticsJson(drawCalls, triangles, shaderCount, textureCount,
+                         textureBytes, pipelineStates, depthStates,
+                         samplerStates);
+  }
+}
+
+void CMetalRenderer::WriteDiagnosticsJson(int drawCalls, int triangles,
+                                          int shaderCount, int textureCount,
+                                          size_t textureBytes,
+                                          size_t pipelineStates,
+                                          size_t depthStates,
+                                          size_t samplerStates) const
+{
+  std::ofstream file(m_diagOutputPath.c_str(), std::ios::out | std::ios::trunc);
+  if (!file.is_open())
+    return;
+
+  const double textureMB = textureBytes / (1024.0 * 1024.0);
+
+  file.setf(std::ios::fixed);
+  file << std::setprecision(4);
+  file << "{\n";
+  file << "  \"drawCalls\": " << drawCalls << ",\n";
+  file << "  \"triangles\": " << triangles << ",\n";
+  file << "  \"shaderCount\": " << shaderCount << ",\n";
+  file << "  \"textureCount\": " << textureCount << ",\n";
+  file << "  \"textureBytes\": " << static_cast<unsigned long long>(textureBytes) << ",\n";
+  file << "  \"textureMB\": " << textureMB << ",\n";
+  file << "  \"pipelineStates\": " << static_cast<unsigned long long>(pipelineStates) << ",\n";
+  file << "  \"depthStates\": " << static_cast<unsigned long long>(depthStates) << ",\n";
+  file << "  \"samplerStates\": " << static_cast<unsigned long long>(samplerStates) << "\n";
+  file << "}\n";
+}
+
+bool CMetalRenderer::LoadDiagnosticsRequestFromFile(bool& requestFileFound)
+{
+  requestFileFound = false;
+
+  auto tryRequest = [this](const std::string& directory) -> bool {
+    if (directory.empty())
+      return false;
+    std::string requestPath = directory + "/metal_diag_request.txt";
+    std::ifstream file(requestPath.c_str());
+    if (!file.is_open())
+      return false;
+
+    std::string line;
+    std::getline(file, line);
+    file.close();
+
+    if (line.empty())
+      return false;
+
+    while (!line.empty())
+    {
+      char last = line.back();
+      if (last == '\n' || last == '\r' || last == ' ' || last == '\t')
+        line.pop_back();
+      else
+        break;
+    }
+
+    if (line.empty())
+      return false;
+
+    m_diagOutputPath = line;
+    return true;
+  };
+
+  char cwd[PATH_MAX];
+  if (getcwd(cwd, sizeof(cwd)))
+  {
+    if (tryRequest(std::string(cwd)))
+    {
+      requestFileFound = true;
+      return true;
+    }
+  }
+
+  NSBundle* bundle = [NSBundle mainBundle];
+  if (bundle)
+  {
+    NSString* bundlePath = [bundle bundlePath];
+    if (bundlePath)
+    {
+      NSString* buildDir = [bundlePath stringByDeletingLastPathComponent];
+      NSString* repoRoot = buildDir ? [buildDir stringByDeletingLastPathComponent] : nil;
+      if (repoRoot && tryRequest(std::string([repoRoot UTF8String])))
+      {
+        requestFileFound = true;
+        return true;
+      }
+
+      if (buildDir)
+      {
+        std::string fallback = std::string([buildDir UTF8String]) + "/metal_diag.json";
+        m_diagOutputPath = fallback;
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
@@ -2628,6 +2814,7 @@ void CMetalRenderer::PostLoad() {
 }
 
 void CMetalRenderer::ShutDown(bool bReInit) {
+  UnregisterMetalConsoleVariables();
   Release();
   
   if (m_currentCommandBuffer) {

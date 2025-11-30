@@ -28,6 +28,7 @@
 #include <QuartzCore/CAMetalLayer.h>
 #include <Cocoa/Cocoa.h>
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <memory>
 
@@ -392,6 +393,19 @@ public:
     void EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, int nFog, CRendElement *re) override;
     void EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, CRendElement *re) override;
     STexPic* EF_MakePhongTexture(int Exp) override;
+
+private:
+    void RegisterMetalConsoleVariables();
+    void UnregisterMetalConsoleVariables();
+    void DumpMetalDiagnostics() const;
+    void WriteDiagnosticsJson(int drawCalls, int triangles, int shaderCount,
+                              int textureCount, size_t textureBytes,
+                              size_t pipelineStates, size_t depthStates,
+                              size_t samplerStates) const;
+    bool LoadDiagnosticsRequestFromFile(bool& requestFileFound);
+
+    int m_metalDumpStatsFlag;
+    std::string m_diagOutputPath;
 
   protected:
     // Specialized manager instances

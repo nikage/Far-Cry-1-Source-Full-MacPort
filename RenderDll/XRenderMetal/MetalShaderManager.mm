@@ -1743,34 +1743,7 @@ void CMetalShaderManager::SetShaderParameters(id<MTLRenderCommandEncoder> encode
     }
     const bool hasUniformBindings = !info.uniformRuntimeBindings.empty();
 
-    if (m_renderer)
-    {
-        if (info.pipelineState)
-            m_renderer->m_currentPipelineState = info.pipelineState;
-
-        if (info.cullMode == MTLCullModeNone)
-            m_renderer->SetCullMode(R_CULL_DISABLE);
-        else if (info.cullMode == MTLCullModeFront)
-            m_renderer->SetCullMode(R_CULL_FRONT);
-        else
-            m_renderer->SetCullMode(R_CULL_BACK);
-
-        m_renderer->SetDepthTest(info.depthTestEnabled);
-        m_renderer->SetDepthWrite(info.depthWriteEnabled);
-        m_renderer->SetDepthFunction(info.depthCompareFunction);
-
-        if (info.blendEnabled)
-        {
-            m_renderer->SetBlending(true);
-            m_renderer->SetBlendFactors(info.sourceBlendFactor, info.destinationBlendFactor, info.blendOperation);
-        }
-        else
-        {
-            m_renderer->SetBlending(false);
-        }
-
-        m_renderer->ApplyRenderState();
-    }
+    ApplyPipelineStateInternal(info);
 
     if (!hasUniformBindings)
         return;
@@ -1851,6 +1824,57 @@ void CMetalShaderManager::BindShaderTextures(id<MTLRenderCommandEncoder> encoder
             [encoder setFragmentSamplerState:sampler atIndex:slot];
         ++bindingIndex;
     }
+}
+
+void CMetalShaderManager::ApplyShaderPipelineState(IShader* shader)
+{
+    ShaderInfo* info = FindShaderInfo(shader);
+    if (!info)
+        return;
+    ApplyPipelineStateInternal(*info);
+}
+
+CMetalShaderManager::ShaderInfo* CMetalShaderManager::FindShaderInfo(IShader* shader)
+{
+    if (!shader)
+        return nullptr;
+    int shaderId = shader->GetID();
+    auto it = m_shaders.find(shaderId);
+    if (it == m_shaders.end())
+        return nullptr;
+    return &it->second;
+}
+
+void CMetalShaderManager::ApplyPipelineStateInternal(ShaderInfo& info)
+{
+    if (!m_renderer)
+        return;
+
+    if (info.pipelineState)
+        m_renderer->m_currentPipelineState = info.pipelineState;
+
+    if (info.cullMode == MTLCullModeNone)
+        m_renderer->SetCullMode(R_CULL_DISABLE);
+    else if (info.cullMode == MTLCullModeFront)
+        m_renderer->SetCullMode(R_CULL_FRONT);
+    else
+        m_renderer->SetCullMode(R_CULL_BACK);
+
+    m_renderer->SetDepthTest(info.depthTestEnabled);
+    m_renderer->SetDepthWrite(info.depthWriteEnabled);
+    m_renderer->SetDepthFunction(info.depthCompareFunction);
+
+    if (info.blendEnabled)
+    {
+        m_renderer->SetBlending(true);
+        m_renderer->SetBlendFactors(info.sourceBlendFactor, info.destinationBlendFactor, info.blendOperation);
+    }
+    else
+    {
+        m_renderer->SetBlending(false);
+    }
+
+    m_renderer->ApplyRenderState();
 }
 
 bool SShaderPass::mfSetTextures()
