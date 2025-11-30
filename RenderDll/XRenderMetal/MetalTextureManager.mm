@@ -27,6 +27,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cfloat>
+#include <utility>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -62,6 +63,134 @@ static void StripExtension(const char *in, char *out)
     }
 }
 
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
+namespace
+{
+    inline size_t DxtBlockSize(ETEX_Format format)
+    {
+        switch (format)
+        {
+            case eTF_DXT1:
+                return 8;
+            case eTF_DXT3:
+            case eTF_DXT5:
+                return 16;
+            default:
+                return 0;
+        }
+    }
+
+    inline bool IsCompressedETEXFormat(ETEX_Format format)
+    {
+        switch (format)
+        {
+            case eTF_DXT1:
+            case eTF_DXT3:
+            case eTF_DXT5:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    inline size_t ComputeCompressedLevelSize(int width, int height, ETEX_Format format)
+    {
+        const size_t blockSize = DxtBlockSize(format);
+        const size_t blocksWide = static_cast<size_t>((width + 3) / 4);
+        const size_t blocksHigh = static_cast<size_t>((height + 3) / 4);
+        return blocksWide * blocksHigh * blockSize;
+    }
+
+    inline size_t ComputeTextureMemoryBytes(int width, int height, int mipLevels, int bytesPerPixel, ETEX_Format format)
+    {
+        size_t total = 0;
+        int levelWidth = std::max(1, width);
+        int levelHeight = std::max(1, height);
+
+        for (int level = 0; level < mipLevels; ++level)
+        {
+            if (IsCompressedETEXFormat(format))
+            {
+                total += ComputeCompressedLevelSize(levelWidth, levelHeight, format);
+            }
+            else
+            {
+                total += static_cast<size_t>(levelWidth) * static_cast<size_t>(levelHeight) * static_cast<size_t>(std::max(1, bytesPerPixel));
+            }
+
+            levelWidth = std::max(1, levelWidth >> 1);
+            levelHeight = std::max(1, levelHeight >> 1);
+        }
+
+        return total;
+    }
+
+    inline int CalculateFullMipCount(int width, int height)
+    {
+        int levels = 1;
+        int w = std::max(1, width);
+        int h = std::max(1, height);
+        while (w > 1 || h > 1)
+        {
+            w = std::max(1, w >> 1);
+            h = std::max(1, h >> 1);
+            ++levels;
+        }
+        return levels;
+    }
+
+    inline NSUInteger BytesPerPixelForMetalFormat(MTLPixelFormat format)
+    {
+        switch (format)
+        {
+            case MTLPixelFormatBC1_RGBA:
+            case MTLPixelFormatBC2_RGBA:
+            case MTLPixelFormatBC3_RGBA:
+                return 0;
+            case MTLPixelFormatRGBA8Unorm:
+            case MTLPixelFormatBGRA8Unorm:
+            case MTLPixelFormatRGBA8Snorm:
+                return 4;
+            case MTLPixelFormatRG8Unorm:
+            case MTLPixelFormatRG8Snorm:
+                return 2;
+            case MTLPixelFormatR8Unorm:
+            case MTLPixelFormatR8Snorm:
+                return 1;
+            case MTLPixelFormatRG16Snorm:
+                return 4;
+            case MTLPixelFormatDepth32Float:
+                return 4;
+            default:
+                return 4;
+        }
+    }
+
+    inline void ReleaseMetalTexture(id<MTLTexture>& texture)
+    {
+        if (texture)
+        {
+            [texture release];
+            texture = nil;
+        }
+    }
+
+    inline void ReleaseSamplerState(id<MTLSamplerState>& sampler)
+    {
+        if (sampler)
+        {
+            [sampler release];
+            sampler = nil;
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////
 // CMetalTexture - ITexPic implementation for Metal textures
 ////////////////////////////////////////////////////////////////////////////
@@ -91,6 +220,72 @@ CMetalTexture::CMetalTexture(int texId, CMetalTextureManager* manager)
 
 CMetalTexture::~CMetalTexture()
 {
+}
+
+struct CMetalTextureManager::TextureInfoHandle::Impl
+{
+    Impl(int textureId, CMetalTextureManager::TextureInfo&& info)
+        : id(textureId)
+        , payload(std::move(info))
+    {
+    }
+
+    ~Impl()
+    {
+        ReleaseMetalTexture(payload.metalTexture);
+    }
+
+    int id = 0;
+    CMetalTextureManager::TextureInfo payload;
+};
+
+CMetalTextureManager::TextureInfoHandle::TextureInfoHandle() = default;
+
+CMetalTextureManager::TextureInfoHandle::TextureInfoHandle(std::shared_ptr<Impl> impl)
+    : m_impl(std::move(impl))
+{
+}
+
+CMetalTextureManager::TextureInfoHandle CMetalTextureManager::TextureInfoHandle::Create(int textureId, CMetalTextureManager::TextureInfo&& info)
+{
+    return TextureInfoHandle(std::make_shared<CMetalTextureManager::TextureInfoHandle::Impl>(textureId, std::move(info)));
+}
+
+CMetalTextureManager::TextureInfo* CMetalTextureManager::TextureInfoHandle::operator->()
+{
+    return m_impl ? &m_impl->payload : nullptr;
+}
+
+const CMetalTextureManager::TextureInfo* CMetalTextureManager::TextureInfoHandle::operator->() const
+{
+    return m_impl ? &m_impl->payload : nullptr;
+}
+
+CMetalTextureManager::TextureInfo& CMetalTextureManager::TextureInfoHandle::operator*()
+{
+    assert(m_impl && "TextureInfoHandle: invalid dereference");
+    return m_impl->payload;
+}
+
+const CMetalTextureManager::TextureInfo& CMetalTextureManager::TextureInfoHandle::operator*() const
+{
+    assert(m_impl && "TextureInfoHandle: invalid dereference");
+    return m_impl->payload;
+}
+
+CMetalTextureManager::TextureInfoHandle::operator bool() const
+{
+    return static_cast<bool>(m_impl);
+}
+
+int CMetalTextureManager::TextureInfoHandle::GetId() const
+{
+    return m_impl ? m_impl->id : 0;
+}
+
+CMetalTextureManager::TextureInfoHandle CMetalTextureManager::CMetalTextureInfoFactory::Create(int textureId, TextureInfo&& info)
+{
+    return TextureInfoHandle::Create(textureId, std::move(info));
 }
 
 void CMetalTexture::AddRef()
@@ -225,6 +420,7 @@ bool CMetalTexture::SetFilter(int nFilter)
 
 CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     : m_renderer(renderer)
+    , m_textureHandleFactory(std::make_unique<CMetalTextureInfoFactory>())
     , m_nextTextureId(1)
     , m_totalTextureMemory(0)
     , m_currentTextureSlot(0)
@@ -252,8 +448,7 @@ CMetalTextureManager::~CMetalTextureManager()
     ClearAllTextures();
     for (auto& entry : m_samplerCache)
     {
-        if (entry.second)
-            [entry.second release];
+        ReleaseSamplerState(entry.second);
     }
     m_samplerCache.clear();
 }
@@ -265,10 +460,10 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
     if (tnum < 0)
         return;
 
-    const auto it = m_textures.find(tnum);
-    if (it != m_textures.end())
+    TextureInfoHandle* handle = FindHandle(tnum);
+    if (handle && *handle)
     {
-        m_currentTexture = it->second.metalTexture;
+        m_currentTexture = (*handle)->metalTexture;
         m_currentTextureSlot = tnum;
         
         if (m_renderer && m_renderer->m_renderEncoder && m_currentTexture)
@@ -426,55 +621,52 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     if (metalFormat == MTLPixelFormatInvalid)
         return 0;
     
-    int bytesPerPixel = GetBytesPerPixel(eTFDst);
-    if (bytesPerPixel == 0)
-        return 0;
-    
-    size_t dataSize = w * h * bytesPerPixel;
-    
-    int textureId = (Id > 0) ? Id : AllocateTextureId();
-    if (textureId <= 0)
-        return 0;
-    
-    auto existingIt = m_textures.find(textureId);
-    if (existingIt != m_textures.end())
-    {
-        m_totalTextureMemory -= existingIt->second.memorySize;
-    }
-    
-    bool useMipmaps = (nummipmap > 0);
-    int mipLevels = useMipmaps ? nummipmap : 1;
+    const bool isCompressed = IsCompressedETEXFormat(eTFDst);
+    const int bytesPerPixel = GetBytesPerPixel(eTFDst);
+    const bool wantsAutogenMips = (nummipmap <= 1) && !isCompressed;
+    const bool canGenerateMips = wantsAutogenMips && (m_renderer->m_commandQueue != nil);
+    const int mipLevels = canGenerateMips ? CalculateFullMipCount(w, h) : std::max(1, nummipmap);
     
     MTLTextureDescriptor* descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalFormat
                                                                                            width:w
                                                                                           height:h
-                                                                                       mipmapped:useMipmaps];
-    
-    if (useMipmaps)
-    {
-        descriptor.mipmapLevelCount = mipLevels;
-    }
-    
-    descriptor.usage = MTLTextureUsageShaderRead;
+                                                                                       mipmapped:(mipLevels > 1)];
+    descriptor.mipmapLevelCount = mipLevels;
     descriptor.storageMode = MTLStorageModeShared;
+    descriptor.usage = canGenerateMips ? (MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite)
+                                       : MTLTextureUsageShaderRead;
     
     id<MTLTexture> texture = [m_renderer->m_device newTextureWithDescriptor:descriptor];
     if (!texture)
-    {
-        if (Id <= 0)
-            ReleaseTextureId(textureId);
         return 0;
+    
+    const int uploadLevels = canGenerateMips ? 1 : mipLevels;
+    const size_t blockSize = isCompressed ? DxtBlockSize(eTFDst) : 0;
+    const int effectiveBpp = std::max(1, bytesPerPixel);
+    const byte* source = data;
+    int levelWidth = w;
+    int levelHeight = h;
+    
+    for (int level = 0; level < uploadLevels; ++level)
+    {
+        const size_t bytesPerRow = isCompressed
+            ? static_cast<size_t>((levelWidth + 3) / 4) * blockSize
+            : static_cast<size_t>(levelWidth) * static_cast<size_t>(effectiveBpp);
+        const size_t levelSize = isCompressed
+            ? static_cast<size_t>((levelWidth + 3) / 4) * static_cast<size_t>((levelHeight + 3) / 4) * blockSize
+            : bytesPerRow * static_cast<size_t>(levelHeight);
+        
+        [texture replaceRegion:MTLRegionMake2D(0, 0, levelWidth, levelHeight)
+                   mipmapLevel:level
+                     withBytes:source
+                   bytesPerRow:bytesPerRow];
+        
+        source += levelSize;
+        levelWidth = std::max(1, levelWidth >> 1);
+        levelHeight = std::max(1, levelHeight >> 1);
     }
     
-    size_t bytesPerRow = w * bytesPerPixel;
-    MTLRegion region = MTLRegionMake2D(0, 0, w, h);
-    
-    [texture replaceRegion:region
-               mipmapLevel:0
-                 withBytes:data
-               bytesPerRow:bytesPerRow];
-    
-    if (useMipmaps && nummipmap > 1)
+    if (canGenerateMips && m_renderer->m_commandQueue)
     {
         id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
@@ -482,7 +674,13 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
         [blitEncoder endEncoding];
         [commandBuffer commit];
         m_renderer->TrackCommandBuffer(commandBuffer);
-        [commandBuffer waitUntilCompleted];
+    }
+    
+    int textureId = (Id > 0) ? Id : AllocateTextureId();
+    if (textureId <= 0)
+    {
+        ReleaseMetalTexture(texture);
+        return 0;
     }
     
     TextureInfo info;
@@ -491,9 +689,9 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     info.height = h;
     info.format = eTFDst;
     info.name = szCacheName ? szCacheName : "";
-    info.memorySize = dataSize;
+    info.memorySize = ComputeTextureMemoryBytes(w, h, mipLevels, effectiveBpp, eTFDst);
     info.isLoaded = true;
-    info.flags = 0;
+    info.flags = flags;
     info.flags2 = 0;
     info.textureType = eTT_Base;
     info.amount1 = -1.0f;
@@ -502,16 +700,16 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     info.clampV = !repeat;
     info.filterMode = filter;
     
-    if (existingIt != m_textures.end())
-    {
-        existingIt->second = info;
-    }
-    else
-    {
-        m_textures[textureId] = info;
-    }
+    size_t previousSize = 0;
+    auto existingHandle = FindHandle(textureId);
+    if (existingHandle && *existingHandle)
+        previousSize = (*existingHandle)->memorySize;
     
-    m_totalTextureMemory += info.memorySize;
+    TextureInfoHandle& storedHandle = UpsertTextureHandle(textureId, std::move(info));
+    
+    if (previousSize > 0)
+        m_totalTextureMemory -= previousSize;
+    m_totalTextureMemory += storedHandle->memorySize;
     
     if (szCacheName && szCacheName[0] != '\0')
     {
@@ -524,15 +722,14 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
 void CMetalTextureManager::UpdateTextureInVideoMemory(uint tnum, unsigned char* newdata, int posx, int posy, 
                                                      int w, int h, ETEX_Format eTF)
 {
-    assert(newdata && "UpdateTextureInVideoMemory: newdata cannot be null!");
-    assert(w > 0 && h > 0 && "UpdateTextureInVideoMemory: width and height must be positive!");
-    assert(posx >= 0 && posy >= 0 && "UpdateTextureInVideoMemory: position cannot be negative!");
+    if (!newdata || w <= 0 || h <= 0 || posx < 0 || posy < 0)
+        return;
     
-    auto it = m_textures.find(tnum);
-    if (it == m_textures.end())
+    TextureInfoHandle* handle = FindHandle(static_cast<int>(tnum));
+    if (!handle || !*handle)
         return;
         
-    id<MTLTexture> texture = it->second.metalTexture;
+    id<MTLTexture> texture = (*handle)->metalTexture;
     if (!texture)
         return;
         
@@ -590,9 +787,9 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     {
         if (tex_type)
         {
-            auto texIt = m_textures.find(nameIt->second);
-            if (texIt != m_textures.end())
-                *tex_type = (int)texIt->second.format;
+            auto texHandle = FindHandle(nameIt->second);
+            if (texHandle && *texHandle)
+                *tex_type = (int)(*texHandle)->format;
             else
                 *tex_type = (int)eTF_8888;
         }
@@ -630,12 +827,13 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     if (bytesPerPixel == 0)
         bytesPerPixel = 4;
     
+    const int mipLevels = CalculateFullMipCount(width, height);
     MTLTextureDescriptor* descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalFormat
                                                                                            width:width
                                                                                           height:height
-                                                                                       mipmapped:YES];
-    
-    descriptor.usage = MTLTextureUsageShaderRead;
+                                                                                       mipmapped:(mipLevels > 1)];
+    descriptor.mipmapLevelCount = mipLevels;
+    descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
     descriptor.storageMode = MTLStorageModeShared;
     
     id<MTLTexture> texture = [m_renderer->m_device newTextureWithDescriptor:descriptor];
@@ -646,7 +844,8 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
         return def_tid;
     }
     
-    size_t bytesPerRow = width * bytesPerPixel;
+    const int effectiveBpp = std::max(1, bytesPerPixel);
+    size_t bytesPerRow = static_cast<size_t>(width) * static_cast<size_t>(effectiveBpp);
     MTLRegion region = MTLRegionMake2D(0, 0, width, height);
     
     [texture replaceRegion:region
@@ -654,7 +853,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
                  withBytes:data.data()
                bytesPerRow:bytesPerRow];
     
-    if (m_renderer->m_commandQueue)
+    if (m_renderer->m_commandQueue && mipLevels > 1)
     {
         id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
@@ -666,12 +865,9 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     
     int textureId = (def_tid > 0 && def_tid != (unsigned int)-1) ? def_tid : AllocateTextureId();
     if (textureId <= 0)
-        return 0;
-    
-    auto existingIt = m_textures.find(textureId);
-    if (existingIt != m_textures.end())
     {
-        m_totalTextureMemory -= existingIt->second.memorySize;
+        ReleaseMetalTexture(texture);
+        return 0;
     }
     
     TextureInfo info;
@@ -680,7 +876,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     info.height = height;
     info.format = detectedFormat;
     info.name = filename;
-    info.memorySize = data.size();
+    info.memorySize = ComputeTextureMemoryBytes(width, height, mipLevels, effectiveBpp, detectedFormat);
     info.isLoaded = true;
     info.flags = 0;
     info.flags2 = 0;
@@ -691,17 +887,18 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     info.clampV = false;
     info.filterMode = FILTER_BILINEAR;
     
-    if (existingIt != m_textures.end())
-    {
-        existingIt->second = info;
-    }
-    else
-    {
-        m_textures[textureId] = info;
-    }
+    size_t previousSize = 0;
+    auto existingHandle = FindHandle(textureId);
+    if (existingHandle && *existingHandle)
+        previousSize = (*existingHandle)->memorySize;
+    
+    TextureInfoHandle& storedHandle = UpsertTextureHandle(textureId, std::move(info));
+    
+    if (previousSize > 0)
+        m_totalTextureMemory -= previousSize;
+    m_totalTextureMemory += storedHandle->memorySize;
     
     m_textureNameMap[nameStr] = textureId;
-    m_totalTextureMemory += info.memorySize;
     
     if (tex_type)
         *tex_type = (int)detectedFormat;
@@ -1266,19 +1463,32 @@ void CMetalTextureManager::RemoveTexture(unsigned int TextureId)
 {
     assert(TextureId > 0 && "RemoveTexture: invalid texture ID!");
     
-    auto it = m_textures.find(TextureId);
-    if (it != m_textures.end())
+    auto handle = FindHandle(static_cast<int>(TextureId));
+    if (!handle || !*handle)
+        return;
+    
+    id<MTLTexture> removedTexture = (*handle)->metalTexture;
+    m_totalTextureMemory -= (*handle)->memorySize;
+    
+    if (!(*handle)->name.empty())
     {
-        m_totalTextureMemory -= it->second.memorySize;
-        
-        if (!it->second.name.empty())
-        {
-            m_textureNameMap.erase(it->second.name);
-        }
-        
-        m_textures.erase(it);
-        ReleaseTextureId(TextureId);
+        m_textureNameMap.erase((*handle)->name);
     }
+    
+    if (m_currentTexture == removedTexture)
+    {
+        m_currentTexture = nil;
+        m_currentTextureSlot = 0;
+    }
+    
+    for (auto& boundTexture : m_boundFragmentTextures)
+    {
+        if (boundTexture == removedTexture)
+            boundTexture = nil;
+    }
+    
+    m_textures.erase(static_cast<int>(TextureId));
+    ReleaseTextureId(TextureId);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1410,8 +1620,8 @@ bool CMetalTextureManager::FontUploadTexture(class CFBitmap* bitmap, ETEX_Format
     
     if (textureId > 0)
     {
-        auto it = m_textures.find(textureId);
-        if (it != m_textures.end() && it->second.metalTexture)
+        auto handle = FindHandle(textureId);
+        if (handle && *handle && (*handle)->metalTexture)
         {
             std::vector<unsigned char> rgbaData(width * height * 4);
             
@@ -1424,7 +1634,7 @@ bool CMetalTextureManager::FontUploadTexture(class CFBitmap* bitmap, ETEX_Format
                 rgbaData[i * 4 + 3] = gray;
             }
             
-            [it->second.metalTexture replaceRegion:MTLRegionMake2D(0, 0, width, height)
+            [(*handle)->metalTexture replaceRegion:MTLRegionMake2D(0, 0, width, height)
                                        mipmapLevel:0
                                          withBytes:rgbaData.data()
                                        bytesPerRow:width * 4];
@@ -1490,8 +1700,8 @@ int CMetalTextureManager::FontCreateTexture(int Width, int Height, byte* pData, 
     info.clampV = true;
     info.filterMode = FILTER_LINEAR;
     
-    m_textures[textureId] = info;
-    m_totalTextureMemory += info.memorySize;
+    TextureInfoHandle& storedHandle = UpsertTextureHandle(textureId, std::move(info));
+    m_totalTextureMemory += storedHandle->memorySize;
     
     return textureId;
 }
@@ -1503,11 +1713,11 @@ bool CMetalTextureManager::FontUpdateTexture(int nTexId, int X, int Y, int USize
     assert(USize > 0 && VSize > 0 && "FontUpdateTexture: update size must be positive!");
     assert(X >= 0 && Y >= 0 && "FontUpdateTexture: position cannot be negative!");
     
-    auto it = m_textures.find(nTexId);
-    if (it == m_textures.end())
+    auto handle = FindHandle(nTexId);
+    if (!handle || !*handle)
         return false;
         
-    UpdateMetalTexture(it->second.metalTexture, pData, X, Y, USize, VSize);
+    UpdateMetalTexture((*handle)->metalTexture, pData, X, Y, USize, VSize);
     return true;
 }
 
@@ -1592,19 +1802,20 @@ void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
 {
     assert(nTexId > 0 && "FontSetTexture: invalid texture ID!");
     
-    auto it = m_textures.find(nTexId);
-    if (it != m_textures.end() && it->second.metalTexture)
+    auto handle = FindHandle(nTexId);
+    if (!handle || !*handle || !(*handle)->metalTexture)
+        return;
+    
+    id<MTLTexture> texture = (*handle)->metalTexture;
+    m_currentTexture = texture;
+    m_currentTextureSlot = nTexId;
+    
+    if (m_renderer && m_renderer->m_renderEncoder)
     {
-        m_currentTexture = it->second.metalTexture;
-        m_currentTextureSlot = nTexId;
-        
-        if (m_renderer && m_renderer->m_renderEncoder)
-        {
-            [m_renderer->m_renderEncoder setFragmentTexture:it->second.metalTexture atIndex:0];
-        }
-        
-        SetTextureParameters(it->second.metalTexture, true, nFilterMode);
+        [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
     }
+    
+    SetTextureParameters(texture, true, nFilterMode);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -1698,17 +1909,17 @@ ITexPic* CMetalTextureManager::EF_GetTextureByID(int Id)
         return nullptr;
     }
     
-    auto it = m_textures.find(Id);
-    if (it == m_textures.end())
+    auto handle = FindHandle(Id);
+    if (!handle || !*handle)
     {
         iLog->Log("Warning: EF_GetTextureByID - texture ID %d not found in texture map\n", Id);
         return nullptr;
     }
     
-    if (!it->second.isLoaded)
+    if (!(*handle)->isLoaded)
     {
         iLog->Log("Warning: EF_GetTextureByID - texture ID %d exists but is not loaded\n", Id);
-        assert(it->second.isLoaded && "CMetalTextureManager: Texture exists but is not loaded!");
+        assert((*handle)->isLoaded && "CMetalTextureManager: Texture exists but is not loaded!");
         return nullptr;
     }
     
@@ -1767,25 +1978,26 @@ ITexPic* CMetalTextureManager::EF_LoadTexture(const char* nameTex, uint flags, u
         return nullptr;
     }
     
-    auto it = m_textures.find(textureId);
-    if (it != m_textures.end())
+    auto handle = FindHandle(static_cast<int>(textureId));
+    if (handle && *handle)
     {
-        it->second.flags = flags;
-        it->second.flags2 = flags2;
-        it->second.textureType = eTT;
-        it->second.amount1 = fAmount1;
-        it->second.amount2 = fAmount2;
-        it->second.clampU = (flags & FT_CLAMP) || (flags2 & FT2_UCLAMP);
-        it->second.clampV = (flags & FT_CLAMP) || (flags2 & FT2_VCLAMP);
+        TextureInfo* entry = handle->operator->();
+        entry->flags = flags;
+        entry->flags2 = flags2;
+        entry->textureType = eTT;
+        entry->amount1 = fAmount1;
+        entry->amount2 = fAmount2;
+        entry->clampU = (flags & FT_CLAMP) || (flags2 & FT2_UCLAMP);
+        entry->clampV = (flags & FT_CLAMP) || (flags2 & FT2_VCLAMP);
         
         if (flags & FT_NOMIPS)
         {
-            it->second.flags |= FT_NOMIPS;
+            entry->flags |= FT_NOMIPS;
         }
         
         if (eTT == eTT_Bumpmap)
         {
-            it->second.flags |= FT_HASNORMALMAP;
+            entry->flags |= FT_HASNORMALMAP;
         }
     }
     
@@ -2351,6 +2563,14 @@ void CMetalTextureManager::ClearAllTextures()
     m_textureNameMap.clear();
     m_totalTextureMemory = 0;
     m_nextTextureId = 1;
+    
+    ReleaseMetalTexture(m_whiteTexture);
+    ReleaseMetalTexture(m_currentTexture);
+    m_currentTextureSlot = 0;
+    for (auto& bound : m_boundFragmentTextures)
+        bound = nil;
+    for (auto& sampler : m_boundFragmentSamplers)
+        sampler = nil;
 }
 
 int CMetalTextureManager::GetTextureCount() const
@@ -2370,27 +2590,33 @@ void CMetalTextureManager::ShareCacheWith(CMetalTextureManager* other)
     
     for (const auto& texPair : other->m_textures) {
         int texId = texPair.first;
-        const auto& texInfo = texPair.second;
+        const auto& texHandle = texPair.second;
+        
+        if (!texHandle)
+            continue;
         
         if (m_textures.find(texId) == m_textures.end()) {
-            m_textures[texId] = texInfo;
-            if (!texInfo.name.empty()) {
-                m_textureNameMap[texInfo.name] = texId;
+            m_textures[texId] = texHandle;
+            if (!texHandle->name.empty()) {
+                m_textureNameMap[texHandle->name] = texId;
             }
-            m_totalTextureMemory += texInfo.memorySize;
+            m_totalTextureMemory += texHandle->memorySize;
         }
     }
     
     for (const auto& texPair : m_textures) {
         int texId = texPair.first;
-        const auto& texInfo = texPair.second;
+        const auto& texHandle = texPair.second;
+        
+        if (!texHandle)
+            continue;
         
         if (other->m_textures.find(texId) == other->m_textures.end()) {
-            other->m_textures[texId] = texInfo;
-            if (!texInfo.name.empty()) {
-                other->m_textureNameMap[texInfo.name] = texId;
+            other->m_textures[texId] = texHandle;
+            if (!texHandle->name.empty()) {
+                other->m_textureNameMap[texHandle->name] = texId;
             }
-            other->m_totalTextureMemory += texInfo.memorySize;
+            other->m_totalTextureMemory += texHandle->memorySize;
         }
     }
 }
@@ -2399,9 +2625,9 @@ const CMetalTextureManager::TextureInfo* CMetalTextureManager::GetTextureInfo(in
 {
     assert(textureId > 0 && "CMetalTextureManager: GetTextureInfo called with invalid ID!");
     
-    auto it = m_textures.find(textureId);
-    if (it != m_textures.end())
-        return &it->second;
+    auto handle = FindHandle(textureId);
+    if (handle && *handle)
+        return handle->operator->();
     return nullptr;
 }
 
@@ -2409,20 +2635,20 @@ void CMetalTextureManager::SetTextureClamp(int textureId, bool bEnable)
 {
     assert(textureId > 0 && "SetTextureClamp: invalid texture ID!");
     
-    auto it = m_textures.find(textureId);
-    if (it != m_textures.end())
+    auto handle = FindHandle(textureId);
+    if (!handle || !*handle)
+        return;
+    
+    (*handle)->clampU = bEnable;
+    (*handle)->clampV = bEnable;
+    
+    if (bEnable)
     {
-        it->second.clampU = bEnable;
-        it->second.clampV = bEnable;
-        
-        if (bEnable)
-        {
-            it->second.flags |= FT_CLAMP;
-        }
-        else
-        {
-            it->second.flags &= ~FT_CLAMP;
-        }
+        (*handle)->flags |= FT_CLAMP;
+    }
+    else
+    {
+        (*handle)->flags &= ~FT_CLAMP;
     }
 }
 
@@ -2430,11 +2656,40 @@ void CMetalTextureManager::SetTextureFilter(int textureId, int nFilter)
 {
     assert(textureId > 0 && "SetTextureFilter: invalid texture ID!");
     
+    auto handle = FindHandle(textureId);
+    if (handle && *handle)
+    {
+        (*handle)->filterMode = nFilter;
+    }
+}
+
+CMetalTextureManager::TextureInfoHandle& CMetalTextureManager::UpsertTextureHandle(int textureId, TextureInfo&& info)
+{
+    TextureInfoHandle handle = m_textureHandleFactory->Create(textureId, std::move(info));
     auto it = m_textures.find(textureId);
     if (it != m_textures.end())
     {
-        it->second.filterMode = nFilter;
+        it->second = std::move(handle);
+        return it->second;
     }
+    auto inserted = m_textures.emplace(textureId, std::move(handle));
+    return inserted.first->second;
+}
+
+CMetalTextureManager::TextureInfoHandle* CMetalTextureManager::FindHandle(int textureId)
+{
+    auto it = m_textures.find(textureId);
+    if (it == m_textures.end())
+        return nullptr;
+    return &it->second;
+}
+
+const CMetalTextureManager::TextureInfoHandle* CMetalTextureManager::FindHandle(int textureId) const
+{
+    auto it = m_textures.find(textureId);
+    if (it == m_textures.end())
+        return nullptr;
+    return &it->second;
 }
 
 // Protected methods
@@ -2451,15 +2706,21 @@ id<MTLTexture> CMetalTextureManager::CreateMetalTexture(int width, int height, M
                                                                                            width:width
                                                                                           height:height
                                                                                        mipmapped:NO];
+    descriptor.storageMode = MTLStorageModeShared;
+    descriptor.usage = MTLTextureUsageShaderRead;
     
     id<MTLTexture> texture = [m_renderer->m_device newTextureWithDescriptor:descriptor];
     
     if (texture && data)
     {
+        const NSUInteger bytesPerPixel = BytesPerPixelForMetalFormat(format);
+        if (bytesPerPixel == 0)
+            return texture;
+        
         [texture replaceRegion:MTLRegionMake2D(0, 0, width, height)
                    mipmapLevel:0
                      withBytes:data
-                   bytesPerRow:width * 4];
+                   bytesPerRow:width * bytesPerPixel];
     }
     
     return texture;
@@ -2480,18 +2741,35 @@ id<MTLTexture> CMetalTextureManager::CreateMetalTextureFromFile(const char* file
 
 void CMetalTextureManager::UpdateMetalTexture(id<MTLTexture> texture, const void* data, int x, int y, int w, int h)
 {
-    assert(texture && "UpdateMetalTexture: texture cannot be null!");
-    assert(data && "UpdateMetalTexture: data cannot be null!");
-    assert(w > 0 && h > 0 && "UpdateMetalTexture: dimensions must be positive!");
-    assert(x >= 0 && y >= 0 && "UpdateMetalTexture: position cannot be negative!");
-    
-    if (!texture || !data)
+    if (!texture || !data || w <= 0 || h <= 0)
         return;
-        
-    [texture replaceRegion:MTLRegionMake2D(x, y, w, h)
+    
+    const NSUInteger texWidth = [texture width];
+    const NSUInteger texHeight = [texture height];
+    if (texWidth == 0 || texHeight == 0)
+        return;
+    
+    const int regionX = std::max(0, x);
+    const int regionY = std::max(0, y);
+    if (regionX >= static_cast<int>(texWidth) || regionY >= static_cast<int>(texHeight))
+        return;
+    
+    NSUInteger updateWidth = std::min<NSUInteger>(static_cast<NSUInteger>(w), texWidth - static_cast<NSUInteger>(regionX));
+    NSUInteger updateHeight = std::min<NSUInteger>(static_cast<NSUInteger>(h), texHeight - static_cast<NSUInteger>(regionY));
+    if (updateWidth == 0 || updateHeight == 0)
+        return;
+    
+    const NSUInteger bytesPerPixel = BytesPerPixelForMetalFormat([texture pixelFormat]);
+    if (bytesPerPixel == 0)
+        return;
+    
+    [texture replaceRegion:MTLRegionMake2D(static_cast<NSUInteger>(regionX),
+                                           static_cast<NSUInteger>(regionY),
+                                           updateWidth,
+                                           updateHeight)
                mipmapLevel:0
                  withBytes:data
-               bytesPerRow:w * 4];
+               bytesPerRow:updateWidth * bytesPerPixel];
 }
 
 void CMetalTextureManager::BindTexture(int slot, id<MTLTexture> texture)
@@ -2622,9 +2900,9 @@ void CMetalTextureManager::ApplyTexUnit(int stage, SShaderTexUnit& unit)
     if (unit.m_ITexPic)
     {
         int textureId = unit.m_ITexPic->GetTextureID();
-        const auto it = m_textures.find(textureId);
-        if (it != m_textures.end())
-            texture = it->second.metalTexture;
+        auto handle = FindHandle(textureId);
+        if (handle && *handle)
+            texture = (*handle)->metalTexture;
     }
     if (!texture)
         texture = m_whiteTexture;
@@ -2749,8 +3027,10 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
         return false;
     
     if (!iSystem)
-        assert(false);
+    {
+        assert(false && "LoadTextureData: iSystem is null!");
         return false;
+    }
     
     iLog->Log("LoadTextureData: Attempting to open texture file: '%s'\n", filename);
     FILE* pFile = iSystem->GetIPak()->FOpen(filename, "rb");

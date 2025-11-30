@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <string>
 #include <array>
+#include <memory>
 #include <cassert>
 
 // Include CryEngine interfaces
@@ -181,11 +182,45 @@ public:
         bool clampV;
         int filterMode;
     };
+
+    class TextureInfoHandle
+    {
+    public:
+        TextureInfoHandle();
+        TextureInfo* operator->();
+        const TextureInfo* operator->() const;
+        TextureInfo& operator*();
+        const TextureInfo& operator*() const;
+        explicit operator bool() const;
+        int GetId() const;
+        static TextureInfoHandle Create(int textureId, TextureInfo&& info);
+    private:
+        struct Impl;
+        std::shared_ptr<Impl> m_impl;
+        explicit TextureInfoHandle(std::shared_ptr<Impl> impl);
+        friend class CMetalTextureInfoFactory;
+    };
+
+    class ITextureInfoFactory
+    {
+    public:
+        virtual ~ITextureInfoFactory() = default;
+        virtual TextureInfoHandle Create(int textureId, TextureInfo&& info) = 0;
+    };
+
+    class CMetalTextureInfoFactory final : public ITextureInfoFactory
+    {
+    public:
+        TextureInfoHandle Create(int textureId, TextureInfo&& info) override;
+    };
     
     // Texture info accessors for CMetalTexture
     const TextureInfo* GetTextureInfo(int textureId) const;
     void SetTextureClamp(int textureId, bool bEnable);
     void SetTextureFilter(int textureId, int nFilter);
+    TextureInfoHandle& UpsertTextureHandle(int textureId, TextureInfo&& info);
+    TextureInfoHandle* FindHandle(int textureId);
+    const TextureInfoHandle* FindHandle(int textureId) const;
     
     // Image file I/O
     bool SaveTextureAsJPG(const byte* pixels, int width, int height, const char* path);
@@ -210,7 +245,7 @@ protected:
     ETEX_Format ConvertFromMetalFormat(MTLPixelFormat format);
     
     
-    std::unordered_map<int, TextureInfo> m_textures;
+    std::unordered_map<int, TextureInfoHandle> m_textures;
     std::unordered_map<std::string, int> m_textureNameMap;
     int m_nextTextureId;
     size_t m_totalTextureMemory;
@@ -245,6 +280,7 @@ protected:
     
     // Reference to base renderer
     CMetalBaseRenderer* m_renderer;
+    std::unique_ptr<ITextureInfoFactory> m_textureHandleFactory;
     
     // Internal methods
     int AllocateTextureId();
