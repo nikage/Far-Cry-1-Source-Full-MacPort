@@ -16,11 +16,13 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "MetalBaseRenderer.m"
+#include "MetalRenderer.m"
 #include "MetalTextureManager.m"
 #include "MetalShaderManager.m"
 #include "I3DEngine.h"
 #include "ISystem.h"
 #include "LeafBuffer.h"
+#include "CREOcLeaf.h"
 #include <Metal/Metal.h>
 
 extern ISystem *iSystem;
@@ -386,17 +388,11 @@ public:
 // CMetalREOcLeaf - Main render element for static meshes and geometry
 //=========================================================================
 
-class CMetalREOcLeaf : public CRendElement
+class CMetalREOcLeaf : public CREOcLeaf
 {
 public:
-    CLeafBuffer* m_pBuffer;
-    CMatInfo* m_pChunk;
-    
     CMetalREOcLeaf()
     {
-        mfSetType(eDATA_OcLeaf);
-        m_pBuffer = nullptr;
-        m_pChunk = nullptr;
     }
     
     virtual ~CMetalREOcLeaf()
@@ -430,12 +426,25 @@ public:
         if (!gRenDev || !m_pBuffer || !m_pChunk)
             return false;
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
-        if (!r || !r->m_renderEncoder)
+        CMetalRenderer* renderer = static_cast<CMetalRenderer*>(gRenDev);
+        if (!renderer || !renderer->m_renderEncoder)
             return false;
         
-        r->SetCullMode(R_CULL_BACK);
-        r->SetState(GS_DEPTHWRITE);
+        CLeafBuffer* lb = m_pBuffer;
+        if (!lb->m_pVertexBuffer)
+            return false;
+        
+        renderer->SetCullMode(R_CULL_BACK);
+        renderer->SetState(GS_DEPTHWRITE);
+        
+        renderer->DrawBuffer(lb->m_pVertexBuffer,
+                             &lb->m_Indices,
+                             m_pChunk->nNumIndices,
+                             m_pChunk->nFirstIndexId,
+                             lb->m_nPrimetiveType,
+                             m_pChunk->nFirstVertId,
+                             m_pChunk->nNumVerts,
+                             m_pChunk);
         
         return true;
     }
@@ -860,6 +869,122 @@ CRendElement* CreateMetalRenderElement(EDataType edt)
     assert(re || edt == eDATA_Unknown && "CreateMetalRenderElement: failed to create render element!");
     
     return re;
+}
+
+list2<CMatInfo>* CREOcLeaf::mfGetMatInfoList()
+{
+    return m_pBuffer ? m_pBuffer->m_pMats : nullptr;
+}
+
+CMatInfo* CREOcLeaf::mfGetMatInfo()
+{
+    return m_pChunk;
+}
+
+int CREOcLeaf::mfGetMatId()
+{
+    return m_pChunk ? m_pChunk->m_Id : -1;
+}
+
+void CREOcLeaf::mfGetPlane(Plane& pl)
+{
+    Vec3 mins, maxs;
+    mfGetBBox(mins, maxs);
+    Vec3 center = (mins + maxs) * 0.5f;
+    pl.n = Vec3(0.0f, 0.0f, 1.0f);
+    pl.d = -pl.n.Dot(center);
+}
+
+void CREOcLeaf::mfEndFlush()
+{
+}
+
+void* CREOcLeaf::mfGetPointer(ESrcPointer ePT, int* Stride, int Type, ESrcPointer Dst, int Flags)
+{
+    if (!m_pBuffer || !Stride)
+        return nullptr;
+    
+    CLeafBuffer* lb = m_pBuffer->GetVertexContainer();
+    switch (ePT)
+    {
+        case eSrcPointer_Vert:
+            return lb->GetPosPtr(*Stride, m_pChunk ? m_pChunk->nFirstVertId : 0, true);
+        case eSrcPointer_Tex:
+            return lb->GetUVPtr(*Stride, m_pChunk ? m_pChunk->nFirstVertId : 0, true);
+        case eSrcPointer_Color:
+            return lb->GetColorPtr(*Stride, m_pChunk ? m_pChunk->nFirstVertId : 0, true);
+        case eSrcPointer_Normal:
+            return lb->GetNormalPtr(*Stride, m_pChunk ? m_pChunk->nFirstVertId : 0, true);
+        default:
+            return nullptr;
+    }
+}
+
+bool CREOcLeaf::mfCheckUpdate(int nVertFormat, int Flags)
+{
+    return m_pBuffer ? m_pBuffer->CheckUpdate(nVertFormat, Flags, (Flags & SHPF_TANGENTS) != 0) : false;
+}
+
+bool CREOcLeaf::mfCullByClipPlane(CCObject* pObj)
+{
+    return false;
+}
+
+float CREOcLeaf::mfMinDistanceToCamera(CCObject* pObj)
+{
+    const CCObject* obj = pObj ? pObj : gRenDev->m_RP.m_pCurObject;
+    if (!obj)
+        return 0.0f;
+    return cry_sqrtf(mfDistanceToCameraSquared(*obj));
+}
+
+float CREOcLeaf::mfDistanceToCameraSquared(const CCObject& thisObject)
+{
+    if (!gRenDev)
+        return 0.0f;
+    
+    Vec3 mins, maxs;
+    mfGetBBox(mins, maxs);
+    Vec3 center = (mins + maxs) * 0.5f + thisObject.GetTranslation();
+    Vec3 delta = gRenDev->m_RP.m_ViewOrg - center;
+    return delta.Dot(delta);
+}
+
+void CREOcLeaf::mfCenter(Vec3& Pos, CCObject* pObj)
+{
+    Vec3 mins, maxs;
+    mfGetBBox(mins, maxs);
+    Pos = (mins + maxs) * 0.5f;
+    if (pObj)
+        Pos += pObj->GetTranslation();
+}
+
+void CREOcLeaf::mfGetBBox(Vec3& vMins, Vec3& vMaxs)
+{
+    if (m_pBuffer)
+    {
+        vMins = m_pBuffer->m_vBoxMin;
+        vMaxs = m_pBuffer->m_vBoxMax;
+    }
+    else
+    {
+        vMins = Vec3(0.0f, 0.0f, 0.0f);
+        vMaxs = Vec3(0.0f, 0.0f, 0.0f);
+    }
+}
+
+bool CREOcLeaf::mfPreDraw(SShaderPass* sl)
+{
+    return true;
+}
+
+void CREOcLeaf::mfPrepare()
+{
+}
+
+bool CREOcLeaf::mfDraw(SShader* ef, SShaderPass* sfm)
+{
+    return true;
 }
 
 #endif // __APPLE__ && __MACH__
