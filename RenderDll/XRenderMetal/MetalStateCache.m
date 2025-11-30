@@ -28,7 +28,7 @@ struct MetalPipelineStateKey
     uint64_t vertexFunctionHash;
     uint64_t fragmentFunctionHash;
     uint64_t vertexFormatHash;
-    uint32_t renderStateHash;
+    uint64_t renderStateHash;
     MTLPixelFormat colorPixelFormat;
     MTLPixelFormat depthPixelFormat;
     
@@ -50,7 +50,7 @@ struct MetalPipelineStateKeyHash
         size_t h1 = std::hash<uint64_t>{}(key.vertexFunctionHash);
         size_t h2 = std::hash<uint64_t>{}(key.fragmentFunctionHash);
         size_t h3 = std::hash<uint64_t>{}(key.vertexFormatHash);
-        size_t h4 = std::hash<uint32_t>{}(key.renderStateHash);
+        size_t h4 = std::hash<uint64_t>{}(key.renderStateHash);
         return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
     }
 };

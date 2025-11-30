@@ -208,7 +208,7 @@ extern "C" void CryModuleFree(void* ptr)
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
-      m_currentDrawable(nil), m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0),
+      m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0),
       m_debugPipelineState(nil) {
   // Managers will be initialized in Init() after Metal device is created
 }
@@ -223,6 +223,11 @@ CMetalRenderer::~CMetalRenderer() {
   if (m_textureManager || m_shaderManager || m_utilityRenderer) {
     ShutdownManagers();
   }
+}
+
+CMetalTextureManager* CMetalRenderer::GetTextureManager() const
+{
+  return m_textureManager.get();
 }
 
 bool CMetalRenderer::EnsureDebugPipelineState()
@@ -1325,6 +1330,7 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     m_windowMetalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     m_windowMetalLayer.framebufferOnly = YES;
     m_windowMetalLayer.drawableSize = CGSizeMake(width, height);
+    m_metalLayer = m_windowMetalLayer;
     
     [contentView setWantsLayer:YES];
     [contentView setLayer:m_windowMetalLayer];
@@ -1362,6 +1368,7 @@ void CMetalRenderer::DestroyGameWindow() {
       [m_windowMetalLayer release];
       m_windowMetalLayer = nil;
     }
+    m_metalLayer = nil;
     
     if (m_window) {
       [m_window close];
@@ -2303,78 +2310,7 @@ void CMetalRenderer::DisplaySplash() {
 
 // Missing IRenderer method implementations
 void CMetalRenderer::BeginFrame() {
-  // Metal renderer BeginFrame
-
-  // End any existing render encoder
-  if (m_renderEncoder) {
-    [m_renderEncoder endEncoding];
-    [m_renderEncoder release];
-    m_renderEncoder = nil;
-  }
-  
-  // Get next drawable from window layer
-  if (m_windowMetalLayer) {
-    // Note: Previous drawable is released in command buffer completion handler
-    // Don't release it here as it may still be in use by a previous frame
-    
-    // Check if layer is valid and has a non-zero size
-    CGSize layerSize = m_windowMetalLayer.drawableSize;
-    
-    if (layerSize.width > 0 && layerSize.height > 0) {
-      m_currentDrawable = [[m_windowMetalLayer nextDrawable] retain];
-      
-      if (!m_currentDrawable) {
-        iLog->Log("BeginFrame: ERROR - Failed to get drawable (layer size: %.0fx%.0f)\n", 
-                  layerSize.width, layerSize.height);
-      }
-    } else {
-      iLog->Log("BeginFrame: ERROR - Layer has zero size (%.0fx%.0f)!\n", 
-                layerSize.width, layerSize.height);
-    }
-  } else {
-    iLog->Log("BeginFrame: ERROR - No metal layer!\n");
-  }
-  
-  // Call base class BeginFrame to set up command buffer
   CMetalBaseRenderer::BeginFrame();
-  
-  // Create render pass descriptor with drawable texture and depth/stencil
-  if (m_currentDrawable && m_currentCommandBuffer) {
-    @autoreleasepool {
-      if (m_currentFrameIndex >= MAX_FRAMES_IN_FLIGHT || m_currentFrameIndex < 0) {
-        iLog->Log("BeginFrame: ERROR - Invalid frame index %d (valid range: 0-%d)!\n", 
-                  m_currentFrameIndex, MAX_FRAMES_IN_FLIGHT - 1);
-        return;
-      }
-      
-      id<MTLTexture> depthStencilTexture = m_depthStencilTextures[m_currentFrameIndex];
-      
-      m_renderPassDescriptor = CreateRenderPassDescriptor(m_currentDrawable.texture, depthStencilTexture);
-      
-      if (!m_renderPassDescriptor) {
-        iLog->Log("BeginFrame: ERROR - Failed to create render pass descriptor!\n");
-        return;
-      }
-      
-      [m_renderPassDescriptor retain];
-      
-      // Use default clear color (will be set by game logic)
-      // m_renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
-      
-      m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
-      
-      if (!m_renderEncoder) {
-        iLog->Log("BeginFrame: ERROR - Failed to create render encoder (drawable=%p, cmdBuffer=%p)!\n",
-                  m_currentDrawable, m_currentCommandBuffer);
-      }
-    }
-  } else {
-    // Only log warning if this is unexpected (not during shutdown)
-    if (m_windowMetalLayer) {
-      iLog->Log("BeginFrame: WARNING - No drawable (%p) or command buffer (%p)\n", 
-                m_currentDrawable, m_currentCommandBuffer);
-    }
-  }
 }
 
 void CMetalRenderer::Update() {
@@ -2387,40 +2323,8 @@ void CMetalRenderer::Update() {
 }
 
 void CMetalRenderer::EndFrame() {
-  // End rendering
   FlushDebugCommands();
-
-  if (m_renderEncoder) {
-    [m_renderEncoder endEncoding];
-    [m_renderEncoder release];
-    m_renderEncoder = nil;
-  }
-  
-  // Present drawable
-  if (m_currentDrawable && m_currentCommandBuffer) {
-    [m_currentCommandBuffer presentDrawable:m_currentDrawable];
-    
-    // Release our retain - command buffer will retain it until completion
-    [m_currentDrawable release];
-    m_currentDrawable = nil;
-  }
-  
-  // Commit command buffer
-  if (m_currentCommandBuffer) {
-    TrackCommandBuffer(m_currentCommandBuffer);
-    [m_currentCommandBuffer commit];
-    m_currentCommandBuffer = nil;
-  }
-  
-  // Clean up
-  if (m_renderPassDescriptor) {
-    [m_renderPassDescriptor release];
-    m_renderPassDescriptor = nil;
-  }
-  
-  // Update frame index
-  m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-  m_currentDynamicVBPool = (m_currentDynamicVBPool + 1) % NUM_DYNAMIC_VB_POOLS;
+  CMetalBaseRenderer::EndFrame();
 }
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
@@ -2533,8 +2437,15 @@ bool CMetalRenderer::DeleteContext(WIN_HWND hWnd) {
     m_currentCommandBuffer = nil;
   }
   
-  m_renderEncoder = nil;
-  m_currentDrawable = nil;
+  if (m_renderEncoder) {
+    [m_renderEncoder endEncoding];
+    [m_renderEncoder release];
+    m_renderEncoder = nil;
+  }
+  if (m_currentDrawable) {
+    [m_currentDrawable release];
+    m_currentDrawable = nil;
+  }
   
   if (hWnd == m_window) {
     m_window = nil;
@@ -2565,8 +2476,15 @@ void CMetalRenderer::FreeResources(int nFlags) {
       m_currentCommandBuffer = nil;
     }
     
-    m_renderEncoder = nil;
-    m_currentDrawable = nil;
+    if (m_renderEncoder) {
+      [m_renderEncoder endEncoding];
+      [m_renderEncoder release];
+      m_renderEncoder = nil;
+    }
+    if (m_currentDrawable) {
+      [m_currentDrawable release];
+      m_currentDrawable = nil;
+    }
     
     CMetalBaseRenderer::FreeResources(nFlags);
   }
@@ -2613,8 +2531,10 @@ void CMetalRenderer::ShareResources(IRenderer *renderer) {
 bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
                                       int nNewColDepth, int nNewRefreshHZ,
                                       bool bFullScreen) {
-  m_width = nNewWidth;
-  m_height = nNewHeight;
+  if (!EnsureBackbufferSize(static_cast<NSUInteger>(nNewWidth),
+                            static_cast<NSUInteger>(nNewHeight))) {
+    return false;
+  }
   m_cbpp = nNewColDepth;
   
   if (m_metalLayer) {
@@ -2682,8 +2602,15 @@ bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd) {
       m_currentCommandBuffer = nil;
     }
     
-    m_renderEncoder = nil;
-    m_currentDrawable = nil;
+    if (m_renderEncoder) {
+      [m_renderEncoder endEncoding];
+      [m_renderEncoder release];
+      m_renderEncoder = nil;
+    }
+    if (m_currentDrawable) {
+      [m_currentDrawable release];
+      m_currentDrawable = nil;
+    }
     
     return true;
   }

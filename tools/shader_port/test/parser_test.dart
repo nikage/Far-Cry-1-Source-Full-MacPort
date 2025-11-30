@@ -45,15 +45,31 @@ CoreScript
 }
 ''';
 
-  final ParseResult result = parseShaderFromSource(shaderSource, 'Testing/Example.crycg');
+  final ParseResult result = parseShaderFromSource(
+    shaderSource,
+    'Testing/Example.crycg',
+  );
 
   _check(result.maskReferences.contains('D3D'), 'expected D3D reference');
-  _check(result.maskReferences.contains('FEATURE_ENABLED'), 'expected FEATURE_ENABLED reference');
-  _check(result.maskReferences.contains('USE_EXTRA'), 'expected USE_EXTRA reference');
-
-  _check(result.coreScriptFlow.isNotEmpty, 'coreScriptFlow should not be empty');
   _check(
-    result.coreScriptFlow.any((node) => node['type'] == 'if' && node['indent'] == 0),
+    result.maskReferences.contains('FEATURE_ENABLED'),
+    'expected FEATURE_ENABLED reference',
+  );
+  _check(
+    result.maskReferences.contains('USE_EXTRA'),
+    'expected USE_EXTRA reference',
+  );
+  _check(result.positionScripts.isEmpty, 'expected no position scripts');
+  _check(result.outputFieldTypes.isEmpty, 'expected no output field overrides');
+
+  _check(
+    result.coreScriptFlow.isNotEmpty,
+    'coreScriptFlow should not be empty',
+  );
+  _check(
+    result.coreScriptFlow.any(
+      (node) => node['type'] == 'if' && node['indent'] == 0,
+    ),
     'expected top-level if node',
   );
   _check(
@@ -71,23 +87,28 @@ CoreScript
   );
   final List<dynamic> entries = (pass['entries'] as List<dynamic>? ?? const []);
   _check(
-    entries.any((entry) =>
-        entry is Map<String, dynamic> &&
-        entry['type'] == 'assignment' &&
-        entry['key'] == 'CullMode' &&
-        entry['value'] == 'Back'),
+    entries.any(
+      (entry) =>
+          entry is Map<String, dynamic> &&
+          entry['type'] == 'assignment' &&
+          entry['key'] == 'CullMode' &&
+          entry['value'] == 'Back',
+    ),
     'expected CullMode assignment in pass entries',
   );
   _check(
-    entries.any((entry) =>
-        entry is Map<String, dynamic> &&
-        entry['type'] == 'call' &&
-        entry['value'] == 'SetTexture(0, baseMap)'),
+    entries.any(
+      (entry) =>
+          entry is Map<String, dynamic> &&
+          entry['type'] == 'call' &&
+          entry['value'] == 'SetTexture(0, baseMap)',
+    ),
     'expected SetTexture call in pass entries',
   );
 
   final Map<String, dynamic> summary =
-      (pass['stateSummary'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+      (pass['stateSummary'] as Map<String, dynamic>? ??
+      const <String, dynamic>{});
   _check(summary['cullMode'] == 'BACK', 'expected cullMode summary');
   _check(summary['alphaTest'] == true, 'expected alphaTest boolean summary');
   _check(summary['depthWrite'] == false, 'expected depthWrite boolean summary');
@@ -102,16 +123,20 @@ CoreScript
     'expected dst blend factor',
   );
   final Map<String, dynamic> colorMask =
-      (summary['colorMask'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+      (summary['colorMask'] as Map<String, dynamic>? ??
+      const <String, dynamic>{});
   _check(colorMask['red'] == true, 'expected red color mask');
   _check(colorMask['green'] == true, 'expected green color mask');
   _check(colorMask['blue'] == true, 'expected blue color mask');
   _check(colorMask['alpha'] == false, 'expected alpha mask disabled');
   final Map<String, dynamic> colorMask1 =
-      (summary['colorMask1'] as Map<String, dynamic>? ?? const <String, dynamic>{});
+      (summary['colorMask1'] as Map<String, dynamic>? ??
+      const <String, dynamic>{});
   _check(colorMask1.isNotEmpty, 'expected secondary color mask entry');
-  _check(colorMask1.values.every((dynamic value) => value == false),
-      'expected secondary color mask disabled');
+  _check(
+    colorMask1.values.every((dynamic value) => value == false),
+    'expected secondary color mask disabled',
+  );
   final num alphaRef = summary['alphaRef'] as num? ?? -1;
   _check((alphaRef - 0.5).abs() < 0.001, 'expected alphaRef summary');
 
@@ -124,4 +149,3 @@ void _check(bool condition, String message) {
     exit(1);
   }
 }
-

@@ -25,6 +25,16 @@
 #include <Cocoa/Cocoa.h>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
+
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
+extern ITimer* iTimer;
 
 CMetalBaseRenderer::CMetalBaseRenderer()
     : m_device(nil)
@@ -34,6 +44,7 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_metalLayer(nil)
     , m_currentCommandBuffer(nil)
     , m_renderPassDescriptor(nil)
+    , m_currentDrawable(nil)
     , m_currentPipelineState(nil)
     , m_currentDepthStencilState(nil)
     , m_numActiveRenderTargets(1)
@@ -177,7 +188,11 @@ WIN_HWND CMetalBaseRenderer::Init(int x, int y, int width, int height, unsigned 
     m_isInitialized = true;
     iLog->Log("Metal base renderer initialized successfully\n");
     iLog->Log("  Device: %s\n", [[m_device name] UTF8String]);
-    iLog->Log("  Max texture size: %lu\n", (unsigned long)[m_device maxTextureWidth2D]);
+    const MTLSize tgSize = [m_device maxThreadsPerThreadgroup];
+    iLog->Log("  Max threadgroup size: %lu x %lu x %lu\n",
+              static_cast<unsigned long>(tgSize.width),
+              static_cast<unsigned long>(tgSize.height),
+              static_cast<unsigned long>(tgSize.depth));
     iLog->Log("  Triple buffering: enabled (%d frames)\n", MAX_FRAMES_IN_FLIGHT);
     
     return (WIN_HWND)m_metalView;
@@ -206,9 +221,23 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     
     m_stateCache.reset();
     
-    m_renderEncoder = nil;
+    if (m_renderEncoder)
+    {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
     m_currentCommandBuffer = nil;
-    m_renderPassDescriptor = nil;
+    if (m_renderPassDescriptor)
+    {
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
+    }
+    if (m_currentDrawable)
+    {
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+    }
     m_currentPipelineState = nil;
     m_currentDepthStencilState = nil;
     m_commandQueue = nil;
@@ -442,7 +471,11 @@ void CMetalBaseRenderer::CleanupDepthStencilTextures()
 {
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        m_depthStencilTextures[i] = nil;
+        if (m_depthStencilTextures[i])
+        {
+            [m_depthStencilTextures[i] release];
+            m_depthStencilTextures[i] = nil;
+        }
     }
 }
 
@@ -550,6 +583,174 @@ void CMetalBaseRenderer::ClearRenderPassCache()
     m_renderPassCache.clear();
 }
 
+bool CMetalBaseRenderer::EnsureBackbufferSize(NSUInteger width, NSUInteger height)
+{
+    width = std::max<NSUInteger>(1, width);
+    height = std::max<NSUInteger>(1, height);
+
+    if (width == static_cast<NSUInteger>(m_width) &&
+        height == static_cast<NSUInteger>(m_height))
+    {
+        return true;
+    }
+
+    iLog->Log("EnsureBackbufferSize: resizing from %dx%d to %lu x %lu\n",
+              m_width, m_height,
+              static_cast<unsigned long>(width),
+              static_cast<unsigned long>(height));
+
+    CleanupDepthStencilTextures();
+
+    m_width = static_cast<int>(width);
+    m_height = static_cast<int>(height);
+    m_viewportWidth = m_width;
+    m_viewportHeight = m_height;
+
+    return InitializeDepthStencilTextures();
+}
+
+bool CMetalBaseRenderer::AcquireDrawableResources()
+{
+    if (m_renderPassDescriptor)
+    {
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
+    }
+    if (m_currentDrawable)
+    {
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+    }
+
+    if (m_metalLayer)
+    {
+        return AcquireDrawableFromLayer();
+    }
+    if (m_metalView)
+    {
+        return AcquireDrawableFromView();
+    }
+
+    // No target to render to yet (headless mode)
+    return true;
+}
+
+bool CMetalBaseRenderer::AcquireDrawableFromLayer()
+{
+    if (!m_metalLayer || !m_currentCommandBuffer)
+        return false;
+
+    CGSize drawableSize = m_metalLayer.drawableSize;
+    NSUInteger targetWidth = static_cast<NSUInteger>(std::max(1.0, drawableSize.width));
+    NSUInteger targetHeight = static_cast<NSUInteger>(std::max(1.0, drawableSize.height));
+
+    if (!EnsureBackbufferSize(targetWidth, targetHeight))
+        return false;
+
+    id<CAMetalDrawable> drawable = [m_metalLayer nextDrawable];
+    if (!drawable)
+    {
+        iLog->Log("AcquireDrawableFromLayer: nextDrawable returned nil (size %.0fx%.0f)\n",
+                  drawableSize.width, drawableSize.height);
+        return false;
+    }
+
+    m_currentDrawable = [drawable retain];
+
+    id<MTLTexture> depthStencilTexture = m_depthStencilTextures[m_currentFrameIndex];
+    if (!depthStencilTexture)
+    {
+        if (!InitializeDepthStencilTextures())
+        {
+            [m_currentDrawable release];
+            m_currentDrawable = nil;
+            return false;
+        }
+        depthStencilTexture = m_depthStencilTextures[m_currentFrameIndex];
+    }
+
+    MTLRenderPassDescriptor* descriptor = CreateRenderPassDescriptor(m_currentDrawable.texture, depthStencilTexture);
+    if (!descriptor)
+    {
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+        return false;
+    }
+    m_renderPassDescriptor = [descriptor retain];
+
+    m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
+    if (!m_renderEncoder)
+    {
+        iLog->Log("AcquireDrawableFromLayer: Failed to create render encoder\n");
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+        return false;
+    }
+
+    SetViewport(0, 0, static_cast<int>(targetWidth), static_cast<int>(targetHeight));
+    return true;
+}
+
+bool CMetalBaseRenderer::AcquireDrawableFromView()
+{
+    if (!m_metalView || !m_currentCommandBuffer)
+        return false;
+
+    CGSize drawableSize = m_metalView.drawableSize;
+    NSUInteger targetWidth = static_cast<NSUInteger>(std::max(1.0, drawableSize.width));
+    NSUInteger targetHeight = static_cast<NSUInteger>(std::max(1.0, drawableSize.height));
+
+    if (!EnsureBackbufferSize(targetWidth, targetHeight))
+        return false;
+
+    id<CAMetalDrawable> drawable = [m_metalView currentDrawable];
+    if (!drawable)
+    {
+        iLog->Log("AcquireDrawableFromView: currentDrawable returned nil (size %.0fx%.0f)\n",
+                  drawableSize.width, drawableSize.height);
+        return false;
+    }
+
+    m_currentDrawable = [drawable retain];
+
+    id<MTLTexture> depthStencilTexture = m_depthStencilTextures[m_currentFrameIndex];
+    if (!depthStencilTexture)
+    {
+        if (!InitializeDepthStencilTextures())
+        {
+            [m_currentDrawable release];
+            m_currentDrawable = nil;
+            return false;
+        }
+        depthStencilTexture = m_depthStencilTextures[m_currentFrameIndex];
+    }
+
+    MTLRenderPassDescriptor* descriptor = CreateRenderPassDescriptor(m_currentDrawable.texture, depthStencilTexture);
+    if (!descriptor)
+    {
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+        return false;
+    }
+    m_renderPassDescriptor = [descriptor retain];
+
+    m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
+    if (!m_renderEncoder)
+    {
+        iLog->Log("AcquireDrawableFromView: Failed to create render encoder\n");
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+        return false;
+    }
+
+    SetViewport(0, 0, static_cast<int>(targetWidth), static_cast<int>(targetHeight));
+    return true;
+}
+
 void CMetalBaseRenderer::BeginFrame()
 {
     if (!m_isInitialized || !m_device || !m_commandQueue)
@@ -563,21 +764,32 @@ void CMetalBaseRenderer::BeginFrame()
     m_nFrameUpdateID++;
     m_frameID = m_nFrameID;
 
-    dispatch_semaphore_wait(m_frameSemaphores[m_currentFrameIndex], DISPATCH_TIME_FOREVER);
+    dispatch_semaphore_t frameSemaphore = m_frameSemaphores[m_currentFrameIndex];
+    dispatch_semaphore_wait(frameSemaphore, DISPATCH_TIME_FOREVER);
     
     m_currentCommandBuffer = [m_commandQueue commandBuffer];
     if (!m_currentCommandBuffer)
     {
         iLog->Log("Error: Failed to create command buffer\n");
+        dispatch_semaphore_signal(frameSemaphore);
         return;
     }
     
-    __block dispatch_semaphore_t semaphore = m_frameSemaphores[m_currentFrameIndex];
+    __block dispatch_semaphore_t completionSemaphore = frameSemaphore;
     [m_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-        dispatch_semaphore_signal(semaphore);
+        dispatch_semaphore_signal(completionSemaphore);
     }];
     
     m_dynamicVBPools[m_currentDynamicVBPool].offset = 0;
+    
+    const bool needsDrawable = (m_metalLayer != nil) || (m_metalView != nil);
+    if (needsDrawable && !AcquireDrawableResources())
+    {
+        iLog->Log("BeginFrame: Failed to acquire drawable resources\n");
+        m_currentCommandBuffer = nil;
+        dispatch_semaphore_signal(frameSemaphore);
+        return;
+    }
     
     m_numDrawCalls = 0;
     m_numTriangles = 0;
@@ -604,19 +816,31 @@ void CMetalBaseRenderer::EndFrame()
     if (m_renderEncoder)
     {
         [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
         m_renderEncoder = nil;
     }
     
-    if (m_metalView && m_metalView.currentDrawable)
+    if (m_currentDrawable)
+    {
+        [m_currentCommandBuffer presentDrawable:m_currentDrawable];
+        [m_currentDrawable release];
+        m_currentDrawable = nil;
+    }
+    else if (m_metalView && m_metalView.currentDrawable)
     {
         [m_currentCommandBuffer presentDrawable:m_metalView.currentDrawable];
+    }
+    
+    if (m_renderPassDescriptor)
+    {
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
     }
     
     TrackCommandBuffer(m_currentCommandBuffer);
     [m_currentCommandBuffer commit];
     
     m_currentCommandBuffer = nil;
-    m_renderPassDescriptor = nil;
     
     m_currentFrameIndex = (m_currentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
     m_currentDynamicVBPool = (m_currentDynamicVBPool + 1) % NUM_DYNAMIC_VB_POOLS;
@@ -803,6 +1027,7 @@ void CMetalBaseRenderer::UpdateUniformBuffer()
     
     Vec3 camPos = m_camera.GetPos();
     m_uniformBufferCPU->cameraPos = camPos;
+    m_uniformBufferCPU->time = iTimer ? iTimer->GetCurrTime() : 0.0f;
     
     m_uniformBufferCPU->lightPos = Vec3(0, 100, 0);
     m_uniformBufferCPU->lightColor = Vec3(1, 1, 1);
@@ -868,6 +1093,98 @@ void CMetalBaseRenderer::GetProjectionMatrix(double* mat)
     
     for (int i = 0; i < 16; ++i)
         mat[i] = m_projectionMatrix.GetData()[i];
+}
+
+Matrix44 CMetalBaseRenderer::GetUniformModelViewProjection() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->modelViewProjectionMatrix;
+    Matrix44 matrix;
+    matrix.SetIdentity();
+    return matrix;
+}
+
+Matrix44 CMetalBaseRenderer::GetUniformModelMatrix() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->modelMatrix;
+    Matrix44 matrix;
+    matrix.SetIdentity();
+    return matrix;
+}
+
+Matrix44 CMetalBaseRenderer::GetUniformViewMatrix() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->viewMatrix;
+    Matrix44 matrix;
+    matrix.SetIdentity();
+    return matrix;
+}
+
+Matrix44 CMetalBaseRenderer::GetUniformProjectionMatrix() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->projectionMatrix;
+    Matrix44 matrix;
+    matrix.SetIdentity();
+    return matrix;
+}
+
+Vec3 CMetalBaseRenderer::GetUniformCameraPosition() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->cameraPos;
+    return Vec3(0.0f, 0.0f, 0.0f);
+}
+
+Vec3 CMetalBaseRenderer::GetUniformLightPosition() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->lightPos;
+    return Vec3(0.0f, 0.0f, 0.0f);
+}
+
+Vec3 CMetalBaseRenderer::GetUniformLightColor() const
+{
+    if (m_uniformBufferCPU)
+        return m_uniformBufferCPU->lightColor;
+    return Vec3(1.0f, 1.0f, 1.0f);
+}
+
+float CMetalBaseRenderer::GetUniformTime() const
+{
+    return m_uniformBufferCPU ? m_uniformBufferCPU->time : 0.0f;
+}
+
+void CMetalBaseRenderer::GetUniformClipPlane(float out[4]) const
+{
+    if (!out)
+        return;
+    if (m_uniformBufferCPU)
+    {
+        out[0] = m_uniformBufferCPU->clipPlane[0];
+        out[1] = m_uniformBufferCPU->clipPlane[1];
+        out[2] = m_uniformBufferCPU->clipPlane[2];
+        out[3] = m_uniformBufferCPU->clipPlane[3];
+    }
+    else
+    {
+        out[0] = 0.0f;
+        out[1] = 0.0f;
+        out[2] = 0.0f;
+        out[3] = 0.0f;
+    }
+}
+
+float CMetalBaseRenderer::GetUniformClipEnabled() const
+{
+    return m_uniformBufferCPU ? m_uniformBufferCPU->clipEnabled : 0.0f;
+}
+
+float CMetalBaseRenderer::GetUniformClipRefract() const
+{
+    return m_uniformBufferCPU ? m_uniformBufferCPU->clipRefract : 0.0f;
 }
 
 #endif

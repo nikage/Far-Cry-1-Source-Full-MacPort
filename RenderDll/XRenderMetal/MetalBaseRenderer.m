@@ -150,6 +150,17 @@ public:
     virtual void GetModelViewMatrix(double* mat);
     virtual void GetProjectionMatrix(double* mat);
     virtual void GetProjectionMatrix(float* mat);
+    Matrix44 GetUniformModelViewProjection() const;
+    Matrix44 GetUniformModelMatrix() const;
+    Matrix44 GetUniformViewMatrix() const;
+    Matrix44 GetUniformProjectionMatrix() const;
+    Vec3 GetUniformCameraPosition() const;
+    Vec3 GetUniformLightPosition() const;
+    Vec3 GetUniformLightColor() const;
+    float GetUniformTime() const;
+    void GetUniformClipPlane(float out[4]) const;
+    float GetUniformClipEnabled() const;
+    float GetUniformClipRefract() const;
     virtual Vec3 GetUnProject(const Vec3& WindowCoords, const CCamera& cam);
     virtual void RenderToViewport(const CCamera& cam, float x, float y, float width, float height);
     
@@ -336,6 +347,7 @@ public:
     // Current frame resources
     id<MTLCommandBuffer> m_currentCommandBuffer;
     MTLRenderPassDescriptor* m_renderPassDescriptor;
+    id<CAMetalDrawable> m_currentDrawable;
     
     // Command buffer pool for triple buffering
     static const int MAX_FRAMES_IN_FLIGHT = 3;
@@ -393,6 +405,10 @@ public:
     MTLBlendFactor m_sourceBlendFactor;
     MTLBlendFactor m_destBlendFactor;
     MTLBlendOperation m_blendOperation;
+    MTLBlendFactor m_sourceAlphaBlendFactor;
+    MTLBlendFactor m_destAlphaBlendFactor;
+    MTLBlendOperation m_alphaBlendOperation;
+    MTLColorWriteMask m_colorWriteMask;
     
     // Vertex buffer management
     std::vector<id<MTLBuffer>> m_vertexBuffers;
@@ -520,6 +536,10 @@ public:
                                                              MTLLoadAction depthLoad = MTLLoadActionClear,
                                                              MTLLoadAction stencilLoad = MTLLoadActionClear);
     void ClearRenderPassCache();
+    bool EnsureBackbufferSize(NSUInteger width, NSUInteger height);
+    bool AcquireDrawableResources();
+    bool AcquireDrawableFromLayer();
+    bool AcquireDrawableFromView();
     
     // Command buffer tracking
     void TrackCommandBuffer(id<MTLCommandBuffer> buffer);

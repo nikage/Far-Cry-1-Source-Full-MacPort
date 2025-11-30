@@ -71,32 +71,36 @@ id<MTLRenderPipelineState> CMetalStateCache::GetOrCreatePipelineState(
     descriptor.colorAttachments[0].pixelFormat = key.colorPixelFormat;
     descriptor.depthAttachmentPixelFormat = key.depthPixelFormat;
     
-    uint32_t blendMode = (key.renderStateHash >> 16) & 0xFF;
-    switch (blendMode)
+    bool blendEnabled = (key.renderStateHash & 0x1ULL) != 0;
+    MTLBlendFactor srcColor = static_cast<MTLBlendFactor>((key.renderStateHash >> 1) & 0x3FULL);
+    MTLBlendFactor dstColor = static_cast<MTLBlendFactor>((key.renderStateHash >> 7) & 0x3FULL);
+    MTLBlendFactor srcAlpha = static_cast<MTLBlendFactor>((key.renderStateHash >> 13) & 0x3FULL);
+    MTLBlendFactor dstAlpha = static_cast<MTLBlendFactor>((key.renderStateHash >> 19) & 0x3FULL);
+    MTLBlendOperation colorOp = static_cast<MTLBlendOperation>((key.renderStateHash >> 25) & 0x7ULL);
+    MTLBlendOperation alphaOp = static_cast<MTLBlendOperation>((key.renderStateHash >> 28) & 0x7ULL);
+    uint8_t colorMaskBits = static_cast<uint8_t>((key.renderStateHash >> 31) & 0xF);
+
+    descriptor.colorAttachments[0].blendingEnabled = blendEnabled ? YES : NO;
+    if (blendEnabled)
     {
-        case kBlendAdditive:
-            descriptor.colorAttachments[0].blendingEnabled = YES;
-            descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
-            descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-            descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-            descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-            descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-            descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-            break;
-        case kBlendNone:
-            descriptor.colorAttachments[0].blendingEnabled = NO;
-            break;
-        case kBlendAlpha:
-        default:
-            descriptor.colorAttachments[0].blendingEnabled = YES;
-            descriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-            descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            descriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
-            descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-            descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-            break;
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = srcColor;
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = dstColor;
+        descriptor.colorAttachments[0].rgbBlendOperation = colorOp;
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = srcAlpha;
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = dstAlpha;
+        descriptor.colorAttachments[0].alphaBlendOperation = alphaOp;
     }
+
+    MTLColorWriteMask writeMask = 0;
+    if (colorMaskBits & 0x1)
+        writeMask |= MTLColorWriteMaskRed;
+    if (colorMaskBits & 0x2)
+        writeMask |= MTLColorWriteMaskGreen;
+    if (colorMaskBits & 0x4)
+        writeMask |= MTLColorWriteMaskBlue;
+    if (colorMaskBits & 0x8)
+        writeMask |= MTLColorWriteMaskAlpha;
+    descriptor.colorAttachments[0].writeMask = writeMask;
     
     NSError* error = nil;
     id<MTLRenderPipelineState> pipelineState = [m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];

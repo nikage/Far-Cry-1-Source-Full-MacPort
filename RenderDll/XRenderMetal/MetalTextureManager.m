@@ -36,6 +36,7 @@ class CMetalBaseRenderer;
 struct STexPic;
 class I3DEngine;
 class CMetalTextureManager;
+struct SShaderTexUnit;
 
 // Metal texture wrapper implementing ITexPic interface
 class CMetalTexture : public ITexPic
@@ -78,8 +79,10 @@ public:
     
     void SetTexture(int tnum, ETexType Type = eTT_Base);
     id<MTLTexture> GetBoundFragmentTexture(int index) const;
+    id<MTLSamplerState> GetBoundFragmentSampler(int index) const;
     void SetWhiteTexture();
     id<MTLTexture> GetWhiteTexture() const { return m_whiteTexture; }
+    void ApplyTexUnit(int stage, SShaderTexUnit& unit);
     
     // Upload texture data from memory to GPU
     unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 
@@ -198,6 +201,9 @@ protected:
     id<MTLTexture> CreateMetalTextureFromFile(const char* filename);
     void UpdateMetalTexture(id<MTLTexture> texture, const void* data, int x, int y, int w, int h);
     void BindTexture(int slot, id<MTLTexture> texture);
+    void BindSampler(int slot, id<MTLSamplerState> sampler);
+    id<MTLSamplerState> GetOrCreateSamplerState(const SShaderTexUnit& unit);
+    id<MTLSamplerState> GetDefaultSampler();
     
     // Texture format conversion
     MTLPixelFormat ConvertToMetalFormat(ETEX_Format format);
@@ -224,6 +230,8 @@ protected:
     id<MTLTexture> m_currentTexture;
     id<MTLTexture> m_whiteTexture;
     std::array<id<MTLTexture>, 16> m_boundFragmentTextures;
+    std::array<id<MTLSamplerState>, 16> m_boundFragmentSamplers;
+    std::unordered_map<uint64_t, id<MTLSamplerState>> m_samplerCache;
     
     // Display gamma correction
     float m_gammaValue;      // Gamma delta value (added to base gamma)

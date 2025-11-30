@@ -21,6 +21,9 @@ class ParseResult {
     this.directives,
     this.coreScriptFlow,
     this.maskReferences,
+    this.positionScripts,
+    this.positionScriptBlocks,
+    this.outputFieldTypes,
   );
 
   final String name;
@@ -35,10 +38,14 @@ class ParseResult {
   final List<String> directives;
   final List<Map<String, dynamic>> coreScriptFlow;
   final List<String> maskReferences;
+  final List<String> positionScripts;
+  final List<Map<String, String>> positionScriptBlocks;
+  final Map<String, String> outputFieldTypes;
 }
 
 void main(List<String> args) {
-  final Directory root = (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
+  final Directory root =
+      (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath = root.path.endsWith(sep) ? root.path : root.path + sep;
   final Directory legacyDir = Directory(rootPath + 'Shaders${sep}Legacy');
@@ -46,14 +53,21 @@ void main(List<String> args) {
     stderr.writeln('Missing directory: ${legacyDir.path}');
     exit(1);
   }
-  final Directory outputDir = Directory(rootPath + 'tools${sep}shader_port${sep}output${sep}ir');
+  final Directory outputDir = Directory(
+    rootPath + 'tools${sep}shader_port${sep}output${sep}ir',
+  );
   outputDir.createSync(recursive: true);
   final List<Map<String, dynamic>> index = [];
-  for (final FileSystemEntity entity in legacyDir.listSync(recursive: true, followLinks: false)) {
+  for (final FileSystemEntity entity in legacyDir.listSync(
+    recursive: true,
+    followLinks: false,
+  )) {
     if (entity is! File) continue;
     final String lower = entity.path.toLowerCase();
     if (!(lower.endsWith('.cryps') || lower.endsWith('.crycg'))) continue;
-    final String relative = entity.path.substring(legacyDir.path.length + 1).replaceAll(RegExp(r'[\\/]'), '/');
+    final String relative = entity.path
+        .substring(legacyDir.path.length + 1)
+        .replaceAll(RegExp(r'[\\/]'), '/');
     final ParseResult result = parseShader(entity, relative);
     final File targetFile = File(outputDir.path + sep + relative + '.json');
     targetFile.parent.createSync(recursive: true);
@@ -62,13 +76,17 @@ void main(List<String> args) {
       'name': result.name,
       'extension': result.extension,
       'relative': relative,
-      'ir': targetFile.path.substring(rootPath.length).replaceAll(RegExp(r'[\\/]'), '/'),
-      'blocks': result.blocks.map((b) => b.name).toList()
+      'ir': targetFile.path
+          .substring(rootPath.length)
+          .replaceAll(RegExp(r'[\\/]'), '/'),
+      'blocks': result.blocks.map((b) => b.name).toList(),
     });
   }
   final File indexFile = File(outputDir.path + sep + 'index.json');
   index.sort((a, b) => a['relative'].compareTo(b['relative']));
-  indexFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(index));
+  indexFile.writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert(index),
+  );
   stdout.writeln('Parsed ${index.length} shader scripts into IR');
 }
 
@@ -114,10 +132,14 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     }
     if (charCode == 35 && depth == 0) {
       final int lineEnd = content.indexOf('\n', index);
-      final String line = content.substring(index, lineEnd == -1 ? content.length : lineEnd).trim();
+      final String line = content
+          .substring(index, lineEnd == -1 ? content.length : lineEnd)
+          .trim();
       if (line.startsWith('#include')) {
         final int quoteStart = line.indexOf('"');
-        final int quoteEnd = quoteStart == -1 ? -1 : line.indexOf('"', quoteStart + 1);
+        final int quoteEnd = quoteStart == -1
+            ? -1
+            : line.indexOf('"', quoteStart + 1);
         if (quoteStart != -1 && quoteEnd != -1 && quoteEnd > quoteStart)
           includes.add(line.substring(quoteStart + 1, quoteEnd));
       }
@@ -127,7 +149,9 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     if (depth == 0 && isIdentifierStart(charCode)) {
       final int start = index;
       index++;
-      while (index < content.length && isIdentifierPart(content.codeUnitAt(index))) index++;
+      while (index < content.length &&
+          isIdentifierPart(content.codeUnitAt(index)))
+        index++;
       final String identifier = content.substring(start, index);
       final int nextIndex = skipWhitespace(content, index);
       if (nextIndex < content.length && content.codeUnitAt(nextIndex) == 123) {
@@ -136,7 +160,9 @@ ParseResult _parseShaderContent(String content, String relativePath) {
           index = nextIndex + 1;
           continue;
         }
-        final String blockContent = content.substring(nextIndex + 1, blockEnd).trimRight();
+        final String blockContent = content
+            .substring(nextIndex + 1, blockEnd)
+            .trimRight();
         blocks.add(Block(identifier, blockContent));
         index = blockEnd + 1;
         continue;
@@ -150,11 +176,17 @@ ParseResult _parseShaderContent(String content, String relativePath) {
   final String extension = dot == -1 ? '' : fileName.substring(dot + 1);
   final List<Map<String, dynamic>> textureStages = extractTextureStages(blocks);
   final List<Map<String, dynamic>> passStates = extractPassStates(blocks);
-  final List<Map<String, dynamic>> coreExpressions = extractCoreExpressions(blocks);
+  final List<Map<String, dynamic>> coreExpressions = extractCoreExpressions(
+    blocks,
+  );
   final List<String> vertexAttributes = extractVertexAttributes(blocks);
   final List<String> directives = extractDirectives(content);
   final List<Map<String, dynamic>> coreFlow = extractCoreScriptFlow(blocks);
   final List<String> maskReferences = extractMaskReferences(content);
+  final List<String> positionScripts = extractPositionScripts(content);
+  final List<Map<String, String>> positionScriptBlocks =
+      extractPositionScriptBlocks(blocks);
+  final Map<String, String> outputFieldTypes = extractOutputFieldTypes(blocks);
   return ParseResult(
     name,
     extension,
@@ -168,6 +200,9 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     directives,
     coreFlow,
     maskReferences,
+    positionScripts,
+    positionScriptBlocks,
+    outputFieldTypes,
   );
 }
 
@@ -178,10 +213,7 @@ String encodeResult(ParseResult result) {
     'path': result.relativePath,
     'includes': result.includes,
     'blocks': result.blocks
-        .map((block) => {
-              'name': block.name,
-              'content': block.content
-            })
+        .map((block) => {'name': block.name, 'content': block.content})
         .toList(),
     'textureStages': result.textureStages,
     'passStates': result.passStates,
@@ -190,6 +222,9 @@ String encodeResult(ParseResult result) {
     'directives': result.directives,
     'coreScriptFlow': result.coreScriptFlow,
     'maskReferences': result.maskReferences,
+    'positionScripts': result.positionScripts,
+    'positionScriptBlocks': result.positionScriptBlocks,
+    'outputFieldTypes': result.outputFieldTypes,
   };
   return const JsonEncoder.withIndent('  ').convert(map);
 }
@@ -201,14 +236,13 @@ List<Map<String, dynamic>> extractTextureStages(List<Block> blocks) {
     if (!lower.contains('tex') && !lower.contains('layer')) {
       continue;
     }
-    final List<Map<String, String>> statements = _extractAssignments(block.content);
+    final List<Map<String, String>> statements = _extractAssignments(
+      block.content,
+    );
     if (statements.isEmpty) {
       continue;
     }
-    stages.add({
-      'block': block.name,
-      'statements': statements,
-    });
+    stages.add({'block': block.name, 'statements': statements});
   }
   return stages;
 }
@@ -216,12 +250,19 @@ List<Map<String, dynamic>> extractTextureStages(List<Block> blocks) {
 List<Map<String, dynamic>> extractPassStates(List<Block> blocks) {
   final List<Map<String, dynamic>> states = [];
   for (final Block block in blocks) {
-    final List<Map<String, String>> statements = _extractAssignments(block.content);
-    final List<Map<String, dynamic>> entries = _parseStateEntries(block.content);
+    final List<Map<String, String>> statements = _extractAssignments(
+      block.content,
+    );
+    final List<Map<String, dynamic>> entries = _parseStateEntries(
+      block.content,
+    );
     if (statements.isEmpty && entries.isEmpty) {
       continue;
     }
-    final Map<String, dynamic> summary = _summarizePassState(statements, entries);
+    final Map<String, dynamic> summary = _summarizePassState(
+      statements,
+      entries,
+    );
     final bool blockNameSuggestsPass = _blockNameSuggestsPass(block.name);
     final bool hasPassStateCall = entries.any((entry) {
       if (entry['type'] != 'call') {
@@ -265,10 +306,7 @@ List<Map<String, dynamic>> extractCoreExpressions(List<Block> blocks) {
       continue;
     }
     if (line.startsWith('//')) {
-      expressions.add({
-        'type': 'comment',
-        'value': line.substring(2).trim(),
-      });
+      expressions.add({'type': 'comment', 'value': line.substring(2).trim()});
       continue;
     }
     if (line == '{' || line == '}') {
@@ -278,7 +316,10 @@ List<Map<String, dynamic>> extractCoreExpressions(List<Block> blocks) {
       final int index = line.indexOf('=');
       final String lhs = line.substring(0, index).trim();
       final String rhs = line.substring(index + 1).trim().replaceAll(';', '');
-      final bool isSample = rhs.contains('tex2D') || rhs.contains('texCUBE') || rhs.contains('tex3D');
+      final bool isSample =
+          rhs.contains('tex2D') ||
+          rhs.contains('texCUBE') ||
+          rhs.contains('tex3D');
       expressions.add({
         'type': 'assignment',
         'lhs': lhs,
@@ -287,10 +328,7 @@ List<Map<String, dynamic>> extractCoreExpressions(List<Block> blocks) {
         'raw': line,
       });
     } else {
-      expressions.add({
-        'type': 'statement',
-        'raw': line,
-      });
+      expressions.add({'type': 'statement', 'raw': line});
     }
   }
   return expressions;
@@ -371,6 +409,52 @@ class _InlineStateAssignment {
 
   final String key;
   final String value;
+}
+
+class _OutputFieldSpec {
+  const _OutputFieldSpec(this.field, this.type);
+
+  final String field;
+  final String type;
+}
+
+_OutputFieldSpec? _mapOutputMacroToSpec(String macro) {
+  switch (macro) {
+    case 'OUT_P':
+      return const _OutputFieldSpec('HPosition', 'float4');
+    case 'OUT_C0':
+      return const _OutputFieldSpec('Color', 'float4');
+    case 'OUT_C1':
+      return const _OutputFieldSpec('Color1', 'float4');
+  }
+  final RegExp texPattern = RegExp(r'^OUT_T(\d+)(?:_(\d+))?$');
+  final RegExpMatch? match = texPattern.firstMatch(macro);
+  if (match != null) {
+    final String index = match.group(1)!;
+    final String? componentCount = match.group(2);
+    String type = 'float4';
+    if (componentCount != null) {
+      switch (componentCount) {
+        case '1':
+          type = 'float';
+          break;
+        case '2':
+          type = 'float2';
+          break;
+        case '3':
+          type = 'float3';
+          break;
+        case '4':
+          type = 'float4';
+          break;
+        default:
+          type = 'float$componentCount';
+          break;
+      }
+    }
+    return _OutputFieldSpec('Tex$index', type);
+  }
+  return null;
 }
 
 const Map<String, String> _passStateKeyLookup = {
@@ -480,7 +564,9 @@ Map<String, dynamic> _summarizePassState(
     String? lhs = statement['lhs'];
     String? rhs = statement['rhs'];
     if ((lhs == null || rhs == null) && statement.containsKey('raw')) {
-      final _InlineStateAssignment? inline = _parseInlineState(statement['raw']!);
+      final _InlineStateAssignment? inline = _parseInlineState(
+        statement['raw']!,
+      );
       if (inline != null) {
         lhs = inline.key;
         rhs = inline.value;
@@ -550,7 +636,9 @@ Map<String, dynamic> _summarizePassState(
         break;
       case 'colorMask':
         final Map<String, bool> mask = _parseColorMask(value);
-        final String key = keyInfo.index == null ? 'colorMask' : 'colorMask${keyInfo.index}';
+        final String key = keyInfo.index == null
+            ? 'colorMask'
+            : 'colorMask${keyInfo.index}';
         colorMasks[key] = mask;
         break;
       case 'cullMode':
@@ -788,8 +876,11 @@ List<String> _splitStateValues(String raw) {
   if (cleaned.isEmpty) {
     return const [];
   }
-  final List<String> tokens =
-      cleaned.split(RegExp(r'[,\s]+')).map((token) => token.trim()).where((token) => token.isNotEmpty).toList();
+  final List<String> tokens = cleaned
+      .split(RegExp(r'[,\s]+'))
+      .map((token) => token.trim())
+      .where((token) => token.isNotEmpty)
+      .toList();
   return tokens.map(_normalizeEnumValue).toList();
 }
 
@@ -885,7 +976,7 @@ List<String> extractDirectives(String content) {
     'TwoSided',
     'HalfPrecision',
     'HalfPrecisionOnly',
-    'FogDisable'
+    'FogDisable',
   };
   for (final String rawLine in content.split('\n')) {
     final String line = rawLine.trim();
@@ -928,14 +1019,18 @@ List<String> extractMaskReferences(String content) {
       tokens.add(value);
     }
   }
-  final RegExp ifdefPattern = RegExp(r'#\s*(?:ifn?def|ifdef|ifndef)\s+([A-Za-z_][A-Za-z0-9_]*)');
+  final RegExp ifdefPattern = RegExp(
+    r'#\s*(?:ifn?def|ifdef|ifndef)\s+([A-Za-z_][A-Za-z0-9_]*)',
+  );
   for (final Match match in ifdefPattern.allMatches(content)) {
     final String? value = match.group(1);
     if (value != null && value.isNotEmpty) {
       tokens.add(value);
     }
   }
-  final RegExp definedPattern = RegExp(r'defined\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)');
+  final RegExp definedPattern = RegExp(
+    r'defined\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)',
+  );
   for (final Match match in definedPattern.allMatches(content)) {
     final String? value = match.group(1);
     if (value != null && value.isNotEmpty) {
@@ -944,6 +1039,85 @@ List<String> extractMaskReferences(String content) {
   }
   final List<String> result = tokens.toList();
   result.sort();
+  return result;
+}
+
+List<String> extractPositionScripts(String content) {
+  final RegExp pattern = RegExp(
+    r'PositionScript\s*=\s*([A-Za-z_][A-Za-z0-9_]*)',
+  );
+  final Set<String> scripts = <String>{};
+  for (final RegExpMatch match in pattern.allMatches(content)) {
+    final String? script = match.group(1);
+    if (script != null && script.isNotEmpty) {
+      scripts.add(script.trim());
+    }
+  }
+  final List<String> result = scripts.toList();
+  result.sort();
+  return result;
+}
+
+List<Map<String, String>> extractPositionScriptBlocks(List<Block> blocks) {
+  final List<Map<String, String>> scripts = <Map<String, String>>[];
+  for (final Block block in blocks) {
+    final String lower = block.name.toLowerCase();
+    if (!lower.startsWith('positionscript')) {
+      continue;
+    }
+    String name = '';
+    final RegExpMatch? match = RegExp(
+      r'positionscript\s*=\s*([A-Za-z_][A-Za-z0-9_]*)',
+      caseSensitive: false,
+    ).firstMatch(block.name);
+    if (match != null) {
+      name = match.group(1) ?? '';
+    }
+    scripts.add({'name': name, 'content': block.content});
+  }
+  return scripts;
+}
+
+Map<String, String> extractOutputFieldTypes(List<Block> blocks) {
+  final Map<String, String> result = <String, String>{};
+  final RegExp macroPattern = RegExp(r'OUT_[A-Za-z0-9_]+');
+  for (final Block block in blocks) {
+    if (block.name.toLowerCase() != 'declarationsscript') {
+      continue;
+    }
+    for (final RegExpMatch match in macroPattern.allMatches(block.content)) {
+      final String macro = match.group(0)!;
+      final _OutputFieldSpec? spec = _mapOutputMacroToSpec(macro);
+      if (spec != null) {
+        result.putIfAbsent(spec.field, () => spec.type);
+      }
+    }
+    final RegExp structPattern = RegExp(
+      r'struct\s+vertout\s*\{([\s\S]*?)\};',
+      multiLine: true,
+    );
+    final RegExpMatch? structMatch = structPattern.firstMatch(block.content);
+    if (structMatch != null) {
+      final String body = structMatch.group(1)!;
+      final List<String> structLines = body.split('\n');
+      for (final String rawLine in structLines) {
+        final String line = rawLine.trim();
+        if (line.isEmpty ||
+            line.startsWith('//') ||
+            line.startsWith('#')) {
+          continue;
+        }
+        final RegExpMatch? fieldMatch = RegExp(
+          r'(float[0-9]*(?:x[0-9]+)?)\s+([A-Za-z0-9_]+)',
+        ).firstMatch(line);
+        if (fieldMatch != null) {
+          final String type = fieldMatch.group(1)!;
+          final String name = fieldMatch.group(2)!;
+          result.putIfAbsent(name, () => type);
+        }
+      }
+    }
+  }
   return result;
 }
 
@@ -979,9 +1153,13 @@ List<Map<String, dynamic>> _buildCoreScriptFlow(String content) {
     }
 
     final bool opensBlock = line.endsWith('{');
-    String contentText = opensBlock ? line.substring(0, line.length - 1).trimRight() : line;
+    String contentText = opensBlock
+        ? line.substring(0, line.length - 1).trimRight()
+        : line;
     if (contentText.endsWith(';')) {
-      contentText = contentText.substring(0, contentText.length - 1).trimRight();
+      contentText = contentText
+          .substring(0, contentText.length - 1)
+          .trimRight();
     }
     final String type = _classifyFlowLine(contentText);
 
@@ -1084,7 +1262,9 @@ int skipWhitespace(String content, int index) {
 }
 
 bool isIdentifierStart(int code) {
-  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code == 95;
+  return (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122) ||
+      code == 95;
 }
 
 bool isIdentifierPart(int code) {

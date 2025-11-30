@@ -24,6 +24,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <cstdint>
 
 // Include CryEngine interfaces
 #include "IRenderer.h"
@@ -34,6 +35,29 @@
 class CMetalBaseRenderer;
 class CMetalTextureManager;
 class CMetalShaderManager;
+
+enum class UniformScalarType : uint8_t
+{
+    Float,
+    Int,
+    Bool
+};
+
+enum class UniformValueSource : uint8_t
+{
+    ShaderParam,
+    RendererModelViewProj,
+    RendererModel,
+    RendererView,
+    RendererProjection,
+    RendererCameraPos,
+    RendererLightPos,
+    RendererLightColor,
+    RendererClipPlane,
+    RendererClipEnabled,
+    RendererClipRefract,
+    RendererTime
+};
 
 class CMetalShader : public IShader
 {
@@ -102,6 +126,7 @@ public:
         std::string name;
         std::string type;
         std::string semantic;
+        int arraySize = 0;
     };
 
     struct GeneratedTextureBinding
@@ -131,14 +156,27 @@ public:
         MTLBlendFactor sourceBlendFactor;
         MTLBlendFactor destinationBlendFactor;
         MTLBlendOperation blendOperation;
+        MTLBlendFactor sourceAlphaBlendFactor;
+        MTLBlendFactor destinationAlphaBlendFactor;
+        MTLBlendOperation alphaBlendOperation;
         bool depthTestEnabled;
         bool depthWriteEnabled;
         MTLCompareFunction depthCompareFunction;
         MTLCullMode cullMode;
+        uint8_t colorWriteMask = 0xF;
         struct UniformRuntimeBinding
         {
-            int paramIndex;
+            int paramIndex = -1;
             GeneratedUniformBinding binding;
+            std::vector<int> arrayParamIndices;
+            UniformScalarType scalarType = UniformScalarType::Float;
+            int rows = 1;
+            int columns = 1;
+            int arrayCount = 1;
+            size_t offset = 0;
+            size_t size = 0;
+            size_t elementStride = 0;
+            UniformValueSource source = UniformValueSource::ShaderParam;
         };
         struct TextureRuntimeBinding
         {
@@ -149,6 +187,8 @@ public:
         std::vector<TextureRuntimeBinding> textureRuntimeBindings;
         size_t publicParamSignature = 0;
         bool runtimeBindingsPrepared = false;
+        size_t uniformDataSize = 0;
+        std::vector<uint8_t> uniformStaging;
     };
 
     CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTextureManager* textureManager);
@@ -303,5 +343,21 @@ protected:
 };
 
 #endif // __APPLE__ && __MACH__
+
+#if defined(__APPLE__) && defined(__MACH__)
+inline uint64 BuildRenderStateHash(const CMetalShaderManager::ShaderInfo& info)
+{
+    uint64 hash = 0;
+    hash |= info.blendEnabled ? 1ULL : 0ULL;
+    hash |= (static_cast<uint64>(static_cast<uint32>(info.sourceBlendFactor)) & 0x3FULL) << 1;
+    hash |= (static_cast<uint64>(static_cast<uint32>(info.destinationBlendFactor)) & 0x3FULL) << 7;
+    hash |= (static_cast<uint64>(static_cast<uint32>(info.sourceAlphaBlendFactor)) & 0x3FULL) << 13;
+    hash |= (static_cast<uint64>(static_cast<uint32>(info.destinationAlphaBlendFactor)) & 0x3FULL) << 19;
+    hash |= (static_cast<uint64>(static_cast<uint32>(info.blendOperation)) & 0x7ULL) << 25;
+    hash |= (static_cast<uint64>(static_cast<uint32>(info.alphaBlendOperation)) & 0x7ULL) << 28;
+    hash |= (static_cast<uint64>(info.colorWriteMask & 0xF)) << 31;
+    return hash;
+}
+#endif
 
 #endif // METAL_SHADER_MANAGER_H

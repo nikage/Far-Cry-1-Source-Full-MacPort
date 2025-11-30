@@ -794,7 +794,7 @@ void C3DEngine::DrawText(float x, float y, const char * format, ...)
 	char buffer[512];
 	va_list args;
 	va_start(args, format);
-	vsprintf(buffer, format, args);
+ 	vsprintf(buffer, format, args);
 	va_end(args);
 
 	ICryFont *pCryFont = GetSystem()->GetICryFont();

@@ -59,6 +59,8 @@ void main() {
     coreExpressions: expressions,
     coreFlow: flow,
     passStates: const [],
+    positionScripts: const [],
+    outputFieldTypes: const {},
     maskReferences: const ['MASK_FEATURE', 'MASK_FOG'],
   );
 
@@ -83,11 +85,7 @@ void main() {
     <Map<String, dynamic>>[
       {
         'stateSummary': {
-          'blend': {
-            'enabled': true,
-            'src': 'SRCALPHA',
-            'dst': 'INVSRCALPHA',
-          },
+          'blend': {'enabled': true, 'src': 'SRCALPHA', 'dst': 'INVSRCALPHA'},
           'depthWrite': false,
           'depthTest': true,
           'depthFunc': 'LESS_EQUAL',
@@ -105,16 +103,30 @@ void main() {
   _check(pipeline['blendEnabled'] == true, 'pipeline blendEnabled incorrect');
   _check(pipeline['blendMode'] == 'alpha', 'pipeline blendMode incorrect');
   final Map<String, dynamic> blendFactors =
-      (pipeline['blendFactors'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-  _check(blendFactors['src'] == 'SRCALPHA', 'pipeline src blend factor incorrect');
-  _check(blendFactors['dst'] == 'INVSRCALPHA', 'pipeline dst blend factor incorrect');
+      (pipeline['blendFactors'] as Map<String, dynamic>? ??
+      const <String, dynamic>{});
+  _check(
+    blendFactors['src'] == 'SRCALPHA',
+    'pipeline src blend factor incorrect',
+  );
+  _check(
+    blendFactors['dst'] == 'INVSRCALPHA',
+    'pipeline dst blend factor incorrect',
+  );
   _check(pipeline['depthWrite'] == false, 'pipeline depthWrite incorrect');
   _check(pipeline['depthTest'] == true, 'pipeline depthTest incorrect');
-  _check(pipeline['depthCompare'] == 'lessEqual', 'pipeline depthCompare incorrect');
+  _check(
+    pipeline['depthCompare'] == 'lessEqual',
+    'pipeline depthCompare incorrect',
+  );
   _check(pipeline['cullMode'] == 'none', 'pipeline cull mode incorrect');
   final Map<String, dynamic> colorMask =
-      (pipeline['colorMask'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-  _check(colorMask['red'] == true && colorMask['alpha'] == false, 'pipeline color mask incorrect');
+      (pipeline['colorMask'] as Map<String, dynamic>? ??
+      const <String, dynamic>{});
+  _check(
+    colorMask['red'] == true && colorMask['alpha'] == false,
+    'pipeline color mask incorrect',
+  );
 
   stdout.writeln('metal_generator_test: all checks passed');
 }
@@ -125,4 +137,3 @@ void _check(bool condition, String message) {
     exit(1);
   }
 }
-

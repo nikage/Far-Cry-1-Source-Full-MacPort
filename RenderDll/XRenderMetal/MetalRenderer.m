@@ -105,6 +105,7 @@ public:
      * associated Metal objects (textures, buffers, shaders, etc.)
      */
     virtual ~CMetalRenderer();
+    CMetalTextureManager* GetTextureManager() const;
     
     ////////////////////////////////////////////////////////////////////////////
     // Camera Management (delegated to CMetalBaseRenderer)
@@ -429,7 +430,6 @@ public:
     // Window and rendering surface
     NSWindow* m_window;
     CAMetalLayer* m_windowMetalLayer;
-    id<CAMetalDrawable> m_currentDrawable;
     
     // 2D mode state
     bool m_2DMode;

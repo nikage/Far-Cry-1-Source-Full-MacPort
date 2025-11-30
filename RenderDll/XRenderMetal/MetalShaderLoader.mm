@@ -103,15 +103,78 @@ struct PipelineStateConfig
     MTLBlendFactor sourceBlendFactor = MTLBlendFactorSourceAlpha;
     MTLBlendFactor destinationBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
     MTLBlendOperation blendOperation = MTLBlendOperationAdd;
+    MTLBlendFactor sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+    MTLBlendFactor destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    MTLBlendOperation alphaBlendOperation = MTLBlendOperationAdd;
     bool depthTestEnabled = true;
     bool depthWriteEnabled = false;
     MTLCompareFunction depthCompareFunction = MTLCompareFunctionLessEqual;
     MTLCullMode cullMode = MTLCullModeBack;
+    uint8_t colorWriteMask = 0xF;
 };
 
 PipelineStateConfig DefaultPipelineConfig()
 {
     return PipelineStateConfig();
+}
+
+static NSString* NormalizeBlendString(NSString* value)
+{
+    if (!value)
+        return nil;
+    NSString* lowered = [[value lowercaseString] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    lowered = [lowered stringByReplacingOccurrencesOfString:@"_" withString:@""];
+    lowered = [lowered stringByReplacingOccurrencesOfString:@"-" withString:@""];
+    lowered = [lowered stringByReplacingOccurrencesOfString:@" " withString:@""];
+    return lowered;
+}
+
+static MTLBlendFactor BlendFactorFromString(NSString* value)
+{
+    NSString* token = NormalizeBlendString(value);
+    if (!token || [token length] == 0)
+        return MTLBlendFactorOne;
+    if ([token isEqualToString:@"zero"])
+        return MTLBlendFactorZero;
+    if ([token isEqualToString:@"one"])
+        return MTLBlendFactorOne;
+    if ([token isEqualToString:@"srccolor"] || [token isEqualToString:@"src"])
+        return MTLBlendFactorSourceColor;
+    if ([token isEqualToString:@"invsrccolor"] || [token isEqualToString:@"oneminussrccolor"])
+        return MTLBlendFactorOneMinusSourceColor;
+    if ([token isEqualToString:@"dstcolor"] || [token isEqualToString:@"dst"])
+        return MTLBlendFactorDestinationColor;
+    if ([token isEqualToString:@"invdstcolor"] || [token isEqualToString:@"oneminusdstcolor"])
+        return MTLBlendFactorOneMinusDestinationColor;
+    if ([token isEqualToString:@"srcalpha"])
+        return MTLBlendFactorSourceAlpha;
+    if ([token isEqualToString:@"invsrcalpha"] || [token isEqualToString:@"oneminussrcalpha"])
+        return MTLBlendFactorOneMinusSourceAlpha;
+    if ([token isEqualToString:@"dstalpha"])
+        return MTLBlendFactorDestinationAlpha;
+    if ([token isEqualToString:@"invdstalpha"] || [token isEqualToString:@"oneminusdstalpha"])
+        return MTLBlendFactorOneMinusDestinationAlpha;
+    if ([token isEqualToString:@"srcalphasat"] || [token isEqualToString:@"srcalphasaturate"])
+        return MTLBlendFactorSourceAlphaSaturated;
+    return MTLBlendFactorOne;
+}
+
+static MTLBlendOperation BlendOperationFromString(NSString* value)
+{
+    NSString* token = NormalizeBlendString(value);
+    if (!token || [token length] == 0)
+        return MTLBlendOperationAdd;
+    if ([token isEqualToString:@"add"])
+        return MTLBlendOperationAdd;
+    if ([token isEqualToString:@"subtract"])
+        return MTLBlendOperationSubtract;
+    if ([token isEqualToString:@"revsubtract"] || [token isEqualToString:@"reversesubtract"])
+        return MTLBlendOperationReverseSubtract;
+    if ([token isEqualToString:@"min"])
+        return MTLBlendOperationMin;
+    if ([token isEqualToString:@"max"])
+        return MTLBlendOperationMax;
+    return MTLBlendOperationAdd;
 }
 
 void ApplyPipelineConfigFromManifest(PipelineStateConfig& config, NSDictionary* pipelineDict)
@@ -150,6 +213,41 @@ void ApplyPipelineConfigFromManifest(PipelineStateConfig& config, NSDictionary* 
         }
     }
 
+    NSDictionary* blendFactorsDict = pipelineDict[@"blendFactors"];
+    if (blendFactorsDict && [blendFactorsDict isKindOfClass:[NSDictionary class]])
+    {
+        NSString* srcValue = blendFactorsDict[@"src"];
+        if (srcValue)
+            config.sourceBlendFactor = BlendFactorFromString(srcValue);
+        NSString* dstValue = blendFactorsDict[@"dst"];
+        if (dstValue)
+            config.destinationBlendFactor = BlendFactorFromString(dstValue);
+        NSString* srcAlphaValue = blendFactorsDict[@"srcAlpha"];
+        if (srcAlphaValue)
+            config.sourceAlphaBlendFactor = BlendFactorFromString(srcAlphaValue);
+        else
+            config.sourceAlphaBlendFactor = config.sourceBlendFactor;
+        NSString* dstAlphaValue = blendFactorsDict[@"dstAlpha"];
+        if (dstAlphaValue)
+            config.destinationAlphaBlendFactor = BlendFactorFromString(dstAlphaValue);
+        else
+            config.destinationAlphaBlendFactor = config.destinationBlendFactor;
+        NSString* opValue = blendFactorsDict[@"op"];
+        if (opValue)
+            config.blendOperation = BlendOperationFromString(opValue);
+        NSString* opAlphaValue = blendFactorsDict[@"opAlpha"];
+        if (opAlphaValue)
+            config.alphaBlendOperation = BlendOperationFromString(opAlphaValue);
+        else
+            config.alphaBlendOperation = config.blendOperation;
+    }
+    else
+    {
+        config.sourceAlphaBlendFactor = config.sourceBlendFactor;
+        config.destinationAlphaBlendFactor = config.destinationBlendFactor;
+        config.alphaBlendOperation = config.blendOperation;
+    }
+
     NSNumber* depthTestValue = pipelineDict[@"depthTest"];
     if (depthTestValue)
         config.depthTestEnabled = depthTestValue.boolValue;
@@ -184,6 +282,25 @@ void ApplyPipelineConfigFromManifest(PipelineStateConfig& config, NSDictionary* 
 
     if (!config.blendEnabled)
         config.blendMode = kBlendNone;
+
+    NSDictionary* colorMaskDict = pipelineDict[@"colorMask"];
+    if (colorMaskDict && [colorMaskDict isKindOfClass:[NSDictionary class]])
+    {
+        uint8_t mask = 0;
+        NSNumber* rValue = colorMaskDict[@"r"];
+        NSNumber* gValue = colorMaskDict[@"g"];
+        NSNumber* bValue = colorMaskDict[@"b"];
+        NSNumber* aValue = colorMaskDict[@"a"];
+        if (!rValue || rValue.boolValue)
+            mask |= 0x1;
+        if (!gValue || gValue.boolValue)
+            mask |= 0x2;
+        if (!bValue || bValue.boolValue)
+            mask |= 0x4;
+        if (!aValue || aValue.boolValue)
+            mask |= 0x8;
+        config.colorWriteMask = mask ? mask : 0;
+    }
 }
 
 static std::string NormalizeShaderName(const char* name)
@@ -354,10 +471,14 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         info.sourceBlendFactor = MTLBlendFactorSourceAlpha;
         info.destinationBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         info.blendOperation = MTLBlendOperationAdd;
+        info.sourceAlphaBlendFactor = info.sourceBlendFactor;
+        info.destinationAlphaBlendFactor = info.destinationBlendFactor;
+        info.alphaBlendOperation = info.blendOperation;
         info.depthTestEnabled = true;
         info.depthWriteEnabled = true;
         info.depthCompareFunction = MTLCompareFunctionLessEqual;
         info.cullMode = MTLCullModeBack;
+        info.colorWriteMask = 0xF;
 
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(
             vertexFunc, fragmentFunc, vertexDesc, &info);
@@ -532,10 +653,14 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         info.sourceBlendFactor = pipelineConfig.sourceBlendFactor;
         info.destinationBlendFactor = pipelineConfig.destinationBlendFactor;
         info.blendOperation = pipelineConfig.blendOperation;
+        info.sourceAlphaBlendFactor = pipelineConfig.sourceAlphaBlendFactor;
+        info.destinationAlphaBlendFactor = pipelineConfig.destinationAlphaBlendFactor;
+        info.alphaBlendOperation = pipelineConfig.alphaBlendOperation;
         info.depthTestEnabled = pipelineConfig.depthTestEnabled;
         info.depthWriteEnabled = pipelineConfig.depthWriteEnabled;
         info.depthCompareFunction = pipelineConfig.depthCompareFunction;
         info.cullMode = pipelineConfig.cullMode;
+        info.colorWriteMask = pipelineConfig.colorWriteMask;
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
         if (!pipelineState)
             continue;
@@ -565,12 +690,14 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                 NSString* uName = uniformDict[@"name"];
                 NSString* uType = uniformDict[@"type"];
                 NSString* uSemantic = uniformDict[@"semantic"];
+                NSNumber* uArraySize = uniformDict[@"arraySize"];
                 if (uName)
                     binding.name = [uName UTF8String];
                 if (uType)
                     binding.type = [uType UTF8String];
                 if (uSemantic)
                     binding.semantic = [uSemantic UTF8String];
+                binding.arraySize = uArraySize ? uArraySize.intValue : 0;
                 info.uniformBindings.push_back(binding);
             }
         }
@@ -645,7 +772,11 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     MTLBlendFactor srcBlend = MTLBlendFactorSourceAlpha;
     MTLBlendFactor dstBlend = MTLBlendFactorOneMinusSourceAlpha;
     MTLBlendOperation blendOp = MTLBlendOperationAdd;
-    uint32 blendModeEnum = static_cast<uint32>(kBlendAlpha);
+    MTLBlendFactor srcAlphaBlend = srcBlend;
+    MTLBlendFactor dstAlphaBlend = dstBlend;
+    MTLBlendOperation alphaOp = blendOp;
+    uint8_t colorWriteMask = 0xF;
+    uint64_t renderStateHash = 0;
 
     if (shaderInfo)
     {
@@ -653,14 +784,31 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
         srcBlend = shaderInfo->sourceBlendFactor;
         dstBlend = shaderInfo->destinationBlendFactor;
         blendOp = shaderInfo->blendOperation;
-        blendModeEnum = shaderInfo->blendMode;
+        srcAlphaBlend = shaderInfo->sourceAlphaBlendFactor;
+        dstAlphaBlend = shaderInfo->destinationAlphaBlendFactor;
+        alphaOp = shaderInfo->alphaBlendOperation;
+        colorWriteMask = shaderInfo->colorWriteMask;
+        renderStateHash = BuildRenderStateHash(*shaderInfo);
+    }
+    else
+    {
+        ShaderInfo temp;
+        temp.blendEnabled = blendEnabled;
+        temp.sourceBlendFactor = srcBlend;
+        temp.destinationBlendFactor = dstBlend;
+        temp.blendOperation = blendOp;
+        temp.sourceAlphaBlendFactor = srcAlphaBlend;
+        temp.destinationAlphaBlendFactor = dstAlphaBlend;
+        temp.alphaBlendOperation = alphaOp;
+        temp.colorWriteMask = colorWriteMask;
+        renderStateHash = BuildRenderStateHash(temp);
     }
 
     MetalPipelineStateKey key;
     key.vertexFunctionHash = (uint64_t)vertexFunction;
     key.fragmentFunctionHash = (uint64_t)fragmentFunction;
     key.vertexFormatHash = 0;
-    key.renderStateHash = (blendModeEnum & 0xFF) << 16;
+    key.renderStateHash = renderStateHash;
     key.colorPixelFormat = colorFormat;
     key.depthPixelFormat = depthFormat;
     
@@ -685,10 +833,20 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
         descriptor.colorAttachments[0].sourceRGBBlendFactor = srcBlend;
         descriptor.colorAttachments[0].destinationRGBBlendFactor = dstBlend;
         descriptor.colorAttachments[0].rgbBlendOperation = blendOp;
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = srcBlend;
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = dstBlend;
-        descriptor.colorAttachments[0].alphaBlendOperation = blendOp;
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = srcAlphaBlend;
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = dstAlphaBlend;
+        descriptor.colorAttachments[0].alphaBlendOperation = alphaOp;
     }
+    MTLColorWriteMask writeMask = 0;
+    if (colorWriteMask & 0x1)
+        writeMask |= MTLColorWriteMaskRed;
+    if (colorWriteMask & 0x2)
+        writeMask |= MTLColorWriteMaskGreen;
+    if (colorWriteMask & 0x4)
+        writeMask |= MTLColorWriteMaskBlue;
+    if (colorWriteMask & 0x8)
+        writeMask |= MTLColorWriteMaskAlpha;
+    descriptor.colorAttachments[0].writeMask = writeMask;
  
     descriptor.depthAttachmentPixelFormat = depthFormat;
     

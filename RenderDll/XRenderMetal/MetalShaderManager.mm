@@ -27,6 +27,8 @@
 #include <functional>
 #include <cctype>
 #include <cstdlib>
+#include <cstdint>
+#include <cstring>
 #include <strings.h>
 
 
@@ -223,6 +225,368 @@ size_t ComputePublicParamSignature(const TArray<SShaderParam>& params)
         hash = CombineHash(hash, static_cast<size_t>(param.m_Type));
     }
     return hash;
+}
+
+struct UniformLayoutInfo
+{
+    UniformScalarType scalarType;
+    int rows;
+    int columns;
+    int arrayCount;
+    size_t elementSize;
+    size_t alignedSize;
+};
+
+static size_t AlignSize(size_t value, size_t alignment)
+{
+    const size_t mask = alignment - 1;
+    return (value + mask) & ~mask;
+}
+
+static UniformLayoutInfo ParseUniformLayout(const CMetalShaderManager::GeneratedUniformBinding& binding)
+{
+    UniformLayoutInfo info;
+    info.scalarType = UniformScalarType::Float;
+    info.rows = 1;
+    info.columns = 1;
+    info.arrayCount = binding.arraySize > 0 ? binding.arraySize : 1;
+    std::string lowerType = binding.type;
+    std::transform(lowerType.begin(), lowerType.end(), lowerType.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lowerType.find("bool") != std::string::npos)
+        info.scalarType = UniformScalarType::Bool;
+    else if (lowerType.find("int") != std::string::npos)
+        info.scalarType = UniformScalarType::Int;
+    int numbers[2] = {0, 0};
+    int numberIndex = 0;
+    for (char ch : lowerType)
+    {
+        if (ch >= '0' && ch <= '9')
+        {
+            numbers[numberIndex] = numbers[numberIndex] * 10 + (ch - '0');
+        }
+        else if (ch == 'x' && numberIndex == 0)
+        {
+            numberIndex = 1;
+        }
+    }
+    if (numbers[0] > 0 && numbers[1] > 0)
+    {
+        info.rows = numbers[0];
+        info.columns = numbers[1];
+    }
+    else if (numbers[0] > 0)
+    {
+        info.columns = numbers[0];
+    }
+    size_t componentCount = static_cast<size_t>(info.rows) * static_cast<size_t>(info.columns);
+    if (componentCount == 0)
+        componentCount = 1;
+    size_t scalarSize = sizeof(float);
+    if (info.scalarType == UniformScalarType::Int || info.scalarType == UniformScalarType::Bool)
+        scalarSize = sizeof(int32_t);
+    info.elementSize = componentCount * scalarSize;
+    info.alignedSize = AlignSize(info.elementSize, 16);
+    return info;
+}
+
+static UniformValueSource EvaluateUniformIdentifier(const std::string& identifier)
+{
+    if (identifier.empty())
+        return UniformValueSource::ShaderParam;
+    if (identifier.find("modelviewproj") != std::string::npos || identifier.find("worldviewproj") != std::string::npos || identifier == "mvp")
+        return UniformValueSource::RendererModelViewProj;
+    if (identifier.find("model") != std::string::npos || identifier.find("world") != std::string::npos)
+        return UniformValueSource::RendererModel;
+    if (identifier.find("view") != std::string::npos && identifier.find("proj") == std::string::npos)
+        return UniformValueSource::RendererView;
+    if (identifier.find("proj") != std::string::npos)
+        return UniformValueSource::RendererProjection;
+    if (identifier.find("camerapos") != std::string::npos || identifier.find("eye") != std::string::npos || identifier.find("viewpos") != std::string::npos)
+        return UniformValueSource::RendererCameraPos;
+    if (identifier.find("lightpos") != std::string::npos)
+        return UniformValueSource::RendererLightPos;
+    if (identifier.find("lightcolor") != std::string::npos || identifier.find("lightcolour") != std::string::npos)
+        return UniformValueSource::RendererLightColor;
+    if (identifier.find("clipplane") != std::string::npos)
+        return UniformValueSource::RendererClipPlane;
+    if (identifier.find("clipenabled") != std::string::npos || identifier.find("clip_enable") != std::string::npos)
+        return UniformValueSource::RendererClipEnabled;
+    if (identifier.find("cliprefract") != std::string::npos)
+        return UniformValueSource::RendererClipRefract;
+    if (identifier.find("time") != std::string::npos)
+        return UniformValueSource::RendererTime;
+    return UniformValueSource::ShaderParam;
+}
+
+static UniformValueSource DetermineUniformSource(const CMetalShaderManager::GeneratedUniformBinding& binding)
+{
+    std::string normalizedName = NormalizeShaderName(binding.name.c_str());
+    UniformValueSource fromName = EvaluateUniformIdentifier(normalizedName);
+    if (fromName != UniformValueSource::ShaderParam)
+        return fromName;
+    if (!binding.semantic.empty())
+    {
+        std::string normalizedSemantic = NormalizeShaderName(binding.semantic.c_str());
+        return EvaluateUniformIdentifier(normalizedSemantic);
+    }
+    return UniformValueSource::ShaderParam;
+}
+
+static size_t GetComponentCount(const CMetalShaderManager::ShaderInfo::UniformRuntimeBinding& binding)
+{
+    size_t count = static_cast<size_t>(binding.rows) * static_cast<size_t>(binding.columns);
+    return count == 0 ? 1 : count;
+}
+
+static void WriteDefaultUniform(const CMetalShaderManager::ShaderInfo::UniformRuntimeBinding& binding, uint8_t* dst)
+{
+    size_t componentCount = GetComponentCount(binding);
+    if (binding.scalarType == UniformScalarType::Float)
+    {
+        float* out = reinterpret_cast<float*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = 0.0f;
+        if (binding.rows > 1 && binding.columns > 1)
+        {
+            const size_t rows = static_cast<size_t>(binding.rows);
+            const size_t cols = static_cast<size_t>(binding.columns);
+            size_t diagCount = (rows < cols) ? rows : cols;
+            for (size_t i = 0; i < diagCount; ++i)
+                out[i * binding.columns + i] = 1.0f;
+        }
+        else if (componentCount > 0)
+        {
+            out[componentCount - 1] = 1.0f;
+        }
+    }
+    else if (binding.scalarType == UniformScalarType::Int)
+    {
+        int32_t* out = reinterpret_cast<int32_t*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = 0;
+    }
+    else
+    {
+        uint32_t* out = reinterpret_cast<uint32_t*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = 0;
+    }
+}
+
+static void ExtractShaderParamValues(const SShaderParam& param, std::vector<float>& values)
+{
+    switch (param.m_Type)
+    {
+    case eType_FLOAT:
+        if (!values.empty())
+            values[0] = param.m_Value.m_Float;
+        break;
+    case eType_INT:
+        if (!values.empty())
+            values[0] = static_cast<float>(param.m_Value.m_Int);
+        break;
+    case eType_SHORT:
+        if (!values.empty())
+            values[0] = static_cast<float>(param.m_Value.m_Short);
+        break;
+    case eType_BYTE:
+        if (!values.empty())
+            values[0] = static_cast<float>(param.m_Value.m_Byte);
+        break;
+    case eType_BOOL:
+        if (!values.empty())
+            values[0] = param.m_Value.m_Bool ? 1.0f : 0.0f;
+        break;
+    case eType_VECTOR:
+        for (size_t i = 0; i < values.size() && i < 3; ++i)
+            values[i] = param.m_Value.m_Vector[i];
+        if (values.size() > 3)
+            values[3] = 1.0f;
+        break;
+    case eType_FCOLOR:
+        for (size_t i = 0; i < values.size() && i < 4; ++i)
+            values[i] = param.m_Value.m_Color[i];
+        break;
+    default:
+        break;
+    }
+}
+
+static void WriteShaderParamUniform(const CMetalShaderManager::ShaderInfo::UniformRuntimeBinding& binding, const SShaderParam& param, uint8_t* dst)
+{
+    size_t componentCount = GetComponentCount(binding);
+    if (binding.scalarType == UniformScalarType::Float)
+    {
+        std::vector<float> values(componentCount, 0.0f);
+        ExtractShaderParamValues(param, values);
+        float* out = reinterpret_cast<float*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = values[i];
+    }
+    else if (binding.scalarType == UniformScalarType::Int)
+    {
+        std::vector<float> values(componentCount, 0.0f);
+        ExtractShaderParamValues(param, values);
+        int32_t* out = reinterpret_cast<int32_t*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = static_cast<int32_t>(values[i]);
+    }
+    else
+    {
+        std::vector<float> values(componentCount, 0.0f);
+        ExtractShaderParamValues(param, values);
+        uint32_t* out = reinterpret_cast<uint32_t*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = values[i] != 0.0f ? 1u : 0u;
+    }
+}
+
+static void WriteRendererUniform(const CMetalShaderManager::ShaderInfo::UniformRuntimeBinding& binding, uint8_t* dst, CMetalBaseRenderer* renderer)
+{
+    if (!renderer)
+    {
+        WriteDefaultUniform(binding, dst);
+        return;
+    }
+    size_t componentCount = GetComponentCount(binding);
+    if (binding.scalarType == UniformScalarType::Float)
+    {
+        float* out = reinterpret_cast<float*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = 0.0f;
+        switch (binding.source)
+        {
+        case UniformValueSource::RendererModelViewProj:
+        {
+            Matrix44 matrix = renderer->GetUniformModelViewProjection();
+            const float* src = reinterpret_cast<const float*>(&matrix);
+            for (size_t i = 0; i < componentCount && i < 16; ++i)
+                out[i] = src[i];
+            break;
+        }
+        case UniformValueSource::RendererModel:
+        {
+            Matrix44 matrix = renderer->GetUniformModelMatrix();
+            const float* src = reinterpret_cast<const float*>(&matrix);
+            for (size_t i = 0; i < componentCount && i < 16; ++i)
+                out[i] = src[i];
+            break;
+        }
+        case UniformValueSource::RendererView:
+        {
+            Matrix44 matrix = renderer->GetUniformViewMatrix();
+            const float* src = reinterpret_cast<const float*>(&matrix);
+            for (size_t i = 0; i < componentCount && i < 16; ++i)
+                out[i] = src[i];
+            break;
+        }
+        case UniformValueSource::RendererProjection:
+        {
+            Matrix44 matrix = renderer->GetUniformProjectionMatrix();
+            const float* src = reinterpret_cast<const float*>(&matrix);
+            for (size_t i = 0; i < componentCount && i < 16; ++i)
+                out[i] = src[i];
+            break;
+        }
+        case UniformValueSource::RendererCameraPos:
+        {
+            Vec3 value = renderer->GetUniformCameraPosition();
+            if (componentCount > 0)
+                out[0] = value.x;
+            if (componentCount > 1)
+                out[1] = value.y;
+            if (componentCount > 2)
+                out[2] = value.z;
+            if (componentCount > 3)
+                out[3] = 1.0f;
+            break;
+        }
+        case UniformValueSource::RendererLightPos:
+        {
+            Vec3 value = renderer->GetUniformLightPosition();
+            if (componentCount > 0)
+                out[0] = value.x;
+            if (componentCount > 1)
+                out[1] = value.y;
+            if (componentCount > 2)
+                out[2] = value.z;
+            if (componentCount > 3)
+                out[3] = 1.0f;
+            break;
+        }
+        case UniformValueSource::RendererLightColor:
+        {
+            Vec3 value = renderer->GetUniformLightColor();
+            if (componentCount > 0)
+                out[0] = value.x;
+            if (componentCount > 1)
+                out[1] = value.y;
+            if (componentCount > 2)
+                out[2] = value.z;
+            if (componentCount > 3)
+                out[3] = 1.0f;
+            break;
+        }
+        case UniformValueSource::RendererClipPlane:
+        {
+            float clip[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+            renderer->GetUniformClipPlane(clip);
+            for (size_t i = 0; i < componentCount && i < 4; ++i)
+                out[i] = clip[i];
+            break;
+        }
+        case UniformValueSource::RendererClipEnabled:
+        {
+            float value = renderer->GetUniformClipEnabled();
+            if (componentCount > 0)
+                out[0] = value;
+            break;
+        }
+        case UniformValueSource::RendererClipRefract:
+        {
+            float value = renderer->GetUniformClipRefract();
+            if (componentCount > 0)
+                out[0] = value;
+            break;
+        }
+        case UniformValueSource::RendererTime:
+        {
+            float value = renderer->GetUniformTime();
+            if (componentCount > 0)
+                out[0] = value;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    else if (binding.scalarType == UniformScalarType::Int)
+    {
+        int32_t* out = reinterpret_cast<int32_t*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = 0;
+    }
+    else
+    {
+        uint32_t* out = reinterpret_cast<uint32_t*>(dst);
+        for (size_t i = 0; i < componentCount; ++i)
+            out[i] = 0;
+    }
+}
+
+static void WriteUniformElement(const CMetalShaderManager::ShaderInfo::UniformRuntimeBinding& binding, const SShaderParam* param, uint8_t* dst, CMetalBaseRenderer* renderer)
+{
+    if (binding.source == UniformValueSource::ShaderParam)
+    {
+        if (param)
+            WriteShaderParamUniform(binding, *param, dst);
+        else
+            WriteDefaultUniform(binding, dst);
+    }
+    else
+    {
+        WriteRendererUniform(binding, dst, renderer);
+    }
 }
 }
 void CMetalShaderManager::InitializeShaderFallbacks()
@@ -1280,6 +1644,8 @@ void CMetalShaderManager::ResetRuntimeBindingState(ShaderInfo& info)
     info.textureRuntimeBindings.clear();
     info.runtimeBindingsPrepared = false;
     info.publicParamSignature = 0;
+    info.uniformDataSize = 0;
+    info.uniformStaging.clear();
 }
 
 void CMetalShaderManager::PrepareRuntimeBindings(CMetalShader* shader, ShaderInfo& info)
@@ -1290,6 +1656,7 @@ void CMetalShaderManager::PrepareRuntimeBindings(CMetalShader* shader, ShaderInf
     TArray<SShaderParam>& params = shader->GetPublicParams();
     ResetRuntimeBindingState(info);
 
+    size_t offset = 0;
     for (const GeneratedUniformBinding& binding : info.uniformBindings)
     {
         int index = FindShaderParamIndex(params, binding.name);
@@ -1300,6 +1667,38 @@ void CMetalShaderManager::PrepareRuntimeBindings(CMetalShader* shader, ShaderInf
         ShaderInfo::UniformRuntimeBinding runtimeBinding;
         runtimeBinding.paramIndex = index;
         runtimeBinding.binding = binding;
+        UniformLayoutInfo layout = ParseUniformLayout(binding);
+        runtimeBinding.scalarType = layout.scalarType;
+        runtimeBinding.rows = layout.rows;
+        runtimeBinding.columns = layout.columns;
+        runtimeBinding.arrayCount = layout.arrayCount;
+        runtimeBinding.source = DetermineUniformSource(binding);
+        runtimeBinding.elementStride = layout.alignedSize;
+        size_t alignedOffset = AlignSize(offset, 16);
+        runtimeBinding.offset = alignedOffset;
+        runtimeBinding.size = layout.alignedSize * static_cast<size_t>(layout.arrayCount);
+        offset = alignedOffset + runtimeBinding.size;
+        if (layout.arrayCount > 1)
+        {
+            runtimeBinding.arrayParamIndices.reserve(layout.arrayCount);
+            for (int element = 0; element < layout.arrayCount; ++element)
+            {
+                std::string indexedName = binding.name;
+                indexedName += "[";
+                indexedName += std::to_string(element);
+                indexedName += "]";
+                int elementIndex = FindShaderParamIndex(params, indexedName);
+                if (elementIndex == -1 && !binding.semantic.empty())
+                {
+                    std::string indexedSemantic = binding.semantic;
+                    indexedSemantic += "[";
+                    indexedSemantic += std::to_string(element);
+                    indexedSemantic += "]";
+                    elementIndex = FindShaderParamIndex(params, indexedSemantic);
+                }
+                runtimeBinding.arrayParamIndices.push_back(elementIndex);
+            }
+        }
         info.uniformRuntimeBindings.push_back(runtimeBinding);
     }
 
@@ -1312,6 +1711,10 @@ void CMetalShaderManager::PrepareRuntimeBindings(CMetalShader* shader, ShaderInf
         info.textureRuntimeBindings.push_back(runtimeBinding);
         fallbackIndex++;
     }
+
+    info.uniformDataSize = offset > 0 ? AlignSize(offset, 16) : 0;
+    if (info.uniformDataSize > 0)
+        info.uniformStaging.assign(info.uniformDataSize, 0);
 
     info.runtimeBindingsPrepared = true;
     info.publicParamSignature = ComputePublicParamSignature(params);
@@ -1372,31 +1775,33 @@ void CMetalShaderManager::SetShaderParameters(id<MTLRenderCommandEncoder> encode
     if (!hasUniformBindings)
         return;
 
-    std::vector<float> uniformValues;
-    uniformValues.reserve(info.uniformRuntimeBindings.size() * 4);
+    if (info.uniformDataSize == 0)
+        return;
 
+    if (info.uniformStaging.size() != info.uniformDataSize)
+        info.uniformStaging.assign(info.uniformDataSize, 0);
+    else
+        std::fill(info.uniformStaging.begin(), info.uniformStaging.end(), 0);
+
+    uint8_t* stagingData = info.uniformStaging.data();
+    CMetalBaseRenderer* rendererBase = m_renderer;
     for (const auto& runtimeBinding : info.uniformRuntimeBindings)
     {
-        float values[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-        if (runtimeBinding.paramIndex >= 0 && runtimeBinding.paramIndex < shaderParams.Num())
+        uint8_t* basePtr = stagingData + runtimeBinding.offset;
+        int arrayCount = runtimeBinding.arrayCount > 0 ? runtimeBinding.arrayCount : 1;
+        for (int element = 0; element < arrayCount; ++element)
         {
-            const SShaderParam& param = shaderParams[runtimeBinding.paramIndex];
-            ConvertShaderParamToFloat4(param, values);
+            uint8_t* elementPtr = basePtr + runtimeBinding.elementStride * static_cast<size_t>(element);
+            int paramIndex = runtimeBinding.paramIndex;
+            if (!runtimeBinding.arrayParamIndices.empty() && element < static_cast<int>(runtimeBinding.arrayParamIndices.size()))
+                paramIndex = runtimeBinding.arrayParamIndices[element];
+            const SShaderParam* paramPtr = (paramIndex >= 0 && paramIndex < shaderParams.Num()) ? &shaderParams[paramIndex] : nullptr;
+            WriteUniformElement(runtimeBinding, paramPtr, elementPtr, rendererBase);
         }
-        else
-        {
-            FillDefaultUniform(runtimeBinding.binding, values);
-        }
-
-        uniformValues.insert(uniformValues.end(), values, values + 4);
     }
 
-    if (!uniformValues.empty())
-    {
-        const NSUInteger length = uniformValues.size() * sizeof(float);
-        [encoder setFragmentBytes:uniformValues.data() length:length atIndex:2];
-        [encoder setVertexBytes:uniformValues.data() length:length atIndex:2];
-    }
+    [encoder setFragmentBytes:info.uniformStaging.data() length:info.uniformDataSize atIndex:2];
+    [encoder setVertexBytes:info.uniformStaging.data() length:info.uniformDataSize atIndex:2];
 }
 
 void CMetalShaderManager::BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader)
@@ -1438,15 +1843,30 @@ void CMetalShaderManager::BindShaderTextures(id<MTLRenderCommandEncoder> encoder
         }
         id<MTLTexture> texture = m_textureManager->GetBoundFragmentTexture(slot);
         if (!texture)
-        {
             texture = m_textureManager->GetWhiteTexture();
-        }
+        id<MTLSamplerState> sampler = m_textureManager->GetBoundFragmentSampler(slot);
         if (texture)
-        {
             [encoder setFragmentTexture:texture atIndex:slot];
-        }
+        if (sampler)
+            [encoder setFragmentSamplerState:sampler atIndex:slot];
         ++bindingIndex;
     }
+}
+
+bool SShaderPass::mfSetTextures()
+{
+    for (int i = 0; i < m_TUnits.Num(); ++i)
+    {
+        SShaderTexUnit* unit = &m_TUnits[i];
+        if (!unit)
+            continue;
+        unit->mfSetTexture(i);
+    }
+    return true;
+}
+
+void SShaderPass::mfResetTextures()
+{
 }
 
 #endif // __APPLE__ && __MACH__
