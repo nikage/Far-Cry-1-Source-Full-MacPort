@@ -7,7 +7,9 @@ class ExpressionTranslator {
     Set<String> scalarInputFields,
     List<LineTransformer> transformers,
   ) : _scalarInputFields = Set<String>.from(scalarInputFields),
-      _transformers = transformers {
+      _transformers = transformers,
+      macros = data.coreMacros {
+    _initializeMacroValues();
     _build();
   }
 
@@ -15,6 +17,7 @@ class ExpressionTranslator {
   final _InOutAnalyzer analyzer;
   final Set<String> _scalarInputFields;
   final List<LineTransformer> _transformers;
+  final List<MacroDefinition> macros;
   final List<String> prologue = <String>[];
   final List<String> body = <String>[];
   late final String returnExpression;
@@ -24,10 +27,32 @@ class ExpressionTranslator {
   bool _usesNormalReference = false;
   bool _hasNewstDeclaration = false;
   final Set<String> _scalarVariables = <String>{};
+  final Map<String, String> _activeMacroValues = <String, String>{};
+  final Map<String, String> _inactiveMacroValues = <String, String>{};
+  final Set<String> _macroFallbackReferences = <String>{};
+  bool _needsSharedDif = false;
+  String _sharedDifType = 'float3';
+  bool _insideBlockComment = false;
+  final Map<String, String> _variableTypes = <String, String>{};
   late final Set<String> _scalarUniforms = data.uniforms
       .where((UniformBinding u) => _isScalarType(u.type))
       .map((UniformBinding u) => u.name)
       .toSet();
+
+  void _initializeMacroValues() {
+    for (final MacroDefinition macro in macros) {
+      final String replacement =
+          macro.value.isEmpty ? '1' : macro.value.trim();
+      if (!_isSimpleMacroValue(replacement)) {
+        continue;
+      }
+      if (macro.active == false) {
+        _inactiveMacroValues.putIfAbsent(macro.name, () => replacement);
+      } else {
+        _activeMacroValues.putIfAbsent(macro.name, () => replacement);
+      }
+    }
+  }
 
   void _build() {
     final List<List<String>> expressionBatches = <List<String>>[];
@@ -41,11 +66,22 @@ class ExpressionTranslator {
       if (raw == null) {
         continue;
       }
-      final String trimmed = raw.trim();
+      final String normalized = _evaluateSimplePreprocessor(raw);
+      final String trimmed = normalized.trim();
+      final bool isDirective = trimmed.startsWith('#');
+      final Object? activeState = expr['active'];
+      if (activeState is bool && activeState == false) {
+        if (isDirective) {
+          _notifyTransformersOfDirective(trimmed);
+          _processPreprocessorDirective(trimmed, conditionalStack);
+        }
+        continue;
+      }
       if (trimmed.isEmpty) {
         continue;
       }
-      if (trimmed.startsWith('#')) {
+      if (isDirective) {
+      _notifyTransformersOfDirective(trimmed);
         final bool emitDirective =
             _processPreprocessorDirective(trimmed, conditionalStack);
         if (emitDirective) {
@@ -108,16 +144,66 @@ class ExpressionTranslator {
     _hoistDuplicateDeclarations();
     _balancePreprocessorDirectives();
     _rewritePlantDiffuseBlock();
+    _injectMacroFallbacks();
+    _prepareSharedDifDeclaration();
+    _ensureDifSunFallback();
+    _ensureBumpColorDeclaration();
+    _removeDifZeroInits();
     returnExpression = analyzer.outputFields.contains('Color')
         ? 'OUT.Color'
         : 'float4(0.0)';
   }
+
+  void _notifyTransformersOfDirective(String directive) {
+    for (final LineTransformer transformer in _transformers) {
+      if (transformer is DirectiveAwareLineTransformer) {
+        transformer.handleDirective(directive);
+      }
+    }
+  }
+
+  String _stripBlockComments(String line) {
+    final StringBuffer buffer = StringBuffer();
+    int index = 0;
+    while (index < line.length) {
+      if (_insideBlockComment) {
+        if (index + 1 < line.length &&
+            line.codeUnitAt(index) == 42 &&
+            line.codeUnitAt(index + 1) == 47) {
+          _insideBlockComment = false;
+          index += 2;
+          continue;
+        }
+        index += 1;
+        continue;
+      }
+      if (index + 1 < line.length) {
+        final int first = line.codeUnitAt(index);
+        final int second = line.codeUnitAt(index + 1);
+        if (first == 47 && second == 42) {
+          _insideBlockComment = true;
+          index += 2;
+          continue;
+        }
+        if (first == 47 && second == 47) {
+          break;
+        }
+      }
+      buffer.writeCharCode(line.codeUnitAt(index));
+      index += 1;
+    }
+    return buffer.toString();
+  }
+
 
   bool get hasVPosDeclaration => _hasVPosDeclaration;
   bool get hasVNormalDeclaration => _hasVNormalDeclaration;
   bool get hasNormalDeclaration => _hasNormalDeclaration;
   bool get usesNormalReference => _usesNormalReference;
   bool get hasNewstDeclaration => _hasNewstDeclaration;
+  bool get needsSharedDif => _needsSharedDif;
+  String get sharedDifType => _sharedDifType;
+  String get sharedDifZeroValue => _zeroValueForDataType(_sharedDifType);
 
   bool _processPreprocessorDirective(
     String line,
@@ -193,6 +279,14 @@ class ExpressionTranslator {
     if (!_hasNewstDeclaration && _declaresNewst(line)) {
       _hasNewstDeclaration = true;
     }
+    final RegExpMatch? typeMatch = RegExp(
+      r'^\s*(float[234]?|half[234]?|float|half)\s+([A-Za-z_][A-Za-z0-9_]*)',
+    ).firstMatch(line.trimLeft());
+    if (typeMatch != null) {
+      final String type = typeMatch.group(1)!;
+      final String name = typeMatch.group(2)!;
+      _variableTypes.putIfAbsent(name, () => type);
+    }
   }
 
   bool _declaresVPos(String line) {
@@ -211,6 +305,7 @@ class ExpressionTranslator {
     return _newstDeclarationPattern.hasMatch(line);
   }
 
+
   static final RegExp _vPosDeclarationPattern = RegExp(r'\bfloat\d*\s+vPos\b');
   static final RegExp _vNormalDeclarationPattern = RegExp(
     r'\bfloat\d*\s+vNormal\b',
@@ -219,6 +314,8 @@ class ExpressionTranslator {
   static final RegExp _identifierRegexNormal =
       RegExp(r'(?<![A-Za-z0-9_])normal(?![A-Za-z0-9_])');
   static final RegExp _newstDeclarationPattern = RegExp(r'\bfloat\d*\s+newst\b');
+  static final RegExp _difSunDeclarationPattern =
+      RegExp(r'\bfloat\d*\s+difSun\b');
   static final RegExp _scalarDeclarationPattern = RegExp(
     r'^(float|half|int|uint|bool)\s+([A-Za-z_][A-Za-z0-9_]*)$',
   );
@@ -483,6 +580,178 @@ class ExpressionTranslator {
     }
   }
 
+  void _prepareSharedDifDeclaration() {
+    final RegExp usagePattern = RegExp(r'(?<![A-Za-z0-9_])dif(?![A-Za-z0-9_])');
+    final bool usesDif = body.any(
+      (String line) => usagePattern.hasMatch(line),
+    );
+    final bool hasDeclaration = body.any(
+      (String line) => line.trimLeft().startsWith('float3 dif ='),
+    );
+    if (!usesDif && !hasDeclaration) {
+      return;
+    }
+    _needsSharedDif = true;
+    _sharedDifType = _determineSharedDifType();
+    _rewriteDifDeclarationsAsAssignments();
+    _removePrologueDifZeroInits();
+  }
+
+  String _determineSharedDifType() {
+    int bestRank = -1;
+    String bestType = _sharedDifType;
+    for (final String line in <String>[...prologue, ...body]) {
+      final String trimmed = line.trimLeft();
+      final RegExpMatch? match = RegExp(
+        r'^(float[234]?|half[234]?|float|half)\s+dif\b',
+        caseSensitive: false,
+      ).firstMatch(trimmed);
+      if (match == null) {
+        continue;
+      }
+      final String normalized = _normalizeVectorType(match.group(1)!);
+      final int rank = _vectorTypeRank(normalized);
+      if (rank > bestRank) {
+        bestRank = rank;
+        bestType = normalized;
+        if (rank >= 4) {
+          break;
+        }
+      }
+    }
+    return bestType;
+  }
+
+  String _normalizeVectorType(String type) {
+    final String lower = type.toLowerCase();
+    if (lower.startsWith('half4')) return 'half4';
+    if (lower.startsWith('half3')) return 'half3';
+    if (lower.startsWith('half2')) return 'half2';
+    if (lower.startsWith('half')) return 'half';
+    if (lower.startsWith('float4')) return 'float4';
+    if (lower.startsWith('float3')) return 'float3';
+    if (lower.startsWith('float2')) return 'float2';
+    if (lower.startsWith('float')) return 'float';
+    return lower;
+  }
+
+  int _vectorTypeRank(String type) {
+    final String lower = type.toLowerCase();
+    if (lower.endsWith('4')) {
+      return 4;
+    }
+    if (lower.endsWith('3')) {
+      return 3;
+    }
+    if (lower.endsWith('2')) {
+      return 2;
+    }
+    return 1;
+  }
+
+  void _rewriteDifDeclarationsAsAssignments() {
+    if (!_needsSharedDif) {
+      return;
+    }
+    final RegExp declarationPattern = RegExp(
+      r'^(float[234]?|half[234]?|float|half)\s+dif\b',
+      caseSensitive: false,
+    );
+    for (int i = 0; i < body.length; i++) {
+      final String line = body[i];
+      final String trimmed = line.trimLeft();
+      final RegExpMatch? match = declarationPattern.firstMatch(trimmed);
+      if (match == null) {
+        continue;
+      }
+      final int equalsIndex = line.indexOf('=');
+      if (equalsIndex == -1) {
+        body[i] = '';
+        continue;
+      }
+      final String indent = line.substring(0, line.indexOf(trimmed));
+      final String rhs = line.substring(equalsIndex + 1).trimLeft();
+      body[i] = '$indent' 'dif = $rhs';
+    }
+    body.removeWhere((String line) => line.trim().isEmpty);
+  }
+
+  void _removeDifZeroInits() {
+    body.removeWhere((String line) {
+      final String normalized = line.trimLeft().toLowerCase();
+      return normalized.startsWith('float3 dif = float3(0.0);') ||
+          normalized.startsWith('dif = float3(0.0);');
+    });
+  }
+
+  void _removePrologueDifZeroInits() {
+    prologue.removeWhere((String line) {
+      final String normalized = line.trimLeft().toLowerCase();
+      return normalized.startsWith('float3 dif = float3(0.0);') ||
+          normalized.startsWith('dif = float3(0.0);');
+    });
+  }
+
+  void _ensureDifSunFallback() {
+    final bool referencesDifSun =
+        body.any((String line) => line.contains('difSun'));
+    if (!referencesDifSun) {
+      return;
+    }
+    final bool hasDeclaration = body.any(
+          (String line) =>
+              _difSunDeclarationPattern.hasMatch(line.trimLeft()),
+        ) ||
+        prologue.any(
+          (String line) =>
+              _difSunDeclarationPattern.hasMatch(line.trimLeft()),
+        );
+    if (hasDeclaration) {
+      return;
+    }
+    prologue.add('  float3 difSun = float3(0.0);');
+  }
+
+  void _ensureBumpColorDeclaration() {
+    final bool referencesBumpColor =
+        body.any((String line) => line.contains('bumpColor'));
+    if (!referencesBumpColor) {
+      return;
+    }
+    final bool hasDeclaration =
+        _variableTypes.containsKey('bumpColor') ||
+        body.any(
+          (String line) =>
+              line.trimLeft().startsWith('float4 bumpColor'),
+        );
+    if (hasDeclaration) {
+      return;
+    }
+    final String coord = analyzer.inputFields.contains('Tex0')
+        ? 'IN.Tex0.xy'
+        : analyzer.inputFields.contains('Tex1')
+            ? 'IN.Tex1.xy'
+            : 'IN.Tex0.xy';
+    body.insert(
+      0,
+      '  float4 bumpColor = bumpMap.sample(bumpMapSampler, $coord);',
+    );
+  }
+
+  void _injectMacroFallbacks() {
+    if (_macroFallbackReferences.isEmpty) {
+      return;
+    }
+    for (final String name in _macroFallbackReferences) {
+      final String? value = _inactiveMacroValues[name];
+      if (value == null) {
+        continue;
+      }
+      prologue.add('float $name = $value;');
+    }
+    _macroFallbackReferences.clear();
+  }
+
   String _normalizeScalarComponents(String line) {
     String result = line;
     final List<String> scalarNames = <String>[];
@@ -510,11 +779,151 @@ class ExpressionTranslator {
     return result;
   }
 
+  String _evaluateSimplePreprocessor(String source) {
+    final List<_PreprocEvalFrame> stack = <_PreprocEvalFrame>[];
+    bool currentActive = true;
+    final List<String> lines = source.split('\n');
+    final StringBuffer buffer = StringBuffer();
+
+    bool _isLiteral(String directive, String token) {
+      final String lower = directive.toLowerCase();
+      return lower.startsWith(token);
+    }
+
+    for (final String line in lines) {
+      final String trimmed = line.trimLeft();
+      if (trimmed.startsWith('#if')) {
+        final bool known =
+            _isLiteral(trimmed, '#if 0') || _isLiteral(trimmed, '#if 1');
+        final bool condTrue = _isLiteral(trimmed, '#if 1');
+        final _PreprocEvalFrame frame = _PreprocEvalFrame(
+          parentActive: currentActive,
+          isUnknown: !known,
+        );
+        if (frame.isUnknown) {
+          frame.branchActive = currentActive;
+          buffer.writeln(line);
+        } else {
+          frame.branchActive = currentActive && condTrue;
+          frame.hasTrueBranch = frame.branchActive;
+          currentActive = frame.branchActive;
+        }
+        stack.add(frame);
+        continue;
+      }
+      if (trimmed.startsWith('#elif')) {
+        if (stack.isEmpty) {
+          buffer.writeln(line);
+          continue;
+        }
+        final _PreprocEvalFrame frame = stack.last;
+        if (frame.isUnknown) {
+          buffer.writeln(line);
+          continue;
+        }
+        final bool known =
+            _isLiteral(trimmed, '#elif 0') || _isLiteral(trimmed, '#elif 1');
+        if (!known) {
+          frame.isUnknown = true;
+          currentActive = frame.parentActive;
+          buffer.writeln(line);
+          continue;
+        }
+        final bool condTrue = _isLiteral(trimmed, '#elif 1');
+        if (!frame.hasTrueBranch && condTrue && frame.parentActive) {
+          frame.branchActive = true;
+          frame.hasTrueBranch = true;
+        } else {
+          frame.branchActive = false;
+        }
+        currentActive = frame.branchActive;
+        continue;
+      }
+      if (trimmed.startsWith('#else')) {
+        if (stack.isEmpty) {
+          buffer.writeln(line);
+          continue;
+        }
+        final _PreprocEvalFrame frame = stack.last;
+        if (frame.isUnknown) {
+          buffer.writeln(line);
+          continue;
+        }
+        frame.branchActive = frame.parentActive && !frame.hasTrueBranch;
+        frame.hasTrueBranch = true;
+        currentActive = frame.branchActive;
+        continue;
+      }
+      if (trimmed.startsWith('#endif')) {
+        if (stack.isEmpty) {
+          buffer.writeln(line);
+          continue;
+        }
+        final _PreprocEvalFrame frame = stack.removeLast();
+        if (frame.isUnknown) {
+          buffer.writeln(line);
+        }
+        currentActive = frame.parentActive;
+        continue;
+      }
+      if (currentActive) {
+        buffer.writeln(line);
+      }
+    }
+
+    return buffer.toString();
+  }
+
   String _rewriteMatrixCasts(String line) {
     return line.replaceAll(
       RegExp(r'\(\s*(?:const\s+)?float3x3\s*\)\s*uniforms\.ModelMatrix'),
       'float3x3(uniforms.ModelMatrix[0].xyz, uniforms.ModelMatrix[1].xyz, uniforms.ModelMatrix[2].xyz)',
     );
+  }
+
+  String _expandSimpleMacros(String line) {
+    String result = line;
+    bool replaced;
+    int depth = 0;
+    do {
+      replaced = false;
+      for (final MapEntry<String, String> entry in _activeMacroValues.entries) {
+        final RegExp pattern =
+            RegExp(r'\b' + RegExp.escape(entry.key) + r'\b');
+        final String updated = result.replaceAll(pattern, entry.value);
+        if (updated != result) {
+          result = updated;
+          replaced = true;
+        }
+      }
+      depth++;
+    } while (replaced && depth < 4);
+    return result;
+  }
+
+  void _noteMacroReferences(String line) {
+    if (_inactiveMacroValues.isEmpty) {
+      return;
+    }
+    for (final String name in _inactiveMacroValues.keys) {
+      if (_containsIdentifier(line, name)) {
+        _macroFallbackReferences.add(name);
+      }
+    }
+  }
+
+  bool _containsIdentifier(String line, String identifier) {
+    return RegExp(r'\b' + RegExp.escape(identifier) + r'\b').hasMatch(line);
+  }
+
+  bool _isSimpleMacroValue(String value) {
+    if (value.isEmpty) {
+      return false;
+    }
+    final RegExp identifier = RegExp(r'^[A-Za-z_][A-Za-z0-9_\.]*$');
+    final RegExp number =
+        RegExp(r'^-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$');
+    return identifier.hasMatch(value) || number.hasMatch(value);
   }
 
   String _rewritePreprocessor(String line) {
@@ -658,10 +1067,17 @@ class ExpressionTranslator {
     if (line.trimLeft().startsWith('#')) {
       return '';
     }
-    String result = _replaceInlineMacros(line);
+    String result = _stripBlockComments(line);
+    if (result.trim().isEmpty) {
+      return '';
+    }
+    result = _expandSimpleMacros(result);
+    _noteMacroReferences(result);
+    result = _replaceInlineMacros(result);
     for (final LineTransformer transformer in _transformers) {
       result = transformer.transform(result);
     }
+    result = _applySampleAssignmentSuffix(result);
     result = _normalizeScalarComponents(result);
     result = _normalizeModuloLiterals(result);
     result = _rewriteMatrixCasts(result);
@@ -744,6 +1160,32 @@ class ExpressionTranslator {
       (Match match) => ', 1.0)',
     );
     return result;
+  }
+
+  String _applySampleAssignmentSuffix(String line) {
+    final RegExp assignPattern = RegExp(
+      r'^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*\.sample\([^;]+\));\s*$',
+    );
+    final RegExpMatch? match = assignPattern.firstMatch(line);
+    if (match == null) {
+      return line;
+    }
+    final String variable = match.group(2)!;
+    final String? type = _variableTypes[variable];
+    if (type == null) {
+      return line;
+    }
+    final String lower = type.toLowerCase();
+    String suffix = '';
+    if (lower.endsWith('2')) {
+      suffix = '.xy';
+    } else if (lower.endsWith('3')) {
+      suffix = '.xyz';
+    }
+    if (suffix.isEmpty) {
+      return line;
+    }
+    return '${match.group(1)}$variable = ${match.group(3)}$suffix;';
   }
 
   static final Map<String, String> _inlineMacroReplacements = <String, String>{
@@ -887,8 +1329,24 @@ class _ConditionalFrame {
   bool skipping;
 }
 
+class _PreprocEvalFrame {
+  _PreprocEvalFrame({
+    required this.parentActive,
+    required this.isUnknown,
+  });
+
+  final bool parentActive;
+  bool isUnknown;
+  bool branchActive = true;
+  bool hasTrueBranch = false;
+}
+
 abstract class LineTransformer {
   String transform(String line);
+}
+
+abstract class DirectiveAwareLineTransformer implements LineTransformer {
+  void handleDirective(String directive);
 }
 
 class ComputeLightVectorsTransformer implements LineTransformer {
@@ -1193,6 +1651,87 @@ class VectorSampleTransformer implements LineTransformer {
   }
 }
 
+class GetNormalMapTransformer implements LineTransformer {
+  @override
+  String transform(String line) {
+    if (!line.contains('GetNormalMap')) {
+      return line;
+    }
+    final RegExp pattern =
+        RegExp(r'GetNormalMap\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([^)]+)\)');
+    if (!pattern.hasMatch(line)) {
+      return line;
+    }
+    return line.replaceAllMapped(
+      pattern,
+      (Match match) {
+        final String texture = match.group(1)!;
+        final String coords = match.group(2)!;
+        final String samplerName = '${texture}Sampler';
+        return '(normalize(${texture}.sample($samplerName, ${coords}).xyz * 2.0 - 1.0))';
+      },
+    );
+  }
+}
+
+class ImplicitSampleDeclarationTransformer implements LineTransformer {
+  final Set<String> _declared = <String>{};
+  final List<bool> _conditionalStack = <bool>[];
+  final RegExp _declPattern =
+      RegExp(r'^\s*(float[234]?|half[234]?|float|half)\s+([A-Za-z_][A-Za-z0-9_]*)');
+  final RegExp _assignPattern =
+      RegExp(r'^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Za-z_][A-Za-z0-9_]*\.sample\([^;]+\));$');
+
+  @override
+  String transform(String line) {
+    final String trimmed = line.trimLeft();
+    if (trimmed.startsWith('#if')) {
+      _conditionalStack.add(trimmed == '#if 0');
+      return line;
+    }
+    if (trimmed.startsWith('#elif')) {
+      if (_conditionalStack.isNotEmpty && _conditionalStack.last) {
+        _conditionalStack[_conditionalStack.length - 1] = false;
+      }
+      return line;
+    }
+    if (trimmed.startsWith('#else')) {
+      if (_conditionalStack.isNotEmpty) {
+        final bool wasDisabled = _conditionalStack.removeLast();
+        _conditionalStack.add(!wasDisabled);
+      }
+      return line;
+    }
+    if (trimmed.startsWith('#endif')) {
+      if (_conditionalStack.isNotEmpty) {
+        _conditionalStack.removeLast();
+      }
+      return line;
+    }
+    final bool disabled =
+        _conditionalStack.isNotEmpty && _conditionalStack.last == true;
+    final RegExpMatch? declMatch = _declPattern.firstMatch(line);
+    if (declMatch != null) {
+      if (!disabled) {
+        _declared.add(declMatch.group(2)!);
+      }
+      return line;
+    }
+    final RegExpMatch? assignMatch = _assignPattern.firstMatch(line);
+    if (assignMatch == null) {
+      return line;
+    }
+    final String name = assignMatch.group(2)!;
+    if (_declared.contains(name)) {
+      return line;
+    }
+    final String indent = assignMatch.group(1)!;
+    final String expression = assignMatch.group(3)!;
+    _declared.add(name);
+    return '${indent}float4 $name = $expression;';
+  }
+}
+
 class ScalarBroadcastTransformer implements LineTransformer {
   @override
   String transform(String line) {
@@ -1355,6 +1894,30 @@ class ColorComponentAssignmentTransformer implements LineTransformer {
   }
 }
 
+class TangentSpaceAssignmentTransformer implements LineTransformer {
+  @override
+  String transform(String line) {
+    final String trimmed = line.trimLeft();
+    if (!trimmed.startsWith('objToTangentSpace')) {
+      return line;
+    }
+    if (!line.contains('=')) {
+      return line;
+    }
+    final int equalsIndex = line.indexOf('=');
+    final String lhs = line.substring(0, equalsIndex + 1);
+    final String rhs = line.substring(equalsIndex + 1).trim();
+    if (rhs.endsWith('.xyz;') || rhs.endsWith('.xy;')) {
+      return line;
+    }
+    if (!rhs.endsWith(';')) {
+      return line;
+    }
+    final String expr = rhs.substring(0, rhs.length - 1).trim();
+    return '$lhs ($expr).xyz;';
+  }
+}
+
 class ColorAliasTransformer implements LineTransformer {
   @override
   String transform(String line) {
@@ -1391,6 +1954,13 @@ class OutColorUniformReducer implements LineTransformer {
         return '${match.group(0)}.xyz';
       },
     );
+  }
+}
+
+class FracFunctionTransformer implements LineTransformer {
+  @override
+  String transform(String line) {
+    return line.replaceAll('frac(', 'fract(');
   }
 }
 
@@ -1440,6 +2010,20 @@ class BumpPlantsFixupTransformer implements LineTransformer {
       return '';
     }
     if (result.contains('float3 dif = (')) {
+      final int openIndex = result.indexOf('(', result.indexOf('dif ='));
+      if (openIndex != -1) {
+        final int closeIndex = _findMatchingParen(result, openIndex);
+        if (closeIndex != -1) {
+          final String before = result.substring(0, openIndex);
+          final String inside = result.substring(openIndex + 1, closeIndex);
+          final String after = result.substring(closeIndex + 1);
+          result = '$before$inside$after';
+        } else {
+          result = result.replaceFirst('float3 dif = (', 'float3 dif = ');
+        }
+      }
+    }
+    if (_plantBlockPending && result.contains('float3 dif = (')) {
       result = result.replaceFirst(
         RegExp(r'float3 dif = \(.*'),
         'float3 dif = decalColor.xyz * NdotL * uniforms.Diffuse.xyz;',
@@ -1462,13 +2046,89 @@ class BumpPlantsFixupTransformer implements LineTransformer {
   }
 }
 
+int _findMatchingParen(String source, int openIndex) {
+  int depth = 0;
+  for (int i = openIndex; i < source.length; i++) {
+    final String char = source[i];
+    if (char == '(') {
+      depth++;
+    } else if (char == ')') {
+      depth--;
+      if (depth == 0) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
 class DifZeroInitCleanupTransformer implements LineTransformer {
   @override
   String transform(String line) {
-    if (line.trimLeft().startsWith('float3 dif = float3(0.0);')) {
+    final String trimmed = line.trimLeft();
+    if (trimmed.startsWith('float3 dif = float3(0.0);') ||
+        trimmed.startsWith('dif = float3(0.0);')) {
       return '';
     }
     return line;
+  }
+}
+
+class DifRedeclareTransformer implements DirectiveAwareLineTransformer {
+  bool _declared = false;
+  final List<bool> _conditionalDeclarations = <bool>[];
+
+  @override
+  String transform(String line) {
+    final String trimmed = line.trimLeft();
+    if (!trimmed.startsWith('float3 dif =')) {
+      return line;
+    }
+    final int equalsIndex = line.indexOf('=');
+    if (equalsIndex == -1) {
+      return line;
+    }
+    final String indent = line.substring(0, line.indexOf(trimmed));
+    final String rhs = line.substring(equalsIndex + 1).trimLeft();
+    final bool allowDeclaration = _canDeclareInCurrentContext();
+    if (allowDeclaration) {
+      _declared = true;
+      if (_conditionalDeclarations.isNotEmpty) {
+        _conditionalDeclarations[_conditionalDeclarations.length - 1] = true;
+      }
+      return line;
+    }
+    return '$indent' 'dif = $rhs';
+  }
+
+  bool _canDeclareInCurrentContext() {
+    if (_conditionalDeclarations.isNotEmpty) {
+      return !_conditionalDeclarations.last;
+    }
+    return !_declared;
+  }
+
+  @override
+  void handleDirective(String directive) {
+    final String lower = directive.toLowerCase();
+    final String canonical = lower.replaceFirst(RegExp(r'#\s*'), '#');
+    if (canonical.startsWith('#if') ||
+        canonical.startsWith('#ifdef') ||
+        canonical.startsWith('#ifndef')) {
+      _conditionalDeclarations.add(false);
+      return;
+    }
+    if (canonical.startsWith('#else') || canonical.startsWith('#elif')) {
+      if (_conditionalDeclarations.isNotEmpty) {
+        _conditionalDeclarations[_conditionalDeclarations.length - 1] = false;
+      }
+      return;
+    }
+    if (canonical.startsWith('#endif')) {
+      if (_conditionalDeclarations.isNotEmpty) {
+        _conditionalDeclarations.removeLast();
+      }
+    }
   }
 }
 
@@ -1611,6 +2271,37 @@ class VectorMultiplyCleanupTransformer implements LineTransformer {
   }
 }
 
+class Float3ColorTransformer implements LineTransformer {
+  static const List<String> _colorUniforms = <String>[
+    'Ambient',
+    'Diffuse',
+    'Specular',
+    'WaterColor',
+    'RefrColor',
+    'RealAmbient',
+  ];
+
+  @override
+  String transform(String line) {
+    final String trimmed = line.trimLeft();
+    final bool targetsFloat3 =
+        trimmed.startsWith('float3 ') || trimmed.contains('.xyz');
+    if (!targetsFloat3) {
+      return line;
+    }
+    String result = line;
+    for (final String name in _colorUniforms) {
+      final RegExp pattern =
+          RegExp('uniforms\\.$name(?![A-Za-z0-9_\\.])');
+      result = result.replaceAllMapped(
+        pattern,
+        (Match match) => '${match.group(0)}.xyz',
+      );
+    }
+    return result;
+  }
+}
+
 class NightVisionVectorCleanupTransformer implements LineTransformer {
   @override
   String transform(String line) {
@@ -1730,10 +2421,21 @@ class UniformVectorComponentTransformer implements LineTransformer {
 
   bool _prefersFloat4Context(String operand) {
     final String normalized = operand.replaceAll(' ', '');
-    return normalized.contains('.wwww') ||
-        normalized.contains('.xyzw') ||
-        normalized.contains('float4(') ||
-        normalized.contains('float4');
+    if (normalized.contains('IN.Tangent') ||
+        normalized.contains('IN.Binormal') ||
+        normalized.contains('IN.TNormal')) {
+      return false;
+    }
+    if (normalized.contains('.xyz') ||
+        normalized.contains('.xy') ||
+        normalized.contains('.zw') ||
+        normalized.contains('.yz')) {
+      return false;
+    }
+    if (normalized.contains('float3(') || normalized.contains('float2(')) {
+      return false;
+    }
+    return true;
   }
 
   bool _hasComponentSuffix(String value) {
@@ -2034,13 +2736,67 @@ class MatrixRowVectorTransformer implements LineTransformer {
       (Match match) => '${match.group(1)}float3(${match.group(2)})',
     );
     result = result.replaceAll('.xyzz', '.xyz');
-    if (result.contains('offsettex2D(') ||
-        result.contains('offsettexRECT(') ||
-        result.contains('IN.Tex1.xy / IN.Tex1.w') ||
-        result.contains('newst = newst +')) {
-      return '';
-    }
     return result;
+  }
+}
+
+class OffsetTextureTransformer implements LineTransformer {
+  int _counter = 0;
+
+  @override
+  String transform(String line) {
+    final int callIndex = line.indexOf('offsettex');
+    if (callIndex == -1) {
+      return line;
+    }
+    final _FunctionCall? call = _FunctionCallUtils.parse(line, callIndex);
+    if (call == null) {
+      return line;
+    }
+    if (call.name != 'offsettex2D' && call.name != 'offsettexRECT') {
+      return line;
+    }
+    if (call.args.length < 4) {
+      return line;
+    }
+    final int equalsIndex = line.indexOf('=');
+    if (equalsIndex == -1) {
+      return line;
+    }
+    final String leftSide = line.substring(0, equalsIndex).trimRight();
+    final int indentLength = line.length - line.trimLeft().length;
+    final String indent =
+        indentLength > 0 ? line.substring(0, indentLength) : '';
+    final String texture = call.args[0];
+    final String coord = call.args[1];
+    final String bump = call.args[2];
+    final String matrix = call.args[3];
+    final String tempName = '_offsetUv${_counter++}';
+    final String adjustedCoord =
+        '${indent}float2 $tempName = ${coord} + ${matrix}.xy * ${bump}.xx + ${matrix}.zw * ${bump}.yy;';
+    final String sampled =
+        '$leftSide = ${texture}.sample(${texture}Sampler, $tempName);';
+    return '$adjustedCoord\n$sampled';
+  }
+}
+
+class CubeReflectTransformer implements LineTransformer {
+  @override
+  String transform(String line) {
+    final int startIndex = line.indexOf('texCUBE_reflect_dp3x3');
+    if (startIndex == -1) {
+      return line;
+    }
+    final _FunctionCall? call =
+        _FunctionCallUtils.parse(line, startIndex);
+    if (call == null || call.args.length < 2) {
+      return line;
+    }
+    final String texture = call.args[0];
+    final String dir = call.args[1];
+    final String replacement =
+        '${texture}.sample(${texture}Sampler, ${dir}.xyz)';
+    return line.replaceRange(startIndex, call.endIndex, replacement);
   }
 }
 

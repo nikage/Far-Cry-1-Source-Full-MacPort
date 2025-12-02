@@ -25,6 +25,7 @@ Pass0
 
 CoreScript
 {
+#define CUSTOM_ALIAS fDif
   if (IN.Color.x > 0.5)
   {
     OUT.Color = float4(1, 0, 0, 1);
@@ -37,6 +38,11 @@ CoreScript
   {
     OUT.Color.xyz += IN.Data[i];
   }
+#ifdef D3D
+  OUT.Color += tex2D(baseMap, IN.Tex0.xy);
+#else
+  OUT.Color += tex2D(baseMap, IN.Tex1.xy);
+#endif
 #if %FEATURE_ENABLED
   OUT.Color *= Constants;
 #endif
@@ -152,6 +158,39 @@ CoreScript
       );
       final num alphaRef = summary['alphaRef'] as num? ?? -1;
       expect(alphaRef, closeTo(0.5, 0.001));
+
+      final List<Map<String, dynamic>> coreExpressions =
+          List<Map<String, dynamic>>.from(result.coreScriptExpressions);
+      final Map<String, dynamic> d3dSample = coreExpressions.firstWhere(
+        (Map<String, dynamic> entry) =>
+            (entry['raw'] as String? ?? '').contains('IN.Tex0.xy'),
+      );
+      expect(d3dSample['active'], isTrue);
+      expect(d3dSample['guards'], isNotEmpty);
+      final List<dynamic> d3dGuards =
+          d3dSample['guards'] as List<dynamic>? ?? const [];
+      expect(
+        d3dGuards,
+        anyElement(
+          predicate(
+            (dynamic guard) =>
+                guard is Map<String, dynamic> &&
+                guard['directive'] == '#ifdef' &&
+                guard['state'] == 'true',
+          ),
+        ),
+      );
+      final Map<String, dynamic> oglSample = coreExpressions.firstWhere(
+        (Map<String, dynamic> entry) =>
+            (entry['raw'] as String? ?? '').contains('IN.Tex1.xy'),
+      );
+      expect(oglSample['active'], isFalse);
+
+      expect(result.coreMacros, isNotEmpty);
+      final Map<String, dynamic> macro = result.coreMacros.first;
+      expect(macro['name'], 'CUSTOM_ALIAS');
+      expect(macro['value'], 'fDif');
+      expect(macro['active'], isTrue);
     });
   });
 }

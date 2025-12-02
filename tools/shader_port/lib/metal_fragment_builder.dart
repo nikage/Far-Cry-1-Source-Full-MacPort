@@ -49,9 +49,13 @@ class MetalFragmentBuilder {
       DotVariableDimensionTransformer(),
       MatrixRowVectorTransformer(),
       CameraVectorTransformer(),
+      OffsetTextureTransformer(),
+      CubeReflectTransformer(),
       TextureFunctionTransformer(),
       ScalarSampleTransformer(),
       VectorSampleTransformer(),
+      GetNormalMapTransformer(),
+      ImplicitSampleDeclarationTransformer(),
       ScalarSwizzleCleanupTransformer(_scalarInputFields),
       Float4ProductReducerTransformer(),
       VFinalColorDeclarationTransformer(),
@@ -73,14 +77,18 @@ class MetalFragmentBuilder {
       ),
       DotUniformSuffixFixupTransformer(),
       ColorComponentAssignmentTransformer(_uniformTypes),
+      Float3ColorTransformer(),
+      TangentSpaceAssignmentTransformer(),
       VectorSuffixCleanupTransformer(),
       ScalarBroadcastTransformer(),
       ImplicitVectorDeclarationTransformer(),
       ColorAliasTransformer(),
       OutColorUniformReducer(_uniformTypes),
+      FracFunctionTransformer(),
       LuminosityDifFixupTransformer(),
       BumpPlantsFixupTransformer(),
       DifZeroInitCleanupTransformer(),
+      DifRedeclareTransformer(),
       BrushedMetalFixupTransformer(),
       ShadowProjFixupTransformer(),
       HdrOutputTransformer(),
@@ -95,7 +103,7 @@ class MetalFragmentBuilder {
   late final String _outputStructName = '${data.normalizedName}_output';
 
   String build() {
-  final StringBuffer buffer = StringBuffer();
+    final StringBuffer buffer = StringBuffer();
     _computeSyntheticUniforms();
     _writePreamble(buffer);
     _writeUniformStruct(buffer);
@@ -141,7 +149,11 @@ class MetalFragmentBuilder {
   void _writeInputStruct(StringBuffer buffer) {
     buffer.writeln('struct $_inputStructName {');
   buffer.writeln('  float4 position [[position]];');
-    for (final String field in _analyzer.inputFields) {
+    final List<String> fields = List<String>.from(_analyzer.inputFields);
+    if (!fields.contains('Color')) {
+      fields.insert(0, 'Color');
+    }
+    for (final String field in fields) {
       final String type = _typeForInputField(field);
       if (type == 'float') {
         _scalarInputFields.add(field);
@@ -243,7 +255,18 @@ float3 CMKYToRGB(float4 vColor) {
       }
     }
     _writePositionScriptAdjustments(buffer);
+    if (_translator.needsSharedDif) {
+      final String difType = _translator.sharedDifType;
+      final String difZero = _translator.sharedDifZeroValue;
+      buffer.writeln('  $difType dif = $difZero;');
+    }
     for (final String line in _translator.body) {
+      final String trimmed = line.trimLeft();
+      if (_translator.needsSharedDif &&
+          (trimmed.startsWith('float3 dif = float3(0.0);') ||
+              trimmed.startsWith('dif = float3(0.0);'))) {
+        continue;
+      }
       buffer.writeln(line);
     }
     buffer.writeln('  return ${_translator.returnExpression};');
@@ -514,6 +537,10 @@ class _InOutAnalyzer {
 
   void _scan() {
     for (final Map<String, dynamic> expr in _expressions) {
+      final Object? activeState = expr['active'];
+      if (activeState is bool && activeState == false) {
+        continue;
+      }
       _collect(expr['lhs']);
       _collect(expr['rhs']);
       _collect(expr['raw']);

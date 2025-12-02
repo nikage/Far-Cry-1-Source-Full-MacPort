@@ -17,6 +17,7 @@ class ParseResult {
     this.textureStages,
     this.passStates,
     this.coreScriptExpressions,
+    this.coreMacros,
     this.vertexAttributes,
     this.directives,
     this.coreScriptFlow,
@@ -34,6 +35,7 @@ class ParseResult {
   final List<Map<String, dynamic>> textureStages;
   final List<Map<String, dynamic>> passStates;
   final List<Map<String, dynamic>> coreScriptExpressions;
+  final List<Map<String, dynamic>> coreMacros;
   final List<String> vertexAttributes;
   final List<String> directives;
   final List<Map<String, dynamic>> coreScriptFlow;
@@ -176,9 +178,9 @@ ParseResult _parseShaderContent(String content, String relativePath) {
   final String extension = dot == -1 ? '' : fileName.substring(dot + 1);
   final List<Map<String, dynamic>> textureStages = extractTextureStages(blocks);
   final List<Map<String, dynamic>> passStates = extractPassStates(blocks);
-  final List<Map<String, dynamic>> coreExpressions = extractCoreExpressions(
-    blocks,
-  );
+  final List<Map<String, dynamic>> coreMacros = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> coreExpressions =
+      extractCoreExpressions(blocks, coreMacros);
   final List<String> vertexAttributes = extractVertexAttributes(blocks);
   final List<String> directives = extractDirectives(content);
   final List<Map<String, dynamic>> coreFlow = extractCoreScriptFlow(blocks);
@@ -196,6 +198,7 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     textureStages,
     passStates,
     coreExpressions,
+    coreMacros,
     vertexAttributes,
     directives,
     coreFlow,
@@ -218,6 +221,7 @@ String encodeResult(ParseResult result) {
     'textureStages': result.textureStages,
     'passStates': result.passStates,
     'coreScriptExpressions': result.coreScriptExpressions,
+    'coreMacros': result.coreMacros,
     'vertexAttributes': result.vertexAttributes,
     'directives': result.directives,
     'coreScriptFlow': result.coreScriptFlow,
@@ -287,7 +291,10 @@ List<Map<String, dynamic>> extractPassStates(List<Block> blocks) {
   return states;
 }
 
-List<Map<String, dynamic>> extractCoreExpressions(List<Block> blocks) {
+List<Map<String, dynamic>> extractCoreExpressions(
+  List<Block> blocks, [
+  List<Map<String, dynamic>>? macroSink,
+]) {
   Block? coreBlock;
   for (final Block block in blocks) {
     if (block.name.toLowerCase() == 'corescript') {
@@ -299,6 +306,7 @@ List<Map<String, dynamic>> extractCoreExpressions(List<Block> blocks) {
     return const [];
   }
   final List<Map<String, dynamic>> expressions = [];
+  final List<_GuardFrame> guardStack = <_GuardFrame>[];
   final List<String> lines = coreBlock.content.split('\n');
   for (final String rawLine in lines) {
     final String line = rawLine.trim();
@@ -306,32 +314,369 @@ List<Map<String, dynamic>> extractCoreExpressions(List<Block> blocks) {
       continue;
     }
     if (line.startsWith('//')) {
-      expressions.add({'type': 'comment', 'value': line.substring(2).trim()});
+      expressions.add({
+        'type': 'comment',
+        'value': line.substring(2).trim(),
+        'guards': _materializeGuards(guardStack),
+        'active': _guardStackActive(guardStack),
+      });
       continue;
     }
     if (line == '{' || line == '}') {
       continue;
     }
-    if (line.contains('=')) {
-      final int index = line.indexOf('=');
-      final String lhs = line.substring(0, index).trim();
-      final String rhs = line.substring(index + 1).trim().replaceAll(';', '');
-      final bool isSample =
-          rhs.contains('tex2D') ||
-          rhs.contains('texCUBE') ||
-          rhs.contains('tex3D');
-      expressions.add({
-        'type': 'assignment',
-        'lhs': lhs,
-        'rhs': rhs,
-        'textureSample': isSample,
-        'raw': line,
-      });
-    } else {
-      expressions.add({'type': 'statement', 'raw': line});
+    if (line.startsWith('#')) {
+      if (_maybeRecordMacro(line, guardStack, macroSink)) {
+        continue;
+      }
+      _handleCoreDirective(line, guardStack, expressions);
+      continue;
     }
+    final Map<String, dynamic>? entry = _parseCoreExpressionLine(line);
+    if (entry == null) {
+      continue;
+    }
+    entry['guards'] = _materializeGuards(guardStack);
+    entry['active'] = _guardStackActive(guardStack);
+    expressions.add(entry);
   }
   return expressions;
+}
+
+Map<String, dynamic>? _parseCoreExpressionLine(String line) {
+  if (line.contains('=')) {
+    final int index = line.indexOf('=');
+    if (index <= 0) {
+      return null;
+    }
+    final String lhs = line.substring(0, index).trim();
+    final String rhs = line.substring(index + 1).trim().replaceAll(';', '');
+    final bool isSample =
+        rhs.contains('tex2D') || rhs.contains('texCUBE') || rhs.contains('tex3D');
+    return {
+      'type': 'assignment',
+      'lhs': lhs,
+      'rhs': rhs,
+      'textureSample': isSample,
+      'raw': line,
+    };
+  }
+  return {'type': 'statement', 'raw': line};
+}
+
+bool _maybeRecordMacro(
+  String line,
+  List<_GuardFrame> guardStack,
+  List<Map<String, dynamic>>? sink,
+) {
+  if (sink == null) {
+    return false;
+  }
+  final RegExpMatch? match =
+      RegExp(r'^#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\s*(.*)$').firstMatch(line);
+  if (match == null) {
+    return false;
+  }
+  final String name = match.group(1)!;
+  if (name.contains('(')) {
+    return false;
+  }
+  final String value = (match.group(2) ?? '').trim();
+  sink.add({
+    'name': name,
+    'value': value,
+    'guards': _materializeGuards(guardStack),
+    'active': _guardStackActive(guardStack),
+    'raw': line,
+  });
+  return true;
+}
+
+String _directiveArgument(String source, int prefixLength) {
+  if (source.length <= prefixLength) {
+    return '';
+  }
+  return source.substring(prefixLength).trim();
+}
+
+void _handleCoreDirective(
+  String line,
+  List<_GuardFrame> guardStack,
+  List<Map<String, dynamic>> expressions,
+) {
+  final String trimmed = line.trim();
+  final String normalized =
+      trimmed.startsWith('#') ? trimmed.substring(1).trimLeft() : trimmed;
+  final String lower = normalized.toLowerCase();
+  if (lower.startsWith('ifdef')) {
+    final String symbol = _directiveArgument(normalized, 5);
+    final _GuardState state = _evaluateGuardSymbol(symbol);
+    guardStack.add(
+      _GuardFrame(
+        directive: '#ifdef',
+        expression: symbol,
+        state: state,
+        shouldEmit: state == _GuardState.unknown,
+      ),
+    );
+    if (guardStack.last.shouldEmit) {
+      expressions.add({
+        'type': 'directive',
+        'raw': line,
+        'guards': _materializeGuards(guardStack.sublist(0, guardStack.length - 1)),
+        'active': true,
+      });
+    }
+    return;
+  }
+  if (lower.startsWith('ifndef')) {
+    final String symbol = _directiveArgument(normalized, 6);
+    final _GuardState state = _invertGuardState(_evaluateGuardSymbol(symbol));
+    guardStack.add(
+      _GuardFrame(
+        directive: '#ifndef',
+        expression: symbol,
+        state: state,
+        shouldEmit: state == _GuardState.unknown,
+      ),
+    );
+    if (guardStack.last.shouldEmit) {
+      expressions.add({
+        'type': 'directive',
+        'raw': line,
+        'guards': _materializeGuards(guardStack.sublist(0, guardStack.length - 1)),
+        'active': true,
+      });
+    }
+    return;
+  }
+  if (lower.startsWith('if')) {
+    final String expression = _directiveArgument(normalized, 2);
+    final _GuardState state = _evaluateGuardExpression(expression);
+    guardStack.add(
+      _GuardFrame(
+        directive: '#if',
+        expression: expression,
+        state: state,
+        shouldEmit: state == _GuardState.unknown,
+      ),
+    );
+    if (guardStack.last.shouldEmit) {
+      expressions.add({
+        'type': 'directive',
+        'raw': line,
+        'guards': _materializeGuards(guardStack.sublist(0, guardStack.length - 1)),
+        'active': true,
+      });
+    }
+    return;
+  }
+  if (lower.startsWith('elif')) {
+    if (guardStack.isEmpty) {
+      return;
+    }
+    final _GuardFrame frame = guardStack.last;
+    final String expression = _directiveArgument(normalized, 4);
+    _updateElifFrame(frame, expression);
+    if (frame.shouldEmit) {
+      expressions.add({
+        'type': 'directive',
+        'raw': line,
+        'guards': _materializeGuards(guardStack.sublist(0, guardStack.length - 1)),
+        'active': true,
+      });
+    }
+    return;
+  }
+  if (lower.startsWith('else')) {
+    if (guardStack.isEmpty) {
+      return;
+    }
+    final _GuardFrame frame = guardStack.last;
+    _updateElseFrame(frame);
+    if (frame.shouldEmit) {
+      expressions.add({
+        'type': 'directive',
+        'raw': line,
+        'guards': _materializeGuards(guardStack.sublist(0, guardStack.length - 1)),
+        'active': true,
+      });
+    }
+    return;
+  }
+  if (lower.startsWith('endif')) {
+    if (guardStack.isEmpty) {
+      return;
+    }
+    final _GuardFrame frame = guardStack.removeLast();
+    if (frame.shouldEmit) {
+      expressions.add({
+        'type': 'directive',
+        'raw': line,
+        'guards': _materializeGuards(guardStack),
+        'active': true,
+      });
+    }
+    return;
+  }
+  expressions.add({
+    'type': 'directive',
+    'raw': line,
+    'guards': _materializeGuards(guardStack),
+    'active': true,
+  });
+}
+
+void _updateElifFrame(_GuardFrame frame, String expression) {
+  if (frame.anyKnownTrue) {
+    frame.directive = '#elif';
+    frame.expression = expression;
+    frame.state = _GuardState.falseValue;
+    return;
+  }
+  if (frame.maybeTrue) {
+    frame.directive = '#elif';
+    frame.expression = expression;
+    frame.state = _GuardState.unknown;
+    return;
+  }
+  final _GuardState state = _evaluateGuardExpression(expression);
+  frame.directive = '#elif';
+  frame.expression = expression;
+  frame.state = state;
+  if (state == _GuardState.trueValue) {
+    frame.anyKnownTrue = true;
+    frame.maybeTrue = true;
+  } else if (state == _GuardState.unknown) {
+    frame.maybeTrue = true;
+  }
+}
+
+void _updateElseFrame(_GuardFrame frame) {
+  frame.directive = '#else';
+  frame.expression = 'else';
+  if (frame.anyKnownTrue) {
+    frame.state = _GuardState.falseValue;
+    return;
+  }
+  if (frame.maybeTrue) {
+    frame.state = _GuardState.unknown;
+    return;
+  }
+  frame.state = _GuardState.trueValue;
+  frame.anyKnownTrue = true;
+  frame.maybeTrue = true;
+}
+
+List<Map<String, dynamic>> _materializeGuards(List<_GuardFrame> stack) {
+  if (stack.isEmpty) {
+    return const [];
+  }
+  return stack
+      .map(
+        (_GuardFrame frame) => {
+          'directive': frame.directive,
+          'expression': frame.expression,
+          'state': _guardStateToString(frame.state),
+        },
+      )
+      .toList();
+}
+
+bool? _guardStackActive(List<_GuardFrame> stack) {
+  bool hasUnknown = false;
+  for (final _GuardFrame frame in stack) {
+    if (frame.state == _GuardState.falseValue) {
+      return false;
+    }
+    if (frame.state == _GuardState.unknown) {
+      hasUnknown = true;
+    }
+  }
+  if (hasUnknown) {
+    return null;
+  }
+  return true;
+}
+
+_GuardState _evaluateGuardExpression(String expression) {
+  final String trimmed = expression.trim();
+  if (trimmed == '1') {
+    return _GuardState.trueValue;
+  }
+  if (trimmed == '0') {
+    return _GuardState.falseValue;
+  }
+  final RegExp definedPattern =
+      RegExp(r'^(!)?\s*defined\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)$');
+  final RegExpMatch? match = definedPattern.firstMatch(trimmed.replaceAll(' ', ''));
+  if (match != null) {
+    final bool negated = (match.group(1) ?? '').contains('!');
+    final String symbol = match.group(2) ?? '';
+    return negated
+        ? _invertGuardState(_evaluateGuardSymbol(symbol))
+        : _evaluateGuardSymbol(symbol);
+  }
+  return _GuardState.unknown;
+}
+
+_GuardState _evaluateGuardSymbol(String symbol) {
+  final String upper = symbol.trim().toUpperCase();
+  if (upper == 'D3D') {
+    return _GuardState.trueValue;
+  }
+  if (upper == 'OPENGL') {
+    return _GuardState.falseValue;
+  }
+  if (upper == '_PS_1_1') {
+    return _GuardState.falseValue;
+  }
+  return _GuardState.unknown;
+}
+
+_GuardState _invertGuardState(_GuardState state) {
+  if (state == _GuardState.trueValue) {
+    return _GuardState.falseValue;
+  }
+  if (state == _GuardState.falseValue) {
+    return _GuardState.trueValue;
+  }
+  return _GuardState.unknown;
+}
+
+String _guardStateToString(_GuardState state) {
+  switch (state) {
+    case _GuardState.trueValue:
+      return 'true';
+    case _GuardState.falseValue:
+      return 'false';
+    case _GuardState.unknown:
+    default:
+      return 'unknown';
+  }
+}
+
+class _GuardFrame {
+  _GuardFrame({
+    required this.directive,
+    required this.expression,
+    required this.state,
+    required this.shouldEmit,
+  })  : anyKnownTrue = state == _GuardState.trueValue,
+        maybeTrue = state != _GuardState.falseValue;
+
+  String directive;
+  String expression;
+  _GuardState state;
+  final bool shouldEmit;
+  bool anyKnownTrue;
+  bool maybeTrue;
+}
+
+enum _GuardState {
+  trueValue,
+  falseValue,
+  unknown,
 }
 
 List<Map<String, String>> _extractAssignments(String content) {

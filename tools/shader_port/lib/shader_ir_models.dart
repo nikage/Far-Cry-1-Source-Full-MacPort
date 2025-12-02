@@ -25,6 +25,7 @@ class ShaderIrData {
     required this.uniforms,
     required this.textures,
     required this.coreExpressions,
+    required this.coreMacros,
     required this.coreFlow,
     required this.passStates,
     required this.positionScripts,
@@ -40,12 +41,29 @@ class ShaderIrData {
   final List<UniformBinding> uniforms;
   final List<TextureBinding> textures;
   final List<Map<String, dynamic>> coreExpressions;
+  final List<MacroDefinition> coreMacros;
   final List<Map<String, dynamic>> coreFlow;
   final List<Map<String, dynamic>> passStates;
   final List<String> positionScripts;
   final List<Map<String, String>> positionScriptBlocks;
   final Map<String, String> outputFieldTypes;
   final List<String> maskReferences;
+}
+
+class MacroDefinition {
+  MacroDefinition({
+    required this.name,
+    required this.value,
+    required this.guards,
+    required this.active,
+    required this.raw,
+  });
+
+  final String name;
+  final String value;
+  final List<Map<String, dynamic>> guards;
+  final bool? active;
+  final String raw;
 }
 
 class ShaderIrParseResult {

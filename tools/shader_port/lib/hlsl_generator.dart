@@ -174,6 +174,10 @@ List<String> translateCoreScript(List<dynamic> coreExpressions) {
     if (entry is! Map<String, dynamic>) {
       continue;
     }
+    final Object? activeState = entry['active'];
+    if (activeState is bool && activeState == false) {
+      continue;
+    }
     final String type = entry['type'] as String? ?? 'raw';
     if (type == 'comment') {
       final String value = entry['value'] as String? ?? '';

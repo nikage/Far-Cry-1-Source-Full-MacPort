@@ -58,6 +58,7 @@ void main() {
         uniforms: uniforms,
         textures: textures,
         coreExpressions: expressions,
+        coreMacros: const [],
         coreFlow: flow,
         passStates: const [],
         positionScripts: const [],

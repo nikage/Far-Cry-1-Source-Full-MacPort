@@ -113,8 +113,19 @@ target_compile_definitions(XRenderMetal PRIVATE
 )
 
 find_program(DART_EXECUTABLE dart)
-set(GENERATED_METAL_METALLIB "")
+set(DART_COMMAND "")
 if(DART_EXECUTABLE)
+    set(DART_COMMAND ${DART_EXECUTABLE})
+else()
+    find_program(FVM_EXECUTABLE fvm)
+    if(FVM_EXECUTABLE)
+        set(DART_COMMAND ${FVM_EXECUTABLE} dart)
+        message(STATUS "Dart executable not found; using fvm at ${FVM_EXECUTABLE}")
+    endif()
+endif()
+
+set(GENERATED_METAL_METALLIB "")
+if(DART_COMMAND)
     set(SHADER_PORT_ROOT ${CMAKE_SOURCE_DIR})
     set(SHADER_PARSER ${SHADER_PORT_ROOT}/tools/shader_port/lib/parser.dart)
     set(SHADER_METAL_GENERATOR ${SHADER_PORT_ROOT}/tools/shader_port/lib/metal_generator.dart)
@@ -123,8 +134,8 @@ if(DART_EXECUTABLE)
     add_custom_command(
         OUTPUT ${GENERATED_STAMP}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/Generated
-        COMMAND ${DART_EXECUTABLE} ${SHADER_PARSER} ${SHADER_PORT_ROOT}
-        COMMAND ${DART_EXECUTABLE} ${SHADER_METAL_GENERATOR} ${SHADER_PORT_ROOT}
+        COMMAND ${DART_COMMAND} ${SHADER_PARSER} ${SHADER_PORT_ROOT}
+        COMMAND ${DART_COMMAND} ${SHADER_METAL_GENERATOR} ${SHADER_PORT_ROOT}
         COMMAND ${CMAKE_COMMAND} -E touch ${GENERATED_STAMP}
         DEPENDS ${SHADER_PARSER} ${SHADER_METAL_GENERATOR}
         WORKING_DIRECTORY ${SHADER_PORT_ROOT}
@@ -140,7 +151,7 @@ if(DART_EXECUTABLE)
     add_custom_command(
         OUTPUT ${GENERATED_METAL_METALLIB}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_AIR_DIR}
-        COMMAND ${DART_EXECUTABLE} ${METAL_BUILD_SCRIPT} ${SHADER_PORT_ROOT} ${CMAKE_CURRENT_SOURCE_DIR}/Generated ${GENERATED_AIR_DIR} ${GENERATED_METAL_METALLIB}
+        COMMAND ${DART_COMMAND} ${METAL_BUILD_SCRIPT} ${SHADER_PORT_ROOT} ${CMAKE_CURRENT_SOURCE_DIR}/Generated ${GENERATED_AIR_DIR} ${GENERATED_METAL_METALLIB}
         DEPENDS ${GENERATED_STAMP} ${METAL_BUILD_SCRIPT}
         COMMENT "Compiling generated Metal shaders"
         VERBATIM
@@ -200,7 +211,8 @@ install(FILES ${GENERATED_METAL_METALLIB}
     DESTINATION lib
 )
 
-    set(FARCRY_APP_BUNDLE_DIR "${CMAKE_BINARY_DIR}/bin/FarCry.app" CACHE PATH "Location of FarCry.app for resource staging")
+    set(DEFAULT_FARCRY_APP_BUNDLE "${CMAKE_BINARY_DIR}/FarCry.app")
+    set(FARCRY_APP_BUNDLE_DIR "${DEFAULT_FARCRY_APP_BUNDLE}" CACHE PATH "Location of FarCry.app for resource staging")
     set(FARCRY_APP_RESOURCES_DIR "${FARCRY_APP_BUNDLE_DIR}/Contents/Resources")
 
     add_custom_command(

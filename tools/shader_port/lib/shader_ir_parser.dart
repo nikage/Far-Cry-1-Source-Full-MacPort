@@ -131,6 +131,7 @@ class ShaderIrParser {
       coreExpressions: _castMapList(
         ir['coreScriptExpressions'] as List<dynamic>?,
       ),
+      coreMacros: _castMacroList(ir['coreMacros'] as List<dynamic>?),
       coreFlow: _castMapList(ir['coreScriptFlow'] as List<dynamic>?),
       passStates: _castMapList(ir['passStates'] as List<dynamic>?),
       positionScripts: positionScripts,
@@ -215,6 +216,38 @@ List<Map<String, dynamic>> _castMapList(List<dynamic>? source) {
   return result;
 }
 
+List<MacroDefinition> _castMacroList(List<dynamic>? source) {
+  if (source == null) {
+    return const [];
+  }
+  final List<MacroDefinition> result = <MacroDefinition>[];
+  for (final dynamic entry in source) {
+    if (entry is! Map<String, dynamic>) {
+      continue;
+    }
+    final String? name = entry['name'] as String?;
+    if (name == null || name.isEmpty) {
+      continue;
+    }
+    final String value = (entry['value'] as String?) ?? '';
+    final List<Map<String, dynamic>> guards =
+        _castGuardList(entry['guards'] as List<dynamic>?);
+    final bool? active =
+        entry['active'] is bool ? entry['active'] as bool : null;
+    final String raw = (entry['raw'] as String?) ?? '';
+    result.add(
+      MacroDefinition(
+        name: name,
+        value: value,
+        guards: guards,
+        active: active,
+        raw: raw,
+      ),
+    );
+  }
+  return result;
+}
+
 List<String> _castStringList(List<dynamic>? source) {
   if (source == null) {
     return const [];
@@ -223,6 +256,19 @@ List<String> _castStringList(List<dynamic>? source) {
   for (final dynamic entry in source) {
     if (entry is String) {
       result.add(entry);
+    }
+  }
+  return result;
+}
+
+List<Map<String, dynamic>> _castGuardList(List<dynamic>? source) {
+  if (source == null) {
+    return const [];
+  }
+  final List<Map<String, dynamic>> result = <Map<String, dynamic>>[];
+  for (final dynamic entry in source) {
+    if (entry is Map<String, dynamic>) {
+      result.add(Map<String, dynamic>.from(entry));
     }
   }
   return result;
