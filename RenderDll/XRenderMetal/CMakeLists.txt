@@ -165,11 +165,11 @@ endif()
 # Compile Metal shaders at build time  
 # Note: Do NOT pass C++ include paths to Metal compiler
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
-    COMMAND xcrun -sdk macosx metal -std=macos-metal2.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/BasicShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.air
-    COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/BasicShaders.metal
-    COMMENT "Compiling BasicShaders"
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
+    COMMAND xcrun -sdk macosx metal -std=macos-metal2.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air
+    COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal
+    COMMENT "Compiling UtilShaders"
     VERBATIM
 )
 
@@ -183,7 +183,7 @@ add_custom_command(
 )
 
 add_custom_target(MetalShaders ALL
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
             ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
 )
 
@@ -200,7 +200,7 @@ install(TARGETS XRenderMetal
 )
 
 # Install Metal shader libraries
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BasicShaders.metallib
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
               ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
     DESTINATION lib
 )
