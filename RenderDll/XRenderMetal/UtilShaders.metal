@@ -253,6 +253,166 @@ vertex VertexOut_Tex tex_vertex(VertexIn_P3F_TEX2F in [[stage_in]],
     return out;
 }
 
+// Position + two TexCoords (with optional color) vertex shader
+struct VertexIn_P3F_COL4UB_TEX2F_TEX2F {
+    float3 position [[attribute(0)]];
+    uchar4 color [[attribute(1)]];
+    float2 texCoord0 [[attribute(2)]];
+    float2 texCoord1 [[attribute(3)]];
+};
+
+struct VertexOut_Tex2 {
+    float4 position [[position]];
+    float4 Tex0;
+    float4 Tex1;
+};
+
+struct VertexOut_ColorTex2 {
+    float4 position [[position]];
+    float4 Color;
+    float4 Tex0;
+    float4 Tex1;
+};
+
+vertex VertexOut_Tex2 tex2_vertex(VertexIn_P3F_COL4UB_TEX2F_TEX2F in [[stage_in]],
+                                  constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_Tex2 out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.Tex0 = float4(in.texCoord0, 0.0, 1.0);
+    out.Tex1 = float4(in.texCoord1, 0.0, 1.0);
+    return out;
+}
+
+vertex VertexOut_ColorTex2 colortex2_vertex(VertexIn_P3F_COL4UB_TEX2F_TEX2F in [[stage_in]],
+                                           constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_ColorTex2 out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.Color = float4(in.color) / 255.0;
+    out.Tex0 = float4(in.texCoord0, 0.0, 1.0);
+    out.Tex1 = float4(in.texCoord1, 0.0, 1.0);
+    return out;
+}
+
+struct VertexIn_P3F_COL4UB_COL4UB {
+    float3 position [[attribute(0)]];
+    uchar4 color0 [[attribute(1)]];
+    uchar4 color1 [[attribute(2)]];
+};
+
+struct VertexIn_P3F_COL4UB_COL4UB_TEX2F {
+    float3 position [[attribute(0)]];
+    uchar4 color0 [[attribute(1)]];
+    uchar4 color1 [[attribute(2)]];
+    float2 texCoord [[attribute(3)]];
+};
+
+struct VertexOut_DualColor {
+    float4 position [[position]];
+    float4 color;
+    float4 color1;
+    float clipDistance;
+};
+
+struct VertexOut_DualColorTex {
+    float4 position [[position]];
+    float4 color;
+    float4 color1;
+    float4 Tex0;
+    float clipDistance;
+};
+
+vertex VertexOut_DualColor colordual_vertex(VertexIn_P3F_COL4UB_COL4UB in [[stage_in]],
+                                            constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_DualColor out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.color = float4(in.color0) / 255.0;
+    out.color1 = float4(in.color1) / 255.0;
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
+vertex VertexOut_DualColorTex colordual_tex_vertex(VertexIn_P3F_COL4UB_COL4UB_TEX2F in [[stage_in]],
+                                                   constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_DualColorTex out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.color = float4(in.color0) / 255.0;
+    out.color1 = float4(in.color1) / 255.0;
+    out.Tex0 = float4(in.texCoord, 0.0, 1.0);
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
+struct VertexIn_P3F_N_COL4UB_COL4UB {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    uchar4 color0 [[attribute(2)]];
+    uchar4 color1 [[attribute(3)]];
+};
+
+struct VertexIn_P3F_N_COL4UB_COL4UB_TEX2F {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    uchar4 color0 [[attribute(2)]];
+    uchar4 color1 [[attribute(3)]];
+    float2 texCoord [[attribute(4)]];
+};
+
+struct VertexOut_LitDualColor {
+    float4 position [[position]];
+    float3 worldPos;
+    float3 normal;
+    float2 texCoord;
+    float4 color;
+    float4 color1;
+    float clipDistance;
+};
+
+vertex VertexOut_LitDualColor basic_colordual_vertex(VertexIn_P3F_N_COL4UB_COL4UB in [[stage_in]],
+                                                     constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_LitDualColor out;
+    float4 localPos = float4(in.position, 1.0);
+    out.position = uniforms.modelViewProjectionMatrix * localPos;
+    out.worldPos = (uniforms.modelMatrix * localPos).xyz;
+    out.normal = normalize((uniforms.modelMatrix * float4(in.normal, 0.0)).xyz);
+    out.texCoord = float2(0.0);
+    out.color = float4(in.color0) / 255.0;
+    out.color1 = float4(in.color1) / 255.0;
+    if (uniforms.clipEnabled > 0.0) {
+        out.clipDistance = dot(out.worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
+vertex VertexOut_LitDualColor basic_colordual_tex_vertex(VertexIn_P3F_N_COL4UB_COL4UB_TEX2F in [[stage_in]],
+                                                         constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_LitDualColor out;
+    float4 localPos = float4(in.position, 1.0);
+    out.position = uniforms.modelViewProjectionMatrix * localPos;
+    out.worldPos = (uniforms.modelMatrix * localPos).xyz;
+    out.normal = normalize((uniforms.modelMatrix * float4(in.normal, 0.0)).xyz);
+    out.texCoord = in.texCoord;
+    out.color = float4(in.color0) / 255.0;
+    out.color1 = float4(in.color1) / 255.0;
+    if (uniforms.clipEnabled > 0.0) {
+        out.clipDistance = dot(out.worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
 fragment float4 colortex_fragment(VertexOut_ColorTex in [[stage_in]],
                                   constant Uniforms& uniforms [[buffer(0)]],
                                   texture2d<float> baseTexture [[texture(0)]],

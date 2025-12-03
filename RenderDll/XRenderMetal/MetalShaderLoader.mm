@@ -26,6 +26,13 @@
 #include <cctype>
 #include <cassert>
 #include <strings.h>
+#include <algorithm>
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
 
 namespace
 {
@@ -35,6 +42,19 @@ struct VertexLayoutInfo
     NSString* functionName;
     bool hasTexCoords;
     bool hasColor;
+    bool hasSecondTex;
+    bool hasSecondColor;
+    bool hasNormal;
+    int texCoordCount;
+};
+
+struct VertexAttributeSummary
+{
+    bool hasPosition = true;
+    bool hasNormal = false;
+    bool hasColor0 = false;
+    bool hasColor1 = false;
+    int texCoordCount = 0;
 };
 
 int FallbackVertexFormat(int format)
@@ -54,100 +74,180 @@ int FallbackVertexFormat(int format)
     }
 }
 
-VertexLayoutInfo InferVertexLayout(NSArray* attributes, int textureCount, NSString* shaderName)
+VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metadata, int textureCount, NSString* shaderName)
 {
-    bool hasPosition = true;
-    bool hasNormal = false;
-    bool hasColor = false;
-    bool hasTex = textureCount > 0;
-    const bool hasExplicitAttributes = attributes && [attributes count] > 0;
-
-    if (hasExplicitAttributes)
+    VertexAttributeSummary summary;
+    bool populatedFromMetadata = false;
+    if (metadata && [metadata isKindOfClass:[NSArray class]] && [metadata count] > 0)
     {
-        for (id item in attributes)
+        populatedFromMetadata = true;
+        for (id entry in metadata)
         {
-            if (![item isKindOfClass:[NSString class]])
+            if (![entry isKindOfClass:[NSDictionary class]])
                 continue;
-            NSString* attrString = [(NSString*)item lowercaseString];
-            if ([attrString containsString:@"position"])
-                hasPosition = true;
-            if ([attrString containsString:@"normal"])
-                hasNormal = true;
-            if ([attrString containsString:@"color"] && ![attrString containsString:@"texcoord"])
-                hasColor = true;
-            if ([attrString containsString:@"texcoord"])
-                hasTex = true;
-        }
-    }
-    if (shaderName)
-    {
-        NSString* lowerName = [shaderName lowercaseString];
-        if ([lowerName hasPrefix:@"cgv"])
-        {
-            hasColor = true;
-            hasTex = true;
-        }
-        else if (!hasExplicitAttributes)
-        {
-            if ([lowerName containsString:@"vegetation"] ||
-                [lowerName containsString:@"plants"])
+            NSDictionary* dict = (NSDictionary*)entry;
+            NSString* category = dict[@"category"];
+            if (!category || ![category isKindOfClass:[NSString class]])
+                continue;
+            if ([category isEqualToString:@"color"])
             {
-                hasColor = true;
-                hasTex = true;
+                NSNumber* indexValue = dict[@"index"];
+                int index = indexValue ? indexValue.intValue : 0;
+                if (index <= 0)
+                    summary.hasColor0 = true;
+                else if (index == 1)
+                    summary.hasColor1 = true;
             }
-            if ([lowerName containsString:@"normal"] ||
-                [lowerName containsString:@"bump"])
+            else if ([category isEqualToString:@"texcoord"])
             {
-                hasNormal = true;
-                hasTex = true;
+                NSNumber* indexValue = dict[@"index"];
+                if (indexValue)
+                {
+                    int idx = indexValue.intValue;
+                    if (idx >= 0)
+                        summary.texCoordCount = std::max(summary.texCoordCount, idx + 1);
+                }
+            }
+            else if ([category isEqualToString:@"normal"])
+            {
+                summary.hasNormal = true;
             }
         }
     }
 
-    if (hasNormal && !hasColor)
+    const bool hasExplicitAttributes = attributes && [attributes count] > 0;
+    if (!populatedFromMetadata)
     {
-        hasColor = true;
+        if (hasExplicitAttributes)
+        {
+            for (id item in attributes)
+            {
+                if (![item isKindOfClass:[NSString class]])
+                    continue;
+                NSString* attrString = [(NSString*)item lowercaseString];
+                if ([attrString containsString:@"normal"])
+                    summary.hasNormal = true;
+                if ([attrString containsString:@"color1"] || [attrString containsString:@"sec_color"])
+                    summary.hasColor1 = true;
+                else if ([attrString containsString:@"color"])
+                    summary.hasColor0 = true;
+                if ([attrString containsString:@"texcoord1"])
+                    summary.texCoordCount = std::max(summary.texCoordCount, 2);
+                else if ([attrString containsString:@"texcoord"])
+                    summary.texCoordCount = std::max(summary.texCoordCount, 1);
+            }
+        }
+        if (shaderName)
+        {
+            NSString* lowerName = [shaderName lowercaseString];
+            if ([lowerName hasPrefix:@"cgv"])
+            {
+                summary.hasColor0 = true;
+                summary.texCoordCount = std::max(summary.texCoordCount, 1);
+            }
+            else if (!hasExplicitAttributes)
+            {
+                if ([lowerName containsString:@"vegetation"] ||
+                    [lowerName containsString:@"plants"])
+                {
+                    summary.hasColor0 = true;
+                    summary.texCoordCount = std::max(summary.texCoordCount, 1);
+                }
+                if ([lowerName containsString:@"normal"] ||
+                    [lowerName containsString:@"bump"])
+                {
+                    summary.hasNormal = true;
+                    summary.texCoordCount = std::max(summary.texCoordCount, 1);
+                }
+            }
+        }
     }
 
+    if (!summary.hasColor0 && summary.hasNormal)
+        summary.hasColor0 = true;
+    if (summary.texCoordCount == 0 && textureCount > 0)
+        summary.texCoordCount = 1;
+    if (summary.hasColor1)
+        summary.hasColor0 = true;
+    summary.texCoordCount = std::min(summary.texCoordCount, 2);
+    return summary;
+}
+
+VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSString* shaderName)
+{
     VertexLayoutInfo info;
-    info.hasTexCoords = hasTex;
-    info.hasColor = hasColor;
+    info.hasTexCoords = summary.texCoordCount > 0;
+    info.hasColor = summary.hasColor0;
+    info.hasSecondTex = summary.texCoordCount > 1;
+    info.hasSecondColor = summary.hasColor1;
+    info.hasNormal = summary.hasNormal;
+    info.texCoordCount = summary.texCoordCount;
 
-    if (hasPosition && hasNormal && hasColor && hasTex)
+    if (summary.hasColor1)
+    {
+        if (summary.texCoordCount > 1 && iLog)
+        {
+            iLog->Log("MetalShaderManager: Shader '%s' requests dual colors with more than one texcoord set; using single texcoord fallback\n",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>");
+        }
+        if (summary.hasNormal)
+        {
+            if (summary.texCoordCount > 0)
+            {
+                info.format = VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F;
+                info.functionName = @"basic_colordual_tex_vertex";
+            }
+            else
+            {
+                info.format = VERTEX_FORMAT_P3F_N_COL4UB_COL4UB;
+                info.functionName = @"basic_colordual_vertex";
+            }
+        }
+        else
+        {
+            if (summary.texCoordCount > 0)
+            {
+                info.format = VERTEX_FORMAT_P3F_COL4UB_COL4UB_TEX2F;
+                info.functionName = @"colordual_tex_vertex";
+            }
+            else
+            {
+                info.format = VERTEX_FORMAT_P3F_COL4UB_COL4UB;
+                info.functionName = @"colordual_vertex";
+            }
+        }
+        return info;
+    }
+
+    if (summary.texCoordCount > 1)
+        info.format = VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F;
+    else if (summary.hasNormal && summary.hasColor0 && summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-    else if (hasPosition && hasNormal && hasTex)
+    else if (summary.hasNormal && summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_N_TEX2F;
-    else if (hasPosition && hasColor && hasTex)
+    else if (summary.hasColor0 && summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_COL4UB_TEX2F;
-    else if (hasPosition && hasTex)
+    else if (summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_TEX2F;
-    else if (hasPosition && hasNormal)
+    else if (summary.hasNormal)
         info.format = VERTEX_FORMAT_P3F_N;
-    else if (hasPosition && hasColor)
+    else if (summary.hasColor0)
         info.format = VERTEX_FORMAT_P3F_COL4UB;
     else
         info.format = VERTEX_FORMAT_P3F;
 
-    if (hasNormal && hasColor)
-    {
+    if (summary.texCoordCount > 1)
+        info.functionName = summary.hasColor0 ? @"colortex2_vertex" : @"tex2_vertex";
+    else if (summary.hasNormal && summary.hasColor0)
         info.functionName = @"basic_vertex";
-    }
-    else if (hasTex)
-    {
-        info.functionName = hasColor ? @"colortex_vertex" : @"tex_vertex";
-    }
+    else if (summary.texCoordCount > 0)
+        info.functionName = summary.hasColor0 ? @"colortex_vertex" : @"tex_vertex";
     else
-    {
-        info.functionName = hasColor ? @"color_vertex" : @"simple_vertex";
-    }
-
-    if (!hasExplicitAttributes && hasTex && !hasColor)
-    {
-        info.functionName = @"tex_vertex";
-    }
+        info.functionName = summary.hasColor0 ? @"color_vertex" : @"simple_vertex";
 
     return info;
 }
+
 
 enum PipelineBlendMode : uint32
 {
@@ -434,7 +534,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     NSError* error = nil;
     
     NSBundle* bundle = [NSBundle mainBundle];
-    NSString* shaderPath = [bundle pathForResource:@"BasicShaders" ofType:@"metallib"];
+    NSString* shaderPath = [bundle pathForResource:@"UtilShaders" ofType:@"metallib"];
     
     id<MTLLibrary> defaultLibrary = nil;
     
@@ -449,7 +549,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
         // Try loading from app bundle MacOS directory (where we copy the metallibs)
         NSString* exePath = [[NSBundle mainBundle] executablePath];
         NSString* exeDir = [exePath stringByDeletingLastPathComponent];
-        NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"BasicShaders.metallib"];
+        NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"UtilShaders.metallib"];
         
         iLog->Log("Attempting to load from executable directory: %s\n", [metallibPath UTF8String]);
         defaultLibrary = [m_renderer->m_device newLibraryWithFile:metallibPath error:&error];
@@ -653,6 +753,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         NSArray* uniformArray = entry[@"uniforms"];
         NSArray* textureArray = entry[@"textures"];
         NSArray* vertexAttrArray = entry[@"vertexAttributes"];
+        NSArray* vertexAttrMetaArray = entry[@"vertexAttributeMetadata"];
         NSNumber* textureCountValue = entry[@"textureCount"];
         NSArray* directiveArray = entry[@"directives"];
         NSArray* maskArray = entry[@"maskReferences"];
@@ -681,25 +782,28 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             textureCount = static_cast<int>([textureArray count]);
         }
 
-        VertexLayoutInfo layout = InferVertexLayout(vertexAttrArray, textureCount, shaderName);
+        VertexAttributeSummary attributeSummary = BuildAttributeSummary(vertexAttrArray, vertexAttrMetaArray, textureCount, shaderName);
+        VertexLayoutInfo layout = InferVertexLayout(attributeSummary, shaderName);
         NSString* vertexFunctionName = layout.functionName;
         int vertexFormat = layout.format;
         if (shaderName && ([shaderName isEqualToString:@"CGVProgShadow_Depth2_3Samples"] ||
             [shaderName isEqualToString:@"CGRCRefractive"]))
         {
             if (iLog)
-                iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d)\n",
+                iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d color1=%d)\n",
                           [shaderName UTF8String],
                           [vertexFunctionName UTF8String],
                           vertexFormat,
                           layout.hasTexCoords ? 1 : 0,
-                          layout.hasColor ? 1 : 0);
-            fprintf(stderr, "MetalShaderManager: '%s' using vertex function %s, format %d (tex=%d color=%d)\n",
+                          layout.hasColor ? 1 : 0,
+                          layout.hasSecondColor ? 1 : 0);
+            fprintf(stderr, "MetalShaderManager: '%s' using vertex function %s, format %d (tex=%d color=%d color1=%d)\n",
                     [shaderName UTF8String],
                     [vertexFunctionName UTF8String],
                     vertexFormat,
                     layout.hasTexCoords ? 1 : 0,
-                    layout.hasColor ? 1 : 0);
+                    layout.hasColor ? 1 : 0,
+                    layout.hasSecondColor ? 1 : 0);
         }
         id<MTLFunction> vertexFunction = nil;
 
@@ -745,7 +849,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         info.colorWriteMask = pipelineConfig.colorWriteMask;
         info.name = normalizedKey;
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
-        if (!pipelineState && !layout.hasColor)
+        if (!pipelineState && !layout.hasColor && !layout.hasSecondTex)
         {
             int fallbackFormat = FallbackVertexFormat(vertexFormat);
             if (fallbackFormat != vertexFormat)

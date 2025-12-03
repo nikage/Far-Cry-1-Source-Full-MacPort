@@ -71,10 +71,12 @@ class ShaderIrParseResult {
     required this.data,
     required this.directives,
     required this.vertexAttributes,
+    required this.vertexAttributeMetadata,
   });
 
   final ShaderIrData data;
   final List<dynamic> directives;
   final List<dynamic> vertexAttributes;
+  final List<Map<String, dynamic>> vertexAttributeMetadata;
 }
 

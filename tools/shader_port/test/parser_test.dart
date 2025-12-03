@@ -191,6 +191,18 @@ CoreScript
       expect(macro['name'], 'CUSTOM_ALIAS');
       expect(macro['value'], 'fDif');
       expect(macro['active'], isTrue);
+
+      expect(result.vertexAttributes, contains('TEXCOORD0_2'));
+      expect(result.vertexAttributes, contains('TEXCOORD1_2'));
+      expect(result.vertexAttributes, contains('COLOR_4'));
+      expect(result.vertexAttributeMetadata, isNotEmpty);
+      final Map<String, dynamic> tex0Meta = result.vertexAttributeMetadata
+          .firstWhere(
+            (Map<String, dynamic> entry) =>
+                entry['token'] == 'Tex0' && entry['category'] == 'texcoord',
+          );
+      expect(tex0Meta['components'], greaterThanOrEqualTo(2));
+      expect(tex0Meta['label'], 'TEXCOORD0_2');
     });
   });
 }

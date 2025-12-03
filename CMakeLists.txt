@@ -175,7 +175,7 @@ if(APPLE)
     # Copy Metal shader libraries separately with explicit dependency on MetalShaders target
     add_custom_command(TARGET FarCry POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/BasicShaders.metallib
+            ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/UtilShaders.metallib
             ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/SpriteShaders.metallib
             ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
         COMMENT "Copying Metal shader libraries to app bundle"

@@ -251,12 +251,12 @@ bool CMetalRenderer::EnsureDebugPipelineState()
     NSString *shaderPath = nil;
     NSBundle *bundle = [NSBundle mainBundle];
     if (bundle)
-      shaderPath = [bundle pathForResource:@"BasicShaders" ofType:@"metallib"];
+      shaderPath = [bundle pathForResource:@"UtilShaders" ofType:@"metallib"];
     if (!shaderPath)
     {
       NSString *exePath = [[NSBundle mainBundle] executablePath];
       NSString *exeDir = [exePath stringByDeletingLastPathComponent];
-      shaderPath = [exeDir stringByAppendingPathComponent:@"BasicShaders.metallib"];
+      shaderPath = [exeDir stringByAppendingPathComponent:@"UtilShaders.metallib"];
     }
     if (shaderPath)
       library = [m_device newLibraryWithFile:shaderPath error:&error];

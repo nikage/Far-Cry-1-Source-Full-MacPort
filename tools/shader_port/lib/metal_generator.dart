@@ -50,6 +50,7 @@ void main(List<String> args) {
       'uniformCount': data.uniforms.length,
       'textureCount': data.textures.length,
       'vertexAttributes': result.vertexAttributes,
+      'vertexAttributeMetadata': result.vertexAttributeMetadata,
       'directives': result.directives,
       'maskReferences': data.maskReferences,
       'uniforms': data.uniforms

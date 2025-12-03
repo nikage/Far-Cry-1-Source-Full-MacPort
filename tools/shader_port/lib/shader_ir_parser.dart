@@ -143,10 +143,13 @@ class ShaderIrParser {
     );
     final List<dynamic> vertexAttributes =
         ir['vertexAttributes'] as List<dynamic>? ?? [];
+    final List<Map<String, dynamic>> vertexAttributeMetadata =
+        _castMapList(ir['vertexAttributeMetadata'] as List<dynamic>?);
     return ShaderIrParseResult(
       data: data,
       directives: directives,
       vertexAttributes: vertexAttributes,
+      vertexAttributeMetadata: vertexAttributeMetadata,
     );
   }
 

@@ -19,6 +19,7 @@ class ParseResult {
     this.coreScriptExpressions,
     this.coreMacros,
     this.vertexAttributes,
+    this.vertexAttributeMetadata,
     this.directives,
     this.coreScriptFlow,
     this.maskReferences,
@@ -37,6 +38,7 @@ class ParseResult {
   final List<Map<String, dynamic>> coreScriptExpressions;
   final List<Map<String, dynamic>> coreMacros;
   final List<String> vertexAttributes;
+  final List<Map<String, dynamic>> vertexAttributeMetadata;
   final List<String> directives;
   final List<Map<String, dynamic>> coreScriptFlow;
   final List<String> maskReferences;
@@ -183,9 +185,14 @@ ParseResult _parseShaderContent(String content, String relativePath) {
       extractCoreExpressions(blocks, coreMacros);
   final List<Map<String, dynamic>> coreFlow = extractCoreScriptFlow(blocks);
   final List<String> explicitVertexAttributes = extractVertexAttributes(blocks);
-  final List<String> vertexAttributes = explicitVertexAttributes.isNotEmpty
-      ? explicitVertexAttributes
-      : deriveVertexAttributes(coreExpressions, coreFlow);
+  final _VertexAttributeSummary vertexSummary = deriveVertexAttributeSummary(
+    explicitVertexAttributes,
+    coreExpressions,
+    coreFlow,
+  );
+  final List<String> vertexAttributes = vertexSummary.semantics;
+  final List<Map<String, dynamic>> vertexAttributeMetadata =
+      vertexSummary.metadata;
   final List<String> directives = extractDirectives(content);
   final List<String> maskReferences = extractMaskReferences(content);
   final List<String> positionScripts = extractPositionScripts(content);
@@ -203,6 +210,7 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     coreExpressions,
     coreMacros,
     vertexAttributes,
+    vertexAttributeMetadata,
     directives,
     coreFlow,
     maskReferences,
@@ -226,6 +234,7 @@ String encodeResult(ParseResult result) {
     'coreScriptExpressions': result.coreScriptExpressions,
     'coreMacros': result.coreMacros,
     'vertexAttributes': result.vertexAttributes,
+    'vertexAttributeMetadata': result.vertexAttributeMetadata,
     'directives': result.directives,
     'coreScriptFlow': result.coreScriptFlow,
     'maskReferences': result.maskReferences,
@@ -1300,23 +1309,179 @@ Map<String, bool> _parseColorMask(String value) {
 List<String> extractVertexAttributes(List<Block> blocks) {
   for (final Block block in blocks) {
     if (block.name.toLowerCase() == 'vertattributes') {
-      String content = block.content.replaceAll('{', ' ').replaceAll('}', ' ');
-      final List<String> tokens = content
-          .split(RegExp(r'\s+'))
-          .map((token) => token.trim())
-          .where((token) => token.isNotEmpty)
-          .toList();
+      final List<String> tokens = <String>[];
+      final List<String> lines = block.content.split('\n');
+      for (final String rawLine in lines) {
+        final String line = rawLine.trim();
+        if (line.isEmpty) {
+          continue;
+        }
+        if (line.startsWith('#')) {
+          continue;
+        }
+        final String sanitized =
+            line.replaceAll('{', ' ').replaceAll('}', ' ');
+        for (final String candidate in sanitized
+            .split(RegExp(r'[,\\s]+'))
+            .map((token) => token.trim())) {
+          if (_isValidVertAttributeToken(candidate)) {
+            tokens.add(candidate);
+          }
+        }
+      }
       return tokens;
     }
   }
   return const [];
 }
 
-List<String> deriveVertexAttributes(
+bool _isValidVertAttributeToken(String token) {
+  if (token.isEmpty) {
+    return false;
+  }
+  if (token.startsWith('%') ||
+      token.startsWith('&&') ||
+      token.startsWith('||') ||
+      token.startsWith('!')) {
+    return false;
+  }
+  if (token == 'if' || token == 'endif' || token == 'else') {
+    return false;
+  }
+  return RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(token);
+}
+
+class _VertexAttributeSummary {
+  _VertexAttributeSummary(this.semantics, this.metadata);
+
+  final List<String> semantics;
+  final List<Map<String, dynamic>> metadata;
+}
+
+_VertexAttributeSummary deriveVertexAttributeSummary(
+  List<String> explicit,
   List<Map<String, dynamic>> expressions,
   List<Map<String, dynamic>> flow,
 ) {
-  final Set<String> attributes = <String>{'POSITION_3'};
+  if (explicit.isNotEmpty) {
+    return _summaryFromExplicit(explicit);
+  }
+  return _summaryFromUsage(expressions, flow);
+}
+
+_VertexAttributeSummary _summaryFromExplicit(List<String> tokens) {
+  final List<String> semantics = <String>[];
+  final List<Map<String, dynamic>> metadata = <Map<String, dynamic>>[];
+  for (final String token in tokens) {
+    final _ExplicitTokenParts parts = _parseExplicitToken(token);
+    final _AttributeClassification classification =
+        _classifyAttributeToken(parts.baseToken);
+    final _AttributeUsage usage = _AttributeUsage(
+      parts.originalToken,
+      source: 'explicit',
+    )..markFullAccess();
+    final int components =
+        parts.components ?? classification.defaultComponents;
+    final String? label =
+        _semanticLabelForClassification(classification, components);
+    if (label != null) {
+      semantics.add(label);
+    }
+    metadata.add(
+      _buildAttributeMetadata(
+        usage,
+        classification,
+        components,
+        label: label,
+      ),
+    );
+  }
+  final List<String> uniqueSemantics = semantics.toSet().toList()..sort();
+  metadata.sort(_compareAttributeMetadata);
+  return _VertexAttributeSummary(uniqueSemantics, metadata);
+}
+
+_VertexAttributeSummary _summaryFromUsage(
+  List<Map<String, dynamic>> expressions,
+  List<Map<String, dynamic>> flow,
+) {
+  final Map<String, _AttributeUsage> usage =
+      _collectAttributeUsage(expressions, flow);
+  usage.putIfAbsent(
+    'position',
+    () => _AttributeUsage('Position', source: 'implicit')..markFullAccess(),
+  );
+  final Set<String> semanticSet = <String>{};
+  final List<Map<String, dynamic>> metadata = <Map<String, dynamic>>[];
+  for (final _AttributeUsage entry in usage.values) {
+    final _AttributeClassification classification =
+        _classifyAttributeToken(entry.token);
+    final int components = entry.componentCount(
+      classification.defaultComponents,
+    );
+    final String? label =
+        _semanticLabelForClassification(classification, components);
+    if (label != null) {
+      semanticSet.add(label);
+    }
+    metadata.add(
+      _buildAttributeMetadata(
+        entry,
+        classification,
+        components,
+        label: label,
+      ),
+    );
+  }
+  final List<String> semantics = semanticSet.toList()..sort();
+  metadata.sort(_compareAttributeMetadata);
+  return _VertexAttributeSummary(semantics, metadata);
+}
+
+String? _mapInputTokenToAttribute(String token) {
+  final _AttributeClassification classification =
+      _classifyAttributeToken(token);
+  return _semanticLabelForClassification(
+    classification,
+    classification.defaultComponents,
+  );
+}
+
+final RegExp _vertexInputPattern = RegExp(r'IN\.([A-Za-z0-9_]+)');
+
+class _ExplicitTokenParts {
+  _ExplicitTokenParts(this.originalToken, this.baseToken, this.components);
+
+  final String originalToken;
+  final String baseToken;
+  final int? components;
+}
+
+_ExplicitTokenParts _parseExplicitToken(String token) {
+  final RegExpMatch? match = RegExp(r'^(.*?)(?:_(\d+))?$').firstMatch(token);
+  if (match == null) {
+    return _ExplicitTokenParts(token, token, null);
+  }
+  final String base = (match.group(1) ?? token).trim();
+  final int? components = match.group(2) == null
+      ? null
+      : int.tryParse(match.group(2)!);
+  return _ExplicitTokenParts(token, base, components);
+}
+
+Map<String, _AttributeUsage> _collectAttributeUsage(
+  List<Map<String, dynamic>> expressions,
+  List<Map<String, dynamic>> flow,
+) {
+  final Map<String, _AttributeUsage> usage = <String, _AttributeUsage>{};
+
+  _AttributeUsage usageFor(String rawToken) {
+    final String key = rawToken.toLowerCase();
+    return usage.putIfAbsent(
+      key,
+      () => _AttributeUsage(rawToken, source: 'derived'),
+    );
+  }
 
   void scan(String? text) {
     if (text == null || text.isEmpty) {
@@ -1327,9 +1492,20 @@ List<String> deriveVertexAttributes(
       if (token == null || token.isEmpty) {
         continue;
       }
-      final String? semantic = _mapInputTokenToAttribute(token);
-      if (semantic != null) {
-        attributes.add(semantic);
+      final _AttributeUsage entry = usageFor(token);
+      final int nextIndex = _skipWhitespace(text, match.end);
+      if (nextIndex >= text.length) {
+        entry.markFullAccess();
+        continue;
+      }
+      final int charCode = text.codeUnitAt(nextIndex);
+      if (charCode == 46) {
+        final int mask = _extractSwizzleMask(text, nextIndex + 1);
+        entry.addSwizzle(mask);
+      } else if (charCode == 91) {
+        entry.markFullAccess();
+      } else {
+        entry.markFullAccess();
       }
     }
   }
@@ -1342,44 +1518,325 @@ List<String> deriveVertexAttributes(
   for (final Map<String, dynamic> entry in flow) {
     scan(entry['content'] as String?);
   }
-
-  final List<String> sorted = attributes.toList();
-  sorted.sort();
-  return sorted;
+  return usage;
 }
 
-String? _mapInputTokenToAttribute(String token) {
-  final String lower = token.toLowerCase();
-  if (lower == 'color' || lower.startsWith('color')) {
-    return 'COLOR_4';
+int _skipWhitespace(String source, int index) {
+  int current = index;
+  while (current < source.length) {
+    final int charCode = source.codeUnitAt(current);
+    if (charCode == 32 ||
+        charCode == 9 ||
+        charCode == 10 ||
+        charCode == 13) {
+      current++;
+      continue;
+    }
+    break;
   }
-  if (lower == 'position' || lower == 'pos') {
-    return 'POSITION_3';
-  }
-  if (lower == 'normal' || lower == 'tnormal') {
-    return 'NORMAL_3';
-  }
-  if (lower == 'tangent') {
-    return 'TANGENT_3';
-  }
-  if (lower == 'binormal') {
-    return 'BINORMAL_3';
-  }
-  if (lower.startsWith('texcoord')) {
-    final String suffix = lower.substring('texcoord'.length);
-    final int index = int.tryParse(suffix) ?? 0;
-    return 'TEXCOORD${index}_2';
-  }
-  final RegExp texPattern = RegExp(r'^tex(\d+)$');
-  final Match? texMatch = texPattern.firstMatch(lower);
-  if (texMatch != null) {
-    final int index = int.tryParse(texMatch.group(1) ?? '') ?? 0;
-    return 'TEXCOORD${index}_2';
-  }
-  return null;
+  return current;
 }
 
-final RegExp _vertexInputPattern = RegExp(r'IN\.([A-Za-z0-9_]+)');
+int _extractSwizzleMask(String source, int startIndex) {
+  int mask = 0;
+  for (int i = startIndex; i < source.length; i++) {
+    final int code = source.codeUnitAt(i);
+    final int bit = _componentBitForChar(code);
+    if (bit == 0) {
+      break;
+    }
+    mask |= bit;
+  }
+  return mask;
+}
+
+int _componentBitForChar(int codeUnit) {
+  switch (codeUnit) {
+    case 120: // x
+    case 88: // X
+    case 114: // r
+    case 82: // R
+      return 1;
+    case 121: // y
+    case 89: // Y
+    case 103: // g
+    case 71: // G
+      return 2;
+    case 122: // z
+    case 90: // Z
+    case 98: // b
+    case 66: // B
+      return 4;
+    case 119: // w
+    case 87: // W
+    case 97: // a
+    case 65: // A
+      return 8;
+    default:
+      return 0;
+  }
+}
+
+class _AttributeUsage {
+  _AttributeUsage(this.token, {required this.source});
+
+  final String token;
+  final String source;
+  bool hasFullAccess = false;
+  int swizzleMask = 0;
+  int maxComponent = 0;
+
+  void markFullAccess() {
+    hasFullAccess = true;
+  }
+
+  void addSwizzle(int mask) {
+    if (mask == 0) {
+      hasFullAccess = true;
+      return;
+    }
+    swizzleMask |= mask;
+    if ((mask & 8) != 0) {
+      maxComponent = 4;
+    } else if ((mask & 4) != 0 && maxComponent < 3) {
+      maxComponent = 3;
+    } else if ((mask & 2) != 0 && maxComponent < 2) {
+      maxComponent = 2;
+    } else if ((mask & 1) != 0 && maxComponent < 1) {
+      maxComponent = 1;
+    }
+  }
+
+  int componentCount(int defaultComponents) {
+    if (hasFullAccess) {
+      return defaultComponents;
+    }
+    if (maxComponent == 0 && swizzleMask == 0) {
+      return defaultComponents;
+    }
+    final int highest =
+        maxComponent == 0 ? _countBits(swizzleMask) : maxComponent;
+    final int required = highest == 0 ? defaultComponents : highest;
+    return _clampComponents(required > defaultComponents ? required : defaultComponents);
+  }
+}
+
+class _AttributeClassification {
+  _AttributeClassification({
+    required this.token,
+    required this.category,
+    required this.semantic,
+    required this.defaultComponents,
+    this.index,
+  });
+
+  final String token;
+  final String category;
+  final String semantic;
+  final int defaultComponents;
+  final int? index;
+}
+
+_AttributeClassification _classifyAttributeToken(String token) {
+  final String original = token;
+  String normalized = original.toLowerCase();
+  normalized = normalized.replaceFirst(RegExp(r'^in\.'), '');
+  final RegExp suffixDigits = RegExp(r'_(\d+)$');
+  normalized = normalized.replaceFirst(suffixDigits, '');
+  final Match? trailingDigits = RegExp(r'(\d+)$').firstMatch(normalized);
+  int? suffixNumber;
+  if (trailingDigits != null) {
+    suffixNumber = int.tryParse(trailingDigits.group(1)!);
+    normalized = normalized.substring(0, trailingDigits.start);
+  }
+
+  if (normalized == 'prim_color') {
+    return _AttributeClassification(
+      token: token,
+      category: 'color',
+      semantic: 'COLOR',
+      defaultComponents: 4,
+      index: 0,
+    );
+  }
+  if (normalized == 'sec_color') {
+    return _AttributeClassification(
+      token: token,
+      category: 'color',
+      semantic: 'COLOR',
+      defaultComponents: 4,
+      index: 1,
+    );
+  }
+
+  if (normalized == 'position' || normalized == 'pos') {
+    return _AttributeClassification(
+      token: token,
+      category: 'position',
+      semantic: 'POSITION',
+      defaultComponents: 3,
+    );
+  }
+
+  if (normalized == 'normal' ||
+      normalized == 'tnormal' ||
+      normalized == 'norm' ||
+      normalized == 'normvec') {
+    return _AttributeClassification(
+      token: token,
+      category: 'normal',
+      semantic: 'NORMAL',
+      defaultComponents: 3,
+    );
+  }
+
+  if (normalized.contains('tangent') || normalized == 'tangvec') {
+    return _AttributeClassification(
+      token: token,
+      category: 'tangent',
+      semantic: 'TANGENT',
+      defaultComponents: 3,
+    );
+  }
+
+  if (normalized.contains('binormal') || normalized == 'binormvec') {
+    return _AttributeClassification(
+      token: token,
+      category: 'binormal',
+      semantic: 'BINORMAL',
+      defaultComponents: 3,
+    );
+  }
+
+  if (normalized.contains('color')) {
+    final int channel = suffixNumber ?? 0;
+    return _AttributeClassification(
+      token: token,
+      category: 'color',
+      semantic: 'COLOR',
+      defaultComponents: 4,
+      index: channel,
+    );
+  }
+
+  if (normalized.startsWith('texcoord') || normalized.startsWith('tex')) {
+    final int coordIndex = suffixNumber ?? 0;
+    return _AttributeClassification(
+      token: token,
+      category: 'texcoord',
+      semantic: 'TEXCOORD',
+      defaultComponents: 2,
+      index: coordIndex,
+    );
+  }
+
+  if (normalized.endsWith('tc') || normalized.contains('tc')) {
+    return _AttributeClassification(
+      token: token,
+      category: 'texcoord',
+      semantic: 'TEXCOORD',
+      defaultComponents: 2,
+    );
+  }
+
+  if (normalized == 'tang_3x3') {
+    return _AttributeClassification(
+      token: token,
+      category: 'tangentFrame',
+      semantic: 'TANGENT_FRAME',
+      defaultComponents: 9,
+    );
+  }
+
+  return _AttributeClassification(
+    token: token,
+    category: 'custom',
+    semantic: token.toUpperCase(),
+    defaultComponents: 4,
+  );
+}
+
+String? _semanticLabelForClassification(
+  _AttributeClassification classification,
+  int components,
+) {
+  final int clamped = _clampComponents(components);
+  switch (classification.category) {
+    case 'position':
+      return 'POSITION_${clamped}';
+    case 'normal':
+      return 'NORMAL_${clamped}';
+    case 'tangent':
+      return 'TANGENT_${clamped}';
+    case 'binormal':
+      return 'BINORMAL_${clamped}';
+    case 'color':
+      final int index = classification.index ?? 0;
+      final String prefix = index == 0 ? 'COLOR' : 'COLOR${index}';
+      return '${prefix}_${clamped}';
+    case 'texcoord':
+      final int? index = classification.index;
+      if (index == null) {
+        return null;
+      }
+      return 'TEXCOORD${index}_${clamped}';
+    case 'tangentFrame':
+      return 'TANG_3X3';
+    default:
+      return null;
+  }
+}
+
+Map<String, dynamic> _buildAttributeMetadata(
+  _AttributeUsage usage,
+  _AttributeClassification classification,
+  int components, {
+  String? label,
+}) {
+  final Map<String, dynamic> entry = <String, dynamic>{
+    'token': usage.token,
+    'category': classification.category,
+    'semantic': classification.semantic,
+    'components': _clampComponents(components),
+    'source': usage.source,
+  };
+  if (classification.index != null) {
+    entry['index'] = classification.index;
+  }
+  if (label != null) {
+    entry['label'] = label;
+  }
+  return entry;
+}
+
+int _compareAttributeMetadata(
+  Map<String, dynamic> a,
+  Map<String, dynamic> b,
+) {
+  final String labelA = (a['label'] as String?) ?? (a['token'] as String? ?? '');
+  final String labelB = (b['label'] as String?) ?? (b['token'] as String? ?? '');
+  return labelA.compareTo(labelB);
+}
+
+int _countBits(int value) {
+  int count = 0;
+  int temp = value;
+  while (temp != 0) {
+    temp &= temp - 1;
+    count++;
+  }
+  return count;
+}
+
+int _clampComponents(int value) {
+  if (value < 1) {
+    return 1;
+  }
+  if (value > 4) {
+    return 4;
+  }
+  return value;
+}
 
 List<String> extractDirectives(String content) {
   final List<String> directives = [];
