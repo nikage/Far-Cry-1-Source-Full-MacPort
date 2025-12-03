@@ -34,16 +34,35 @@ struct VertexLayoutInfo
     int format;
     NSString* functionName;
     bool hasTexCoords;
+    bool hasColor;
 };
 
-VertexLayoutInfo InferVertexLayout(NSArray* attributes, int textureCount)
+int FallbackVertexFormat(int format)
 {
-    bool hasPosition = false;
+    switch (format)
+    {
+        case VERTEX_FORMAT_P3F_TEX2F:
+            return VERTEX_FORMAT_P3F_COL4UB_TEX2F;
+        case VERTEX_FORMAT_P3F:
+            return VERTEX_FORMAT_P3F_COL4UB;
+        case VERTEX_FORMAT_P3F_N_TEX2F:
+            return VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+        case VERTEX_FORMAT_P3F_N:
+            return VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+        default:
+            return format;
+    }
+}
+
+VertexLayoutInfo InferVertexLayout(NSArray* attributes, int textureCount, NSString* shaderName)
+{
+    bool hasPosition = true;
     bool hasNormal = false;
     bool hasColor = false;
     bool hasTex = textureCount > 0;
+    const bool hasExplicitAttributes = attributes && [attributes count] > 0;
 
-    if (attributes && [attributes isKindOfClass:[NSArray class]])
+    if (hasExplicitAttributes)
     {
         for (id item in attributes)
         {
@@ -54,15 +73,45 @@ VertexLayoutInfo InferVertexLayout(NSArray* attributes, int textureCount)
                 hasPosition = true;
             if ([attrString containsString:@"normal"])
                 hasNormal = true;
-            if ([attrString containsString:@"color"])
+            if ([attrString containsString:@"color"] && ![attrString containsString:@"texcoord"])
                 hasColor = true;
             if ([attrString containsString:@"texcoord"])
                 hasTex = true;
         }
     }
+    if (shaderName)
+    {
+        NSString* lowerName = [shaderName lowercaseString];
+        if ([lowerName hasPrefix:@"cgv"])
+        {
+            hasColor = true;
+            hasTex = true;
+        }
+        else if (!hasExplicitAttributes)
+        {
+            if ([lowerName containsString:@"vegetation"] ||
+                [lowerName containsString:@"plants"])
+            {
+                hasColor = true;
+                hasTex = true;
+            }
+            if ([lowerName containsString:@"normal"] ||
+                [lowerName containsString:@"bump"])
+            {
+                hasNormal = true;
+                hasTex = true;
+            }
+        }
+    }
+
+    if (hasNormal && !hasColor)
+    {
+        hasColor = true;
+    }
 
     VertexLayoutInfo info;
     info.hasTexCoords = hasTex;
+    info.hasColor = hasColor;
 
     if (hasPosition && hasNormal && hasColor && hasTex)
         info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
@@ -79,12 +128,23 @@ VertexLayoutInfo InferVertexLayout(NSArray* attributes, int textureCount)
     else
         info.format = VERTEX_FORMAT_P3F;
 
-    if (hasNormal)
+    if (hasNormal && hasColor)
+    {
         info.functionName = @"basic_vertex";
+    }
     else if (hasTex)
-        info.functionName = @"colortex_vertex";
+    {
+        info.functionName = hasColor ? @"colortex_vertex" : @"tex_vertex";
+    }
     else
-        info.functionName = @"color_vertex";
+    {
+        info.functionName = hasColor ? @"color_vertex" : @"simple_vertex";
+    }
+
+    if (!hasExplicitAttributes && hasTex && !hasColor)
+    {
+        info.functionName = @"tex_vertex";
+    }
 
     return info;
 }
@@ -479,6 +539,7 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         info.depthCompareFunction = MTLCompareFunctionLessEqual;
         info.cullMode = MTLCullModeBack;
         info.colorWriteMask = 0xF;
+        info.name = shader.name;
 
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(
             vertexFunc, fragmentFunc, vertexDesc, &info);
@@ -491,7 +552,6 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         info.vertexFunction = vertexFunc;
         info.fragmentFunction = fragmentFunc;
         info.pipelineState = pipelineState;
-        info.name = shader.name;
         info.shaderClass = eSH_World;
         info.isLoaded = true;
         info.nMaskGen = 0;
@@ -621,9 +681,26 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             textureCount = static_cast<int>([textureArray count]);
         }
 
-        VertexLayoutInfo layout = InferVertexLayout(vertexAttrArray, textureCount);
+        VertexLayoutInfo layout = InferVertexLayout(vertexAttrArray, textureCount, shaderName);
         NSString* vertexFunctionName = layout.functionName;
         int vertexFormat = layout.format;
+        if (shaderName && ([shaderName isEqualToString:@"CGVProgShadow_Depth2_3Samples"] ||
+            [shaderName isEqualToString:@"CGRCRefractive"]))
+        {
+            if (iLog)
+                iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d)\n",
+                          [shaderName UTF8String],
+                          [vertexFunctionName UTF8String],
+                          vertexFormat,
+                          layout.hasTexCoords ? 1 : 0,
+                          layout.hasColor ? 1 : 0);
+            fprintf(stderr, "MetalShaderManager: '%s' using vertex function %s, format %d (tex=%d color=%d)\n",
+                    [shaderName UTF8String],
+                    [vertexFunctionName UTF8String],
+                    vertexFormat,
+                    layout.hasTexCoords ? 1 : 0,
+                    layout.hasColor ? 1 : 0);
+        }
         id<MTLFunction> vertexFunction = nil;
 
         PipelineStateConfig pipelineConfig = DefaultPipelineConfig();
@@ -633,7 +710,12 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         {
             vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
             if (!vertexFunction)
+            {
+                if (iLog)
+                    iLog->Log("MetalShaderManager: '%s' vertex entry not found, falling back to basic_vertex\n",
+                              [vertexFunctionName UTF8String]);
                 vertexFunction = [vertexLibrary newFunctionWithName:@"basic_vertex"];
+            }
         }
 
         if (!vertexFunction)
@@ -661,7 +743,35 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         info.depthCompareFunction = pipelineConfig.depthCompareFunction;
         info.cullMode = pipelineConfig.cullMode;
         info.colorWriteMask = pipelineConfig.colorWriteMask;
+        info.name = normalizedKey;
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
+        if (!pipelineState && !layout.hasColor)
+        {
+            int fallbackFormat = FallbackVertexFormat(vertexFormat);
+            if (fallbackFormat != vertexFormat)
+            {
+                const char* shaderNameStr = shaderName ? [shaderName UTF8String] : "<unnamed>";
+                MTLVertexDescriptor* fallbackDescriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(fallbackFormat);
+                if (fallbackDescriptor)
+                {
+                    iLog->Log("MetalShaderManager: Retrying shader '%s' with fallback vertex format %d (was %d)\n",
+                              shaderNameStr, fallbackFormat, vertexFormat);
+                    fprintf(stderr, "MetalShaderManager: Retrying shader '%s' with fallback vertex format %d (was %d)\n",
+                            shaderNameStr, fallbackFormat, vertexFormat);
+                    descriptor = fallbackDescriptor;
+                    vertexFormat = fallbackFormat;
+                    if (vertexLibrary)
+                    {
+                        id<MTLFunction> fallbackVertex = [vertexLibrary newFunctionWithName:@"colortex_vertex"];
+                        if (!fallbackVertex)
+                            fallbackVertex = [vertexLibrary newFunctionWithName:@"basic_vertex"];
+                        if (fallbackVertex)
+                            vertexFunction = fallbackVertex;
+                    }
+                    pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
+                }
+            }
+        }
         if (!pipelineState)
             continue;
 
@@ -672,7 +782,6 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         }
 
         int shaderId = AllocateShaderId();
-        info.name = normalizedKey;
         info.shaderClass = eSH_Misc;
         info.isLoaded = true;
         info.nMaskGen = 0;
@@ -854,6 +963,38 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     id<MTLRenderPipelineState> pipelineState = 
         [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
     
+    if (!pipelineState)
+    {
+        const char* vsName = vertexFunction && [vertexFunction label]
+            ? [[vertexFunction label] UTF8String]
+            : "<unnamed>";
+        const char* fsName = fragmentFunction && [fragmentFunction label]
+            ? [[fragmentFunction label] UTF8String]
+            : "<unnamed>";
+        const char* shaderName = (shaderInfo && !shaderInfo->name.empty())
+            ? shaderInfo->name.c_str()
+            : "<unnamed>";
+        if (error)
+        {
+            const char* errorText = [[error localizedDescription] UTF8String];
+            iLog->Log("CreatePipelineState failed for shader '%s' VS '%s' / FS '%s': %s\n", shaderName, vsName, fsName, errorText);
+            fprintf(stderr, "CreatePipelineState failed for shader '%s' VS '%s' / FS '%s': %s\n", shaderName, vsName, fsName, errorText);
+        }
+        else
+        {
+            iLog->Log("CreatePipelineState failed for shader '%s' VS '%s' / FS '%s' with unknown error\n", shaderName, vsName, fsName);
+            fprintf(stderr, "CreatePipelineState failed for shader '%s' VS '%s' / FS '%s' with unknown error\n", shaderName, vsName, fsName);
+        }
+        
+        NSString* compilerError = error.userInfo[@"MTLCompilerErrorKey"];
+        if (compilerError)
+        {
+            const char* errorDetails = [compilerError UTF8String];
+            iLog->Log("Metal compiler output for shader '%s':\n%s\n", shaderName, errorDetails);
+            fprintf(stderr, "Metal compiler output for shader '%s':\n%s\n", shaderName, errorDetails);
+        }
+    }
+
     assert(pipelineState != nil && "CreatePipelineStateWithFunctions: Failed to create pipeline state - check Metal shader compilation");
     if (!pipelineState && error)
     {

@@ -1067,6 +1067,22 @@ class ExpressionTranslator {
     if (line.trimLeft().startsWith('#')) {
       return '';
     }
+    final RegExp ambientLeftPattern =
+        RegExp(r'^(\s*)OUT\.Color\s*=\s*Ambient\s*\*\s*decalColor\s*;');
+    final RegExp ambientRightPattern =
+        RegExp(r'^(\s*)OUT\.Color\s*=\s*decalColor\s*\*\s*Ambient\s*;');
+    RegExpMatch? ambientMatch = ambientLeftPattern.firstMatch(line);
+    if (ambientMatch != null) {
+      final String indent = ambientMatch.group(1)!;
+      return '$indent'
+          'OUT.Color = float4((uniforms.Ambient.xyz * decalColor.xyz), uniforms.Ambient.w * decalColor.w);';
+    }
+    ambientMatch = ambientRightPattern.firstMatch(line);
+    if (ambientMatch != null) {
+      final String indent = ambientMatch.group(1)!;
+      return '$indent'
+          'OUT.Color = float4((uniforms.Ambient.xyz * decalColor.xyz), uniforms.Ambient.w * decalColor.w);';
+    }
     String result = _stripBlockComments(line);
     if (result.trim().isEmpty) {
       return '';
@@ -1651,6 +1667,22 @@ class VectorSampleTransformer implements LineTransformer {
   }
 }
 
+class Float3DecalColorTransformer implements LineTransformer {
+  final RegExp _float3AssignPattern = RegExp(r'^\s*float3\b');
+  final RegExp _decalPattern = RegExp(r'\bdecalColor\b(?!\.)');
+
+  @override
+  String transform(String line) {
+    if (!_float3AssignPattern.hasMatch(line)) {
+      return line;
+    }
+    if (!line.contains('decalColor')) {
+      return line;
+    }
+    return line.replaceAll(_decalPattern, 'decalColor.xyz');
+  }
+}
+
 class GetNormalMapTransformer implements LineTransformer {
   @override
   String transform(String line) {
@@ -1810,6 +1842,10 @@ class ColorComponentAssignmentTransformer implements LineTransformer {
 
   @override
   String transform(String line) {
+    if (line.contains('OUT.Color =')) {
+      _recordTypes(line);
+      return line;
+    }
     _recordTypes(line);
     return line.replaceAllMapped(
       RegExp(
@@ -2239,14 +2275,6 @@ class VectorMultiplyCleanupTransformer implements LineTransformer {
       (Match match) => '(uniforms.RefrColor * refrColor).xyz',
     );
     result = result.replaceAll('atten.xyz', 'atten');
-    result = result.replaceAll(
-      'uniforms.Ambient.xyz * decalColor',
-      'uniforms.Ambient.xyz * decalColor.xyz',
-    );
-    result = result.replaceAll(
-      'decalColor * uniforms.Ambient.xyz',
-      'decalColor.xyz * uniforms.Ambient.xyz',
-    );
     final RegExp float4Projection = RegExp(
       r'(float4\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*\([^;]+?)\s*\.xyz\s*;',
       dotAll: true,
@@ -2376,6 +2404,9 @@ class UniformVectorComponentTransformer implements LineTransformer {
 
   @override
   String transform(String line) {
+    if (line.contains('OUT.Color =')) {
+      return line;
+    }
     String result = line;
     result = result.replaceAllMapped(_patternLeft, (Match match) {
       final String lhs = match.group(1)!;
@@ -2435,7 +2466,8 @@ class UniformVectorComponentTransformer implements LineTransformer {
     if (normalized.contains('float3(') || normalized.contains('float2(')) {
       return false;
     }
-    return true;
+    return normalized.contains('float4') || normalized.contains('.xyzw') ||
+        normalized.contains('.wwww');
   }
 
   bool _hasComponentSuffix(String value) {

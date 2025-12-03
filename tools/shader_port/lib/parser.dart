@@ -181,9 +181,12 @@ ParseResult _parseShaderContent(String content, String relativePath) {
   final List<Map<String, dynamic>> coreMacros = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> coreExpressions =
       extractCoreExpressions(blocks, coreMacros);
-  final List<String> vertexAttributes = extractVertexAttributes(blocks);
-  final List<String> directives = extractDirectives(content);
   final List<Map<String, dynamic>> coreFlow = extractCoreScriptFlow(blocks);
+  final List<String> explicitVertexAttributes = extractVertexAttributes(blocks);
+  final List<String> vertexAttributes = explicitVertexAttributes.isNotEmpty
+      ? explicitVertexAttributes
+      : deriveVertexAttributes(coreExpressions, coreFlow);
+  final List<String> directives = extractDirectives(content);
   final List<String> maskReferences = extractMaskReferences(content);
   final List<String> positionScripts = extractPositionScripts(content);
   final List<Map<String, String>> positionScriptBlocks =
@@ -1308,6 +1311,75 @@ List<String> extractVertexAttributes(List<Block> blocks) {
   }
   return const [];
 }
+
+List<String> deriveVertexAttributes(
+  List<Map<String, dynamic>> expressions,
+  List<Map<String, dynamic>> flow,
+) {
+  final Set<String> attributes = <String>{'POSITION_3'};
+
+  void scan(String? text) {
+    if (text == null || text.isEmpty) {
+      return;
+    }
+    for (final RegExpMatch match in _vertexInputPattern.allMatches(text)) {
+      final String? token = match.group(1);
+      if (token == null || token.isEmpty) {
+        continue;
+      }
+      final String? semantic = _mapInputTokenToAttribute(token);
+      if (semantic != null) {
+        attributes.add(semantic);
+      }
+    }
+  }
+
+  for (final Map<String, dynamic> expr in expressions) {
+    scan(expr['raw'] as String?);
+    scan(expr['lhs'] as String?);
+    scan(expr['rhs'] as String?);
+  }
+  for (final Map<String, dynamic> entry in flow) {
+    scan(entry['content'] as String?);
+  }
+
+  final List<String> sorted = attributes.toList();
+  sorted.sort();
+  return sorted;
+}
+
+String? _mapInputTokenToAttribute(String token) {
+  final String lower = token.toLowerCase();
+  if (lower == 'color' || lower.startsWith('color')) {
+    return 'COLOR_4';
+  }
+  if (lower == 'position' || lower == 'pos') {
+    return 'POSITION_3';
+  }
+  if (lower == 'normal' || lower == 'tnormal') {
+    return 'NORMAL_3';
+  }
+  if (lower == 'tangent') {
+    return 'TANGENT_3';
+  }
+  if (lower == 'binormal') {
+    return 'BINORMAL_3';
+  }
+  if (lower.startsWith('texcoord')) {
+    final String suffix = lower.substring('texcoord'.length);
+    final int index = int.tryParse(suffix) ?? 0;
+    return 'TEXCOORD${index}_2';
+  }
+  final RegExp texPattern = RegExp(r'^tex(\d+)$');
+  final Match? texMatch = texPattern.firstMatch(lower);
+  if (texMatch != null) {
+    final int index = int.tryParse(texMatch.group(1) ?? '') ?? 0;
+    return 'TEXCOORD${index}_2';
+  }
+  return null;
+}
+
+final RegExp _vertexInputPattern = RegExp(r'IN\.([A-Za-z0-9_]+)');
 
 List<String> extractDirectives(String content) {
   final List<String> directives = [];

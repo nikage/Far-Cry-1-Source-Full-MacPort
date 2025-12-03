@@ -54,6 +54,7 @@ class MetalFragmentBuilder {
       TextureFunctionTransformer(),
       ScalarSampleTransformer(),
       VectorSampleTransformer(),
+      Float3DecalColorTransformer(),
       GetNormalMapTransformer(),
       ImplicitSampleDeclarationTransformer(),
       ScalarSwizzleCleanupTransformer(_scalarInputFields),
@@ -77,7 +78,6 @@ class MetalFragmentBuilder {
       ),
       DotUniformSuffixFixupTransformer(),
       ColorComponentAssignmentTransformer(_uniformTypes),
-      Float3ColorTransformer(),
       TangentSpaceAssignmentTransformer(),
       VectorSuffixCleanupTransformer(),
       ScalarBroadcastTransformer(),
@@ -150,7 +150,8 @@ class MetalFragmentBuilder {
     buffer.writeln('struct $_inputStructName {');
   buffer.writeln('  float4 position [[position]];');
     final List<String> fields = List<String>.from(_analyzer.inputFields);
-    if (!fields.contains('Color')) {
+    final bool needsColor = _translator.usesIdentifier('IN.Color');
+    if (needsColor && !fields.contains('Color')) {
       fields.insert(0, 'Color');
     }
     for (final String field in fields) {
@@ -208,6 +209,21 @@ float3 CMKYToRGB(float4 vColor) {
       );
     }
   }
+
+  String _rewriteFloat3DecalColor(String line) {
+    if (!line.contains('decalColor')) {
+      return line;
+    }
+    final String trimmed = line.trimLeft();
+    if (!trimmed.startsWith('float3 ')) {
+      return line;
+    }
+    if (line.contains('decalColor.')) {
+      return line;
+    }
+    return line.replaceAll(RegExp(r'\bdecalColor\b(?!\.)'), 'decalColor.xyz');
+  }
+
   void _writeFragmentFunction(StringBuffer buffer) {
     buffer.writeln(
       'fragment float4 ${data.fragmentName}(${_buildParameters().join(', ')})',
@@ -267,7 +283,7 @@ float3 CMKYToRGB(float4 vColor) {
               trimmed.startsWith('dif = float3(0.0);'))) {
         continue;
       }
-      buffer.writeln(line);
+      buffer.writeln(_rewriteFloat3DecalColor(line));
     }
     buffer.writeln('  return ${_translator.returnExpression};');
     buffer.writeln('}');

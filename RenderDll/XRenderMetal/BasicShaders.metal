@@ -227,6 +227,32 @@ vertex VertexOut_ColorTex colortex_vertex(VertexIn_P3F_COL4UB_TEX2F in [[stage_i
     return out;
 }
 
+// Position + TexCoord vertex shader (no per-vertex color)
+struct VertexIn_P3F_TEX2F {
+    float3 position [[attribute(0)]];
+    float2 texCoord [[attribute(1)]];
+};
+
+struct VertexOut_Tex {
+    float4 position [[position]];
+    float2 texCoord;
+    float clipDistance;
+};
+
+vertex VertexOut_Tex tex_vertex(VertexIn_P3F_TEX2F in [[stage_in]],
+                                constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut_Tex out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.texCoord = in.texCoord;
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
 fragment float4 colortex_fragment(VertexOut_ColorTex in [[stage_in]],
                                   constant Uniforms& uniforms [[buffer(0)]],
                                   texture2d<float> baseTexture [[texture(0)]],
