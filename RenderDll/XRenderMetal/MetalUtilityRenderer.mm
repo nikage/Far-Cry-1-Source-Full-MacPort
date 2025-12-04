@@ -847,6 +847,7 @@ int CMetalUtilityRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Form
         iLog->Log("CreateRenderTarget: Failed to create depth texture (%dx%d)\n", nWidth, nHeight);
         [colorTexture release];
         ReleaseRenderTargetId(renderTargetId);
+        assert(false);
         return 0;
     }
     

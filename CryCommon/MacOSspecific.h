@@ -812,7 +812,7 @@ inline uintptr_t SetThreadAffinityMask(void* hThread, uintptr_t dwThreadAffinity
 // Windows critical section functions - implement using pthread mutex
 inline void InitializeCriticalSection(CRITICAL_SECTION* lpCriticalSection) {
     if (lpCriticalSection) {
-        pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+    auto mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
         if (!mutex) {
             lpCriticalSection->DebugInfo = NULL;
             lpCriticalSection->LockCount = 0;

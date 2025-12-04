@@ -808,6 +808,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                     iLog->Log("MetalShaderManager: '%s' vertex entry '%s' not found; skipping shader\n",
                               shaderName ? [shaderName UTF8String] : "<unnamed>",
                               [vertexFunctionName UTF8String]);
+                assert(false);
                 continue;
             }
         }
@@ -816,6 +817,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             if (iLog)
                 iLog->Log("MetalShaderManager: No vertex library available; skipping shader '%s'\n",
                           shaderName ? [shaderName UTF8String] : "<unnamed>");
+            assert(false);
             continue;
         }
 
@@ -823,11 +825,13 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         {
             if (iLog)
                 iLog->Log("MetalShaderManager: Missing generated vertex function for shader '%s'\n", [shaderName UTF8String]);
+            assert(false);
             continue;
         }
 
         MTLVertexDescriptor* descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
         if (!descriptor)
+            assert(false);
             continue;
 
         ShaderInfo info;
@@ -852,6 +856,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             {
                 iLog->Log("MetalShaderManager: Skipping shader '%s' due to pipeline creation failure\n",
                           shaderName ? [shaderName UTF8String] : "<unnamed>");
+                assert(false);
             }
             continue;
         }
