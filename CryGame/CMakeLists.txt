@@ -11,6 +11,13 @@ file(GLOB_RECURSE CRYGAME_HEADERS
     "*.h"
 )
 
+if(APPLE)
+    file(GLOB_RECURSE CRYGAME_OBJC_SOURCES
+        "*.mm"
+    )
+    list(APPEND CRYGAME_SOURCES ${CRYGAME_OBJC_SOURCES})
+endif()
+
 # Create the CryGame library
 add_library(CryGame SHARED ${CRYGAME_SOURCES} ${CRYGAME_HEADERS})
 
@@ -36,6 +43,14 @@ target_compile_definitions(CryGame PRIVATE
 if(APPLE)
     target_compile_options(CryGame PRIVATE
         -include ${CMAKE_SOURCE_DIR}/CryCommon/platform_macos.h
+    )
+    target_link_libraries(CryGame PRIVATE
+        "-framework AVFoundation"
+        "-framework CoreMedia"
+        "-framework CoreVideo"
+        "-framework QuartzCore"
+        "-framework Foundation"
+        "-framework CoreFoundation"
     )
 endif()
 

@@ -40,6 +40,12 @@ int CScriptObjectUI::Create(CUISystem *pUISystem)
 
 	InitGlobal(pScriptSystem, "UI", this);
 
+#if defined(NOT_USE_BINK_SDK)
+	pScriptSystem->SetGlobalValue("g_bSupportsCutscenes", 0);
+#else
+	pScriptSystem->SetGlobalValue("g_bSupportsCutscenes", 1);
+#endif
+
 	return 1;
 }
 

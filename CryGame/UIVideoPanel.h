@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - A Bink Video Control
@@ -16,6 +16,8 @@
 
 #include "UIWidget.h"
 #include "UISystem.h"
+#include "AvfVideoPlayer.h"
+#include <memory>
 
 #if !defined(WIN64) && !defined(LINUX) && !defined(NOT_USE_BINK_SDK)
 #	include "../binksdk/bink.h"
@@ -100,6 +102,11 @@ public:
 	int						m_iTextureID;
 	UISkinTexture m_pOverlay;
 	int						*m_pSwapBuffer;
+#if defined(__APPLE__)
+	std::unique_ptr<CAvfVideoPlayer> m_pAvfPlayer;
+	bool m_bAvfActive;
+	bool m_bAvfAudioEnabled;
+#endif
 };
 
 #endif

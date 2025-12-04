@@ -8,7 +8,7 @@
 //  Description: UI Video Panel Manager
 //
 //  History:
-//  - [9/7/2003]: File created by Márcio Martins
+//  - [9/7/2003]: File created by Mï¿½rcio Martins
 //	- February 2005: Modified by Marco Corbetta for SDK release
 //
 //////////////////////////////////////////////////////////////////////
@@ -30,6 +30,19 @@ _DECLARE_SCRIPTABLEEX(CUIVideoPanel)
 //////////////////////////////////////////////////////////////////////
 static bool g_bBinkInit = 0;
 
+#if defined(__APPLE__)
+static bool HasExtension(const string& value, const char* ext)
+{
+	const size_t len = value.length();
+	const size_t extLen = strlen(ext);
+	if (len < extLen)
+	{
+		return false;
+	}
+	return stricmp(value.c_str() + len - extLen, ext) == 0;
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////// 
 CUIVideoPanel::CUIVideoPanel()
 :
@@ -37,6 +50,10 @@ CUIVideoPanel::CUIVideoPanel()
 	m_hBink(0),
 #endif
 	m_bLooping(1), m_bPlaying(0), m_bPaused(0), m_iTextureID(-1), m_pSwapBuffer(0), m_szVideoFile(""), m_bKeepAspect(1)
+#if defined(__APPLE__)
+	, m_bAvfActive(false)
+	, m_bAvfAudioEnabled(true)
+#endif
 {
 	m_DivX_Active=0;	
 }
@@ -86,6 +103,64 @@ int CUIVideoPanel::LoadVideo(const string &szFileName, bool bSound)
 {
 	
 	m_DivX_Active=1; //activate DivX
+
+#if defined(__APPLE__)
+	if (HasExtension(szFileName, ".mp4"))
+	{
+		if (!m_pAvfPlayer)
+		{
+			m_pAvfPlayer.reset(new CAvfVideoPlayer(m_pUISystem));
+		}
+		const bool audioEnabled = bSound && m_bAvfAudioEnabled;
+		if (m_pAvfPlayer->Load(szFileName.c_str(), audioEnabled))
+		{
+			const int width = m_pAvfPlayer->GetWidth();
+			const int height = m_pAvfPlayer->GetHeight();
+			if (width <= 0 || height <= 0)
+			{
+				m_pAvfPlayer->Release();
+				return 0;
+			}
+			const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+			if (m_pSwapBuffer)
+			{
+				delete [] m_pSwapBuffer;
+			}
+			m_pSwapBuffer = new int[pixelCount];
+			memset(m_pSwapBuffer, 0, pixelCount * sizeof(int));
+			if (m_iTextureID > -1)
+			{
+				m_pUISystem->GetIRenderer()->RemoveTexture(m_iTextureID);
+				m_iTextureID = -1;
+			}
+			m_iTextureID = m_pUISystem->GetIRenderer()->DownLoadToVideoMemory(
+				reinterpret_cast<unsigned char*>(m_pSwapBuffer),
+				width,
+				height,
+				eTF_0888,
+				eTF_0888,
+				0,
+				0,
+				FILTER_LINEAR,
+				0,
+				"$VideoPanel",
+				FT_DYNAMIC);
+			if (m_iTextureID == -1)
+			{
+				delete [] m_pSwapBuffer;
+				m_pSwapBuffer = 0;
+				m_pAvfPlayer->Release();
+				return 0;
+			}
+			m_bAvfActive = true;
+			m_DivX_Active = 0;
+			m_bPlaying = 0;
+			m_bPaused = 0;
+			m_szVideoFile = szFileName;
+			return 1;
+		}
+	}
+#endif
 
 #if !defined(WIN64) && !defined(NOT_USE_BINK_SDK)
 	//check if a BINK-file exists 
@@ -232,6 +307,28 @@ LRESULT CUIVideoPanel::Update(unsigned int iMessage, WPARAM wParam, LPARAM lPara
 {
 
 	FUNCTION_PROFILER( m_pUISystem->GetISystem(), PROFILE_GAME );
+#if defined(__APPLE__)
+	if (m_bAvfActive)
+	{
+		if ((iMessage == UIM_DRAW) && (wParam == 0) && m_bPlaying && m_pAvfPlayer)
+		{
+			m_pAvfPlayer->UpdateTexture(m_iTextureID, m_pUISystem->GetIRenderer());
+			if (m_pAvfPlayer->HasFinished())
+			{
+				if (m_bLooping)
+				{
+					m_pAvfPlayer->Play();
+				}
+				else
+				{
+					Stop();
+					OnFinished();
+				}
+			}
+		}
+		return CUISystem::DefaultUpdate(this, iMessage, wParam, lParam);
+	}
+#endif
 #if !defined(NOT_USE_DIVX_SDK)
 	if (m_DivX_Active){
 		g_DivXPlayer.Update_DivX(this);
@@ -296,6 +393,18 @@ LRESULT CUIVideoPanel::Update(unsigned int iMessage, WPARAM wParam, LPARAM lPara
 ////////////////////////////////////////////////////////////////////// 
 int CUIVideoPanel::Play()
 {
+#if defined(__APPLE__)
+	if (m_bAvfActive && m_pAvfPlayer)
+	{
+		if (!m_pAvfPlayer->Play())
+		{
+			return 0;
+		}
+		m_bPlaying = 1;
+		m_bPaused = 0;
+		return 1;
+	}
+#endif
 	if (m_DivX_Active){
 		m_bPlaying = 1;
 		m_bPaused = 0;
@@ -330,6 +439,15 @@ int CUIVideoPanel::Play()
 ////////////////////////////////////////////////////////////////////// 
 int CUIVideoPanel::Stop()
 {
+#if defined(__APPLE__)
+	if (m_bAvfActive && m_pAvfPlayer)
+	{
+		m_pAvfPlayer->Stop();
+		m_bPaused = 0;
+		m_bPlaying = 0;
+		return 1;
+	}
+#endif
 #if !defined(NOT_USE_DIVX_SDK)
 	if (m_DivX_Active){
 		g_DivXPlayer.StopSound();
@@ -363,6 +481,16 @@ int CUIVideoPanel::ReleaseVideo()
 		return 1;
 	}
 
+#if defined(__APPLE__)
+	bool handledAvf = false;
+	if (m_bAvfActive && m_pAvfPlayer)
+	{
+		m_pAvfPlayer->Release();
+		m_bAvfActive = false;
+		handledAvf = true;
+	}
+#endif
+
 #if !defined(WIN64) && !defined(LINUX) && !defined(NOT_USE_BINK_SDK)
 	if (m_hBink)
 	{
@@ -385,7 +513,7 @@ int CUIVideoPanel::ReleaseVideo()
 	}
 	return 1;
 #else
-	return 0;
+	return handledAvf ? 1 : 0;
 #endif
 
 	return 1;
@@ -398,6 +526,21 @@ int CUIVideoPanel::Pause(bool bPause)
 		return 1;
 	}
 
+#if defined(__APPLE__)
+	if (m_bAvfActive && m_pAvfPlayer)
+	{
+		if (!m_pAvfPlayer->Pause(bPause))
+		{
+			return 0;
+		}
+		m_bPaused = bPause ? 1 : 0;
+		if (!bPause)
+		{
+			m_bPlaying = 1;
+		}
+		return 1;
+	}
+#endif
 
 #if !defined(WIN64) && !defined(LINUX) && !defined(NOT_USE_BINK_SDK)
 	if (!m_hBink)
@@ -436,6 +579,13 @@ int CUIVideoPanel::IsPlaying()
 		return (m_bPlaying ? 1 : 0);
 	}
 
+#if defined(__APPLE__)
+	if (m_bAvfActive)
+	{
+		return m_bPlaying ? 1 : 0;
+	}
+#endif
+
 #if !defined(WIN64) && !defined(LINUX) && !defined(NOT_USE_BINK_SDK)
 	if (!m_hBink)
 	{
@@ -455,6 +605,12 @@ int CUIVideoPanel::IsPaused()
 	if (m_DivX_Active){
 		return (m_bPaused ? 1 : 0);
 	}
+#if defined(__APPLE__)
+	if (m_bAvfActive)
+	{
+		return m_bPaused ? 1 : 0;
+	}
+#endif
 #if !defined(WIN64) && !defined(LINUX) && !defined(NOT_USE_BINK_SDK)
 	if (!m_hBink)
 	{
@@ -684,6 +840,14 @@ int CUIVideoPanel::EnableVideo(bool bEnable)
 ////////////////////////////////////////////////////////////////////// 
 int CUIVideoPanel::EnableAudio(bool bEnable)
 {
+#if defined(__APPLE__)
+	m_bAvfAudioEnabled = bEnable;
+	if (m_bAvfActive && m_pAvfPlayer)
+	{
+		m_pAvfPlayer->SetAudioEnabled(bEnable);
+		return 1;
+	}
+#endif
 #if !defined(WIN64) && !defined(LINUX) && !defined(NOT_USE_BINK_SDK)
 
 	if (!m_hBink)
