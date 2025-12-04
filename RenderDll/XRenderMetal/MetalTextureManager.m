@@ -83,6 +83,7 @@ public:
     id<MTLSamplerState> GetBoundFragmentSampler(int index) const;
     void SetWhiteTexture();
     id<MTLTexture> GetWhiteTexture() const { return m_whiteTexture; }
+    void SetClampModeForLastTexture(bool clamp);
     void ApplyTexUnit(int stage, SShaderTexUnit& unit);
     
     // Upload texture data from memory to GPU
@@ -267,6 +268,8 @@ protected:
     std::array<id<MTLTexture>, 16> m_boundFragmentTextures;
     std::array<id<MTLSamplerState>, 16> m_boundFragmentSamplers;
     std::unordered_map<uint64_t, id<MTLSamplerState>> m_samplerCache;
+    int m_lastBoundStage;
+    std::array<int, 16> m_stageTextureIds;
     
     // Display gamma correction
     float m_gammaValue;      // Gamma delta value (added to base gamma)

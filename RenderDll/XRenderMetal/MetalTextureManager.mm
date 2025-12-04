@@ -145,6 +145,25 @@ namespace
         return levels;
     }
 
+    inline uint64_t BuildSamplerKey(MTLSamplerMinMagFilter minFilter,
+                                    MTLSamplerMinMagFilter magFilter,
+                                    MTLSamplerMipFilter mipFilter,
+                                    MTLSamplerAddressMode addressModeU,
+                                    MTLSamplerAddressMode addressModeV,
+                                    MTLSamplerAddressMode addressModeW,
+                                    uint32_t anisotropy)
+    {
+        uint64_t key = 0;
+        key |= static_cast<uint64_t>(minFilter & 0x3);
+        key |= static_cast<uint64_t>(magFilter & 0x3) << 2;
+        key |= static_cast<uint64_t>(mipFilter & 0x3) << 4;
+        key |= static_cast<uint64_t>(addressModeU & 0x7) << 6;
+        key |= static_cast<uint64_t>(addressModeV & 0x7) << 9;
+        key |= static_cast<uint64_t>(addressModeW & 0x7) << 12;
+        key |= static_cast<uint64_t>(anisotropy & 0xFF) << 15;
+        return key;
+    }
+
     inline NSUInteger BytesPerPixelForMetalFormat(MTLPixelFormat format)
     {
         switch (format)
@@ -432,6 +451,7 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     , m_savedViewportHeight(0)
     , m_savedBlendSrc(0)
     , m_savedBlendDst(0)
+    , m_lastBoundStage(0)
 {
     for (auto& tex : m_boundFragmentTextures)
     {
@@ -440,6 +460,10 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     for (auto& sampler : m_boundFragmentSamplers)
     {
         sampler = nil;
+    }
+    for (auto& stageId : m_stageTextureIds)
+    {
+        stageId = 0;
     }
 }
 
@@ -496,6 +520,16 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
                     textureIndex = 0;
                     break;
             }
+            int stage = textureIndex;
+            if (stage < 0)
+                stage = 0;
+            if (stage >= static_cast<int>(m_stageTextureIds.size()))
+                stage = static_cast<int>(m_stageTextureIds.size()) - 1;
+            m_lastBoundStage = stage;
+            if (tnum > 0)
+                m_stageTextureIds[stage] = tnum;
+            else
+                m_stageTextureIds[stage] = 0;
             [m_renderer->m_renderEncoder setFragmentTexture:m_currentTexture atIndex:textureIndex];
             if (textureIndex >= 0 && textureIndex < static_cast<int>(m_boundFragmentTextures.size()))
             {
@@ -510,6 +544,9 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
     {
         if (m_whiteTexture && m_renderer && m_renderer->m_renderEncoder)
         {
+            m_lastBoundStage = 0;
+            if (!m_stageTextureIds.empty())
+                m_stageTextureIds[0] = 0;
             [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
             m_boundFragmentTextures[0] = m_whiteTexture;
             id<MTLSamplerState> sampler = GetDefaultSampler();
@@ -541,6 +578,9 @@ void CMetalTextureManager::SetWhiteTexture()
     
     m_currentTexture = m_whiteTexture;
     m_currentTextureSlot = 0;
+    m_lastBoundStage = 0;
+    if (!m_stageTextureIds.empty())
+        m_stageTextureIds[0] = 0;
     
     if (m_renderer && m_renderer->m_renderEncoder)
     {
@@ -564,6 +604,51 @@ id<MTLSamplerState> CMetalTextureManager::GetBoundFragmentSampler(int index) con
     if (index < 0 || index >= static_cast<int>(m_boundFragmentSamplers.size()))
         return nil;
     return m_boundFragmentSamplers[index];
+}
+
+void CMetalTextureManager::SetClampModeForLastTexture(bool clamp)
+{
+    if (!m_renderer || !m_renderer->m_renderEncoder || !m_renderer->m_device)
+        return;
+    if (m_lastBoundStage < 0 || m_lastBoundStage >= static_cast<int>(m_boundFragmentSamplers.size()))
+        return;
+    MTLSamplerMinMagFilter minFilter = MTLSamplerMinMagFilterLinear;
+    MTLSamplerMinMagFilter magFilter = MTLSamplerMinMagFilterLinear;
+    MTLSamplerMipFilter mipFilter = MTLSamplerMipFilterLinear;
+    MTLSamplerAddressMode mode = clamp ? MTLSamplerAddressModeClampToEdge : MTLSamplerAddressModeRepeat;
+    const uint32_t anisotropy = 1;
+    uint64_t key = BuildSamplerKey(minFilter, magFilter, mipFilter, mode, mode, mode, anisotropy);
+    id<MTLSamplerState> sampler = nil;
+    auto it = m_samplerCache.find(key);
+    if (it != m_samplerCache.end())
+        sampler = it->second;
+    if (!sampler)
+    {
+        MTLSamplerDescriptor* descriptor = [[MTLSamplerDescriptor alloc] init];
+        descriptor.minFilter = minFilter;
+        descriptor.magFilter = magFilter;
+        descriptor.mipFilter = mipFilter;
+        descriptor.sAddressMode = mode;
+        descriptor.tAddressMode = mode;
+        descriptor.rAddressMode = mode;
+        descriptor.maxAnisotropy = anisotropy;
+        descriptor.lodMinClamp = 0.0f;
+        descriptor.lodMaxClamp = FLT_MAX;
+        descriptor.normalizedCoordinates = YES;
+        sampler = [m_renderer->m_device newSamplerStateWithDescriptor:descriptor];
+        [descriptor release];
+        if (sampler)
+            m_samplerCache.emplace(key, sampler);
+    }
+    if (!sampler)
+        return;
+    BindSampler(m_lastBoundStage, sampler);
+    if (m_lastBoundStage >= 0 && m_lastBoundStage < static_cast<int>(m_stageTextureIds.size()))
+    {
+        int textureId = m_stageTextureIds[m_lastBoundStage];
+        if (textureId > 0)
+            SetTextureClamp(textureId, clamp);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -2895,7 +2980,7 @@ void CMetalTextureManager::ApplyTexUnit(int stage, SShaderTexUnit& unit)
 {
     if (!m_renderer || !m_renderer->m_renderEncoder)
         return;
-
+    m_lastBoundStage = std::max(0, std::min(stage, static_cast<int>(m_stageTextureIds.size()) - 1));
     id<MTLTexture> texture = nil;
     if (unit.m_ITexPic)
     {
@@ -2903,9 +2988,15 @@ void CMetalTextureManager::ApplyTexUnit(int stage, SShaderTexUnit& unit)
         auto handle = FindHandle(textureId);
         if (handle && *handle)
             texture = (*handle)->metalTexture;
+        if (m_lastBoundStage >= 0 && m_lastBoundStage < static_cast<int>(m_stageTextureIds.size()))
+            m_stageTextureIds[m_lastBoundStage] = textureId;
     }
     if (!texture)
+    {
         texture = m_whiteTexture;
+        if (m_lastBoundStage >= 0 && m_lastBoundStage < static_cast<int>(m_stageTextureIds.size()))
+            m_stageTextureIds[m_lastBoundStage] = 0;
+    }
 
     id<MTLSamplerState> sampler = GetOrCreateSamplerState(unit);
     if (!sampler)

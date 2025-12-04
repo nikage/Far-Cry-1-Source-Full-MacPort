@@ -24,7 +24,6 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/SimpleFrameProfiler.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/XtfImage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/TgaImage.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/DDSImage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/JpgImage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Textures/Image/JpgImage_XBox.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Shaders/ShaderScript.cpp"

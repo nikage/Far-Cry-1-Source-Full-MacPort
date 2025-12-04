@@ -804,12 +804,16 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
             if (!vertexFunction)
             {
+                const char* shaderLabel = shaderName ? [shaderName UTF8String] : "<unnamed>";
+                const char* functionLabel = [vertexFunctionName UTF8String];
                 if (iLog)
-                    iLog->Log("MetalShaderManager: '%s' vertex entry '%s' not found; skipping shader\n",
-                              shaderName ? [shaderName UTF8String] : "<unnamed>",
-                              [vertexFunctionName UTF8String]);
-                assert(false);
-                continue;
+                {
+                    iLog->LogError("MetalShaderManager: Missing vertex entry '%s' required by shader '%s' - "
+                                   "ensure UtilShaders.metal defines this helper and regenerate UtilShaders.metallib\n",
+                                   functionLabel, shaderLabel);
+                }
+                assert(!"MetalShaderManager: Missing vertex entry in UtilShaders.metallib");
+                return;
             }
         }
         else
@@ -817,22 +821,24 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             if (iLog)
                 iLog->Log("MetalShaderManager: No vertex library available; skipping shader '%s'\n",
                           shaderName ? [shaderName UTF8String] : "<unnamed>");
-            assert(false);
-            continue;
+            assert(!"MetalShaderManager: No default vertex library available");
+            return;
         }
 
         if (!vertexFunction)
         {
             if (iLog)
                 iLog->Log("MetalShaderManager: Missing generated vertex function for shader '%s'\n", [shaderName UTF8String]);
-            assert(false);
-            continue;
+            assert(!"MetalShaderManager: Missing generated vertex function");
+            return;
         }
 
         MTLVertexDescriptor* descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
         if (!descriptor)
-            assert(false);
-            continue;
+        {
+            assert(!"MetalShaderManager: Failed to create vertex descriptor");
+            return;
+        }
 
         ShaderInfo info;
         info.blendEnabled = pipelineConfig.blendEnabled;

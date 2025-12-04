@@ -458,13 +458,6 @@ void SMatrixTransform_Rotate::mfSet(Matrix44& matr)
     assert(false && "macOS: rotate matrix transform not implemented");
 }
 
-// Standalone image writing functions (normally in DDSImage.cpp, JpgImage.cpp, TgaImage.cpp)
-void WriteDDS(byte* data, int width, int height, int Size, const char* filename, EImFormat format, int mips)
-{
-    // macOS: DDS writing not implemented
-    assert(false && "macOS: DDS writing not implemented");
-}
-
 void WriteJPG(byte* data, int width, int height, char* filename)
 {
     // macOS: JPEG writing not implemented
@@ -475,24 +468,6 @@ void WriteTGA(byte* data, int width, int height, char* filename, int bpp)
 {
     // macOS: TGA writing not implemented
     assert(false && "macOS: TGA writing not implemented");
-}
-
-// Image loader stub class implementations
-// Complete class definitions with out-of-line constructors/destructors
-
-// DDS image loader stub
-class CImageDDSFile : public CImageFile {
-public:
-    CImageDDSFile(byte* ptr, long filesize);
-    virtual ~CImageDDSFile();
-};
-
-CImageDDSFile::CImageDDSFile(byte* ptr, long filesize) {
-    // macOS: DDS loading not implemented
-    assert(false && "macOS: DDS loading not implemented");
-}
-
-CImageDDSFile::~CImageDDSFile() {
 }
 
 // JPEG image loader stub

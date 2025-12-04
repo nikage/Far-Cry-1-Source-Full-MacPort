@@ -141,6 +141,7 @@ public:
     // Texture methods
     void SetTexture(int tnum, ETexType Type) override;
     void SetWhiteTexture() override;
+    void SetTexClampMode(bool clamp) override;
     unsigned int DownLoadToVideoMemory(unsigned char *data, int w, int h,
                                        ETEX_Format eTFSrc, ETEX_Format eTFDst,
                                        int nummipmap, bool repeat, int filter,
@@ -156,6 +157,9 @@ public:
     void RemoveTexture(unsigned int TextureId) override;
     void RemoveTexture(ITexPic *pTexPic) override;
     bool SetGammaDelta(const float fGamma) override;
+    int LoadAnimatedTexture(const char *format, const int nCount) override;
+    void RemoveAnimatedTexture(AnimTexInfo *pInfo) override;
+    AnimTexInfo* GetAnimTexInfoFromId(int nId) override;
     
     // Font system methods
     bool FontUploadTexture(class CFBitmap *bitmap, ETEX_Format eTF) override;

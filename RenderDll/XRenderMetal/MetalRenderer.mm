@@ -34,6 +34,9 @@
 #include <iomanip>
 #include <unistd.h>
 #include <limits.h>
+#include <string>
+#include <cctype>
+#include <memory>
 
 // Global system pointers (defined here, declared as extern in CommonRender.h)
 // gRenDev is defined in RenderDll/Common/Renderer.cpp
@@ -88,6 +91,51 @@ namespace
     inline bool NeedsBlend(const CFColor& color)
     {
         return color.a < 0.999f;
+    }
+
+    constexpr size_t kMaxAnimTexturePath = 512;
+
+    struct AnimTexturePattern
+    {
+        std::string printfFormat;
+        int firstFrame = 0;
+    };
+
+    inline AnimTexturePattern DeriveAnimPattern(const char* literal)
+    {
+        AnimTexturePattern result;
+        if (!literal)
+            return result;
+
+        std::string fullPath(literal);
+        size_t slashPos = fullPath.find_last_of("/\\");
+        std::string directory = (slashPos != std::string::npos) ? fullPath.substr(0, slashPos + 1) : std::string();
+        std::string file = (slashPos != std::string::npos) ? fullPath.substr(slashPos + 1) : fullPath;
+
+        size_t dotPos = file.find_last_of('.');
+        std::string name = (dotPos != std::string::npos) ? file.substr(0, dotPos) : file;
+        std::string extension = (dotPos != std::string::npos) ? file.substr(dotPos) : std::string();
+
+        size_t digitStart = name.size();
+        while (digitStart > 0 && std::isdigit(static_cast<unsigned char>(name[digitStart - 1])))
+        {
+            --digitStart;
+        }
+
+        std::string digits = name.substr(digitStart);
+        std::string baseName = name.substr(0, digitStart);
+        if (!digits.empty())
+            result.firstFrame = std::atoi(digits.c_str());
+
+        const int numDigits = static_cast<int>(digits.size());
+        char formatter[16] = {};
+        if (numDigits > 0)
+            std::snprintf(formatter, sizeof(formatter), "%%0%dd", numDigits);
+        else
+            std::snprintf(formatter, sizeof(formatter), "%%d");
+
+        result.printfFormat = directory + baseName + formatter + extension;
+        return result;
     }
 
     inline void DecodeLineFlags(int flags, const CFColor& color,
@@ -705,6 +753,81 @@ void CMetalRenderer::SetTexture(int tnum, ETexType Type) {
 void CMetalRenderer::SetWhiteTexture() {
   assert(m_textureManager && "SetWhiteTexture: Texture manager is null!");
   m_textureManager->SetWhiteTexture();
+}
+
+void CMetalRenderer::SetTexClampMode(bool clamp) {
+  if (!m_textureManager)
+    return;
+  m_textureManager->SetClampModeForLastTexture(clamp);
+}
+
+int CMetalRenderer::LoadAnimatedTexture(const char* format, const int nCount) {
+  if (!format || nCount <= 0)
+    return 0;
+  if (!m_textureManager)
+    return 0;
+
+  for (int i = 0; i < m_LoadedAnimatedTextures.Count(); ++i) {
+    AnimTexInfo* info = m_LoadedAnimatedTextures[i];
+    if (!info)
+      continue;
+    if (std::strcmp(info->sName, format) == 0 && info->nFramesCount == nCount) {
+      info->nRefCounter++;
+      return i + 1;
+    }
+  }
+
+  std::unique_ptr<AnimTexInfo> info(new AnimTexInfo());
+  std::strncpy(info->sName, format, sizeof(info->sName) - 1);
+  info->sName[sizeof(info->sName) - 1] = '\0';
+  info->pBindIds = new int[nCount];
+  std::memset(info->pBindIds, 0, sizeof(int) * nCount);
+
+  const bool hasSpecifier = std::strchr(format, '%') != nullptr;
+  AnimTexturePattern pattern = hasSpecifier ? AnimTexturePattern{format, 0}
+                                            : DeriveAnimPattern(format);
+
+  bool success = true;
+  for (int frame = 0; frame < nCount; ++frame) {
+    const int frameIndex = hasSpecifier ? frame : (pattern.firstFrame + frame);
+    char filename[kMaxAnimTexturePath] = {};
+    const int written = std::snprintf(filename, sizeof(filename), pattern.printfFormat.c_str(), frameIndex);
+    if (written <= 0 || written >= static_cast<int>(sizeof(filename))) {
+      success = false;
+      break;
+    }
+
+    const int texId = m_textureManager->LoadTexture(filename);
+    if (texId <= 0) {
+      iLog->LogError("MetalRenderer: failed to load animated texture frame '%s'", filename);
+      success = false;
+      break;
+    }
+
+    info->pBindIds[info->nFramesCount++] = texId;
+  }
+
+  if (!success || info->nFramesCount != nCount) {
+    for (int i = 0; i < info->nFramesCount; ++i)
+      RemoveTexture(info->pBindIds[i]);
+    delete[] info->pBindIds;
+    return 0;
+  }
+
+  info->nRefCounter = 1;
+  m_LoadedAnimatedTextures.Add(info.get());
+  info.release();
+  return m_LoadedAnimatedTextures.Count();
+}
+
+void CMetalRenderer::RemoveAnimatedTexture(AnimTexInfo* pInfo) {
+  if (!pInfo)
+    return;
+  CRenderer::RemoveAnimatedTexture(pInfo);
+}
+
+AnimTexInfo* CMetalRenderer::GetAnimTexInfoFromId(int nId) {
+  return CRenderer::GetAnimTexInfoFromId(nId);
 }
 
 unsigned int
