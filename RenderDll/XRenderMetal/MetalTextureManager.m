@@ -85,6 +85,8 @@ public:
     id<MTLTexture> GetWhiteTexture() const { return m_whiteTexture; }
     void SetClampModeForLastTexture(bool clamp);
     void ApplyTexUnit(int stage, SShaderTexUnit& unit);
+    id<MTLSamplerState> AcquireDefaultSampler();
+    void BindDefaultSampler(int slot);
     
     // Upload texture data from memory to GPU
     unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 

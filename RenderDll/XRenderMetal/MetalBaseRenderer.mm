@@ -1498,12 +1498,18 @@ void CMetalBaseRenderer::ReleaseIndexBuffer(SVertexStream* dest)
 
 void* CMetalBaseRenderer::GetDynVBPtr(int nVerts, int& nOffs, int Pool)
 {
-    if (nVerts <= 0 || Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
+    if (Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
         return nullptr;
     
     DynamicVBPool& pool = m_dynamicVBPools[Pool];
     
     int vertexSize = sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
+    if (nVerts <= 0)
+    {
+        nOffs = 0;
+        return pool.cpuData;
+    }
+    
     size_t requiredSize = nVerts * vertexSize;
     
     if (pool.offset + requiredSize > pool.size)

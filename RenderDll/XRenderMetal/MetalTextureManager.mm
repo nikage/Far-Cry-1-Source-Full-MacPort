@@ -606,6 +606,18 @@ id<MTLSamplerState> CMetalTextureManager::GetBoundFragmentSampler(int index) con
     return m_boundFragmentSamplers[index];
 }
 
+id<MTLSamplerState> CMetalTextureManager::AcquireDefaultSampler()
+{
+    return GetDefaultSampler();
+}
+
+void CMetalTextureManager::BindDefaultSampler(int slot)
+{
+    id<MTLSamplerState> sampler = GetDefaultSampler();
+    if (sampler)
+        BindSampler(slot, sampler);
+}
+
 void CMetalTextureManager::SetClampModeForLastTexture(bool clamp)
 {
     if (!m_renderer || !m_renderer->m_renderEncoder || !m_renderer->m_device)
@@ -1885,7 +1897,8 @@ void CMetalTextureManager::FontSetTexture(class CFBitmap* bitmap, int nFilterMod
 ////////////////////////////////////////////////////////////////////////////
 void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
 {
-    assert(nTexId > 0 && "FontSetTexture: invalid texture ID!");
+    if (nTexId <= 0)
+        return;
     
     auto handle = FindHandle(nTexId);
     if (!handle || !*handle || !(*handle)->metalTexture)
@@ -1923,13 +1936,19 @@ void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
 void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWidth, unsigned long nVirtualScreenHeight)
 {
     assert(m_renderer && "FontSetRenderingState: renderer is null!");
-    assert(nVirtualScreenWidth > 0 && nVirtualScreenHeight > 0 && "FontSetRenderingState: invalid screen dimensions!");
     
     if (!m_renderer)
         return;
     
-    m_savedViewportWidth = nVirtualScreenWidth;
-    m_savedViewportHeight = nVirtualScreenHeight;
+    unsigned long width = nVirtualScreenWidth;
+    unsigned long height = nVirtualScreenHeight;
+    if (width == 0)
+        width = static_cast<unsigned long>(std::max(1, m_renderer->GetWidth()));
+    if (height == 0)
+        height = static_cast<unsigned long>(std::max(1, m_renderer->GetHeight()));
+    
+    m_savedViewportWidth = width;
+    m_savedViewportHeight = height;
 }
 
 ////////////////////////////////////////////////////////////////////////////

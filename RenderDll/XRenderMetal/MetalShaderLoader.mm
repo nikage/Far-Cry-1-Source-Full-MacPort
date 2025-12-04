@@ -776,8 +776,15 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         NSString* vertexFunctionName = layout.functionName;
         int vertexFormat = layout.format;
         if (shaderName && ([shaderName isEqualToString:@"CGVProgShadow_Depth2_3Samples"] ||
-            [shaderName isEqualToString:@"CGRCRefractive"]))
+            [shaderName isEqualToString:@"CGRCRefractive"] ||
+            [shaderName isEqualToString:@"CGVProgHeatHaze"]))
         {
+            iLog->Log("MetalShaderManager: summary for '%s': texCoords=%d color0=%d normal=%d explicit=%d\n",
+                      [shaderName UTF8String],
+                      attributeSummary.texCoordCount,
+                      attributeSummary.hasColor0 ? 1 : 0,
+                      attributeSummary.hasNormal ? 1 : 0,
+                      vertexAttrArray && [vertexAttrArray count] > 0 ? 1 : 0);
             if (iLog)
                 iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d color1=%d)\n",
                           [shaderName UTF8String],

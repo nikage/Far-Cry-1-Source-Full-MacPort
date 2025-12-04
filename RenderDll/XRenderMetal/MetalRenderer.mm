@@ -1719,9 +1719,9 @@ void CMetalRenderer::DrawTriStrip(CVertexBuffer *src, int vert_num) {
 }
 
 void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {
-  assert(nVerts > 0 && "GetDynVBPtr: vertex count must be positive");
   assert(Pool >= 0 && "GetDynVBPtr: pool index cannot be negative");
-  
+  if (nVerts <= 0)
+    return CMetalBaseRenderer::GetDynVBPtr(0, nOffs, Pool);
   return CMetalBaseRenderer::GetDynVBPtr(nVerts, nOffs, Pool);
 }
 
@@ -2401,14 +2401,15 @@ void CMetalRenderer::DisplaySplash() {
         );
         
         // Create temporary overlay window for splash
-        NSWindow *splashWindow = [[[NSWindow alloc] initWithContentRect:splashFrame
-                                                              styleMask:NSWindowStyleMaskBorderless
-                                                                backing:NSBackingStoreBuffered
-                                                                  defer:NO] autorelease];
+        NSWindow *splashWindow = [[NSWindow alloc] initWithContentRect:splashFrame
+                                                             styleMask:NSWindowStyleMaskBorderless
+                                                               backing:NSBackingStoreBuffered
+                                                                 defer:NO];
         [splashWindow setOpaque:NO];
         [splashWindow setBackgroundColor:[NSColor clearColor]];
         [splashWindow setLevel:NSFloatingWindowLevel];
         [splashWindow setIgnoresMouseEvents:YES];
+        [splashWindow setReleasedWhenClosed:NO];
         
         // Create image view
         NSImageView *splashView = [[[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, imageSize.width, imageSize.height)] autorelease];
@@ -2421,21 +2422,20 @@ void CMetalRenderer::DisplaySplash() {
         [splashWindow makeKeyAndOrderFront:nil];
         [splashWindow display];
         
-        iLog->Log("DisplaySplash: Splash window displayed (%fx%f at %f,%f)\\n", 
-                  imageSize.width, imageSize.height, splashFrame.origin.x, splashFrame.origin.y);
+        iLog->Log("DisplaySplash: Splash window %p displayed (%fx%f at %f,%f)\\n", 
+                  splashWindow, imageSize.width, imageSize.height, splashFrame.origin.x, splashFrame.origin.y);
         
         [splashImage autorelease];
-        
-        NSWindow *splashWindowRetained = [splashWindow retain];
         
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), 
                       dispatch_get_main_queue(), ^{
             @autoreleasepool {
-                [splashWindowRetained close];
-                [splashWindowRetained release];
+                [splashWindow close];
                 iLog->Log("DisplaySplash: Splash window closed\\n");
             }
         });
+        
+        [splashWindow release];
     }
 #endif
 }

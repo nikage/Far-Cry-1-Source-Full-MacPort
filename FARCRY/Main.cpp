@@ -62,6 +62,28 @@ void AuthCheckFunction( void *data )
 // On macOS, include Cocoa headers BEFORE platform.h and CryEngine headers to avoid conflicts
 #if defined(__APPLE__) && defined(__MACH__)
 #import <Cocoa/Cocoa.h>
+
+@interface CryApplicationDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation CryApplicationDelegate
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag
+{
+    NSLog(@"CryApplicationDelegate: applicationShouldHandleReopen (hasVisible=%d)", flag);
+    [sender activateIgnoringOtherApps:YES];
+    return NO;
+}
+
+- (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames
+{
+    NSLog(@"CryApplicationDelegate: openFiles %@", filenames);
+    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+
+@end
+
+static CryApplicationDelegate* g_appDelegate = nil;
 #endif
 
 #include <platform.h>
@@ -920,6 +942,11 @@ int main(int argc, char* argv[]) {
             [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
             [NSApp finishLaunching];
             [NSApp activateIgnoringOtherApps:YES];
+            if (!g_appDelegate)
+            {
+                g_appDelegate = [[CryApplicationDelegate alloc] init];
+                [NSApp setDelegate:g_appDelegate];
+            }
         
         printf("NSApplication initialized\n");
         

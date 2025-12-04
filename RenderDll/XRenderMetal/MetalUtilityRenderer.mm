@@ -279,8 +279,10 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
             [m_renderer->m_renderEncoder setRenderPipelineState:m_spritePipelineState];
         }
         
-        // Bind texture
+        // Bind texture and sampler
         [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
+        if (m_textureManager)
+            m_textureManager->BindDefaultSampler(0);
     }
     else
     {
@@ -310,6 +312,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
             if (whiteTexture)
             {
                 [m_renderer->m_renderEncoder setFragmentTexture:whiteTexture atIndex:0];
+                m_textureManager->BindDefaultSampler(0);
             }
         }
     }
