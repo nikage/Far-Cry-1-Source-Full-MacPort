@@ -242,6 +242,9 @@ namespace
     };
 #pragma pack(pop)
 
+    constexpr uint32_t kDdsFlagAlphaPixels = 0x00000001;
+    constexpr uint32_t kDdsFlagRgb = 0x00000040;
+
     inline bool TryLoadDDSFromMemory(const byte* buffer, size_t bufferSize, std::vector<byte>& outData, int& width, int& height, ETEX_Format& format, int& mipCount)
     {
         if (!buffer || bufferSize < 4 + sizeof(DdsHeader))
@@ -262,7 +265,7 @@ namespace
         else if (fourCC == MakeFourCC('D', 'X', 'T', '5'))
             format = eTF_DXT5;
         else
-            return false;
+            format = eTF_Unknown;
 
         width = static_cast<int>(header->width);
         height = static_cast<int>(header->height);
@@ -273,20 +276,89 @@ namespace
             return false;
         const size_t remaining = static_cast<size_t>((buffer + bufferSize) - pixelData);
 
-        size_t expectedSize = 0;
+        if (format == eTF_DXT1 || format == eTF_DXT3 || format == eTF_DXT5)
+        {
+            size_t expectedSize = 0;
+            int levelWidth = std::max(1, width);
+            int levelHeight = std::max(1, height);
+            for (int level = 0; level < mipCount; ++level)
+            {
+                expectedSize += ComputeCompressedLevelSize(levelWidth, levelHeight, format);
+                levelWidth = std::max(1, levelWidth >> 1);
+                levelHeight = std::max(1, levelHeight >> 1);
+            }
+
+            if (remaining < expectedSize)
+                return false;
+
+            outData.assign(pixelData, pixelData + expectedSize);
+            return true;
+        }
+
+        const bool isRgb = (header->ddspf.flags & kDdsFlagRgb) != 0;
+        const bool hasAlpha = (header->ddspf.flags & kDdsFlagAlphaPixels) != 0;
+        const uint32_t rgbBits = header->ddspf.rgbBitCount;
+        if (!isRgb || (rgbBits != 24 && rgbBits != 32))
+            return false;
+
+        const uint32_t expectedRMask = 0x00FF0000;
+        const uint32_t expectedGMask = 0x0000FF00;
+        const uint32_t expectedBMask = 0x000000FF;
+        const uint32_t expectedAMask = 0xFF000000;
+        const bool masksMatch = header->ddspf.rBitMask == expectedRMask
+            && header->ddspf.gBitMask == expectedGMask
+            && header->ddspf.bBitMask == expectedBMask
+            && ((rgbBits == 32 && header->ddspf.aBitMask == expectedAMask) || (rgbBits == 24));
+        if (!masksMatch)
+            return false;
+
+        const int srcBytesPerPixel = static_cast<int>(rgbBits / 8);
+        size_t srcOffset = 0;
+        size_t dstOffset = 0;
         int levelWidth = std::max(1, width);
         int levelHeight = std::max(1, height);
+        size_t requiredSource = 0;
         for (int level = 0; level < mipCount; ++level)
         {
-            expectedSize += ComputeCompressedLevelSize(levelWidth, levelHeight, format);
+            requiredSource += static_cast<size_t>(levelWidth) * static_cast<size_t>(levelHeight) * static_cast<size_t>(srcBytesPerPixel);
             levelWidth = std::max(1, levelWidth >> 1);
             levelHeight = std::max(1, levelHeight >> 1);
         }
-
-        if (remaining < expectedSize)
+        if (remaining < requiredSource)
             return false;
 
-        outData.assign(pixelData, pixelData + expectedSize);
+        levelWidth = std::max(1, width);
+        levelHeight = std::max(1, height);
+        outData.clear();
+        for (int level = 0; level < mipCount; ++level)
+        {
+            const size_t levelPixels = static_cast<size_t>(levelWidth) * static_cast<size_t>(levelHeight);
+            const size_t levelBytes = levelPixels * static_cast<size_t>(srcBytesPerPixel);
+            const byte* levelSrc = pixelData + srcOffset;
+            const size_t dstRequired = dstOffset + levelPixels * 4;
+            if (outData.size() < dstRequired)
+                outData.resize(dstRequired);
+
+            for (size_t i = 0; i < levelPixels; ++i)
+            {
+                const byte b = levelSrc[i * srcBytesPerPixel + 0];
+                const byte g = levelSrc[i * srcBytesPerPixel + 1];
+                const byte r = levelSrc[i * srcBytesPerPixel + 2];
+                const byte a = (srcBytesPerPixel == 4) ? levelSrc[i * srcBytesPerPixel + 3] : 0xFF;
+                outData[dstOffset + i * 4 + 0] = r;
+                outData[dstOffset + i * 4 + 1] = g;
+                outData[dstOffset + i * 4 + 2] = b;
+                outData[dstOffset + i * 4 + 3] = a;
+            }
+
+            srcOffset += levelBytes;
+            dstOffset += levelPixels * 4;
+            levelWidth = std::max(1, levelWidth >> 1);
+            levelHeight = std::max(1, levelHeight >> 1);
+        }
+        outData.resize(dstOffset);
+
+        format = eTF_8888;
         return true;
     }
 
@@ -408,6 +480,14 @@ namespace
         return variant;
     }
 
+    inline bool StartsWithTexturesPrefix(const std::string& pathLower)
+    {
+        static const std::string kPrefix = "textures/";
+        if (pathLower.size() < kPrefix.size())
+            return false;
+        return std::equal(kPrefix.begin(), kPrefix.end(), pathLower.begin());
+    }
+
     inline std::vector<std::string> BuildTexturePathCandidates(const std::string& original)
     {
         static const char* kPreferredExtensions[] = { ".dds", ".tga", ".png", ".jpg", ".bmp", ".gif" };
@@ -445,22 +525,47 @@ namespace
                 addCandidate(basePath + upperExt);
         };
 
-        auto buildBaseVariants = [&](const std::string& basePath)
+        auto addBaseVariant = [](std::vector<std::string>& baseVariants, const std::string& variant)
+        {
+            if (variant.empty())
+                return;
+            if (std::find(baseVariants.begin(), baseVariants.end(), variant) == baseVariants.end())
+                baseVariants.push_back(variant);
+        };
+
+        const std::string& rootPath = hasExt ? base : normalized;
+
+        std::vector<std::string> baseVariants;
+        addBaseVariant(baseVariants, rootPath);
+        addBaseVariant(baseVariants, ToLower(rootPath));
+        const std::string upperFirst = UppercaseFirstDirectory(rootPath);
+        if (upperFirst != rootPath)
+            addBaseVariant(baseVariants, upperFirst);
+
+        auto expandWithTexturesPrefix = [&](const std::string& basePath)
         {
             std::vector<std::string> variants;
             variants.push_back(basePath);
-            const std::string upperFirst = UppercaseFirstDirectory(basePath);
-            if (upperFirst != basePath)
-                variants.push_back(upperFirst);
+            std::string lowerBase = ToLower(basePath);
+            if (!StartsWithTexturesPrefix(lowerBase))
+            {
+                variants.push_back(std::string("Textures/") + basePath);
+                variants.push_back(std::string("textures/") + basePath);
+            }
             return variants;
         };
 
+        std::vector<std::string> finalBases;
+        for (const auto& baseVariant : baseVariants)
+        {
+            auto prefixed = expandWithTexturesPrefix(baseVariant);
+            finalBases.insert(finalBases.end(), prefixed.begin(), prefixed.end());
+        }
+
         if (!hasExt)
         {
-            const auto baseVariants = buildBaseVariants(base);
-            for (const auto& baseVariant : baseVariants)
+            for (const auto& baseVariant : finalBases)
             {
-                addCandidate(baseVariant);
                 for (const char* ext : kPreferredExtensions)
                 {
                     addExtensionVariants(baseVariant, ext);
@@ -469,9 +574,8 @@ namespace
         }
         else
         {
-            const auto baseVariants = buildBaseVariants(base);
             const std::string originalExt = normalized.substr(dot);
-            for (const auto& baseVariant : baseVariants)
+            for (const auto& baseVariant : finalBases)
             {
                 addExtensionVariants(baseVariant, originalExt);
 
