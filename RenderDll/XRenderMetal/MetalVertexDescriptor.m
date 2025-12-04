@@ -40,6 +40,7 @@ private:
     static MTLVertexDescriptor* CreateDescriptor_P3F_COL4UB_COL4UB_TEX2F();
     static MTLVertexDescriptor* CreateDescriptor_P3F_N_COL4UB_COL4UB();
     static MTLVertexDescriptor* CreateDescriptor_P3F_N_COL4UB_COL4UB_TEX2F();
+    static MTLVertexDescriptor* CreateDescriptor_P3F_N_COL4UB();
 };
 
 #endif

@@ -253,6 +253,71 @@ vertex VertexOut_Tex tex_vertex(VertexIn_P3F_TEX2F in [[stage_in]],
     return out;
 }
 
+struct VertexIn_P3F_N {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+};
+
+struct VertexIn_P3F_N_TEX2F {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    float2 texCoord [[attribute(2)]];
+};
+
+struct VertexIn_P3F_N_COL4UB {
+    float3 position [[attribute(0)]];
+    float3 normal [[attribute(1)]];
+    uchar4 color [[attribute(2)]];
+};
+
+vertex VertexOut normal_vertex(VertexIn_P3F_N in [[stage_in]],
+                               constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+    out.normal = (uniforms.modelMatrix * float4(in.normal, 0.0)).xyz;
+    out.texCoord = float2(0.0);
+    out.color = float4(1.0);
+    if (uniforms.clipEnabled > 0.0) {
+        out.clipDistance = dot(out.worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
+vertex VertexOut normaltex_vertex(VertexIn_P3F_N_TEX2F in [[stage_in]],
+                                  constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+    out.normal = (uniforms.modelMatrix * float4(in.normal, 0.0)).xyz;
+    out.texCoord = in.texCoord;
+    out.color = float4(1.0);
+    if (uniforms.clipEnabled > 0.0) {
+        out.clipDistance = dot(out.worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
+vertex VertexOut basic_color_vertex(VertexIn_P3F_N_COL4UB in [[stage_in]],
+                                    constant Uniforms& uniforms [[buffer(1)]]) {
+    VertexOut out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+    out.normal = (uniforms.modelMatrix * float4(in.normal, 0.0)).xyz;
+    out.texCoord = float2(0.0);
+    out.color = float4(in.color) / 255.0;
+    if (uniforms.clipEnabled > 0.0) {
+        out.clipDistance = dot(out.worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
 // Position + two TexCoords (with optional color) vertex shader
 struct VertexIn_P3F_COL4UB_TEX2F_TEX2F {
     float3 position [[attribute(0)]];

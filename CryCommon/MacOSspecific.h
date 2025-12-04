@@ -813,7 +813,16 @@ inline uintptr_t SetThreadAffinityMask(void* hThread, uintptr_t dwThreadAffinity
 inline void InitializeCriticalSection(CRITICAL_SECTION* lpCriticalSection) {
     if (lpCriticalSection) {
         pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-        pthread_mutex_init(mutex, NULL);
+        if (!mutex) {
+            lpCriticalSection->DebugInfo = NULL;
+            lpCriticalSection->LockCount = 0;
+            return;
+        }
+        pthread_mutexattr_t attr;
+        pthread_mutexattr_init(&attr);
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(mutex, &attr);
+        pthread_mutexattr_destroy(&attr);
         lpCriticalSection->DebugInfo = mutex;
         lpCriticalSection->LockCount = 0;
     }

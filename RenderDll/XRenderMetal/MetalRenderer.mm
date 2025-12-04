@@ -299,7 +299,7 @@ bool CMetalRenderer::EnsureDebugPipelineState()
   vertexDescriptor.attributes[0].format = MTLVertexFormatFloat3;
   vertexDescriptor.attributes[0].offset = 0;
   vertexDescriptor.attributes[0].bufferIndex = 0;
-  vertexDescriptor.attributes[1].format = MTLVertexFormatUChar4Normalized;
+  vertexDescriptor.attributes[1].format = MTLVertexFormatUChar4;
   vertexDescriptor.attributes[1].offset = sizeof(float) * 3;
   vertexDescriptor.attributes[1].bufferIndex = 0;
   vertexDescriptor.layouts[0].stride = sizeof(DebugVertex);
@@ -1240,6 +1240,21 @@ void CMetalRenderer::SetMaterialColor(float r, float g, float b, float a) {
     assert(false && msg);
   }
   m_utilityRenderer->SetMaterialColor(r, g, b, a);
+}
+
+int CMetalRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) {
+  ASSERT_UTILITY_RENDERER_INIT();
+  return m_utilityRenderer->CreateRenderTarget(nWidth, nHeight, eTF);
+}
+
+bool CMetalRenderer::DestroyRenderTarget(int nHandle) {
+  ASSERT_UTILITY_RENDERER_INIT();
+  return m_utilityRenderer->DestroyRenderTarget(nHandle);
+}
+
+bool CMetalRenderer::SetRenderTarget(int nHandle) {
+  ASSERT_UTILITY_RENDERER_INIT();
+  return m_utilityRenderer->SetRenderTarget(nHandle);
 }
 
 void CMetalRenderer::FlushTextMessages() {

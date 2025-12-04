@@ -269,6 +269,9 @@ public:
     void TransformTextureMatrix(float x, float y, float angle, float scale) override;
     void ResetTextureMatrix() override;
     void SetMaterialColor(float r, float g, float b, float a) override;
+    int CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) override;
+    bool DestroyRenderTarget(int nHandle) override;
+    bool SetRenderTarget(int nHandle) override;
     void FlushTextMessages() override;
     
     // Vertex/Index buffer management (from CRenderer/IRenderer)

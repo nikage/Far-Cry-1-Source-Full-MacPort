@@ -57,23 +57,6 @@ struct VertexAttributeSummary
     int texCoordCount = 0;
 };
 
-int FallbackVertexFormat(int format)
-{
-    switch (format)
-    {
-        case VERTEX_FORMAT_P3F_TEX2F:
-            return VERTEX_FORMAT_P3F_COL4UB_TEX2F;
-        case VERTEX_FORMAT_P3F:
-            return VERTEX_FORMAT_P3F_COL4UB;
-        case VERTEX_FORMAT_P3F_N_TEX2F:
-            return VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-        case VERTEX_FORMAT_P3F_N:
-            return VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-        default:
-            return format;
-    }
-}
-
 VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metadata, int textureCount, NSString* shaderName)
 {
     VertexAttributeSummary summary;
@@ -163,8 +146,6 @@ VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metad
         }
     }
 
-    if (!summary.hasColor0 && summary.hasNormal)
-        summary.hasColor0 = true;
     if (summary.texCoordCount == 0 && textureCount > 0)
         summary.texCoordCount = 1;
     if (summary.hasColor1)
@@ -223,14 +204,16 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
         info.format = VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F;
     else if (summary.hasNormal && summary.hasColor0 && summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-    else if (summary.hasNormal && summary.texCoordCount > 0)
+    else if (summary.hasNormal && summary.hasColor0 && summary.texCoordCount == 0)
+        info.format = VERTEX_FORMAT_P3F_N_COL4UB;
+    else if (summary.hasNormal && !summary.hasColor0 && summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_N_TEX2F;
+    else if (summary.hasNormal && !summary.hasColor0)
+        info.format = VERTEX_FORMAT_P3F_N;
     else if (summary.hasColor0 && summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_COL4UB_TEX2F;
     else if (summary.texCoordCount > 0)
         info.format = VERTEX_FORMAT_P3F_TEX2F;
-    else if (summary.hasNormal)
-        info.format = VERTEX_FORMAT_P3F_N;
     else if (summary.hasColor0)
         info.format = VERTEX_FORMAT_P3F_COL4UB;
     else
@@ -238,8 +221,14 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
 
     if (summary.texCoordCount > 1)
         info.functionName = summary.hasColor0 ? @"colortex2_vertex" : @"tex2_vertex";
-    else if (summary.hasNormal && summary.hasColor0)
+    else if (summary.hasNormal && summary.hasColor0 && summary.texCoordCount > 0)
         info.functionName = @"basic_vertex";
+    else if (summary.hasNormal && summary.hasColor0 && summary.texCoordCount == 0)
+        info.functionName = @"basic_color_vertex";
+    else if (summary.hasNormal && !summary.hasColor0 && summary.texCoordCount > 0)
+        info.functionName = @"normaltex_vertex";
+    else if (summary.hasNormal && !summary.hasColor0)
+        info.functionName = @"normal_vertex";
     else if (summary.texCoordCount > 0)
         info.functionName = summary.hasColor0 ? @"colortex_vertex" : @"tex_vertex";
     else
@@ -816,10 +805,18 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             if (!vertexFunction)
             {
                 if (iLog)
-                    iLog->Log("MetalShaderManager: '%s' vertex entry not found, falling back to basic_vertex\n",
+                    iLog->Log("MetalShaderManager: '%s' vertex entry '%s' not found; skipping shader\n",
+                              shaderName ? [shaderName UTF8String] : "<unnamed>",
                               [vertexFunctionName UTF8String]);
-                vertexFunction = [vertexLibrary newFunctionWithName:@"basic_vertex"];
+                continue;
             }
+        }
+        else
+        {
+            if (iLog)
+                iLog->Log("MetalShaderManager: No vertex library available; skipping shader '%s'\n",
+                          shaderName ? [shaderName UTF8String] : "<unnamed>");
+            continue;
         }
 
         if (!vertexFunction)
@@ -849,35 +846,15 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         info.colorWriteMask = pipelineConfig.colorWriteMask;
         info.name = normalizedKey;
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
-        if (!pipelineState && !layout.hasColor && !layout.hasSecondTex)
-        {
-            int fallbackFormat = FallbackVertexFormat(vertexFormat);
-            if (fallbackFormat != vertexFormat)
-            {
-                const char* shaderNameStr = shaderName ? [shaderName UTF8String] : "<unnamed>";
-                MTLVertexDescriptor* fallbackDescriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(fallbackFormat);
-                if (fallbackDescriptor)
-                {
-                    iLog->Log("MetalShaderManager: Retrying shader '%s' with fallback vertex format %d (was %d)\n",
-                              shaderNameStr, fallbackFormat, vertexFormat);
-                    fprintf(stderr, "MetalShaderManager: Retrying shader '%s' with fallback vertex format %d (was %d)\n",
-                            shaderNameStr, fallbackFormat, vertexFormat);
-                    descriptor = fallbackDescriptor;
-                    vertexFormat = fallbackFormat;
-                    if (vertexLibrary)
-                    {
-                        id<MTLFunction> fallbackVertex = [vertexLibrary newFunctionWithName:@"colortex_vertex"];
-                        if (!fallbackVertex)
-                            fallbackVertex = [vertexLibrary newFunctionWithName:@"basic_vertex"];
-                        if (fallbackVertex)
-                            vertexFunction = fallbackVertex;
-                    }
-                    pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
-                }
-            }
-        }
         if (!pipelineState)
+        {
+            if (iLog)
+            {
+                iLog->Log("MetalShaderManager: Skipping shader '%s' due to pipeline creation failure\n",
+                          shaderName ? [shaderName UTF8String] : "<unnamed>");
+            }
             continue;
+        }
 
         auto existing = m_shaderNameMap.find(normalizedKey);
         if (existing != m_shaderNameMap.end())
@@ -1099,10 +1076,10 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
         }
     }
 
-    assert(pipelineState != nil && "CreatePipelineStateWithFunctions: Failed to create pipeline state - check Metal shader compilation");
     if (!pipelineState && error)
     {
-        iLog->Log("Error details: %s\n", [[error localizedDescription] UTF8String]);
+        iLog->Log("CreatePipelineStateWithFunctions: Unable to build pipeline state (%s)\n",
+                  [[error localizedDescription] UTF8String]);
     }
     
     return pipelineState;

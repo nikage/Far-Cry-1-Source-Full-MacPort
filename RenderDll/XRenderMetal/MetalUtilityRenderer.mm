@@ -21,6 +21,54 @@
 #include "MetalShaderManager.m"
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
+#include <limits>
+
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
+namespace
+{
+static MTLPixelFormat ResolveRenderTargetFormat(ETEX_Format format)
+{
+    switch (format)
+    {
+        case eTF_8888:
+        case eTF_RGBA:
+        case eTF_0888:
+        case eTF_4444:
+        case eTF_1555:
+        case eTF_0555:
+        case eTF_0565:
+        case eTF_RGB8:
+            return MTLPixelFormatRGBA8Unorm;
+        case eTF_DXT1:
+        case eTF_DXT3:
+        case eTF_DXT5:
+            return MTLPixelFormatRGBA8Unorm;
+        case eTF_SIGNED_HILO16:
+            return MTLPixelFormatRG16Snorm;
+        case eTF_SIGNED_HILO8:
+        case eTF_V8U8:
+            return MTLPixelFormatRG8Snorm;
+        case eTF_SIGNED_RGB8:
+            return MTLPixelFormatRGBA8Snorm;
+        case eTF_V16U16:
+            return MTLPixelFormatRG16Snorm;
+        case eTF_0088:
+            return MTLPixelFormatRG8Unorm;
+        case eTF_8000:
+            return MTLPixelFormatR8Unorm;
+        case eTF_DEPTH:
+            return MTLPixelFormatDepth32Float;
+        default:
+            return MTLPixelFormatBGRA8Unorm;
+    }
+}
+}
 
 CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer, 
                                              CMetalTextureManager* textureManager,
@@ -753,31 +801,98 @@ int CMetalUtilityRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Form
 {
     assert(nWidth > 0 && "CreateRenderTarget: width must be positive");
     assert(nHeight > 0 && "CreateRenderTarget: height must be positive");
+    assert(m_renderer != nullptr && "CreateRenderTarget: renderer cannot be null");
+    assert(m_renderer->m_device != nil && "CreateRenderTarget: Metal device cannot be null");
     
-    if (nWidth <= 0 || nHeight <= 0)
+    if (nWidth <= 0 || nHeight <= 0 || !m_renderer || !m_renderer->m_device)
+        return 0;
+    if (!m_textureManager)
         return 0;
         
-    // Create render target
     int renderTargetId = AllocateRenderTargetId();
     if (renderTargetId == -1)
         return 0;
-        
-    // Create Metal texture for render target
-    // This would need to be implemented
+    if (renderTargetId >= static_cast<int>(m_renderTargets.size()))
+        m_renderTargets.resize(renderTargetId + 1);
     
+    MTLPixelFormat colorFormat = ResolveRenderTargetFormat(eTF);
+    if (colorFormat == MTLPixelFormatInvalid)
+        colorFormat = MTLPixelFormatBGRA8Unorm;
+    
+    MTLTextureDescriptor* colorDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:colorFormat
+                                                                                          width:nWidth
+                                                                                         height:nHeight
+                                                                                      mipmapped:NO];
+    colorDesc.storageMode = MTLStorageModePrivate;
+    colorDesc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    
+    id<MTLTexture> colorTexture = [m_renderer->m_device newTextureWithDescriptor:colorDesc];
+    if (!colorTexture)
+    {
+        iLog->Log("CreateRenderTarget: Failed to create color texture (%dx%d)\n", nWidth, nHeight);
+        ReleaseRenderTargetId(renderTargetId);
+        return 0;
+    }
+    
+    MTLTextureDescriptor* depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                                                                          width:nWidth
+                                                                                         height:nHeight
+                                                                                      mipmapped:NO];
+    depthDesc.storageMode = MTLStorageModePrivate;
+    depthDesc.usage = MTLTextureUsageRenderTarget;
+    
+    id<MTLTexture> depthTexture = [m_renderer->m_device newTextureWithDescriptor:depthDesc];
+    if (!depthTexture)
+    {
+        iLog->Log("CreateRenderTarget: Failed to create depth texture (%dx%d)\n", nWidth, nHeight);
+        [colorTexture release];
+        ReleaseRenderTargetId(renderTargetId);
+        return 0;
+    }
+    
+    RenderTargetInfo& info = m_renderTargets[renderTargetId];
+    if (info.colorTexture)
+        [info.colorTexture release];
+    if (info.depthTexture)
+        [info.depthTexture release];
+    
+    info.colorTexture = colorTexture;
+    info.depthTexture = depthTexture;
+    info.width = nWidth;
+    info.height = nHeight;
+    info.format = eTF;
+    info.inUse = true;
+    info.needsClear = true;
+        
     return renderTargetId;
 }
 
 bool CMetalUtilityRenderer::DestroyRenderTarget(int nHandle)
 {
-    assert(nHandle >= 0 && "DestroyRenderTarget: handle cannot be negative");
-    assert(nHandle < m_renderTargets.size() && "DestroyRenderTarget: handle out of range");
+    assert(nHandle > 0 && "DestroyRenderTarget: handle 0 reserved for backbuffer");
     
-    if (nHandle < 0 || nHandle >= m_renderTargets.size())
+    if (nHandle <= 0 || nHandle >= m_renderTargets.size())
         return false;
+    RenderTargetInfo& info = m_renderTargets[nHandle];
+    if (!info.inUse)
+        return false;
+    
+    if (info.colorTexture)
+    {
+        [info.colorTexture release];
+        info.colorTexture = nil;
+    }
+    if (info.depthTexture)
+    {
+        [info.depthTexture release];
+        info.depthTexture = nil;
+    }
+    info.inUse = false;
+    info.needsClear = true;
+    info.width = 0;
+    info.height = 0;
+    info.format = eTF_Unknown;
         
-    // Destroy render target
-    m_renderTargets[nHandle] = nil;
     ReleaseRenderTargetId(nHandle);
     return true;
 }
@@ -785,13 +900,74 @@ bool CMetalUtilityRenderer::DestroyRenderTarget(int nHandle)
 bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
 {
     assert(nHandle >= 0 && "SetRenderTarget: handle cannot be negative");
-    assert(nHandle < m_renderTargets.size() && "SetRenderTarget: handle out of range");
+    assert(m_renderer != nullptr && "SetRenderTarget: renderer cannot be null");
     
-    if (nHandle < 0 || nHandle >= m_renderTargets.size())
+    if (nHandle < 0 || (!m_renderer) || (nHandle >= m_renderTargets.size() && nHandle > 0))
         return false;
+    if (!m_renderer->m_currentCommandBuffer)
+        return false;
+    
+    if (m_renderer->m_renderEncoder)
+    {
+        [m_renderer->m_renderEncoder endEncoding];
+        [m_renderer->m_renderEncoder release];
+        m_renderer->m_renderEncoder = nil;
+    }
+    
+    if (m_renderer->m_renderPassDescriptor)
+    {
+        [m_renderer->m_renderPassDescriptor release];
+        m_renderer->m_renderPassDescriptor = nil;
+    }
+    
+    MTLRenderPassDescriptor* descriptor = nil;
+    int targetWidth = m_renderer->GetWidth();
+    int targetHeight = m_renderer->GetHeight();
+    
+    if (nHandle == 0)
+    {
+        if (!m_renderer->m_currentDrawable)
+        {
+            iLog->Log("SetRenderTarget: Back buffer drawable is not available\n");
+            return false;
+        }
+        id<MTLTexture> depthTexture = m_renderer->m_depthStencilTextures[m_renderer->m_currentFrameIndex];
+        descriptor = m_renderer->CreateRenderPassDescriptor(m_renderer->m_currentDrawable.texture, depthTexture);
+    }
+    else
+    {
+        RenderTargetInfo& info = m_renderTargets[nHandle];
+        if (!info.inUse || !info.colorTexture)
+            return false;
         
-    // Set render target
-    // This would be handled by the Metal render pass descriptor
+        targetWidth = info.width;
+        targetHeight = info.height;
+        
+        MTLLoadAction loadAction = info.needsClear ? MTLLoadActionClear : MTLLoadActionLoad;
+        descriptor = m_renderer->GetOrCreateRenderPassDescriptor(info.colorTexture,
+                                                                 info.depthTexture,
+                                                                 loadAction,
+                                                                 loadAction,
+                                                                 loadAction);
+        if (descriptor && info.needsClear)
+        {
+            descriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 0.0);
+            descriptor.depthAttachment.clearDepth = 1.0;
+            descriptor.stencilAttachment.clearStencil = 0;
+        }
+        info.needsClear = false;
+    }
+    
+    if (!descriptor)
+        return false;
+    
+    m_renderer->m_renderPassDescriptor = [descriptor retain];
+    m_renderer->m_renderEncoder = [[m_renderer->m_currentCommandBuffer renderCommandEncoderWithDescriptor:descriptor] retain];
+    
+    if (!m_renderer->m_renderEncoder)
+        return false;
+    
+    m_renderer->SetViewport(0, 0, targetWidth, targetHeight);
     return true;
 }
 
@@ -966,12 +1142,16 @@ void CMetalUtilityRenderer::DrawSprite(const Vec3& pos, float size, int textureI
 
 int CMetalUtilityRenderer::AllocateRenderTargetId()
 {
+    if (m_nextRenderTargetId == std::numeric_limits<int>::max())
+        return -1;
     return m_nextRenderTargetId++;
 }
 
 void CMetalUtilityRenderer::ReleaseRenderTargetId(int id)
 {
-    // Release render target ID for reuse
+    if (id <= 0 || id >= m_renderTargets.size())
+        return;
+    m_renderTargets[id] = RenderTargetInfo();
 }
 
 #endif // __APPLE__ && __MACH__

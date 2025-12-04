@@ -160,8 +160,28 @@ protected:
     // Global shader template
     int m_globalShaderTemplateId;
     
-    // Render targets
-    std::vector<id<MTLTexture>> m_renderTargets;
+    struct RenderTargetInfo
+    {
+        id<MTLTexture> colorTexture;
+        id<MTLTexture> depthTexture;
+        int width;
+        int height;
+        ETEX_Format format;
+        bool inUse;
+        bool needsClear;
+        
+        RenderTargetInfo()
+            : colorTexture(nil)
+            , depthTexture(nil)
+            , width(0)
+            , height(0)
+            , format(eTF_Unknown)
+            , inUse(false)
+            , needsClear(true)
+        {}
+    };
+    
+    std::vector<RenderTargetInfo> m_renderTargets;
     int m_nextRenderTargetId;
     
     // Reference to other managers

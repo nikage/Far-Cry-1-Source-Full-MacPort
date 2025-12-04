@@ -1906,7 +1906,7 @@ MTLVertexDescriptor* CMetalBaseRenderer::CreateVertexDescriptor(int vertexformat
     switch (vertexformat)
     {
         case VERTEX_FORMAT_P3F_COL4UB_TEX2F:
-            descriptor.attributes[1].format = MTLVertexFormatUChar4Normalized;
+            descriptor.attributes[1].format = MTLVertexFormatUChar4;
             descriptor.attributes[1].offset = 12;
             descriptor.attributes[1].bufferIndex = 0;
             descriptor.attributes[2].format = MTLVertexFormatFloat2;
@@ -1918,7 +1918,7 @@ MTLVertexDescriptor* CMetalBaseRenderer::CreateVertexDescriptor(int vertexformat
             descriptor.attributes[1].format = MTLVertexFormatFloat3;
             descriptor.attributes[1].offset = 12;
             descriptor.attributes[1].bufferIndex = 0;
-            descriptor.attributes[2].format = MTLVertexFormatUChar4Normalized;
+            descriptor.attributes[2].format = MTLVertexFormatUChar4;
             descriptor.attributes[2].offset = 24;
             descriptor.attributes[2].bufferIndex = 0;
             descriptor.attributes[3].format = MTLVertexFormatFloat2;
