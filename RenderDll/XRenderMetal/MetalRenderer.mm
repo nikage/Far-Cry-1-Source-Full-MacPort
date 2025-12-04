@@ -341,7 +341,8 @@ bool CMetalRenderer::EnsureDebugPipelineState()
   descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
   descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
   descriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
-  descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+  descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+  descriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
 
   MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
   vertexDescriptor.attributes[0].format = MTLVertexFormatFloat3;
@@ -1254,8 +1255,7 @@ int CMetalRenderer::EF_RegisterFogVolume(float fMaxFogDist, float fFogLayerZ,
 CLeafBuffer *
 CMetalRenderer::CreateLeafBuffer(bool bDynamic, const char *szSource,
                                  class CIndexedMesh *pIndexedMesh) {
-
-  return m_shaderManager->CreateLeafBuffer(bDynamic, szSource, pIndexedMesh);
+  return CRenderer::CreateLeafBuffer(bDynamic, szSource, pIndexedMesh);
 }
 
 CLeafBuffer *CMetalRenderer::CreateLeafBufferInitialized(
@@ -1264,15 +1264,14 @@ CLeafBuffer *CMetalRenderer::CreateLeafBufferInitialized(
     EBufferType eBufType, int nMatInfoCount, int nClientTextureBindID,
     bool (*PrepareBufferCallback)(CLeafBuffer *, bool), void *CustomData,
     bool bOnlyVideoBuffer, bool bPrecache) {
-
-  return m_shaderManager->CreateLeafBufferInitialized(
-      pVertBuffer, nVertCount, nVertFormat, pIndices, nIndices, nPrimetiveType,
-      szSource, eBufType, nMatInfoCount, nClientTextureBindID,
+  return CRenderer::CreateLeafBufferInitialized(
+      pVertBuffer, nVertCount, nVertFormat, pIndices, nIndices,
+      nPrimetiveType, szSource, eBufType, nMatInfoCount, nClientTextureBindID,
       PrepareBufferCallback, CustomData, bOnlyVideoBuffer, bPrecache);
 }
 
 void CMetalRenderer::DeleteLeafBuffer(CLeafBuffer *pLBuffer) {
-  m_shaderManager->DeleteLeafBuffer(pLBuffer);
+  CRenderer::DeleteLeafBuffer(pLBuffer);
 }
 
 // Helper macro for enhanced assertion messages with variable context

@@ -967,7 +967,7 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
         return nil;
     
     MTLPixelFormat colorFormat = MTLPixelFormatBGRA8Unorm;
-    MTLPixelFormat depthFormat = MTLPixelFormatDepth32Float;
+    MTLPixelFormat depthFormat = MTLPixelFormatDepth32Float_Stencil8;
     
     bool blendEnabled = true;
     MTLBlendFactor srcBlend = MTLBlendFactorSourceAlpha;
@@ -1050,6 +1050,7 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     descriptor.colorAttachments[0].writeMask = writeMask;
  
     descriptor.depthAttachmentPixelFormat = depthFormat;
+    descriptor.stencilAttachmentPixelFormat = depthFormat;
     
     NSError* error = nil;
     id<MTLRenderPipelineState> pipelineState = 

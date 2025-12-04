@@ -70,6 +70,7 @@ id<MTLRenderPipelineState> CMetalStateCache::GetOrCreatePipelineState(
     
     descriptor.colorAttachments[0].pixelFormat = key.colorPixelFormat;
     descriptor.depthAttachmentPixelFormat = key.depthPixelFormat;
+    descriptor.stencilAttachmentPixelFormat = key.depthPixelFormat;
     
     bool blendEnabled = (key.renderStateHash & 0x1ULL) != 0;
     MTLBlendFactor srcColor = static_cast<MTLBlendFactor>((key.renderStateHash >> 1) & 0x3FULL);

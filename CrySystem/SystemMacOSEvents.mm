@@ -10,6 +10,15 @@
 
 static bool s_firstCall = true;
 
+static bool ShouldTraceMacEvents()
+{
+    static bool s_trace = []() {
+        const char* env = getenv("CRY_TRACE_MAC_EVENTS");
+        return env && env[0] && env[0] != '0';
+    }();
+    return s_trace;
+}
+
 extern "C" void ProcessMacOSEvents() {
 //     NSLog(@"ProcessMacOSEvents: ENTRY");
     
@@ -21,6 +30,9 @@ extern "C" void ProcessMacOSEvents() {
     // NSLog(@"ProcessMacOSEvents: NSApp is valid");
     
     @autoreleasepool {
+        if (ShouldTraceMacEvents()) {
+            NSLog(@"ProcessMacOSEvents: entry (firstCall=%d)", s_firstCall ? 1 : 0);
+        }
         if (s_firstCall) {
             // NSLog(@"ProcessMacOSEvents: First call - event loop is running");
             s_firstCall = false;
@@ -42,14 +54,31 @@ extern "C" void ProcessMacOSEvents() {
         {
             // NSLog(@"ProcessMacOSEvents: Got event #%d", eventCount);
             @try {
+                if (ShouldTraceMacEvents()) {
+                    NSLog(@"ProcessMacOSEvents: send event #%d type=%ld windowNumber=%ld timestamp=%f",
+                          eventCount,
+                          (long)[event type],
+                          (long)[event windowNumber],
+                          [event timestamp]);
+                }
                 [NSApp sendEvent:event];
                 // NSLog(@"ProcessMacOSEvents: sendEvent completed for event #%d", eventCount);
+                if (ShouldTraceMacEvents()) {
+                    NSLog(@"ProcessMacOSEvents: updateWindows before event #%d", eventCount);
+                }
                 [NSApp updateWindows];
                 // NSLog(@"ProcessMacOSEvents: updateWindows completed for event #%d", eventCount);
+                if (ShouldTraceMacEvents()) {
+                    NSLog(@"ProcessMacOSEvents: finished event #%d", eventCount);
+                }
                 eventCount++;
             }
             @catch (NSException *exception) {
                 NSLog(@"ProcessMacOSEvents: Exception processing event: %@", exception);
+                break;
+            }
+            @catch (...) {
+                NSLog(@"ProcessMacOSEvents: Unknown exception processing event");
                 break;
             }
         }
@@ -60,6 +89,9 @@ extern "C" void ProcessMacOSEvents() {
         static int totalEvents = 0;
         totalEvents += eventCount;
         ++callCount;
+        if (ShouldTraceMacEvents()) {
+            NSLog(@"ProcessMacOSEvents: exit iteration call=%d processed=%d total=%d", callCount, eventCount, totalEvents);
+        }
     }
     
     // NSLog(@"ProcessMacOSEvents: EXIT");

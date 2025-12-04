@@ -192,7 +192,6 @@ bool CLeafBuffer::LoadMaterial(int m,
 //    m_pSystem->GetIConsole()->Exit("LoadCGF: texture path len error");
 
   SInputShaderResources Res;
-  memset(&Res, 0, sizeof(Res));
   SLightMaterial LMs;
 //  MAT_ENTITY *me = &pCGF->m_lstMaterials[m];
   if (me->m_New && (me->col_d.r>5 || me->col_d.g>5 || me->col_d.b>5 || me->col_s.r>5 || me->col_s.g>5 || me->col_s.b>5))
@@ -208,50 +207,50 @@ bool CLeafBuffer::LoadMaterial(int m,
   }
 
   char diffuse[256]="";
-  strcpy(diffuse, me->map_d.name);
+  CopyTextureString(diffuse, sizeof(diffuse), me->map_d.name);
 
   char bump[256]="";
-  strcpy(bump, me->map_b.name);
+  CopyTextureString(bump, sizeof(bump), me->map_b.name);
 
   char normalmap[256]="";
   if(me->map_displ.name[0] && (me->flags & MTLFLAG_CRYSHADER))
-    strcpy(normalmap, me->map_displ.name);
+    CopyTextureString(normalmap, sizeof(normalmap), me->map_displ.name);
 
   char opacity[256]="";
   char decal[256]="";
   if(me->map_o.name[0])
   {
     if (me->flags & MTLFLAG_CRYSHADER)
-      strcpy(decal, me->map_o.name);
+      CopyTextureString(decal, sizeof(decal), me->map_o.name);
     else
-      strcpy(opacity, me->map_o.name);
+      CopyTextureString(opacity, sizeof(opacity), me->map_o.name);
   }
 
   char gloss[256]="";
   if(me->map_g.name[0])
-    strcpy(gloss, me->map_g.name);
+    CopyTextureString(gloss, sizeof(gloss), me->map_g.name);
 
   char cubemap[256]="";
 
   char env[256]="";
   if(me->map_e.name[0])
-    strcpy(env, me->map_e.name);
+    CopyTextureString(env, sizeof(env), me->map_e.name);
 
   char spec[256]="";
   if(me->map_s.name[0])
-    strcpy(spec, me->map_s.name);
+    CopyTextureString(spec, sizeof(spec), me->map_s.name);
 
   char det[256]="";
   if(me->map_detail.name[0])
-    strcpy(det, me->map_detail.name);
+    CopyTextureString(det, sizeof(det), me->map_detail.name);
 
   char subsurf[256]="";
   if(me->map_subsurf.name[0])
-    strcpy(subsurf, me->map_subsurf.name);
+    CopyTextureString(subsurf, sizeof(subsurf), me->map_subsurf.name);
 
   char refl[256]="";
   if(me->map_e.name[0])
-    strcpy(refl, me->map_e.name);
+    CopyTextureString(refl, sizeof(refl), me->map_e.name);
 
   char * mat_name = me->name;
   
@@ -347,7 +346,7 @@ bool CLeafBuffer::LoadMaterial(int m,
   }
 
   char mName[128];
-  strcpy(mName, mat_name);
+  CopyTextureString(mName, sizeof(mName), mat_name);
   char *str = strchr(mat_name, '/');
   if (str)
   {
@@ -385,7 +384,7 @@ bool CLeafBuffer::LoadMaterial(int m,
   
     // load shader
 	  if(mName[0]==0)
-		  strcpy(mName,"nodraw");
+    CopyTextureString(mName, sizeof(mName), "nodraw");
 
 
     newMat.shaderItem = pRenderer->EF_LoadShaderItem(mName, eSH_World, true, templName, 0, &Res);

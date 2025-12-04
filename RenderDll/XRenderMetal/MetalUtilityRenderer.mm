@@ -63,7 +63,7 @@ static MTLPixelFormat ResolveRenderTargetFormat(ETEX_Format format)
         case eTF_8000:
             return MTLPixelFormatR8Unorm;
         case eTF_DEPTH:
-            return MTLPixelFormatDepth32Float;
+            return MTLPixelFormatDepth32Float_Stencil8;
         default:
             return MTLPixelFormatBGRA8Unorm;
     }
@@ -834,7 +834,7 @@ int CMetalUtilityRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Form
         return 0;
     }
     
-    MTLTextureDescriptor* depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+    MTLTextureDescriptor* depthDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float_Stencil8
                                                                                           width:nWidth
                                                                                          height:nHeight
                                                                                       mipmapped:NO];
@@ -1008,7 +1008,8 @@ void CMetalUtilityRenderer::CreateSpritePipelineState()
     // Create sprite pipeline state descriptor
     MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
     descriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+    descriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
+    descriptor.stencilAttachmentPixelFormat = MTLPixelFormatDepth32Float_Stencil8;
     
     // Enable alpha blending for 2D sprites
     descriptor.colorAttachments[0].blendingEnabled = YES;
