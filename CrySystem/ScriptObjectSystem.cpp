@@ -1186,13 +1186,18 @@ int CScriptObjectSystem::LoadImage(IFunctionHandler *pH)
 	//nTid=m_pRenderer->LoadTexture(sFileName);
 	ITexPic * pPic = m_pRenderer->EF_LoadTexture((char *)sFileName, (bRemovable ? 0 : FT_NOREMOVE) | FT_NORESIZE, 0, eTT_Base);
 
-  if (pPic && pPic->IsTextureLoaded())
+	if (pPic && pPic->IsTextureLoaded())
 	{
 		nTid=pPic->GetTextureID();
 		m_pRenderer->SetTexture(nTid);
 		m_pRenderer->SetTexClampMode(bClamp);
 		USER_DATA ud=m_pScriptSystem->CreateUserData((int)nTid,USER_DATA_TEXTURE);
 		return pH->EndFunction(ud);
+	}
+
+	if (m_pSystem && m_pSystem->GetILog())
+	{
+		m_pSystem->GetILog()->Log("System:LoadImage failed to load '%s'", sFileName ? sFileName : "<null>");
 	}
 
 	return pH->EndFunctionNull();

@@ -18,6 +18,7 @@
 #include "MetalTextureManager.m"
 #include "MetalRenderer.m"
 #include "../../CryFont/FBitmap.h"
+#include "ICryPak.h"
 #include "I3DEngine.h"
 #include "ISystem.h"
 #include "MetalBaseRenderer.m"
@@ -73,6 +74,29 @@ static void StripExtension(const char *in, char *out)
 
 namespace
 {
+    inline bool ShouldTraceTextureLoads()
+    {
+        static int s_trace = -1;
+        if (s_trace == -1)
+        {
+            const char* env = getenv("CRY_TRACE_TEXTURES");
+            s_trace = (env && env[0] && env[0] != '0') ? 1 : 0;
+        }
+        return s_trace == 1;
+    }
+
+    inline void TraceTextureLoad(const char* fmt, ...)
+    {
+        if (!ShouldTraceTextureLoads())
+            return;
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(stderr, fmt, args);
+        fputc('\n', stderr);
+        fflush(stderr);
+        va_end(args);
+    }
+
     inline ETEX_Format ImageFormatToTexFormat(EImFormat imageFormat)
     {
         switch (imageFormat)
@@ -286,6 +310,16 @@ namespace
         return false;
     }
 
+    inline std::string UppercaseFirstDirectory(const std::string& path)
+    {
+        if (path.empty())
+            return path;
+        std::string variant = path;
+        if (std::islower(static_cast<unsigned char>(variant[0])))
+            variant[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(variant[0])));
+        return variant;
+    }
+
     inline std::vector<std::string> BuildTexturePathCandidates(const std::string& original)
     {
         static const char* kPreferredExtensions[] = { ".dds", ".tga", ".png", ".jpg", ".bmp", ".gif" };
@@ -313,30 +347,43 @@ namespace
                 candidates.push_back(candidate);
         };
 
+        auto addExtensionVariants = [&addCandidate](const std::string& basePath, const std::string& ext)
+        {
+            addCandidate(basePath + ext);
+            std::string upperExt = ext;
+            std::transform(upperExt.begin(), upperExt.end(), upperExt.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+            if (upperExt != ext)
+                addCandidate(basePath + upperExt);
+        };
+
         addCandidate(normalized);
+        const std::string upperFirst = UppercaseFirstDirectory(normalized);
+        if (upperFirst != normalized)
+            addCandidate(upperFirst);
 
         if (!hasExt)
         {
             for (const char* ext : kPreferredExtensions)
             {
-                addCandidate(base + ext);
+                addExtensionVariants(base, ext);
             }
         }
         else
         {
             if (extLower == ".dss")
             {
-                addCandidate(base + ".dds");
+                addExtensionVariants(base, ".dds");
             }
             else if (extLower == ".tif")
             {
-                addCandidate(base + ".tiff");
+                addExtensionVariants(base, ".tiff");
             }
 
             for (const char* ext : kPreferredExtensions)
             {
                 if (extLower != ext)
-                    addCandidate(base + ext);
+                    addExtensionVariants(base, ext);
             }
         }
 
@@ -1022,6 +1069,8 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     std::string requestedName = NormalizeTexturePath(filename);
     if (requestedName.empty())
         return def_tid;
+    
+    TraceTextureLoad("LoadTexture request '%s'", requestedName.c_str());
 
     assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
     assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
@@ -1057,9 +1106,10 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
             iLog->Log("Warning: Failed to load texture: %s (requested as %s)\n",
                       resolvedName.c_str(), requestedName.c_str());
         }
+        TraceTextureLoad("LoadTexture FAILED '%s' resolved '%s'", requestedName.c_str(), resolvedName.c_str());
         return def_tid;
     }
-    
+    TraceTextureLoad("LoadTexture success '%s' %dx%d format=%d sourceMips=%d", requestedName.c_str(), width, height, (int)detectedFormat, sourceMipCount);
     if (width <= 0 || height <= 0 || data.empty())
     {
         if (bWarn)
