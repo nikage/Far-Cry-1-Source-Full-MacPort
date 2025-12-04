@@ -202,6 +202,94 @@ namespace
         return levels;
     }
 
+    inline uint32_t MakeFourCC(char a, char b, char c, char d)
+    {
+        return static_cast<uint32_t>(static_cast<unsigned char>(a))
+            | (static_cast<uint32_t>(static_cast<unsigned char>(b)) << 8)
+            | (static_cast<uint32_t>(static_cast<unsigned char>(c)) << 16)
+            | (static_cast<uint32_t>(static_cast<unsigned char>(d)) << 24);
+    }
+
+#pragma pack(push, 1)
+    struct DdsPixelFormat
+    {
+        uint32_t size;
+        uint32_t flags;
+        uint32_t fourCC;
+        uint32_t rgbBitCount;
+        uint32_t rBitMask;
+        uint32_t gBitMask;
+        uint32_t bBitMask;
+        uint32_t aBitMask;
+    };
+
+    struct DdsHeader
+    {
+        uint32_t size;
+        uint32_t flags;
+        uint32_t height;
+        uint32_t width;
+        uint32_t pitchOrLinearSize;
+        uint32_t depth;
+        uint32_t mipMapCount;
+        uint32_t reserved1[11];
+        DdsPixelFormat ddspf;
+        uint32_t caps;
+        uint32_t caps2;
+        uint32_t caps3;
+        uint32_t caps4;
+        uint32_t reserved2;
+    };
+#pragma pack(pop)
+
+    inline bool TryLoadDDSFromMemory(const byte* buffer, size_t bufferSize, std::vector<byte>& outData, int& width, int& height, ETEX_Format& format, int& mipCount)
+    {
+        if (!buffer || bufferSize < 4 + sizeof(DdsHeader))
+            return false;
+
+        if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ')
+            return false;
+
+        const DdsHeader* header = reinterpret_cast<const DdsHeader*>(buffer + 4);
+        if (!header || header->size != 124 || header->ddspf.size != 32)
+            return false;
+
+        uint32_t fourCC = header->ddspf.fourCC;
+        if (fourCC == MakeFourCC('D', 'X', 'T', '1'))
+            format = eTF_DXT1;
+        else if (fourCC == MakeFourCC('D', 'X', 'T', '3'))
+            format = eTF_DXT3;
+        else if (fourCC == MakeFourCC('D', 'X', 'T', '5'))
+            format = eTF_DXT5;
+        else
+            return false;
+
+        width = static_cast<int>(header->width);
+        height = static_cast<int>(header->height);
+        mipCount = header->mipMapCount ? static_cast<int>(header->mipMapCount) : 1;
+
+        const byte* pixelData = buffer + 4 + sizeof(DdsHeader);
+        if (pixelData >= buffer + bufferSize)
+            return false;
+        const size_t remaining = static_cast<size_t>((buffer + bufferSize) - pixelData);
+
+        size_t expectedSize = 0;
+        int levelWidth = std::max(1, width);
+        int levelHeight = std::max(1, height);
+        for (int level = 0; level < mipCount; ++level)
+        {
+            expectedSize += ComputeCompressedLevelSize(levelWidth, levelHeight, format);
+            levelWidth = std::max(1, levelWidth >> 1);
+            levelHeight = std::max(1, levelHeight >> 1);
+        }
+
+        if (remaining < expectedSize)
+            return false;
+
+        outData.assign(pixelData, pixelData + expectedSize);
+        return true;
+    }
+
     inline uint64_t BuildSamplerKey(MTLSamplerMinMagFilter minFilter,
                                     MTLSamplerMinMagFilter magFilter,
                                     MTLSamplerMipFilter mipFilter,
@@ -357,33 +445,50 @@ namespace
                 addCandidate(basePath + upperExt);
         };
 
-        addCandidate(normalized);
-        const std::string upperFirst = UppercaseFirstDirectory(normalized);
-        if (upperFirst != normalized)
-            addCandidate(upperFirst);
+        auto buildBaseVariants = [&](const std::string& basePath)
+        {
+            std::vector<std::string> variants;
+            variants.push_back(basePath);
+            const std::string upperFirst = UppercaseFirstDirectory(basePath);
+            if (upperFirst != basePath)
+                variants.push_back(upperFirst);
+            return variants;
+        };
 
         if (!hasExt)
         {
-            for (const char* ext : kPreferredExtensions)
+            const auto baseVariants = buildBaseVariants(base);
+            for (const auto& baseVariant : baseVariants)
             {
-                addExtensionVariants(base, ext);
+                addCandidate(baseVariant);
+                for (const char* ext : kPreferredExtensions)
+                {
+                    addExtensionVariants(baseVariant, ext);
+                }
             }
         }
         else
         {
-            if (extLower == ".dss")
+            const auto baseVariants = buildBaseVariants(base);
+            const std::string originalExt = normalized.substr(dot);
+            for (const auto& baseVariant : baseVariants)
             {
-                addExtensionVariants(base, ".dds");
-            }
-            else if (extLower == ".tif")
-            {
-                addExtensionVariants(base, ".tiff");
-            }
+                addExtensionVariants(baseVariant, originalExt);
 
-            for (const char* ext : kPreferredExtensions)
-            {
-                if (extLower != ext)
-                    addExtensionVariants(base, ext);
+                if (extLower == ".dss")
+                {
+                    addExtensionVariants(baseVariant, ".dds");
+                }
+                else if (extLower == ".tif")
+                {
+                    addExtensionVariants(baseVariant, ".tiff");
+                }
+
+                for (const char* ext : kPreferredExtensions)
+                {
+                    if (extLower != ext)
+                        addExtensionVariants(baseVariant, ext);
+                }
             }
         }
 
@@ -3372,6 +3477,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
         return false;
     }
     
+    TraceTextureLoad("LoadTextureData: attempt '%s'", filename);
     iLog->Log("LoadTextureData: Attempting to open texture file: '%s'\n", filename);
     FILE* pFile = iSystem->GetIPak()->FOpen(filename, "rb");
     if (pFile)
@@ -3388,6 +3494,12 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
             
             if (bytesRead == fileSize)
             {
+                if (TryLoadDDSFromMemory(fileData.data(), fileData.size(), data, width, height, format, mipCount))
+                {
+                    TraceTextureLoad("LoadTextureData: DDS fast-path '%s' %dx%d format=%d mips=%d", filename, width, height, (int)format, mipCount);
+                    return true;
+                }
+
                 const char* baseName = strrchr(filename, '/');
                 if (!baseName) baseName = strrchr(filename, '\\');
                 if (!baseName) baseName = filename;
@@ -3442,6 +3554,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                                 memcpy(data.data(), pImageData, copySize);
                             }
                             
+                            TraceTextureLoad("LoadTextureData: parsed '%s' %dx%d format=%d bps=%d imgSize=%d", filename, width, height, (int)format, bps, imgSize);
                             delete pImageFile;
                             return true;
                         }
@@ -3480,6 +3593,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                              filename, errorMsg, 
                              errorDetail && errorDetail[0] ? " - " : "", 
                              errorDetail && errorDetail[0] ? errorDetail : "");
+                    TraceTextureLoad("LoadTextureData: parser failed for '%s' error=%s detail=%s", filename, errorMsg, (errorDetail && errorDetail[0]) ? errorDetail : "n/a");
                 }
 
                 delete pImageFile;
@@ -3488,17 +3602,20 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
             {
                 iLog->Log("LoadTextureData: Failed to read file %s - expected %ld bytes, read %zu bytes\n", 
                          filename, fileSize, bytesRead);
+                TraceTextureLoad("LoadTextureData: read mismatch for '%s' expected=%ld read=%zu", filename, fileSize, bytesRead);
             }
         }
         else
         {
             iLog->Log("LoadTextureData: File %s has zero or negative size (%ld bytes)\n", filename, fileSize);
             iSystem->GetIPak()->FClose(pFile);
+            TraceTextureLoad("LoadTextureData: invalid size for '%s' size=%ld", filename, fileSize);
         }
     }
     else
     {
         iLog->Log("LoadTextureData: CryPak failed to open file %s\n", filename);
+        TraceTextureLoad("LoadTextureData: CryPak FOpen failed for '%s'", filename);
     }
     
     @autoreleasepool
@@ -3579,6 +3696,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
         else
         {
             iLog->Log("LoadTextureData: File does not exist at path %s\n", filename);
+            TraceTextureLoad("LoadTextureData: file missing on disk '%s'", filename);
         }
         
         return false;
