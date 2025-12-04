@@ -245,17 +245,42 @@ namespace
     constexpr uint32_t kDdsFlagAlphaPixels = 0x00000001;
     constexpr uint32_t kDdsFlagRgb = 0x00000040;
 
-    inline bool TryLoadDDSFromMemory(const byte* buffer, size_t bufferSize, std::vector<byte>& outData, int& width, int& height, ETEX_Format& format, int& mipCount)
+    inline bool TryLoadDDSFromMemory(const byte* buffer,
+                                     size_t bufferSize,
+                                     std::vector<byte>& outData,
+                                     int& width,
+                                     int& height,
+                                     ETEX_Format& format,
+                                     int& mipCount,
+                                     const char* debugName = nullptr)
     {
         if (!buffer || bufferSize < 4 + sizeof(DdsHeader))
+        {
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - buffer too small (%zu)", debugName ? debugName : "<unnamed>", bufferSize);
             return false;
+        }
 
         if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ')
+        {
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - missing DDS magic", debugName ? debugName : "<unnamed>");
             return false;
+        }
 
         const DdsHeader* header = reinterpret_cast<const DdsHeader*>(buffer + 4);
         if (!header || header->size != 124 || header->ddspf.size != 32)
+        {
+            const uint8_t* raw = reinterpret_cast<const uint8_t*>(buffer + 4);
+            const uint8_t d0 = raw ? raw[76] : 0;
+            const uint8_t d1 = raw ? raw[77] : 0;
+            const uint8_t d2 = raw ? raw[78] : 0;
+            const uint8_t d3 = raw ? raw[79] : 0;
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - invalid header size (%u / %u) ddspf bytes=%02x %02x %02x %02x",
+                             debugName ? debugName : "<unnamed>",
+                             header ? header->size : 0,
+                             header ? header->ddspf.size : 0,
+                             d0, d1, d2, d3);
             return false;
+        }
 
         uint32_t fourCC = header->ddspf.fourCC;
         if (fourCC == MakeFourCC('D', 'X', 'T', '1'))
@@ -273,7 +298,10 @@ namespace
 
         const byte* pixelData = buffer + 4 + sizeof(DdsHeader);
         if (pixelData >= buffer + bufferSize)
+        {
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - pixel data pointer out of range", debugName ? debugName : "<unnamed>");
             return false;
+        }
         const size_t remaining = static_cast<size_t>((buffer + bufferSize) - pixelData);
 
         if (format == eTF_DXT1 || format == eTF_DXT3 || format == eTF_DXT5)
@@ -289,7 +317,10 @@ namespace
             }
 
             if (remaining < expectedSize)
+            {
+                TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - compressed data truncated (expected %zu, have %zu)", debugName ? debugName : "<unnamed>", expectedSize, remaining);
                 return false;
+            }
 
             outData.assign(pixelData, pixelData + expectedSize);
             return true;
@@ -299,7 +330,10 @@ namespace
         const bool hasAlpha = (header->ddspf.flags & kDdsFlagAlphaPixels) != 0;
         const uint32_t rgbBits = header->ddspf.rgbBitCount;
         if (!isRgb || (rgbBits != 24 && rgbBits != 32))
+        {
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - unsupported RGB flags (flags=0x%08x bits=%u)", debugName ? debugName : "<unnamed>", header->ddspf.flags, rgbBits);
             return false;
+        }
 
         const uint32_t expectedRMask = 0x00FF0000;
         const uint32_t expectedGMask = 0x0000FF00;
@@ -310,7 +344,13 @@ namespace
             && header->ddspf.bBitMask == expectedBMask
             && ((rgbBits == 32 && header->ddspf.aBitMask == expectedAMask) || (rgbBits == 24));
         if (!masksMatch)
+        {
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - unexpected channel masks (R=0x%08x G=0x%08x B=0x%08x A=0x%08x)",
+                             debugName ? debugName : "<unnamed>",
+                             header->ddspf.rBitMask, header->ddspf.gBitMask,
+                             header->ddspf.bBitMask, header->ddspf.aBitMask);
             return false;
+        }
 
         const int srcBytesPerPixel = static_cast<int>(rgbBits / 8);
         size_t srcOffset = 0;
@@ -325,7 +365,10 @@ namespace
             levelHeight = std::max(1, levelHeight >> 1);
         }
         if (remaining < requiredSource)
+        {
+            TraceTextureLoad("TryLoadDDSFromMemory: %s rejected - uncompressed data truncated (expected %zu, have %zu)", debugName ? debugName : "<unnamed>", requiredSource, remaining);
             return false;
+        }
 
         levelWidth = std::max(1, width);
         levelHeight = std::max(1, height);
@@ -359,6 +402,7 @@ namespace
         outData.resize(dstOffset);
 
         format = eTF_8888;
+        TraceTextureLoad("TryLoadDDSFromMemory: %s accepted as RGBA (w=%d h=%d mips=%d)", debugName ? debugName : "<unnamed>", width, height, mipCount);
         return true;
     }
 
@@ -3598,11 +3642,12 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
             
             if (bytesRead == fileSize)
             {
-                if (TryLoadDDSFromMemory(fileData.data(), fileData.size(), data, width, height, format, mipCount))
+                if (TryLoadDDSFromMemory(fileData.data(), fileData.size(), data, width, height, format, mipCount, filename))
                 {
                     TraceTextureLoad("LoadTextureData: DDS fast-path '%s' %dx%d format=%d mips=%d", filename, width, height, (int)format, mipCount);
                     return true;
                 }
+                TraceTextureLoad("LoadTextureData: DDS fast-path rejected '%s' after reading %ld bytes", filename, fileSize);
 
                 const char* baseName = strrchr(filename, '/');
                 if (!baseName) baseName = strrchr(filename, '\\');
