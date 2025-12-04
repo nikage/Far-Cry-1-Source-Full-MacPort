@@ -185,10 +185,6 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     assert(w > 0.0f && "Draw2dImage: width must be positive");
     assert(h > 0.0f && "Draw2dImage: height must be positive");
     assert(angle == 0.0f && "Draw2dImage: angle rotation not supported yet");
-    assert(s0 >= 0.0f && s0 <= 1.0f && "Draw2dImage: s0 must be in range [0,1]");
-    assert(t0 >= 0.0f && t0 <= 1.0f && "Draw2dImage: t0 must be in range [0,1]");
-    assert(s1 >= 0.0f && s1 <= 1.0f && "Draw2dImage: s1 must be in range [0,1]");
-    assert(t1 >= 0.0f && t1 <= 1.0f && "Draw2dImage: t1 must be in range [0,1]");
     assert(r >= 0.0f && r <= 1.0f && "Draw2dImage: red component must be in range [0,1]");
     assert(g >= 0.0f && g <= 1.0f && "Draw2dImage: green component must be in range [0,1]");
     assert(b >= 0.0f && b <= 1.0f && "Draw2dImage: blue component must be in range [0,1]");
@@ -250,11 +246,17 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
         float color[4];
     };
     
+    // Metal's texture coordinate system has (0,0) at the bottom-left, while CryEngine
+    // UI code assumes (0,0) at the top-left. Flip the V component so UI textures
+    // render with the same orientation as the original D3D implementation.
+    const float texTop = 1.0f - t0;
+    const float texBottom = 1.0f - t1;
+    
     QuadVertex vertices[4] = {
-        {{x0_ndc, y0_ndc}, {s0, t0}, {r, g, b, a}},  // v0: Top-left
-        {{x0_ndc, y1_ndc}, {s0, t1}, {r, g, b, a}},  // v1: Bottom-left
-        {{x1_ndc, y0_ndc}, {s1, t0}, {r, g, b, a}},  // v2: Top-right
-        {{x1_ndc, y1_ndc}, {s1, t1}, {r, g, b, a}}   // v3: Bottom-right
+        {{x0_ndc, y0_ndc}, {s0, texTop},    {r, g, b, a}},  // v0: Top-left
+        {{x0_ndc, y1_ndc}, {s0, texBottom}, {r, g, b, a}},  // v1: Bottom-left
+        {{x1_ndc, y0_ndc}, {s1, texTop},    {r, g, b, a}},  // v2: Top-right
+        {{x1_ndc, y1_ndc}, {s1, texBottom}, {r, g, b, a}}   // v3: Bottom-right
     };
     
     // Create temporary vertex buffer for this quad

@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <utility>
+#include <cctype>
 #import <CoreGraphics/CoreGraphics.h>
 #import <ImageIO/ImageIO.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
@@ -72,6 +73,27 @@ static void StripExtension(const char *in, char *out)
 
 namespace
 {
+    inline ETEX_Format ImageFormatToTexFormat(EImFormat imageFormat)
+    {
+        switch (imageFormat)
+        {
+            case eIF_DXT1:
+                return eTF_DXT1;
+            case eIF_DXT3:
+                return eTF_DXT3;
+            case eIF_DXT5:
+                return eTF_DXT5;
+            case eIF_DDS_LUMINANCE:
+                return eTF_8000;
+            case eIF_DDS_RGB8:
+                return eTF_0888;
+            case eIF_DDS_RGBA8:
+                return eTF_8888;
+            default:
+                return eTF_8888;
+        }
+    }
+
     inline size_t DxtBlockSize(ETEX_Format format)
     {
         switch (format)
@@ -105,6 +127,17 @@ namespace
         const size_t blocksWide = static_cast<size_t>((width + 3) / 4);
         const size_t blocksHigh = static_cast<size_t>((height + 3) / 4);
         return blocksWide * blocksHigh * blockSize;
+    }
+
+    inline size_t ComputeBytesPerRow(ETEX_Format format, int width, int bytesPerPixel)
+    {
+        if (IsCompressedETEXFormat(format))
+        {
+            const size_t blockSize = DxtBlockSize(format);
+            const size_t blocksWide = static_cast<size_t>((width + 3) / 4);
+            return blocksWide * blockSize;
+        }
+        return static_cast<size_t>(width) * static_cast<size_t>(std::max(1, bytesPerPixel));
     }
 
     inline size_t ComputeTextureMemoryBytes(int width, int height, int mipLevels, int bytesPerPixel, ETEX_Format format)
@@ -207,6 +240,118 @@ namespace
             [sampler release];
             sampler = nil;
         }
+    }
+    inline std::string NormalizeTexturePath(const char* path)
+    {
+        if (!path || !path[0])
+            return std::string();
+        std::string normalized(path);
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+        return normalized;
+    }
+
+    inline bool HasFileExtension(const std::string& path)
+    {
+        const size_t dot = path.find_last_of('.');
+        const size_t slash = path.find_last_of('/');
+        return dot != std::string::npos && (slash == std::string::npos || dot > slash);
+    }
+
+    inline std::string ToLower(std::string value)
+    {
+        std::transform(value.begin(), value.end(), value.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    inline bool DoesFileExistInPakOrDisk(const std::string& path)
+    {
+        if (path.empty())
+            return false;
+
+        if (iSystem && iSystem->GetIPak())
+        {
+            FILE* file = iSystem->GetIPak()->FOpen(path.c_str(), "rb", ICryPak::FOPEN_HINT_QUIET);
+            if (file)
+            {
+                iSystem->GetIPak()->FClose(file);
+                return true;
+            }
+        }
+
+        NSString* filePath = [NSString stringWithUTF8String:path.c_str()];
+        if (filePath && [[NSFileManager defaultManager] fileExistsAtPath:filePath])
+            return true;
+
+        return false;
+    }
+
+    inline std::vector<std::string> BuildTexturePathCandidates(const std::string& original)
+    {
+        static const char* kPreferredExtensions[] = { ".dds", ".tga", ".png", ".jpg", ".bmp", ".gif" };
+
+        std::vector<std::string> candidates;
+        std::string normalized = original;
+        if (normalized.empty())
+            return candidates;
+
+        std::replace(normalized.begin(), normalized.end(), '\\', '/');
+
+        const size_t dot = normalized.find_last_of('.');
+        const bool hasExt = HasFileExtension(normalized);
+        std::string base = normalized;
+        std::string extLower;
+        if (hasExt)
+        {
+            base = normalized.substr(0, dot);
+            extLower = ToLower(normalized.substr(dot));
+        }
+
+        auto addCandidate = [&candidates](const std::string& candidate)
+        {
+            if (std::find(candidates.begin(), candidates.end(), candidate) == candidates.end())
+                candidates.push_back(candidate);
+        };
+
+        addCandidate(normalized);
+
+        if (!hasExt)
+        {
+            for (const char* ext : kPreferredExtensions)
+            {
+                addCandidate(base + ext);
+            }
+        }
+        else
+        {
+            if (extLower == ".dss")
+            {
+                addCandidate(base + ".dds");
+            }
+            else if (extLower == ".tif")
+            {
+                addCandidate(base + ".tiff");
+            }
+
+            for (const char* ext : kPreferredExtensions)
+            {
+                if (extLower != ext)
+                    addCandidate(base + ext);
+            }
+        }
+
+        return candidates;
+    }
+
+    inline std::string ResolveTextureFilename(const std::string& requestedName)
+    {
+        const auto candidates = BuildTexturePathCandidates(requestedName);
+        for (const auto& candidate : candidates)
+        {
+            if (DoesFileExistInPakOrDisk(candidate))
+                return candidate;
+        }
+        return requestedName;
     }
 }
 
@@ -780,12 +925,14 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
         return 0;
     }
     
+    const std::string cacheName = NormalizeTexturePath(szCacheName);
+
     TextureInfo info;
     info.metalTexture = texture;
     info.width = w;
     info.height = h;
     info.format = eTFDst;
-    info.name = szCacheName ? szCacheName : "";
+    info.name = cacheName;
     info.memorySize = ComputeTextureMemoryBytes(w, h, mipLevels, effectiveBpp, eTFDst);
     info.isLoaded = true;
     info.flags = flags;
@@ -808,9 +955,9 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
         m_totalTextureMemory -= previousSize;
     m_totalTextureMemory += storedHandle->memorySize;
     
-    if (szCacheName && szCacheName[0] != '\0')
+    if (!cacheName.empty())
     {
-        m_textureNameMap[std::string(szCacheName)] = textureId;
+        m_textureNameMap[cacheName] = textureId;
     }
     
     return textureId;
@@ -871,15 +1018,18 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
 {
     if (!filename || !filename[0])
         return def_tid;
-    
+
+    std::string requestedName = NormalizeTexturePath(filename);
+    if (requestedName.empty())
+        return def_tid;
+
     assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
     assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
     
     if (!m_renderer || !m_renderer->m_device)
         return def_tid;
     
-    std::string nameStr(filename);
-    auto nameIt = m_textureNameMap.find(nameStr);
+    auto nameIt = m_textureNameMap.find(requestedName);
     if (nameIt != m_textureNameMap.end())
     {
         if (tex_type)
@@ -893,15 +1043,19 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
         return nameIt->second;
     }
     
+    const std::string resolvedName = ResolveTextureFilename(requestedName);
+
     std::vector<byte> data;
     int width, height;
+    int sourceMipCount = 1;
     ETEX_Format detectedFormat = eTF_8888;
     
-    if (!LoadTextureData(filename, data, width, height, detectedFormat))
+    if (!LoadTextureData(resolvedName.c_str(), data, width, height, detectedFormat, sourceMipCount))
     {
         if (bWarn)
         {
-            iLog->Log("Warning: Failed to load texture: %s\n", filename);
+            iLog->Log("Warning: Failed to load texture: %s (requested as %s)\n",
+                      resolvedName.c_str(), requestedName.c_str());
         }
         return def_tid;
     }
@@ -920,11 +1074,15 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
         detectedFormat = eTF_8888;
     }
     
+    const bool isCompressed = IsCompressedETEXFormat(detectedFormat);
     int bytesPerPixel = GetBytesPerPixel(detectedFormat);
-    if (bytesPerPixel == 0)
+    if (!isCompressed && bytesPerPixel == 0)
         bytesPerPixel = 4;
     
-    const int mipLevels = CalculateFullMipCount(width, height);
+    const bool canGenerateMips = !isCompressed && (sourceMipCount <= 1) && (m_renderer->m_commandQueue != nil);
+    const int mipLevels = canGenerateMips ? CalculateFullMipCount(width, height)
+                                          : std::max(1, sourceMipCount);
+    const int uploadLevels = canGenerateMips ? 1 : mipLevels;
     MTLTextureDescriptor* descriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:metalFormat
                                                                                            width:width
                                                                                           height:height
@@ -942,15 +1100,31 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     }
     
     const int effectiveBpp = std::max(1, bytesPerPixel);
-    size_t bytesPerRow = static_cast<size_t>(width) * static_cast<size_t>(effectiveBpp);
-    MTLRegion region = MTLRegionMake2D(0, 0, width, height);
+    size_t levelOffset = 0;
+    int levelWidth = width;
+    int levelHeight = height;
+    byte* source = data.data();
     
-    [texture replaceRegion:region
-               mipmapLevel:0
-                 withBytes:data.data()
-               bytesPerRow:bytesPerRow];
+    for (int level = 0; level < uploadLevels; ++level)
+    {
+        const size_t bytesPerRow = ComputeBytesPerRow(detectedFormat, levelWidth, effectiveBpp);
+        const size_t levelBytes = IsCompressedETEXFormat(detectedFormat)
+            ? ComputeCompressedLevelSize(levelWidth, levelHeight, detectedFormat)
+            : bytesPerRow * static_cast<size_t>(levelHeight);
+        
+        MTLRegion region = MTLRegionMake2D(0, 0, levelWidth, levelHeight);
+        
+        [texture replaceRegion:region
+                   mipmapLevel:level
+                     withBytes:source + levelOffset
+                   bytesPerRow:bytesPerRow];
+        
+        levelOffset += levelBytes;
+        levelWidth = std::max(1, levelWidth / 2);
+        levelHeight = std::max(1, levelHeight / 2);
+    }
     
-    if (m_renderer->m_commandQueue && mipLevels > 1)
+    if (canGenerateMips && mipLevels > 1)
     {
         id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
@@ -972,7 +1146,7 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     info.width = width;
     info.height = height;
     info.format = detectedFormat;
-    info.name = filename;
+    info.name = resolvedName;
     info.memorySize = ComputeTextureMemoryBytes(width, height, mipLevels, effectiveBpp, detectedFormat);
     info.isLoaded = true;
     info.flags = 0;
@@ -995,7 +1169,9 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
         m_totalTextureMemory -= previousSize;
     m_totalTextureMemory += storedHandle->memorySize;
     
-    m_textureNameMap[nameStr] = textureId;
+    m_textureNameMap[requestedName] = textureId;
+    if (resolvedName != requestedName)
+        m_textureNameMap[resolvedName] = textureId;
     
     if (tex_type)
         *tex_type = (int)detectedFormat;
@@ -1567,9 +1743,12 @@ void CMetalTextureManager::RemoveTexture(unsigned int TextureId)
     id<MTLTexture> removedTexture = (*handle)->metalTexture;
     m_totalTextureMemory -= (*handle)->memorySize;
     
-    if (!(*handle)->name.empty())
+    for (auto it = m_textureNameMap.begin(); it != m_textureNameMap.end(); )
     {
-        m_textureNameMap.erase((*handle)->name);
+        if (it->second == static_cast<int>(TextureId))
+            it = m_textureNameMap.erase(it);
+        else
+            ++it;
     }
     
     if (m_currentTexture == removedTexture)
@@ -2837,7 +3016,8 @@ id<MTLTexture> CMetalTextureManager::CreateMetalTextureFromFile(const char* file
     
     std::vector<byte> data;
     int width, height;
-    if (!LoadTextureData(filename, data, width, height))
+    int mipCount = 1;
+    if (!LoadTextureData(filename, data, width, height, mipCount))
         return nil;
         
     return CreateMetalTexture(width, height, MTLPixelFormatRGBA8Unorm, data.data(), data.size());
@@ -3117,22 +3297,22 @@ void CMetalTextureManager::ReleaseTextureId(int id)
     assert(id > 0 && "ReleaseTextureId: invalid texture ID!");
 }
 
-bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height)
+bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, int& mipCount)
 {
     assert(filename && "LoadTextureData: filename cannot be null!");
     
     ETEX_Format format;
-    return LoadTextureData(filename, data, width, height, format);
+    return LoadTextureData(filename, data, width, height, format, mipCount);
 }
 
-bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format)
+bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format, int& mipCount)
 {
     if (!filename || !filename[0])
         return false;
     
     assert(m_renderer && "MetalTextureManager: renderer is null - not properly initialized!");
     assert(m_renderer->m_device && "MetalTextureManager: Metal device is null - renderer not initialized!");
-    
+    mipCount = 1;
     if (!m_renderer || !m_renderer->m_device)
         return false;
     
@@ -3174,6 +3354,10 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                     width = pImageFile->mfGet_width();
                     height = pImageFile->mfGet_height();
                     
+                    EImFormat imageFormat = pImageFile->mfGetFormat();
+                    format = ImageFormatToTexFormat(imageFormat);
+                    mipCount = std::max(1, pImageFile->mfGet_numMips());
+
                     byte* pImageData = pImageFile->mfGet_image();
                     int imgSize = pImageFile->mfGet_ImageSize();
                     if (pImageData && width > 0 && height > 0 && imgSize > 0)
@@ -3183,7 +3367,12 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                         
                         if (imgSize >= expectedSize)
                         {
-                            size_t dataSize = width * height * 4;
+                            size_t dataSize = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+                            if (imageFormat == eIF_DXT1 || imageFormat == eIF_DXT3 || imageFormat == eIF_DXT5)
+                            {
+                                dataSize = static_cast<size_t>(imgSize);
+                            }
+
                             data.resize(dataSize);
                             
                             if (bps == 32)
@@ -3203,7 +3392,6 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                                 memcpy(data.data(), pImageData, copySize);
                             }
                             
-                            format = eTF_8888;
                             delete pImageFile;
                             return true;
                         }
@@ -3288,6 +3476,7 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
             {
                 width = (int)[loadedTexture width];
                 height = (int)[loadedTexture height];
+                mipCount = 1;
                 MTLPixelFormat pixelFormat = [loadedTexture pixelFormat];
                 
                 format = ConvertFromMetalFormat(pixelFormat);
@@ -3298,7 +3487,6 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                     case MTLPixelFormatRGBA8Unorm:
                     case MTLPixelFormatBGRA8Unorm:
                         bytesPerPixel = 4;
-                        format = eTF_8888;
                         break;
                     case MTLPixelFormatRG8Unorm:
                         bytesPerPixel = 2;
@@ -3406,3 +3594,4 @@ int CMetalTextureManager::GetBytesPerPixel(ETEX_Format format)
 }
 
 #endif // __APPLE__ && __MACH__
+

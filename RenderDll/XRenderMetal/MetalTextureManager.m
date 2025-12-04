@@ -290,8 +290,8 @@ protected:
     // Internal methods
     int AllocateTextureId();
     void ReleaseTextureId(int id);
-    bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height);
-    bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format);
+    bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, int& mipCount);
+    bool LoadTextureData(const char* filename, std::vector<byte>& data, int& width, int& height, ETEX_Format& format, int& mipCount);
     void GenerateMipmaps(id<MTLTexture> texture);
     void SetTextureParameters(id<MTLTexture> texture, bool repeat, int filter);
     int GetBytesPerPixel(ETEX_Format format);
