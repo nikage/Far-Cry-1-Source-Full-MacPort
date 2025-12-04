@@ -236,7 +236,24 @@ void CXConsoleVariable::Set(const char* s)
 		*m_fValue=(float)(atof(s));
 	if (m_sValue)
 	{
+#if defined(__APPLE__) && defined(__MACH__)
+		if (s == m_sValue)
+			return;
+		char temp[VAR_STRING_SIZE];
+		if (s)
+		{
+			std::strncpy(temp, s, sizeof(temp) - 1);
+			temp[sizeof(temp) - 1] = '\0';
+		}
+		else
+		{
+			temp[0] = '\0';
+		}
+		std::strncpy(m_sValue, temp, VAR_STRING_SIZE - 1);
+		m_sValue[VAR_STRING_SIZE - 1] = '\0';
+#else
 		strcpy(m_sValue,s);
+#endif
 	}
 }
 

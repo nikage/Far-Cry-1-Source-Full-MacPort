@@ -214,12 +214,16 @@ bool _XMLDOMParserImpl::parse( std::vector<unsigned char> &buffer,string &errorS
 	m_bUnicode=false;
 	m_bErrorState=false;
 
+#if defined(__APPLE__) && defined(__MACH__)
+	XML_Parser parser = XML_ParserCreate(nullptr);
+#else
 	XML_Memory_Handling_Suite memHandler;
 	memHandler.malloc_fcn = CryModuleMalloc;
 	memHandler.realloc_fcn = CryModuleRealloc;
 	memHandler.free_fcn = CryModuleFree;
 
 	XML_Parser parser = XML_ParserCreate_MM(nullptr, &memHandler, nullptr);
+#endif
 
 	XML_SetUserData( parser, this );
 	XML_SetElementHandler( parser, EXPAT_XML_StartElement,EXPAT_XML_EndElement );
