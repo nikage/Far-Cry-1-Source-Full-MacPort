@@ -22,6 +22,7 @@
 #include "I3DEngine.h"
 #include <Cocoa/Cocoa.h>
 #include <limits>
+#include <cstdlib>
 
 #ifdef max
 #undef max

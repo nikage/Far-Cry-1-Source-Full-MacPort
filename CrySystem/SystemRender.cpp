@@ -870,29 +870,17 @@ static void g_DrawLine(float *v1,float *v2)
 //////////////////////////////////////////////////////////////////////////
 void CSystem::RenderBegin()
 {
-	printf("CSystem::RenderBegin ENTRY\n");
-	fflush(stdout);
-	
-	// FUNCTION_PROFILER( this,PROFILE_SYSTEM );
+	FUNCTION_PROFILER( this,PROFILE_SYSTEM );
 
 	if (m_bIgnoreUpdates) {
-		printf("CSystem::RenderBegin - m_bIgnoreUpdates is true, returning\n");
-		fflush(stdout);
 		return;
 	}
 
 	//////////////////////////////////////////////////////////////////////
 	//start the rendering pipeline
 	if (m_pRenderer) {
-		printf("CSystem::RenderBegin: Renderer type = %d (Metal=%d), ptr=%p\n", 
-		       m_pRenderer->GetType(), R_METAL_RENDERER, m_pRenderer);
-		fflush(stdout);
 		m_pRenderer->BeginFrame();
-		printf("CSystem::RenderBegin: BeginFrame() returned\n");
-		fflush(stdout);
 	} else {
-		printf("CSystem::RenderBegin: ERROR - m_pRenderer is NULL!\n");
-		fflush(stdout);
 		assert(false && "No renderer found");
 	}
 }

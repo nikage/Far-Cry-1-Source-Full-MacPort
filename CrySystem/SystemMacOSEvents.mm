@@ -77,6 +77,7 @@ extern "C" void ProcessMacOSEvents() {
     // NSLog(@"ProcessMacOSEvents: NSApp is valid");
     
     @autoreleasepool {
+    if (ShouldTraceMacEvents())
         TraceMacEvent("ProcessMacOSEvents: entry (firstCall=%d)", s_firstCall ? 1 : 0);
         if (s_firstCall) {
             // NSLog(@"ProcessMacOSEvents: First call - event loop is running");
@@ -93,7 +94,8 @@ extern "C" void ProcessMacOSEvents() {
         
         while (eventCount < MAX_EVENTS_PER_FRAME)
         {
-            TraceMacEvent("ProcessMacOSEvents: waiting for event #%d", eventCount);
+            if (ShouldTraceMacEvents())
+                TraceMacEvent("ProcessMacOSEvents: waiting for event #%d", eventCount);
             event = [NSApp nextEventMatchingMask:NSEventMaskAny
                                       untilDate:nil
                                          inMode:NSDefaultRunLoopMode
@@ -102,16 +104,19 @@ extern "C" void ProcessMacOSEvents() {
                 break;
 
             @try {
-                TraceMacEvent("ProcessMacOSEvents: send event #%d type=%lu windowNumber=%ld timestamp=%f event=%p",
-                              eventCount,
-                              (unsigned long)[event type],
-                              (long)[event windowNumber],
-                              [event timestamp],
-                              event);
+                if (ShouldTraceMacEvents())
+                    TraceMacEvent("ProcessMacOSEvents: send event #%d type=%lu windowNumber=%ld timestamp=%f event=%p",
+                                  eventCount,
+                                  (unsigned long)[event type],
+                                  (long)[event windowNumber],
+                                  [event timestamp],
+                                  event);
                 [NSApp sendEvent:event];
-                TraceMacEvent("ProcessMacOSEvents: updateWindows before event #%d", eventCount);
+                if (ShouldTraceMacEvents())
+                    TraceMacEvent("ProcessMacOSEvents: updateWindows before event #%d", eventCount);
                 [NSApp updateWindows];
-                TraceMacEvent("ProcessMacOSEvents: finished event #%d", eventCount);
+                if (ShouldTraceMacEvents())
+                    TraceMacEvent("ProcessMacOSEvents: finished event #%d", eventCount);
                 eventCount++;
             }
             @catch (NSException *exception) {
@@ -130,7 +135,8 @@ extern "C" void ProcessMacOSEvents() {
         static int totalEvents = 0;
         totalEvents += eventCount;
         ++callCount;
-        TraceMacEvent("ProcessMacOSEvents: exit iteration call=%d processed=%d total=%d", callCount, eventCount, totalEvents);
+        if (ShouldTraceMacEvents())
+            TraceMacEvent("ProcessMacOSEvents: exit iteration call=%d processed=%d total=%d", callCount, eventCount, totalEvents);
     }
     
     // NSLog(@"ProcessMacOSEvents: EXIT");

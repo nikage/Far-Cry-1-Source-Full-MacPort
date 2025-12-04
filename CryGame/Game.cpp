@@ -1115,37 +1115,10 @@ bool CXGame::Update()
 	{
 		FRAME_PROFILER("GameUpdate:UI", m_pSystem, PROFILE_GAME);
 
-		printf("CXGame::Update - UI System check: m_pUISystem=%p, IsEnabled=%d, m_bMenuOverlay=%d, m_bUIOverlay=%d\n",
-			m_pUISystem, m_pUISystem->IsEnabled(), m_bMenuOverlay, m_bUIOverlay);
-		fflush(stdout);
-
 		if (m_bMenuOverlay || m_bUIOverlay)
 		{
-			printf("CXGame::Update - Drawing UI (m_bMenuOverlay=%d, m_bUIOverlay=%d)\n", m_bMenuOverlay, m_bUIOverlay);
-			fflush(stdout);
-			m_pLog->Log("CXGame::Update - Drawing UI (m_bMenuOverlay=%d, m_bUIOverlay=%d)\n", m_bMenuOverlay, m_bUIOverlay);
 			m_pUISystem->Update();			
 			m_pUISystem->Draw();
-		}
-		else
-		{
-			static int uiLogCounter = 0;
-			if (uiLogCounter++ < 5) {
-				printf("CXGame::Update - UI enabled but menu overlay flags not set (m_bMenuOverlay=%d, m_bUIOverlay=%d)\n", m_bMenuOverlay, m_bUIOverlay);
-				fflush(stdout);
-				m_pLog->Log("CXGame::Update - UI enabled but menu overlay flags not set\n");
-			}
-		}
-	}
-	else
-	{
-		static int uiLogCounter = 0;
-		if (uiLogCounter++ < 5) {
-			printf("CXGame::Update - UI System not enabled (m_pUISystem=%p, IsEnabled=%d)\n", 
-				m_pUISystem, m_pUISystem ? m_pUISystem->IsEnabled() : 0);
-			fflush(stdout);
-			m_pLog->Log("CXGame::Update - UI System not enabled (m_pUISystem=%p, IsEnabled=%d)\n", 
-				m_pUISystem, m_pUISystem ? m_pUISystem->IsEnabled() : 0);
 		}
 	}
 
