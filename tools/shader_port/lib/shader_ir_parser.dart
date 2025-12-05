@@ -121,6 +121,10 @@ class ShaderIrParser {
         ? relative
         : ir['name'] as String;
     final String normalized = normalizeName(shaderName);
+    final List<dynamic> vertexAttributes =
+        ir['vertexAttributes'] as List<dynamic>? ?? [];
+    final List<Map<String, dynamic>> vertexAttributeMetadata =
+        _castMapList(ir['vertexAttributeMetadata'] as List<dynamic>?);
     final ShaderIrData data = ShaderIrData(
       shaderName: shaderName,
       normalizedName: normalized,
@@ -140,11 +144,10 @@ class ShaderIrParser {
         ir['outputFieldTypes'] as Map<String, dynamic>?,
       ),
       maskReferences: _castStringList(ir['maskReferences'] as List<dynamic>?),
+      stage: _inferStage(relative, shaderName),
+      vertexAttributes: vertexAttributes,
+      vertexAttributeMetadata: vertexAttributeMetadata,
     );
-    final List<dynamic> vertexAttributes =
-        ir['vertexAttributes'] as List<dynamic>? ?? [];
-    final List<Map<String, dynamic>> vertexAttributeMetadata =
-        _castMapList(ir['vertexAttributeMetadata'] as List<dynamic>?);
     return ShaderIrParseResult(
       data: data,
       directives: directives,
@@ -306,5 +309,14 @@ List<Map<String, String>> _castPositionScriptBlocks(List<dynamic>? source) {
     }
   }
   return result;
+}
+
+String _inferStage(String relativePath, String shaderName) {
+  final String relLower = relativePath.toLowerCase();
+  final String nameLower = shaderName.toLowerCase();
+  if (relLower.contains('/cgvshaders/') || nameLower.startsWith('cgv')) {
+    return 'vertex';
+  }
+  return 'fragment';
 }
 

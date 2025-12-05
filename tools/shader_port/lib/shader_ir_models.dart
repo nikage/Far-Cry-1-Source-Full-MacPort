@@ -32,6 +32,9 @@ class ShaderIrData {
     required this.positionScriptBlocks,
     required this.outputFieldTypes,
     required this.maskReferences,
+    required this.stage,
+    required this.vertexAttributes,
+    required this.vertexAttributeMetadata,
   });
 
   final String shaderName;
@@ -48,6 +51,9 @@ class ShaderIrData {
   final List<Map<String, String>> positionScriptBlocks;
   final Map<String, String> outputFieldTypes;
   final List<String> maskReferences;
+  final String stage;
+  final List<dynamic> vertexAttributes;
+  final List<Map<String, dynamic>> vertexAttributeMetadata;
 }
 
 class MacroDefinition {

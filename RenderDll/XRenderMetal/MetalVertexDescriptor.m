@@ -21,11 +21,16 @@
 
 // Include all CryEngine infrastructure
 #include "MetalRenderPCH.h"
+#include "MetalGeneratedVertex.h"
 
 class CMetalVertexDescriptorHelper
 {
 public:
     static MTLVertexDescriptor* CreateVertexDescriptor(int vertexFormat);
+    static MTLVertexDescriptor* CreateVertexDescriptorFromMetadata(
+        const std::vector<GeneratedVertexAttributeDesc>& attributes,
+        bool* outNeedsTangents,
+        int* outVertexFormat);
     static void AttachTangentAttributes(MTLVertexDescriptor* descriptor);
     
 private:

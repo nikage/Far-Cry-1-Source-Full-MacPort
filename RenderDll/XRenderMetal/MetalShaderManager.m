@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <string>
 #include <cstdint>
+#include "MetalGeneratedVertex.h"
 
 // Include CryEngine interfaces
 #include "IRenderer.h"
@@ -314,6 +315,7 @@ protected:
     // Shader caching and management
     std::unordered_map<int, ShaderInfo> m_shaders;
     std::unordered_map<std::string, int> m_shaderNameMap;
+    std::unordered_map<std::string, GeneratedVertexEntry> m_generatedVertexEntries;
     int m_nextShaderId;
     
     // Current shader state

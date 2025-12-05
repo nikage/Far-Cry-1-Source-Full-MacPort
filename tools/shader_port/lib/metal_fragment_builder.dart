@@ -1,8 +1,11 @@
 part of 'metal_generator.dart';
 
 class MetalFragmentBuilder {
-  MetalFragmentBuilder(this.data)
-    : _analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow),
+  MetalFragmentBuilder(this.data, {required bool isVertexStage})
+    : _isVertexStage = isVertexStage,
+      _vertexAttributeMetadata = data.vertexAttributeMetadata,
+      _orderedVertexAttributes = orderVertexAttributes(data.vertexAttributeMetadata),
+      _analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow),
       _positionScripts = data.positionScripts
           .map((String script) => script.toLowerCase())
           .toSet(),
@@ -16,11 +19,15 @@ class MetalFragmentBuilder {
   }
 
   final ShaderIrData data;
+  final bool _isVertexStage;
   final _InOutAnalyzer _analyzer;
   final Set<String> _positionScripts;
   final List<Map<String, String>> _positionScriptBlocks;
+  final List<Map<String, dynamic>> _vertexAttributeMetadata;
+  final List<Map<String, dynamic>> _orderedVertexAttributes;
   final Set<String> _scalarInputFields = <String>{};
   bool _declaredDefaultVNormal = false;
+  bool _wroteHPosition = false;
   late final Map<String, String> _uniformTypes = {
     for (final UniformBinding uniform in data.uniforms)
       uniform.name: uniform.type,
@@ -98,9 +105,11 @@ class MetalFragmentBuilder {
       DotProductDimensionTransformer(),
       SwizzleAssignmentTransformer(),
     ],
+    forcedReturnExpression: _isVertexStage ? 'OUT' : null,
   );
   late final String _inputStructName = '${data.normalizedName}_input';
   late final String _outputStructName = '${data.normalizedName}_output';
+  late final String _positionFieldName = _resolvePositionFieldName();
 
   String build() {
     final StringBuffer buffer = StringBuffer();
@@ -110,7 +119,7 @@ class MetalFragmentBuilder {
     _writeInputStruct(buffer);
     _writeOutputStruct(buffer);
     _writeHelperFunctions(buffer);
-    _writeFragmentFunction(buffer);
+    _writeStageFunction(buffer);
     return buffer.toString();
   }
 
@@ -118,6 +127,25 @@ class MetalFragmentBuilder {
   buffer.writeln('#include <metal_stdlib>');
   buffer.writeln('using namespace metal;');
   buffer.writeln();
+  }
+
+  void _writeVertexInputStruct(StringBuffer buffer) {
+    buffer.writeln('struct $_inputStructName {');
+    final List<Map<String, dynamic>> attributes = _orderedVertexAttributes;
+    if (attributes.isEmpty) {
+      buffer.writeln('  float3 position [[attribute(0)]];');
+    } else {
+      int attributeIndex = 0;
+      for (final Map<String, dynamic> entry in attributes) {
+        final String name =
+            (entry['token'] as String?) ?? 'attr$attributeIndex';
+        final String type = _vertexAttributeType(entry);
+        buffer.writeln('  $type $name [[attribute($attributeIndex)]];');
+        attributeIndex++;
+      }
+    }
+    buffer.writeln('};');
+    buffer.writeln();
   }
 
   void _writeUniformStruct(StringBuffer buffer) {
@@ -147,6 +175,10 @@ class MetalFragmentBuilder {
   }
 
   void _writeInputStruct(StringBuffer buffer) {
+    if (_isVertexStage) {
+      _writeVertexInputStruct(buffer);
+      return;
+    }
     buffer.writeln('struct $_inputStructName {');
   buffer.writeln('  float4 position [[position]];');
     final List<String> fields = List<String>.from(_analyzer.inputFields);
@@ -167,12 +199,21 @@ class MetalFragmentBuilder {
 
   void _writeOutputStruct(StringBuffer buffer) {
     buffer.writeln('struct $_outputStructName {');
-    for (final String field in _analyzer.outputFields) {
+    final Set<String> outputFields = <String>{
+      ..._analyzer.outputFields,
+      ...data.outputFieldTypes.keys,
+    };
+    final List<String> sorted = outputFields.toList()..sort();
+    for (final String field in sorted) {
       final String type = _outputType(field);
+      if (_isVertexStage && field == 'HPosition') {
+        buffer.writeln('  $type HPosition [[position]];');
+        continue;
+      }
       buffer.writeln('  $type $field;');
-  }
-  buffer.writeln('};');
-  buffer.writeln();
+    }
+    buffer.writeln('};');
+    buffer.writeln();
   }
 
   void _writeHelperFunctions(StringBuffer buffer) {
@@ -224,11 +265,36 @@ float3 CMKYToRGB(float4 vColor) {
     return line.replaceAll(RegExp(r'\bdecalColor\b(?!\.)'), 'decalColor.xyz');
   }
 
-  void _writeFragmentFunction(StringBuffer buffer) {
+  void _writeStageFunction(StringBuffer buffer) {
+    if (_isVertexStage) {
+      _writeVertexFunction(buffer);
+    } else {
+      _writeFragmentOnly(buffer);
+    }
+  }
+
+  void _writeFragmentOnly(StringBuffer buffer) {
     buffer.writeln(
       'fragment float4 ${data.fragmentName}(${_buildParameters().join(', ')})',
     );
     buffer.writeln('{');
+    _writeFunctionBody(buffer);
+    buffer.writeln('  return ${_translator.returnExpression};');
+    buffer.writeln('}');
+  }
+
+  void _writeVertexFunction(StringBuffer buffer) {
+    final String functionName = 'generated_${data.normalizedName}_vertex';
+    buffer.writeln(
+      'vertex $_outputStructName $functionName(${_buildParameters().join(', ')})',
+    );
+    buffer.writeln('{');
+    _writeFunctionBody(buffer);
+    buffer.writeln('  return OUT;');
+    buffer.writeln('}');
+  }
+
+  void _writeFunctionBody(StringBuffer buffer) {
     buffer.writeln('  $_outputStructName OUT = $_outputStructName();');
     for (final String line in _translator.prologue) {
       buffer.writeln('  $line');
@@ -247,7 +313,9 @@ float3 CMKYToRGB(float4 vColor) {
         _hasPositionScript('PosBeam') ||
         hasBendingScript;
     if (needsVPos && !_translator.hasVPosDeclaration) {
-      buffer.writeln('  float4 vPos = float4(IN.position.xyz, 1.0);');
+      buffer.writeln(
+        '  float4 vPos = float4(${_positionAccessor('.xyz')}, 1.0);',
+      );
     }
     _declaredDefaultVNormal = false;
     if (_translator.usesIdentifier('vNormal') &&
@@ -285,8 +353,16 @@ float3 CMKYToRGB(float4 vColor) {
       }
       buffer.writeln(_rewriteFloat3DecalColor(line));
     }
-    buffer.writeln('  return ${_translator.returnExpression};');
-    buffer.writeln('}');
+    final bool translatorAssignedHPosition = _translator.body
+        .any((String line) => line.contains('OUT.HPosition'));
+    if (_isVertexStage &&
+        data.outputFieldTypes.containsKey('HPosition') &&
+        !_wroteHPosition &&
+        !translatorAssignedHPosition) {
+      buffer.writeln(
+        '  OUT.HPosition = (uniforms.ModelViewProj) * float4(${_positionAccessor('.xyz')}, 1.0);',
+      );
+    }
   }
 
   List<String> _buildParameters() {
@@ -311,6 +387,30 @@ float3 CMKYToRGB(float4 vColor) {
     return 'float4';
   }
 
+  String _attributeTypeForComponents(int components) {
+    switch (components) {
+      case 1:
+        return 'float';
+      case 2:
+        return 'float2';
+      case 3:
+        return 'float3';
+      default:
+        return 'float4';
+    }
+  }
+
+  String _vertexAttributeType(Map<String, dynamic> entry) {
+    final String category =
+        (entry['category'] as String? ?? '').toLowerCase();
+    if (category == 'color') {
+      return 'uchar4';
+    }
+    final int components =
+        entry['components'] is int ? entry['components'] as int : 4;
+    return _attributeTypeForComponents(components);
+  }
+
   static const Map<String, String> _inputFieldTypeOverrides = <String, String>{
     'Tangent': 'float3',
     'Binormal': 'float3',
@@ -318,6 +418,23 @@ float3 CMKYToRGB(float4 vColor) {
     'Normal': 'float3',
     'HeightMap': 'float',
   };
+
+  String _resolvePositionFieldName() {
+    if (!_isVertexStage) {
+      return 'position';
+    }
+    for (final Map<String, dynamic> entry in _orderedVertexAttributes) {
+      final String? token = entry['token'] as String?;
+      if (token != null && token.toLowerCase() == 'position') {
+        return token;
+      }
+    }
+    return 'position';
+  }
+
+  String _positionAccessor(String suffix) {
+    return 'IN.${_positionFieldName}$suffix';
+  }
 
   static const Map<String, String> _macroUniformTypes = <String, String>{
     'Ambient': 'float4',
@@ -409,7 +526,7 @@ float3 CMKYToRGB(float4 vColor) {
     final int pgSize = _uniformArraySize('pg', 66);
     buffer.writeln('  const uint kPgPermutationSize = ${pgSize}u;');
     buffer.writeln(
-      '  float2 _noiseCoord = float2(IN.position.x, IN.position.y) + uniforms.NoisePos.xy;',
+      '  float2 _noiseCoord = float2(${_positionAccessor('.x')}, ${_positionAccessor('.y')}) + uniforms.NoisePos.xy;',
     );
     buffer.writeln('  float2 _noiseIndex = fract(_noiseCoord * 0.03125);');
     buffer.writeln('  float2 _noiseIdxScaled = _noiseIndex * 32.0;');
@@ -496,11 +613,12 @@ float3 CMKYToRGB(float4 vColor) {
     );
     buffer.writeln('  fFactor = (1.0 / max(fFactor, 1e-4)) / 8.0;');
     buffer.writeln(
-      '  vPos.xyz = IN.position.xyz + vNormal.xyz * uniforms.Constants.x * clamp(fFactor, 0.0, 2.0);',
+      '  vPos.xyz = ${_positionAccessor('.xyz')} + vNormal.xyz * uniforms.Constants.x * clamp(fFactor, 0.0, 2.0);',
     );
-    buffer.writeln('  vPos.w = IN.position.w;');
+    buffer.writeln('  vPos.w = ${_positionAccessor('.w')};');
     if (_analyzer.outputFields.contains('HPosition')) {
       buffer.writeln('  OUT.HPosition = (uniforms.ModelViewProj) * (vPos);');
+      _wroteHPosition = true;
     }
   }
 

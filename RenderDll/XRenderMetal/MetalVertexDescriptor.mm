@@ -17,6 +17,131 @@
 
 #include "MetalVertexDescriptor.m"
 #include <cassert>
+#include <algorithm>
+#include <cctype>
+
+namespace
+{
+struct GeneratedAttributeFlags
+{
+    bool hasNormal = false;
+    bool hasColor0 = false;
+    bool hasColor1 = false;
+    int texCoordCount = 0;
+    bool needsTangents = false;
+};
+
+static std::string ToLowerCopy(const std::string& value)
+{
+    std::string lower = value;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return lower;
+}
+
+static GeneratedAttributeFlags BuildGeneratedAttributeFlags(const std::vector<GeneratedVertexAttributeDesc>& attributes)
+{
+    GeneratedAttributeFlags flags;
+    for (const GeneratedVertexAttributeDesc& attribute : attributes)
+    {
+        const std::string category = ToLowerCopy(attribute.category);
+        const std::string token = ToLowerCopy(attribute.token);
+        if (category == "position")
+        {
+            continue;
+        }
+        if (category == "color")
+        {
+            const int colorIndex = attribute.index >= 0 ? attribute.index : 0;
+            if (colorIndex <= 0)
+                flags.hasColor0 = true;
+            else
+                flags.hasColor1 = true;
+            continue;
+        }
+        if (category == "texcoord")
+        {
+            const int texIndex = attribute.index >= 0 ? attribute.index : 0;
+            flags.texCoordCount = std::max(flags.texCoordCount, texIndex + 1);
+            continue;
+        }
+        if (category == "normal")
+        {
+            if (token.find("tnormal") != std::string::npos)
+            {
+                flags.needsTangents = true;
+            }
+            else
+            {
+                flags.hasNormal = true;
+            }
+            continue;
+        }
+        if (category == "tangent" || category == "binormal")
+        {
+            flags.needsTangents = true;
+            continue;
+        }
+        if (token.find("tangent") != std::string::npos ||
+            token.find("binormal") != std::string::npos ||
+            token.find("tnormal") != std::string::npos)
+        {
+            flags.needsTangents = true;
+        }
+    }
+    if (flags.needsTangents && !flags.hasNormal)
+    {
+        flags.hasNormal = true;
+    }
+    return flags;
+}
+
+static int DetermineVertexFormatFromFlags(const GeneratedAttributeFlags& flags)
+{
+    const bool hasTexCoords = flags.texCoordCount > 0;
+    const bool hasSecondTex = flags.texCoordCount > 1;
+
+    if (flags.hasNormal)
+    {
+        if (flags.hasColor0)
+        {
+            if (flags.hasColor1)
+            {
+                if (hasTexCoords)
+                    return VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F;
+                return VERTEX_FORMAT_P3F_N_COL4UB_COL4UB;
+            }
+            if (hasTexCoords)
+                return VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+            return VERTEX_FORMAT_P3F_N_COL4UB;
+        }
+        if (hasTexCoords)
+            return VERTEX_FORMAT_P3F_N_TEX2F;
+        return VERTEX_FORMAT_P3F_N;
+    }
+
+    if (flags.hasColor0)
+    {
+        if (flags.hasColor1)
+        {
+            if (hasTexCoords)
+                return VERTEX_FORMAT_P3F_COL4UB_COL4UB_TEX2F;
+            return VERTEX_FORMAT_P3F_COL4UB_COL4UB;
+        }
+        if (hasSecondTex)
+            return VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F;
+        if (hasTexCoords)
+            return VERTEX_FORMAT_P3F_COL4UB_TEX2F;
+        return VERTEX_FORMAT_P3F_COL4UB;
+    }
+
+    if (hasTexCoords)
+        return VERTEX_FORMAT_P3F_TEX2F;
+
+    return VERTEX_FORMAT_P3F;
+}
+}
 
 MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptor(int vertexFormat)
 {
@@ -66,6 +191,28 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptor(int ve
         default:
             return CreateDescriptor_P3F_COL4UB_TEX2F();
     }
+}
+
+MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(
+    const std::vector<GeneratedVertexAttributeDesc>& attributes,
+    bool* outNeedsTangents,
+    int* outVertexFormat)
+{
+    if (attributes.empty())
+        return nil;
+
+    GeneratedAttributeFlags flags = BuildGeneratedAttributeFlags(attributes);
+    if (outNeedsTangents)
+        *outNeedsTangents = flags.needsTangents;
+
+    const int vertexFormat = DetermineVertexFormatFromFlags(flags);
+    if (outVertexFormat)
+        *outVertexFormat = vertexFormat;
+
+    if (vertexFormat <= 0)
+        return nil;
+
+    return CreateVertexDescriptor(vertexFormat);
 }
 
 MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F()

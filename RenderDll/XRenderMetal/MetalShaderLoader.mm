@@ -17,6 +17,7 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "MetalShaderManager.m"
+#include "MetalGeneratedVertex.h"
 #include "MetalBaseRenderer.m"
 #include "MetalVertexDescriptor.m"
 #include "MetalStateCache.m"
@@ -27,6 +28,10 @@
 #include <cassert>
 #include <strings.h>
 #include <algorithm>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <unordered_map>
 #ifdef min
 #undef min
 #endif
@@ -531,6 +536,81 @@ static std::string NormalizeShaderName(const char* name)
     }
     return std::string(normalized);
 }
+
+static std::string NSStringToStdString(NSString* value)
+{
+    if (!value)
+        return std::string();
+    const char* utf8 = [value UTF8String];
+    if (!utf8)
+        return std::string();
+    return std::string(utf8);
+}
+
+static std::vector<GeneratedVertexAttributeDesc> BuildGeneratedVertexAttributes(NSArray* metadata)
+{
+    std::vector<GeneratedVertexAttributeDesc> attributes;
+    if (!metadata || ![metadata isKindOfClass:[NSArray class]])
+        return attributes;
+
+    for (id entry in metadata)
+    {
+        if (![entry isKindOfClass:[NSDictionary class]])
+            continue;
+        NSDictionary* dict = (NSDictionary*)entry;
+        GeneratedVertexAttributeDesc attribute;
+        NSString* token = dict[@"token"];
+        NSString* category = dict[@"category"];
+        NSString* semantic = dict[@"semantic"];
+        NSString* label = dict[@"label"];
+        NSNumber* components = dict[@"components"];
+        NSNumber* index = dict[@"index"];
+        attribute.token = NSStringToStdString(token);
+        attribute.category = NSStringToStdString(category);
+        attribute.semantic = NSStringToStdString(semantic);
+        attribute.label = NSStringToStdString(label);
+        attribute.components = components ? components.intValue : 0;
+        attribute.index = index ? index.intValue : -1;
+        attributes.push_back(attribute);
+    }
+    return attributes;
+}
+
+static std::string StripStagePrefix(const std::string& value)
+{
+    static const char* prefixes[] = {
+        "cgvprog_", "cgvprog", "cgv_", "cgvs_", "cgvs",
+        "cgrc_", "cgrc", "cgr_", "cgp_", "cgp", "cg_"
+    };
+    for (const char* prefix : prefixes)
+    {
+        const size_t length = strlen(prefix);
+        if (value.size() >= length && value.compare(0, length, prefix) == 0)
+        {
+            return value.substr(length);
+        }
+    }
+    return value;
+}
+
+static std::string StripVertexSuffix(const std::string& value)
+{
+    static const char* suffixes[] = { "_vs10", "_vs11", "_vs20", "_vs30" };
+    for (const char* suffix : suffixes)
+    {
+        const size_t length = strlen(suffix);
+        if (value.size() > length && value.compare(value.size() - length, length, suffix) == 0)
+        {
+            return value.substr(0, value.size() - length);
+        }
+    }
+    return value;
+}
+
+static std::string BuildStageAgnosticKey(const std::string& normalized)
+{
+    return StripVertexSuffix(StripStagePrefix(normalized));
+}
 }
 
 CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer, 
@@ -726,6 +806,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
     if (!m_renderer || !m_renderer->m_device)
         return;
 
+    m_generatedVertexEntries.clear();
+
     NSError* error = nil;
     id<MTLLibrary> generatedLibrary = nil;
     NSBundle* bundle = [NSBundle mainBundle];
@@ -801,7 +883,10 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 
         NSString* shaderName = entry[@"shader"];
         NSString* normalizedName = entry[@"normalized"];
-        NSString* fragmentName = entry[@"fragment"];
+        NSString* fragmentName = entry[@"entryPoint"];
+        if (!fragmentName)
+            fragmentName = entry[@"fragment"];
+        NSString* stageValue = entry[@"stage"];
         NSArray* uniformArray = entry[@"uniforms"];
         NSArray* textureArray = entry[@"textures"];
         NSArray* vertexAttrArray = entry[@"vertexAttributes"];
@@ -826,6 +911,28 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             normalizedKey = NormalizeShaderName([normalizedName UTF8String]);
         else
             normalizedKey = NormalizeShaderName([shaderName UTF8String]);
+        NSString* loweredStage = stageValue ? [stageValue lowercaseString] : @"fragment";
+        const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
+
+        if ([loweredStage isEqualToString:@"vertex"])
+        {
+            GeneratedVertexEntry vertexEntry;
+            vertexEntry.shaderName = NSStringToStdString(shaderName);
+            vertexEntry.normalizedName = normalizedKey;
+            vertexEntry.entryPoint = NSStringToStdString(fragmentName);
+            vertexEntry.attributes = BuildGeneratedVertexAttributes(vertexAttrMetaArray);
+            m_generatedVertexEntries[canonicalKey] = std::move(vertexEntry);
+            if (iLog)
+            {
+                iLog->Log("MetalShaderManager: cached generated vertex '%s' (key=%s)",
+                          shaderName ? [shaderName UTF8String] : "<unnamed>",
+                          canonicalKey.c_str());
+            }
+            continue;
+        }
+        const auto generatedVertexIt = m_generatedVertexEntries.find(canonicalKey);
+        const GeneratedVertexEntry* matchedVertexEntry =
+            generatedVertexIt != m_generatedVertexEntries.end() ? &generatedVertexIt->second : nullptr;
 
         if (normalizedKey.find("envlight") != std::string::npos)
         {
@@ -893,6 +1000,19 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         }
         NSString* vertexFunctionName = layout.functionName;
         int vertexFormat = layout.format;
+        MTLVertexDescriptor* descriptor = nil;
+        bool metadataNeedsTangents = layout.needsTangents;
+        if (matchedVertexEntry)
+        {
+            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(
+                matchedVertexEntry->attributes,
+                &metadataNeedsTangents,
+                &vertexFormat);
+            if (descriptor)
+            {
+                layout.needsTangents = metadataNeedsTangents;
+            }
+        }
         if (layout.needsTangents && iLog)
         {
             iLog->Log("MetalShaderManager: '%s' requires tangent stream support (format=%d)\n",
@@ -932,25 +1052,50 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                     layout.needsTangents ? 1 : 0);
         }
         id<MTLFunction> vertexFunction = nil;
+        bool usedGeneratedVertex = false;
 
         PipelineStateConfig pipelineConfig = DefaultPipelineConfig();
         ApplyPipelineConfigFromManifest(pipelineConfig, pipelineDict);
 
         if (vertexLibrary)
         {
-            vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
+            if (matchedVertexEntry && generatedLibrary)
+            {
+                NSString* generatedVertexName = [NSString stringWithUTF8String:matchedVertexEntry->entryPoint.c_str()];
+                if (generatedVertexName && [generatedVertexName length] > 0)
+                {
+                    id<MTLFunction> generatedVertexFunction = [generatedLibrary newFunctionWithName:generatedVertexName];
+                    if (generatedVertexFunction)
+                    {
+                        vertexFunction = generatedVertexFunction;
+                        vertexFunctionName = generatedVertexName;
+                        usedGeneratedVertex = true;
+                    }
+                    else if (iLog)
+                    {
+                        iLog->Log("MetalShaderManager: Missing generated vertex function '%s' for shader '%s'\n",
+                                  matchedVertexEntry->entryPoint.c_str(),
+                                  shaderName ? [shaderName UTF8String] : "<unnamed>");
+                    }
+                }
+            }
+
             if (!vertexFunction)
             {
-                const char* shaderLabel = shaderName ? [shaderName UTF8String] : "<unnamed>";
-                const char* functionLabel = [vertexFunctionName UTF8String];
-                if (iLog)
+                vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
+                if (!vertexFunction)
                 {
-                    iLog->LogError("MetalShaderManager: Missing vertex entry '%s' required by shader '%s' - "
-                                   "ensure UtilShaders.metal defines this helper and regenerate UtilShaders.metallib\n",
-                                   functionLabel, shaderLabel);
+                    const char* shaderLabel = shaderName ? [shaderName UTF8String] : "<unnamed>";
+                    const char* functionLabel = [vertexFunctionName UTF8String];
+                    if (iLog)
+                    {
+                        iLog->LogError("MetalShaderManager: Missing vertex entry '%s' required by shader '%s' - "
+                                       "ensure UtilShaders.metal defines this helper and regenerate UtilShaders.metallib\n",
+                                       functionLabel, shaderLabel);
+                    }
+                    assert(!"MetalShaderManager: Missing vertex entry in UtilShaders.metallib");
+                    return;
                 }
-                assert(!"MetalShaderManager: Missing vertex entry in UtilShaders.metallib");
-                return;
             }
         }
         else
@@ -970,15 +1115,18 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             return;
         }
 
-        MTLVertexDescriptor* descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
-        if (layout.needsTangents && descriptor)
+        if (!descriptor)
         {
-            CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
+            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
         }
         if (!descriptor)
         {
             assert(!"MetalShaderManager: Failed to create vertex descriptor");
             return;
+        }
+        if (layout.needsTangents)
+        {
+            CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
         }
 
         ShaderInfo info;

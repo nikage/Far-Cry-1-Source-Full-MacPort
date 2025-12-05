@@ -5,10 +5,12 @@ class ExpressionTranslator {
     this.data,
     this.analyzer,
     Set<String> scalarInputFields,
-    List<LineTransformer> transformers,
-  ) : _scalarInputFields = Set<String>.from(scalarInputFields),
+    List<LineTransformer> transformers, {
+    String? forcedReturnExpression,
+  }) : _scalarInputFields = Set<String>.from(scalarInputFields),
       _transformers = transformers,
-      macros = data.coreMacros {
+      macros = data.coreMacros,
+      _forcedReturnExpression = forcedReturnExpression {
     _initializeMacroValues();
     _build();
   }
@@ -18,6 +20,7 @@ class ExpressionTranslator {
   final Set<String> _scalarInputFields;
   final List<LineTransformer> _transformers;
   final List<MacroDefinition> macros;
+  final String? _forcedReturnExpression;
   final List<String> prologue = <String>[];
   final List<String> body = <String>[];
   late final String returnExpression;
@@ -149,9 +152,13 @@ class ExpressionTranslator {
     _ensureDifSunFallback();
     _ensureBumpColorDeclaration();
     _removeDifZeroInits();
-    returnExpression = analyzer.outputFields.contains('Color')
-        ? 'OUT.Color'
-        : 'float4(0.0)';
+    if (_forcedReturnExpression != null) {
+      returnExpression = _forcedReturnExpression!;
+    } else {
+      returnExpression = analyzer.outputFields.contains('Color')
+          ? 'OUT.Color'
+          : 'float4(0.0)';
+    }
   }
 
   void _notifyTransformersOfDirective(String directive) {

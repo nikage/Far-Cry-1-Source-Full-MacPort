@@ -40,17 +40,27 @@ void main(List<String> args) {
     targetFile.writeAsStringSync(buildMetal(data));
     final Map<String, dynamic> pipeline =
         derivePipelineMetadata(data.shaderName, result.directives, data.passStates);
+    final bool isVertexStage = data.stage == 'vertex';
+    final String entryPointName = isVertexStage
+        ? 'generated_${data.normalizedName}_vertex'
+        : data.fragmentName;
+    final List<Map<String, dynamic>> vertexInputs = isVertexStage
+        ? _summarizeVertexInputs(data.vertexAttributeMetadata)
+        : const [];
     manifestEntries.add({
       'source': relative,
       'metal': metalFileName,
       'shader': data.shaderName,
       'normalized': data.normalizedName,
-      'fragment': data.fragmentName,
+      'fragment': entryPointName,
+      'entryPoint': entryPointName,
+      'stage': data.stage,
       'uniformStruct': data.uniformStruct,
       'uniformCount': data.uniforms.length,
       'textureCount': data.textures.length,
-      'vertexAttributes': result.vertexAttributes,
-      'vertexAttributeMetadata': result.vertexAttributeMetadata,
+      'vertexAttributes': data.vertexAttributes,
+      'vertexAttributeMetadata': data.vertexAttributeMetadata,
+      if (vertexInputs.isNotEmpty) 'vertexInputs': vertexInputs,
       'directives': result.directives,
       'maskReferences': data.maskReferences,
       'uniforms': data.uniforms
@@ -78,7 +88,109 @@ void main(List<String> args) {
 }
 
 String buildMetal(ShaderIrData data) {
-  return MetalFragmentBuilder(data).build();
+  return MetalFragmentBuilder(
+    data,
+    isVertexStage: data.stage == 'vertex',
+  ).build();
+}
+
+List<Map<String, dynamic>> orderVertexAttributes(
+  List<Map<String, dynamic>> metadata,
+) {
+  if (metadata.isEmpty) {
+    return const [];
+  }
+  final List<Map<String, dynamic>> positions = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> normals = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> tangents = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> binormals = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> tNormals = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> color0 = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> color1 = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> texCoords = <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> others = <Map<String, dynamic>>[];
+  for (final Map<String, dynamic> entry in metadata) {
+    final String category =
+        (entry['category'] as String? ?? '').toLowerCase();
+    final String token = (entry['token'] as String? ?? '').toLowerCase();
+    switch (category) {
+      case 'position':
+        positions.add(entry);
+        break;
+      case 'normal':
+        if (token.contains('tnormal')) {
+          tNormals.add(entry);
+        } else {
+          normals.add(entry);
+        }
+        break;
+      case 'tangent':
+        tangents.add(entry);
+        break;
+      case 'binormal':
+        binormals.add(entry);
+        break;
+      case 'color':
+        final int colorIndex = entry['index'] is int ? entry['index'] as int : 0;
+        if (colorIndex <= 0) {
+          color0.add(entry);
+        } else {
+          color1.add(entry);
+        }
+        break;
+      case 'texcoord':
+        texCoords.add(entry);
+        break;
+      default:
+        others.add(entry);
+        break;
+    }
+  }
+  texCoords.sort((Map<String, dynamic> a, Map<String, dynamic> b) {
+    final int aIndex = a['index'] is int ? a['index'] as int : 0;
+    final int bIndex = b['index'] is int ? b['index'] as int : 0;
+    return aIndex.compareTo(bIndex);
+  });
+  color1.sort((Map<String, dynamic> a, Map<String, dynamic> b) {
+    final int aIndex = a['index'] is int ? a['index'] as int : 1;
+    final int bIndex = b['index'] is int ? b['index'] as int : 1;
+    return aIndex.compareTo(bIndex);
+  });
+  final List<Map<String, dynamic>> ordered = <Map<String, dynamic>>[
+    ...positions,
+    ...normals,
+    ...tangents,
+    ...binormals,
+    ...tNormals,
+    ...color0,
+    ...color1,
+    ...texCoords,
+    ...others,
+  ];
+  return ordered.isEmpty ? metadata : ordered;
+}
+
+List<Map<String, dynamic>> _summarizeVertexInputs(
+  List<Map<String, dynamic>> metadata,
+) {
+  final List<Map<String, dynamic>> ordered = orderVertexAttributes(metadata);
+  if (ordered.isEmpty) {
+    return const [];
+  }
+  final List<Map<String, dynamic>> result = <Map<String, dynamic>>[];
+  int attributeIndex = 0;
+  for (final Map<String, dynamic> entry in ordered) {
+    result.add({
+      'name': entry['token'] ?? 'attr$attributeIndex',
+      'index': attributeIndex,
+      if (entry.containsKey('category')) 'category': entry['category'],
+      if (entry.containsKey('semantic')) 'semantic': entry['semantic'],
+      if (entry.containsKey('components')) 'components': entry['components'],
+      if (entry.containsKey('label')) 'label': entry['label'],
+    });
+    attributeIndex++;
+  }
+  return result;
 }
 
 String normalizeName(String input) {
