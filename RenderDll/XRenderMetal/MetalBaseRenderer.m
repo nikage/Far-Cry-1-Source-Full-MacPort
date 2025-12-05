@@ -82,6 +82,7 @@ public:
     virtual void DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf, ushort* pInds, 
                           int nVerts, int nInds, int nPrimType);
     virtual void SetFenceCompleted(CVertexBuffer* buffer);
+    void SetShaderTangentRequirement(bool needsTangents);
     
     // Buffer Management
     virtual CVertexBuffer* CreateBuffer(int vertexcount, int vertexformat, const char* szSource, 
@@ -504,6 +505,7 @@ public:
     bool m_texGenEnabled;
     float m_lodBias;
     bool m_vSyncEnabled;
+    bool m_shaderNeedsTangents;
     int m_currentTMU;
     
     // Clip plane state
@@ -573,6 +575,7 @@ public:
     MTLBlendFactor ConvertBlendFactor(int factor);
     int GetVertexFormatSize(int vertexformat);
     MTLVertexDescriptor* CreateVertexDescriptor(int vertexformat);
+    id<MTLBuffer> LookupStreamBuffer(const CVertexBuffer* src, int streamIndex) const;
 };
 
 #endif // __APPLE__ && __MACH__

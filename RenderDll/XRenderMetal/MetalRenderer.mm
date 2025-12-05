@@ -654,8 +654,8 @@ void CMetalRenderer::FlushDebugCommands()
   UpdateUniformBuffer();
   if (m_uniformBuffer)
   {
-    [m_renderEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:1];
-    [m_renderEncoder setFragmentBuffer:m_uniformBuffer offset:0 atIndex:0];
+    [m_renderEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+    [m_renderEncoder setFragmentBuffer:m_uniformBuffer offset:0 atIndex:kMetalFragmentUniformSlot];
   }
 
   [m_renderEncoder setRenderPipelineState:m_debugPipelineState];
@@ -671,7 +671,8 @@ void CMetalRenderer::FlushDebugCommands()
     if (!buffer)
       continue;
 
-    [m_renderEncoder setVertexBuffer:buffer offset:0 atIndex:0];
+    [m_renderEncoder setVertexBuffer:buffer offset:0 atIndex:kMetalVertexStream_General];
+    [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
     [m_renderEncoder drawPrimitives:cmd.primitiveType
                          vertexStart:0
                          vertexCount:cmd.vertices.size()];
@@ -1558,57 +1559,7 @@ IRenderer *CreateRenderer(int argc, char *argv[], SCryRenderInterface *sp) {
 void CMetalRenderer::DrawBuffer(CVertexBuffer *src, SVertexStream *indicies,
                                 int numindices, int offsindex, int prmode,
                                 int vert_start, int vert_stop, CMatInfo *mi) {
-  assert(src && "DrawBuffer: Vertex buffer cannot be null!");
-  assert(vert_start >= 0 && "DrawBuffer: Vertex start cannot be negative!");
-  assert(vert_stop >= vert_start && "DrawBuffer: Vertex stop must be >= vertex start!");
-  
-  if (!src || !m_renderEncoder)
-    return;
-
-  int bufferId = src->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
-  id<MTLBuffer> vertexBuffer = GetVertexBuffer(bufferId);
-  
-  if (!vertexBuffer) {
-    iLog->Log("Warning: DrawBuffer: Vertex buffer ID %d not found\n", bufferId);
-    return;
-  }
-
-  MTLVertexDescriptor* vertexDescriptor = CreateVertexDescriptor(src->m_vertexformat);
-  if (!vertexDescriptor) {
-    iLog->Log("Warning: DrawBuffer: Failed to create vertex descriptor for format %d\n", src->m_vertexformat);
-    return;
-  }
-
-  int vertexSize = GetVertexFormatSize(src->m_vertexformat);
-  size_t bufferOffset = vert_start * vertexSize;
-
-  [m_renderEncoder setVertexBuffer:vertexBuffer offset:bufferOffset atIndex:0];
-
-  MTLPrimitiveType primitiveType = ConvertPrimitiveType(prmode);
-
-  if (indicies && numindices > 0) {
-    int indexBufferId = indicies->m_VertBuf.m_nID;
-    id<MTLBuffer> indexBuffer = GetIndexBuffer(indexBufferId);
-    
-    if (!indexBuffer) {
-      iLog->Log("Warning: DrawBuffer: Index buffer ID %d not found\n", indexBufferId);
-      return;
-    }
-
-    size_t indexBufferOffset = offsindex * sizeof(ushort);
-    [m_renderEncoder drawIndexedPrimitives:primitiveType
-                                indexCount:numindices
-                                 indexType:MTLIndexTypeUInt16
-                               indexBuffer:indexBuffer
-                         indexBufferOffset:indexBufferOffset];
-  } else {
-    int vertexCount = (vert_stop > vert_start) ? (vert_stop - vert_start) : src->m_NumVerts;
-    if (vertexCount > 0) {
-      [m_renderEncoder drawPrimitives:primitiveType
-                          vertexStart:0
-                          vertexCount:vertexCount];
-    }
-  }
+  CMetalBaseRenderer::DrawBuffer(src, indicies, numindices, offsindex, prmode, vert_start, vert_stop, mi);
 }
 
 // Buffer Management Implementation
@@ -1683,39 +1634,7 @@ void CMetalRenderer::ReleaseIndexBuffer(SVertexStream *dest) {
 
 // Drawing Methods Implementation
 void CMetalRenderer::DrawTriStrip(CVertexBuffer *src, int vert_num) {
-  assert(src != nullptr && "DrawTriStrip: vertex buffer cannot be null");
-  assert(vert_num >= 3 && "DrawTriStrip: need at least 3 vertices for triangle strip");
-  assert(m_renderEncoder != nil && "DrawTriStrip: render encoder cannot be null");
-  
-  if (!src || !m_renderEncoder || vert_num < 3)
-    return;
-
-  int bufferId = src->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
-  id<MTLBuffer> vertexBuffer = GetVertexBuffer(bufferId);
-  
-  if (!vertexBuffer) {
-    iLog->Log("Warning: DrawTriStrip: Vertex buffer ID %d not found\n", bufferId);
-    return;
-  }
-
-  MTLVertexDescriptor* vertexDescriptor = CreateVertexDescriptor(src->m_vertexformat);
-  if (!vertexDescriptor) {
-    iLog->Log("Warning: DrawTriStrip: Failed to create vertex descriptor\n");
-    return;
-  }
-  
-  [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
-  
-  if (m_currentPipelineState) {
-    [m_renderEncoder setRenderPipelineState:m_currentPipelineState];
-  }
-  
-  [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
-                       vertexStart:0
-                       vertexCount:vert_num];
-  
-  m_numDrawCalls++;
-  m_numTriangles += (vert_num - 2);
+  CMetalBaseRenderer::DrawTriStrip(src, vert_num);
 }
 
 void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {

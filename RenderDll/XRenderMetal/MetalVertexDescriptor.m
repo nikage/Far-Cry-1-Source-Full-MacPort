@@ -26,6 +26,7 @@ class CMetalVertexDescriptorHelper
 {
 public:
     static MTLVertexDescriptor* CreateVertexDescriptor(int vertexFormat);
+    static void AttachTangentAttributes(MTLVertexDescriptor* descriptor);
     
 private:
     static MTLVertexDescriptor* CreateDescriptor_P3F();

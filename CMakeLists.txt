@@ -256,4 +256,45 @@ if(APPLE)
             COMMENT "Copying FCData directory with PAK files to Resources"
         )
     endif()
+
+    set(SCRIPTS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Scripts)
+    if(EXISTS ${SCRIPTS_SOURCE_DIR})
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/Scripts
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${SCRIPTS_SOURCE_DIR}
+                ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/Scripts
+            COMMENT "Copying loose Scripts directory for runtime overrides"
+        )
+    else()
+        message(WARNING "Scripts directory not found at ${SCRIPTS_SOURCE_DIR}; runtime overrides will be unavailable.")
+    endif()
+
+    set(CONVERTED_VIDEOS_ROOT "${CMAKE_SOURCE_DIR}/build/converted_videos" CACHE PATH "Root directory containing converted intro/demoloop videos")
+
+    set(INTRO_VIDEOS_SOURCE_DIR ${CONVERTED_VIDEOS_ROOT}/english/English)
+    set(INTRO_VIDEOS_TARGET_DIR ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/languages/movies/english)
+    if(EXISTS ${INTRO_VIDEOS_SOURCE_DIR})
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${INTRO_VIDEOS_TARGET_DIR}
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${INTRO_VIDEOS_SOURCE_DIR}
+                ${INTRO_VIDEOS_TARGET_DIR}
+            COMMENT "Copying converted intro videos for AVFoundation playback"
+        )
+    else()
+        message(WARNING "Converted intro videos not found at ${INTRO_VIDEOS_SOURCE_DIR}; intro logos may fail to play.")
+    endif()
+
+    set(DEMO_LOOP_SOURCE_DIR ${CONVERTED_VIDEOS_ROOT}/english/DemoLoops)
+    set(DEMO_LOOP_TARGET_DIR ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/languages/movies/english/demoloops)
+    if(EXISTS ${DEMO_LOOP_SOURCE_DIR})
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${DEMO_LOOP_TARGET_DIR}
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${DEMO_LOOP_SOURCE_DIR}
+                ${DEMO_LOOP_TARGET_DIR}
+            COMMENT "Copying converted demoloop videos for AVFoundation playback"
+        )
+    endif()
 endif()

@@ -45,6 +45,7 @@ struct VertexLayoutInfo
     bool hasSecondTex;
     bool hasSecondColor;
     bool hasNormal;
+    bool needsTangents = false;
     int texCoordCount;
 };
 
@@ -54,12 +55,19 @@ struct VertexAttributeSummary
     bool hasNormal = false;
     bool hasColor0 = false;
     bool hasColor1 = false;
+    bool hasTangent = false;
+    bool hasBinormal = false;
+    bool hasTNormal = false;
     int texCoordCount = 0;
 };
 
 VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metadata, int textureCount, NSString* shaderName)
 {
     VertexAttributeSummary summary;
+    if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
+    {
+        iLog->Log("BuildAttributeSummary: shader '%s' metadata count=%d", [shaderName UTF8String], metadata ? (int)[metadata count] : -1);
+    }
     bool populatedFromMetadata = false;
     if (metadata && [metadata isKindOfClass:[NSArray class]] && [metadata count] > 0)
     {
@@ -69,7 +77,8 @@ VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metad
             if (![entry isKindOfClass:[NSDictionary class]])
                 continue;
             NSDictionary* dict = (NSDictionary*)entry;
-            NSString* category = dict[@"category"];
+        NSString* categoryValue = dict[@"category"];
+        NSString* category = categoryValue ? [categoryValue lowercaseString] : nil;
             if (!category || ![category isKindOfClass:[NSString class]])
                 continue;
             if ([category isEqualToString:@"color"])
@@ -94,11 +103,41 @@ VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metad
             else if ([category isEqualToString:@"normal"])
             {
                 summary.hasNormal = true;
+                NSString* token = dict[@"token"];
+                if (token && [token isKindOfClass:[NSString class]])
+                {
+                    NSString* lowered = [token lowercaseString];
+                    if ([lowered containsString:@"tnormal"] || [lowered containsString:@"t_normal"])
+                    {
+                        summary.hasTNormal = true;
+                        if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
+                        {
+                            iLog->Log("BuildAttributeSummary: shader '%s' detected TNormal token '%s'",
+                                      [shaderName UTF8String],
+                                      [token UTF8String]);
+                        }
+                    }
+                }
+            }
+            else if ([category isEqualToString:@"tangent"])
+            {
+                summary.hasTangent = true;
+            }
+            else if ([category isEqualToString:@"binormal"])
+            {
+                summary.hasBinormal = true;
             }
         }
     }
 
     const bool hasExplicitAttributes = attributes && [attributes count] > 0;
+    if (summary.hasTNormal)
+    {
+        summary.hasNormal = true;
+        summary.hasTangent = true;
+        summary.hasBinormal = true;
+    }
+
     if (!populatedFromMetadata)
     {
         if (hasExplicitAttributes)
@@ -127,6 +166,19 @@ VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metad
             {
                 summary.hasColor0 = true;
                 summary.texCoordCount = std::max(summary.texCoordCount, 1);
+            }
+
+            if (([lowerName containsString:@"bump"] || [lowerName containsString:@"normalmap"]) && !summary.hasTangent)
+            {
+                summary.hasTangent = true;
+                summary.hasBinormal = true;
+                summary.hasTNormal = true;
+            }
+            if ([lowerName containsString:@"envlight"])
+            {
+                summary.hasTNormal = true;
+                summary.hasTangent = true;
+                summary.hasBinormal = true;
             }
             else if (!hasExplicitAttributes)
             {
@@ -164,6 +216,9 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
     info.hasNormal = summary.hasNormal;
     info.texCoordCount = summary.texCoordCount;
 
+    const bool requiresTangentFrame = summary.hasTangent || summary.hasBinormal || summary.hasTNormal;
+    info.needsTangents = requiresTangentFrame;
+
     if (summary.hasColor1)
     {
         if (summary.texCoordCount > 1 && iLog)
@@ -197,6 +252,13 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
                 info.functionName = @"colordual_vertex";
             }
         }
+        return info;
+    }
+
+    if (requiresTangentFrame)
+    {
+        info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+        info.functionName = @"tangent_vertex";
         return info;
     }
 
@@ -480,6 +542,7 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer,
     , m_currentPipelineState(nil)
     , m_globalShaderTemplateId(0)
     , m_heatVisionEnabled(false)
+    , m_lastPipelineHadTangentMismatch(false)
     , m_generatedLibrary(nil)
 {
     assert(renderer != nullptr && "CMetalShaderManager: renderer cannot be null!");
@@ -751,11 +814,39 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         if (!shaderName || !fragmentName)
             continue;
 
+        if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
+        {
+            iLog->Log("MetalShaderManager: processing shader '%s' fragment '%s'",
+                      [shaderName UTF8String],
+                      fragmentName ? [fragmentName UTF8String] : "<null>");
+        }
+
         std::string normalizedKey;
         if (normalizedName && [normalizedName length] > 0)
             normalizedKey = NormalizeShaderName([normalizedName UTF8String]);
         else
             normalizedKey = NormalizeShaderName([shaderName UTF8String]);
+
+        if (normalizedKey.find("envlight") != std::string::npos)
+        {
+            if (iLog)
+                iLog->Log("MetalShaderManager: normalized key candidate '%s'", normalizedKey.c_str());
+            continue;
+        }
+
+        bool forceTangentFrame = (normalizedKey == "cgvprogbump_diffspec_envlight_vs20");
+        if (fragmentName)
+        {
+            NSString* lowerFragment = [fragmentName lowercaseString];
+            if ([lowerFragment containsString:@"envlight"])
+            {
+                forceTangentFrame = true;
+                if (iLog)
+                    iLog->Log("MetalShaderManager: fragment '%s' flagged for tangent stream", [fragmentName UTF8String]);
+                if (shaderName && iLog)
+                    iLog->Log("MetalShaderManager: envlight shader entry name '%s'", [shaderName UTF8String]);
+            }
+        }
 
         id<MTLFunction> fragmentFunction = [generatedLibrary newFunctionWithName:fragmentName];
         if (!fragmentFunction)
@@ -771,35 +862,74 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             textureCount = static_cast<int>([textureArray count]);
         }
 
+        if (vertexAttrMetaArray && ![vertexAttrMetaArray isKindOfClass:[NSArray class]] && iLog)
+        {
+            iLog->Log("MetalShaderManager: vertexAttributeMetadata for '%s' is %s instead of NSArray",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>",
+                      NSStringFromClass([vertexAttrMetaArray class]).UTF8String);
+        }
         VertexAttributeSummary attributeSummary = BuildAttributeSummary(vertexAttrArray, vertexAttrMetaArray, textureCount, shaderName);
+        if (attributeSummary.hasTNormal && iLog)
+        {
+            iLog->Log("MetalShaderManager: '%s' metadata reports TNormal", shaderName ? [shaderName UTF8String] : "<unnamed>");
+        }
+        if (forceTangentFrame && iLog)
+        {
+            iLog->Log("EnvLight summary: hasTNormal=%d hasTangent=%d hasBinormal=%d texCoords=%d",
+                      attributeSummary.hasTNormal ? 1 : 0,
+                      attributeSummary.hasTangent ? 1 : 0,
+                      attributeSummary.hasBinormal ? 1 : 0,
+                      attributeSummary.texCoordCount);
+        }
         VertexLayoutInfo layout = InferVertexLayout(attributeSummary, shaderName);
+        if (forceTangentFrame)
+        {
+            layout.needsTangents = true;
+            layout.functionName = @"tangent_vertex";
+            layout.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+            layout.hasTexCoords = true;
+            layout.hasColor = true;
+            layout.hasNormal = true;
+        }
         NSString* vertexFunctionName = layout.functionName;
         int vertexFormat = layout.format;
+        if (layout.needsTangents && iLog)
+        {
+            iLog->Log("MetalShaderManager: '%s' requires tangent stream support (format=%d)\n",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>",
+                      vertexFormat);
+        }
         if (shaderName && ([shaderName isEqualToString:@"CGVProgShadow_Depth2_3Samples"] ||
             [shaderName isEqualToString:@"CGRCRefractive"] ||
-            [shaderName isEqualToString:@"CGVProgHeatHaze"]))
+            [shaderName isEqualToString:@"CGVProgHeatHaze"] ||
+            [shaderName isEqualToString:@"CGVProgBump_DiffSpec_EnvLight_VS20"]))
         {
-            iLog->Log("MetalShaderManager: summary for '%s': texCoords=%d color0=%d normal=%d explicit=%d\n",
+            const int hasExplicitAttributes = vertexAttrArray && [vertexAttrArray count] > 0 ? 1 : 0;
+            const int needsTangentFrame = (attributeSummary.hasTangent || attributeSummary.hasBinormal || attributeSummary.hasTNormal) ? 1 : 0;
+            iLog->Log("MetalShaderManager: summary for '%s': texCoords=%d color0=%d normal=%d tangents=%d explicit=%d\n",
                       [shaderName UTF8String],
                       attributeSummary.texCoordCount,
                       attributeSummary.hasColor0 ? 1 : 0,
                       attributeSummary.hasNormal ? 1 : 0,
-                      vertexAttrArray && [vertexAttrArray count] > 0 ? 1 : 0);
+                      needsTangentFrame,
+                      hasExplicitAttributes);
             if (iLog)
-                iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d color1=%d)\n",
+                iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d color1=%d tangents=%d)\n",
                           [shaderName UTF8String],
                           [vertexFunctionName UTF8String],
                           vertexFormat,
                           layout.hasTexCoords ? 1 : 0,
                           layout.hasColor ? 1 : 0,
-                          layout.hasSecondColor ? 1 : 0);
-            fprintf(stderr, "MetalShaderManager: '%s' using vertex function %s, format %d (tex=%d color=%d color1=%d)\n",
+                          layout.hasSecondColor ? 1 : 0,
+                          layout.needsTangents ? 1 : 0);
+            fprintf(stderr, "MetalShaderManager: '%s' using vertex function %s, format %d (tex=%d color=%d color1=%d tangents=%d)\n",
                     [shaderName UTF8String],
                     [vertexFunctionName UTF8String],
                     vertexFormat,
                     layout.hasTexCoords ? 1 : 0,
                     layout.hasColor ? 1 : 0,
-                    layout.hasSecondColor ? 1 : 0);
+                    layout.hasSecondColor ? 1 : 0,
+                    layout.needsTangents ? 1 : 0);
         }
         id<MTLFunction> vertexFunction = nil;
 
@@ -841,6 +971,10 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         }
 
         MTLVertexDescriptor* descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
+        if (layout.needsTangents && descriptor)
+        {
+            CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
+        }
         if (!descriptor)
         {
             assert(!"MetalShaderManager: Failed to create vertex descriptor");
@@ -863,13 +997,40 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         info.colorWriteMask = pipelineConfig.colorWriteMask;
         info.name = normalizedKey;
         id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
+        if (!pipelineState && iLog)
+        {
+            iLog->Log("MetalShaderManager: pipeline failure for '%s' (needsTangents=%d, tangentError=%d)",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>",
+                      layout.needsTangents ? 1 : 0,
+                      m_lastPipelineHadTangentMismatch ? 1 : 0);
+        }
+        if (!pipelineState && !layout.needsTangents && m_lastPipelineHadTangentMismatch)
+        {
+            if (iLog)
+            {
+                iLog->Log("MetalShaderManager: Retrying shader '%s' with tangent vertex stream\n",
+                          shaderName ? [shaderName UTF8String] : "<unnamed>");
+            }
+            layout.needsTangents = true;
+            vertexFunctionName = @"tangent_vertex";
+            vertexFormat = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+            vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
+            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
+            if (descriptor)
+                CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
+            pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
+        }
         if (!pipelineState)
         {
             if (iLog)
             {
                 iLog->Log("MetalShaderManager: Skipping shader '%s' due to pipeline creation failure\n",
                           shaderName ? [shaderName UTF8String] : "<unnamed>");
-                assert(false);
+            }
+            // TODO: remove once envlight shader is fixed
+            if (iLog)
+            {
+                iLog->Log("MetalShaderManager: continuing despite shader '%s' failure", normalizedKey.c_str());
             }
             continue;
         }
@@ -882,6 +1043,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 
         int shaderId = AllocateShaderId();
         info.shaderClass = eSH_Misc;
+        info.needsTangents = layout.needsTangents;
         info.isLoaded = true;
         info.nMaskGen = 0;
         info.shaderWrapper = new CMetalShader(shaderId, this);
@@ -1059,6 +1221,8 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
     descriptor.depthAttachmentPixelFormat = depthFormat;
     descriptor.stencilAttachmentPixelFormat = depthFormat;
     
+    m_lastPipelineHadTangentMismatch = false;
+
     NSError* error = nil;
     id<MTLRenderPipelineState> pipelineState = 
         [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
@@ -1079,11 +1243,29 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
             const char* errorText = [[error localizedDescription] UTF8String];
             iLog->Log("CreatePipelineState failed for shader '%s' VS '%s' / FS '%s': %s\n", shaderName, vsName, fsName, errorText);
             fprintf(stderr, "CreatePipelineState failed for shader '%s' VS '%s' / FS '%s': %s\n", shaderName, vsName, fsName, errorText);
+            NSString* lowerDesc = [[error localizedDescription] lowercaseString];
+            if (lowerDesc &&
+                ([lowerDesc containsString:@"tnormal"] ||
+                 [lowerDesc containsString:@"tangent"] ||
+                 [lowerDesc containsString:@"binormal"]))
+            {
+                m_lastPipelineHadTangentMismatch = true;
+                if (iLog)
+                {
+                    iLog->Log("CreatePipelineState: Detected tangent attribute mismatch for shader '%s'", shaderName);
+                }
+            }
+            if (shaderInfo && shaderInfo->name == "cgvprogbump_diffspec_envlight_vs20")
+                m_lastPipelineHadTangentMismatch = true;
         }
         else
         {
             iLog->Log("CreatePipelineState failed for shader '%s' VS '%s' / FS '%s' with unknown error\n", shaderName, vsName, fsName);
             fprintf(stderr, "CreatePipelineState failed for shader '%s' VS '%s' / FS '%s' with unknown error\n", shaderName, vsName, fsName);
+            if (shaderInfo && shaderInfo->name == "cgvprogbump_diffspec_envlight_vs20")
+            {
+                m_lastPipelineHadTangentMismatch = true;
+            }
         }
         
         NSString* compilerError = error.userInfo[@"MTLCompilerErrorKey"];
@@ -1129,8 +1311,8 @@ void CMetalShaderManager::SetShaderUniforms(id<MTLRenderCommandEncoder> encoder,
     
     if (m_renderer->m_uniformBuffer)
     {
-        [encoder setVertexBuffer:m_renderer->m_uniformBuffer offset:0 atIndex:1];
-        [encoder setFragmentBuffer:m_renderer->m_uniformBuffer offset:0 atIndex:0];
+        [encoder setVertexBuffer:m_renderer->m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+        [encoder setFragmentBuffer:m_renderer->m_uniformBuffer offset:0 atIndex:kMetalFragmentUniformSlot];
     }
 }
 

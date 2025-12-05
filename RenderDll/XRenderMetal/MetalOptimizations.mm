@@ -154,8 +154,9 @@ void CMetalIndirectCommandEncoder::EncodeDrawCommand(id<MTLIndirectCommandBuffer
     
     if (vertexBuffer)
     {
-        [command setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+        [command setVertexBuffer:vertexBuffer offset:0 atIndex:kMetalVertexStream_General];
     }
+    [command setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
     
     if (indexBuffer && indexCount > 0)
     {

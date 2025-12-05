@@ -51,6 +51,12 @@
 // Define constants needed by renderer
 #define MAX_TMU 8
 
+// Shared Metal binding slots (keep in sync with UtilShaders.metal)
+static const NSUInteger kMetalVertexStream_General = 0;
+static const NSUInteger kMetalVertexStream_Tangents = 1;
+static const NSUInteger kMetalVertexUniformSlot = 2;
+static const NSUInteger kMetalFragmentUniformSlot = 0;
+
 // CryEngine utility headers
 #include <list2.h>
 #include <Names.h>

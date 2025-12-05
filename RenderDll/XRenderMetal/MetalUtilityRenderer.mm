@@ -271,7 +271,8 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     }
     
     // Set vertex buffer
-    [m_renderer->m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    [m_renderer->m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:kMetalVertexStream_General];
+    [m_renderer->m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
     
     // Use appropriate pipeline state based on whether we have a texture
     if (hasTexture && texture)

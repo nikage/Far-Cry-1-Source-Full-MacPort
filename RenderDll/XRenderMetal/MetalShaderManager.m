@@ -164,6 +164,7 @@ public:
         MTLCompareFunction depthCompareFunction;
         MTLCullMode cullMode;
         uint8_t colorWriteMask = 0xF;
+        bool needsTangents = false;
         struct UniformRuntimeBinding
         {
             int paramIndex = -1;
@@ -324,6 +325,7 @@ protected:
     
     // Heat vision effect
     bool m_heatVisionEnabled;
+    bool m_lastPipelineHadTangentMismatch;
     
     // Fog volumes
     std::vector<void*> m_fogVolumes; // FogVolume* - forward declaration to avoid include issues

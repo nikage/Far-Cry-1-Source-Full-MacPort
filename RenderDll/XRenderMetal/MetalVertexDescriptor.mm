@@ -415,5 +415,28 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F_N_COL4UB
     return descriptor;
 }
 
+void CMetalVertexDescriptorHelper::AttachTangentAttributes(MTLVertexDescriptor* descriptor)
+{
+    if (!descriptor)
+        return;
+
+    const NSUInteger tangentBufferIndex = kMetalVertexStream_Tangents;
+    descriptor.attributes[4].format = MTLVertexFormatFloat3;
+    descriptor.attributes[4].offset = offsetof(SPipTangents, m_Tangent);
+    descriptor.attributes[4].bufferIndex = tangentBufferIndex;
+
+    descriptor.attributes[5].format = MTLVertexFormatFloat3;
+    descriptor.attributes[5].offset = offsetof(SPipTangents, m_Binormal);
+    descriptor.attributes[5].bufferIndex = tangentBufferIndex;
+
+    descriptor.attributes[6].format = MTLVertexFormatFloat3;
+    descriptor.attributes[6].offset = offsetof(SPipTangents, m_TNormal);
+    descriptor.attributes[6].bufferIndex = tangentBufferIndex;
+
+    descriptor.layouts[tangentBufferIndex].stride = sizeof(SPipTangents);
+    descriptor.layouts[tangentBufferIndex].stepRate = 1;
+    descriptor.layouts[tangentBufferIndex].stepFunction = MTLVertexStepFunctionPerVertex;
+}
+
 #endif
 

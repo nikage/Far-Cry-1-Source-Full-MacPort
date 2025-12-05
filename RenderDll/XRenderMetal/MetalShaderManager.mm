@@ -1874,6 +1874,7 @@ void CMetalShaderManager::ApplyPipelineStateInternal(ShaderInfo& info)
         m_renderer->SetBlending(false);
     }
 
+    m_renderer->SetShaderTangentRequirement(info.needsTangents);
     m_renderer->ApplyRenderState();
 }
 

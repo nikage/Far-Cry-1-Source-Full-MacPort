@@ -83,6 +83,7 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_texGenEnabled(false)
     , m_lodBias(0.0f)
     , m_vSyncEnabled(true)
+    , m_shaderNeedsTangents(false)
     , m_currentTMU(0)
     , m_clipPlaneEnabled(false)
     , m_clipPlaneRefract(false)
@@ -1529,11 +1530,19 @@ void CMetalBaseRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
     if (!m_renderEncoder || nVerts <= 0 || Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
         return;
     
+    if (m_shaderNeedsTangents)
+    {
+        if (iLog)
+            iLog->Log("MetalRenderer: Skipping dynamic VB draw because shader requires tangents");
+        return;
+    }
+    
     DynamicVBPool& pool = m_dynamicVBPools[Pool];
     int vertexSize = sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
     size_t offset = nOffs * vertexSize;
     
-    [m_renderEncoder setVertexBuffer:pool.buffer offset:offset atIndex:0];
+    [m_renderEncoder setVertexBuffer:pool.buffer offset:offset atIndex:kMetalVertexStream_General];
+    [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
     [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:nVerts];
     
     m_numDrawCalls++;
@@ -1545,6 +1554,13 @@ void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf,
 {
     if (!m_renderEncoder || !pBuf || nVerts <= 0)
         return;
+    
+    if (m_shaderNeedsTangents)
+    {
+        if (iLog)
+            iLog->Log("MetalRenderer: Skipping dynamic indexed draw because shader requires tangents");
+        return;
+    }
     
     int nOffs;
     void* dynPtr = GetDynVBPtr(nVerts, nOffs, 0);
@@ -1562,7 +1578,8 @@ void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf,
                                                           length:indexBufferSize 
                                                          options:MTLResourceStorageModeShared];
         
-        [m_renderEncoder setVertexBuffer:m_dynamicVBPools[0].buffer offset:nOffs atIndex:0];
+        [m_renderEncoder setVertexBuffer:m_dynamicVBPools[0].buffer offset:nOffs atIndex:kMetalVertexStream_General];
+        [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
         [m_renderEncoder drawIndexedPrimitives:primType 
                                     indexCount:nInds 
                                      indexType:MTLIndexTypeUInt16 
@@ -1584,15 +1601,28 @@ void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices,
     if (!m_renderEncoder || !src)
         return;
     
-    int bufferId = src->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
-    if (bufferId <= 0 || bufferId >= (int)m_vertexBuffers.size())
-        return;
-    
-    id<MTLBuffer> vertexBuffer = m_vertexBuffers[bufferId];
+    id<MTLBuffer> vertexBuffer = LookupStreamBuffer(src, VSF_GENERAL);
     if (!vertexBuffer)
         return;
     
-    [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:kMetalVertexStream_General];
+    
+    if (m_shaderNeedsTangents)
+    {
+        id<MTLBuffer> tangentBuffer = LookupStreamBuffer(src, VSF_TANGENTS);
+        if (!tangentBuffer)
+        {
+            if (iLog)
+                iLog->Log("MetalRenderer: Tangent data missing for current draw call; skipping draw");
+            return;
+        }
+
+        [m_renderEncoder setVertexBuffer:tangentBuffer offset:0 atIndex:kMetalVertexStream_Tangents];
+    }
+    else
+    {
+        [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
+    }
     
     MTLPrimitiveType primType = ConvertPrimitiveType(prmode);
     
@@ -1631,15 +1661,26 @@ void CMetalBaseRenderer::DrawTriStrip(CVertexBuffer* src, int vert_num)
     if (!m_renderEncoder || !src)
         return;
     
-    int bufferId = src->m_VS[VSF_GENERAL].m_VertBuf.m_nID;
-    if (bufferId <= 0 || bufferId >= (int)m_vertexBuffers.size())
-        return;
-    
-    id<MTLBuffer> vertexBuffer = m_vertexBuffers[bufferId];
+    id<MTLBuffer> vertexBuffer = LookupStreamBuffer(src, VSF_GENERAL);
     if (!vertexBuffer)
         return;
     
-    [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:kMetalVertexStream_General];
+    if (m_shaderNeedsTangents)
+    {
+        id<MTLBuffer> tangentBuffer = LookupStreamBuffer(src, VSF_TANGENTS);
+        if (!tangentBuffer)
+        {
+            if (iLog)
+                iLog->Log("MetalRenderer: Tangent data missing for tri-strip draw; skipping");
+            return;
+        }
+        [m_renderEncoder setVertexBuffer:tangentBuffer offset:0 atIndex:kMetalVertexStream_Tangents];
+    }
+    else
+    {
+        [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
+    }
     [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip 
                         vertexStart:0 
                         vertexCount:vert_num];
@@ -1653,6 +1694,15 @@ void CMetalBaseRenderer::SetFenceCompleted(CVertexBuffer* buffer)
     if (buffer)
     {
         buffer->m_bFenceSet = 0;
+    }
+}
+
+void CMetalBaseRenderer::SetShaderTangentRequirement(bool needsTangents)
+{
+    m_shaderNeedsTangents = needsTangents;
+    if (!needsTangents && m_renderEncoder)
+    {
+        [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
     }
 }
 
@@ -1946,6 +1996,20 @@ MTLVertexDescriptor* CMetalBaseRenderer::CreateVertexDescriptor(int vertexformat
     }
     
     return descriptor;
+}
+
+id<MTLBuffer> CMetalBaseRenderer::LookupStreamBuffer(const CVertexBuffer* src, int streamIndex) const
+{
+    if (!src)
+        return nil;
+
+    const int bufferId = src->m_VS[streamIndex].m_VertBuf.m_nID;
+    if (bufferId > 0 && bufferId < static_cast<int>(m_vertexBuffers.size()))
+    {
+        return m_vertexBuffers[bufferId];
+    }
+
+    return nil;
 }
 
 int CMetalBaseRenderer::GetWidth()
