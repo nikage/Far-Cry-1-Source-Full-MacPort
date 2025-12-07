@@ -3,6 +3,8 @@ part of 'metal_generator.dart';
 class MetalFragmentBuilder {
   MetalFragmentBuilder(this.data, {required bool isVertexStage})
     : _isVertexStage = isVertexStage,
+      _stageStrategy =
+          isVertexStage ? const VertexEmissionStrategy() : const FragmentEmissionStrategy(),
       _vertexAttributeMetadata = data.vertexAttributeMetadata,
       _orderedVertexAttributes = orderVertexAttributes(data.vertexAttributeMetadata),
       _analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow),
@@ -21,6 +23,7 @@ class MetalFragmentBuilder {
 
   final ShaderIrData data;
   final bool _isVertexStage;
+  final StageEmissionStrategy _stageStrategy;
   final _InOutAnalyzer _analyzer;
   final Set<String> _positionScripts;
   final List<Map<String, String>> _positionScriptBlocks;
@@ -270,32 +273,7 @@ float3 CMKYToRGB(float4 vColor) {
   }
 
   void _writeStageFunction(StringBuffer buffer) {
-    if (_isVertexStage) {
-      _writeVertexFunction(buffer);
-    } else {
-      _writeFragmentOnly(buffer);
-    }
-  }
-
-  void _writeFragmentOnly(StringBuffer buffer) {
-    buffer.writeln(
-      'fragment float4 ${data.fragmentName}(${_buildParameters().join(', ')})',
-    );
-    buffer.writeln('{');
-    _writeFunctionBody(buffer);
-    buffer.writeln('  return ${_translator.returnExpression};');
-    buffer.writeln('}');
-  }
-
-  void _writeVertexFunction(StringBuffer buffer) {
-    final String functionName = 'generated_${data.normalizedName}_vertex';
-    buffer.writeln(
-      'vertex $_outputStructName $functionName(${_buildParameters().join(', ')})',
-    );
-    buffer.writeln('{');
-    _writeFunctionBody(buffer);
-    buffer.writeln('  return OUT;');
-    buffer.writeln('}');
+    _stageStrategy.writeStageFunction(this, _buildParameters(), buffer);
   }
 
   void _writeFunctionBody(StringBuffer buffer) {

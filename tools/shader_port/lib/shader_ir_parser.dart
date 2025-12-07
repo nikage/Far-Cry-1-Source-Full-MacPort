@@ -15,6 +15,14 @@ class ShaderIrParser {
     final List<TextureBinding> textures = [];
     final Set<String> uniformNames = <String>{};
     final Set<String> textureNames = <String>{};
+    final Map<String, dynamic>? compilerMetadata =
+        ir['compilerMetadata'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(ir['compilerMetadata'] as Map)
+            : null;
+    ReflectionInfo? reflection;
+    if (compilerMetadata != null) {
+      reflection = ReflectionAdapter(compilerMetadata).toInfo();
+    }
     if (mainInputBlock != null) {
       final String content = (mainInputBlock['content'] as String?) ?? '';
       final RegExp pattern = RegExp(
@@ -125,6 +133,15 @@ class ShaderIrParser {
         ir['vertexAttributes'] as List<dynamic>? ?? [];
     final List<Map<String, dynamic>> vertexAttributeMetadata =
         _castMapList(ir['vertexAttributeMetadata'] as List<dynamic>?);
+    if (reflection != null) {
+      _mergeReflectionUniforms(uniforms, uniformNames, reflection);
+      _mergeReflectionTextures(textures, textureNames, reflection);
+      _mergeReflectionVertexData(
+        vertexAttributeMetadata,
+        vertexAttributes,
+        reflection,
+      );
+    }
     final ShaderIrData data = ShaderIrData(
       shaderName: shaderName,
       normalizedName: normalized,
@@ -318,5 +335,78 @@ String _inferStage(String relativePath, String shaderName) {
     return 'vertex';
   }
   return 'fragment';
+}
+
+void _mergeReflectionUniforms(
+  List<UniformBinding> uniforms,
+  Set<String> uniformNames,
+  ReflectionInfo reflection,
+) {
+  for (final Map<String, dynamic> uniform in reflection.uniforms) {
+    final String name = (uniform['name'] as String? ?? '').trim();
+    if (name.isEmpty || !uniformNames.add(name)) {
+      continue;
+    }
+    final String type = (uniform['type'] as String?) ?? 'float4';
+    final String semantic = (uniform['semantic'] as String?) ?? '';
+    final int? arraySize = uniform['arraySize'] is int ? uniform['arraySize'] as int : null;
+    uniforms.add(
+      UniformBinding(
+        type,
+        name,
+        semantic,
+        arraySize: arraySize,
+      ),
+    );
+  }
+}
+
+void _mergeReflectionTextures(
+  List<TextureBinding> textures,
+  Set<String> textureNames,
+  ReflectionInfo reflection,
+) {
+  final int nextSlotStart = textures.isEmpty
+      ? 0
+      : textures.map((TextureBinding t) => t.slot).reduce(math.max) + 1;
+  int nextSlot = nextSlotStart;
+  for (final Map<String, dynamic> texture in reflection.textures) {
+    final String name = (texture['name'] as String? ?? '').trim();
+    if (name.isEmpty || !textureNames.add(name)) {
+      continue;
+    }
+    final int slot = texture['slot'] is int ? texture['slot'] as int : nextSlot++;
+    final String semantic = (texture['semantic'] as String?) ?? '';
+    textures.add(TextureBinding('sampler', name, slot, semantic));
+  }
+}
+
+void _mergeReflectionVertexData(
+  List<Map<String, dynamic>> metadata,
+  List<dynamic> vertexAttributes,
+  ReflectionInfo reflection,
+) {
+  for (final Map<String, dynamic> input in reflection.vertexInputs) {
+    final String token = (input['name'] as String? ?? input['semantic'] as String? ?? '').trim();
+    if (token.isEmpty) {
+      continue;
+    }
+    if (!vertexAttributes.contains(token)) {
+      vertexAttributes.add(token);
+    }
+    final bool exists =
+        metadata.any((Map<String, dynamic> entry) => entry['token'] == token);
+    if (exists) {
+      continue;
+    }
+    final Map<String, dynamic> entry = <String, dynamic>{'token': token};
+    if (input['semantic'] != null) {
+      entry['semantic'] = input['semantic'];
+    }
+    if (input['components'] != null) {
+      entry['components'] = input['components'];
+    }
+    metadata.add(entry);
+  }
 }
 

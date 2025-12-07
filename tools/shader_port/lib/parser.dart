@@ -1,6 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/args.dart';
+import 'package:path/path.dart' as p;
+
+import 'compiler_backend.dart';
+import 'source_resolver.dart';
+
 class Block {
   Block(this.name, this.content);
   final String name;
@@ -26,6 +32,7 @@ class ParseResult {
     this.positionScripts,
     this.positionScriptBlocks,
     this.outputFieldTypes,
+    this.compilerMetadata,
   );
 
   final String name;
@@ -45,11 +52,57 @@ class ParseResult {
   final List<String> positionScripts;
   final List<Map<String, String>> positionScriptBlocks;
   final Map<String, String> outputFieldTypes;
+  final Map<String, dynamic>? compilerMetadata;
+}
+
+class CoreScriptParseResult {
+  CoreScriptParseResult({
+    required this.expressions,
+    required this.macros,
+    required this.flow,
+  });
+
+  final List<Map<String, dynamic>> expressions;
+  final List<Map<String, dynamic>> macros;
+  final List<Map<String, dynamic>> flow;
+}
+
+abstract class CoreScriptParser {
+  const CoreScriptParser();
+
+  CoreScriptParseResult parse(List<Block> blocks);
+}
+
+class HeuristicCoreScriptParser extends CoreScriptParser {
+  const HeuristicCoreScriptParser();
+
+  @override
+  CoreScriptParseResult parse(List<Block> blocks) {
+    final List<Map<String, dynamic>> macros = <Map<String, dynamic>>[];
+    final List<Map<String, dynamic>> expressions =
+        extractCoreExpressions(blocks, macros);
+    final List<Map<String, dynamic>> flow = extractCoreScriptFlow(blocks);
+    return CoreScriptParseResult(
+      expressions: expressions,
+      macros: macros,
+      flow: flow,
+    );
+  }
 }
 
 void main(List<String> args) {
+  final ArgParser parser = ArgParser()
+    ..addFlag(
+      'use-compiler-resolver',
+      negatable: false,
+    )
+    ..addOption('clang-path')
+    ..addOption('dxc-path')
+    ..addOption('metal-shader-converter-path')
+    ..addOption('cache-dir');
+  final ArgResults parsedArgs = parser.parse(args);
   final Directory root =
-      (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
+      (parsedArgs.rest.isEmpty ? Directory.current : Directory(parsedArgs.rest.first)).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath = root.path.endsWith(sep) ? root.path : root.path + sep;
   final Directory legacyDir = Directory(rootPath + 'Shaders${sep}Legacy');
@@ -62,6 +115,24 @@ void main(List<String> args) {
   );
   outputDir.createSync(recursive: true);
   final List<Map<String, dynamic>> index = [];
+  final bool useCompilerResolver = parsedArgs['use-compiler-resolver'] as bool? ?? false;
+  final ShaderSourceResolver resolver = useCompilerResolver
+      ? CompilerShaderSourceResolver(
+          CompilerBackend(
+            CompilerBackendConfig(
+              cacheDir: Directory(
+                parsedArgs['cache-dir'] as String? ??
+                    p.join(rootPath, 'tools', 'shader_port', 'output', 'preprocessed'),
+              ),
+              clangPath: parsedArgs['clang-path'] as String?,
+              dxcPath: parsedArgs['dxc-path'] as String?,
+              metalShaderConverterPath:
+                  parsedArgs['metal-shader-converter-path'] as String?,
+              includeDirs: <String>[legacyDir.path],
+            ),
+          ),
+        )
+      : const FileShaderSourceResolver();
   for (final FileSystemEntity entity in legacyDir.listSync(
     recursive: true,
     followLinks: false,
@@ -72,7 +143,11 @@ void main(List<String> args) {
     final String relative = entity.path
         .substring(legacyDir.path.length + 1)
         .replaceAll(RegExp(r'[\\/]'), '/');
-    final ParseResult result = parseShader(entity, relative);
+    final ParseResult result = parseShader(
+      entity,
+      relative,
+      resolver: resolver,
+    );
     final File targetFile = File(outputDir.path + sep + relative + '.json');
     targetFile.parent.createSync(recursive: true);
     targetFile.writeAsStringSync(encodeResult(result));
@@ -94,16 +169,43 @@ void main(List<String> args) {
   stdout.writeln('Parsed ${index.length} shader scripts into IR');
 }
 
-ParseResult parseShader(File file, String relativePath) {
-  final String content = file.readAsStringSync(encoding: latin1);
-  return parseShaderFromSource(content, relativePath);
+ParseResult parseShader(
+  File file,
+  String relativePath, {
+  ShaderSourceResolver? resolver,
+  CoreScriptParser? coreParser,
+}) {
+  final ShaderSourceResolver activeResolver =
+      resolver ?? const FileShaderSourceResolver();
+  final ShaderSource shaderSource = activeResolver.resolve(file, relativePath);
+  return parseShaderFromSource(
+    shaderSource.content,
+    relativePath,
+    coreParser: coreParser,
+    compilerMetadata: shaderSource.artifacts?.reflection,
+  );
 }
 
-ParseResult parseShaderFromSource(String source, String relativePath) {
-  return _parseShaderContent(source, relativePath);
+ParseResult parseShaderFromSource(
+  String source,
+  String relativePath, {
+  CoreScriptParser? coreParser,
+  Map<String, dynamic>? compilerMetadata,
+}) {
+  return _parseShaderContent(
+    source,
+    relativePath,
+    coreParser: coreParser,
+    compilerMetadata: compilerMetadata,
+  );
 }
 
-ParseResult _parseShaderContent(String content, String relativePath) {
+ParseResult _parseShaderContent(
+  String content,
+  String relativePath, {
+  CoreScriptParser? coreParser,
+  Map<String, dynamic>? compilerMetadata,
+}) {
   final List<String> includes = [];
   final List<Block> blocks = [];
   int index = 0;
@@ -174,16 +276,18 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     }
     index++;
   }
+  final CoreScriptParser activeCoreParser =
+      coreParser ?? const HeuristicCoreScriptParser();
+  final CoreScriptParseResult coreResult = activeCoreParser.parse(blocks);
   final String fileName = relativePath.split('/').last;
   final int dot = fileName.lastIndexOf('.');
   final String name = dot == -1 ? fileName : fileName.substring(0, dot);
   final String extension = dot == -1 ? '' : fileName.substring(dot + 1);
   final List<Map<String, dynamic>> textureStages = extractTextureStages(blocks);
   final List<Map<String, dynamic>> passStates = extractPassStates(blocks);
-  final List<Map<String, dynamic>> coreMacros = <Map<String, dynamic>>[];
-  final List<Map<String, dynamic>> coreExpressions =
-      extractCoreExpressions(blocks, coreMacros);
-  final List<Map<String, dynamic>> coreFlow = extractCoreScriptFlow(blocks);
+  final List<Map<String, dynamic>> coreMacros = coreResult.macros;
+  final List<Map<String, dynamic>> coreExpressions = coreResult.expressions;
+  final List<Map<String, dynamic>> coreFlow = coreResult.flow;
   final List<String> explicitVertexAttributes = extractVertexAttributes(blocks);
   final _VertexAttributeSummary vertexSummary = deriveVertexAttributeSummary(
     explicitVertexAttributes,
@@ -223,6 +327,7 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     positionScripts,
     positionScriptBlocks,
     outputFieldTypes,
+    compilerMetadata,
   );
 }
 
@@ -247,6 +352,7 @@ String encodeResult(ParseResult result) {
     'positionScripts': result.positionScripts,
     'positionScriptBlocks': result.positionScriptBlocks,
     'outputFieldTypes': result.outputFieldTypes,
+    if (result.compilerMetadata != null) 'compilerMetadata': result.compilerMetadata,
   };
   return const JsonEncoder.withIndent('  ').convert(map);
 }

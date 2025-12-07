@@ -4,9 +4,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'reflection_adapter.dart';
+
 part 'shader_ir_models.dart';
 part 'shader_ir_parser.dart';
 part 'expression_translator.dart';
+part 'emission_strategies.dart';
 part 'metal_fragment_builder.dart';
 void main(List<String> args) {
   final Directory root = (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
