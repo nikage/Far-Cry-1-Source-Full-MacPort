@@ -28,10 +28,12 @@
 #include <cassert>
 #include <strings.h>
 #include <algorithm>
+#include <cstdlib>
 #include <vector>
 #include <string>
 #include <unordered_map>
 #include <unordered_map>
+#include <unordered_set>
 #ifdef min
 #undef min
 #endif
@@ -41,6 +43,11 @@
 
 namespace
 {
+static int g_missingVertexLogCount = 0;
+static int g_vertexMatchLogCount = 0;
+static int g_requirementLogCount = 0;
+static int g_fragmentMetaLogCount = 0;
+static const int kMaxMissingVertexLogs = 32;
 struct VertexLayoutInfo
 {
     int format;
@@ -64,6 +71,22 @@ struct VertexAttributeSummary
     bool hasBinormal = false;
     bool hasTNormal = false;
     int texCoordCount = 0;
+};
+
+static std::string ToLowerCopy(const std::string& value)
+{
+    std::string lower = value;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return lower;
+}
+
+struct FragmentVaryingRequirement
+{
+    std::string name;
+    std::string normalizedName;
+    int components = 0;
 };
 
 VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metadata, int textureCount, NSString* shaderName)
@@ -302,6 +325,35 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
         info.functionName = summary.hasColor0 ? @"color_vertex" : @"simple_vertex";
 
     return info;
+}
+
+static void ApplyScreenVertexFallback(bool hasGeneratedVertex,
+                                      VertexLayoutInfo& layout,
+                                      const VertexAttributeSummary& summary,
+                                      NSString* shaderName)
+{
+    if (hasGeneratedVertex)
+        return;
+    if (summary.texCoordCount == 0)
+        return;
+    if (summary.hasNormal || summary.hasColor0 || summary.hasColor1 ||
+        summary.hasTangent || summary.hasBinormal || summary.hasTNormal)
+    {
+        return;
+    }
+
+    layout.format = VERTEX_FORMAT_P3F_TEX2F;
+    layout.functionName = @"screen_vertex";
+    layout.hasTexCoords = true;
+    layout.hasColor = false;
+    layout.hasNormal = false;
+    layout.needsTangents = false;
+
+    if (iLog && shaderName)
+    {
+        iLog->Log("MetalShaderManager: applying screen_vertex fallback for shader '%s'\n",
+                  [shaderName UTF8String]);
+    }
 }
 
 
@@ -576,6 +628,169 @@ static std::vector<GeneratedVertexAttributeDesc> BuildGeneratedVertexAttributes(
     return attributes;
 }
 
+static std::vector<GeneratedVertexOutputDesc> BuildGeneratedVertexOutputs(NSArray* outputsArray)
+{
+    std::vector<GeneratedVertexOutputDesc> outputs;
+    if (!outputsArray || ![outputsArray isKindOfClass:[NSArray class]])
+        return outputs;
+    for (id entry in outputsArray)
+    {
+        if (![entry isKindOfClass:[NSDictionary class]])
+            continue;
+        NSDictionary* dict = (NSDictionary*)entry;
+        NSString* nameValue = dict[@"name"];
+        if (!nameValue || ![nameValue isKindOfClass:[NSString class]])
+            continue;
+        GeneratedVertexOutputDesc desc;
+        desc.name = NSStringToStdString(nameValue);
+        NSNumber* componentsValue = dict[@"components"];
+        if (componentsValue && [componentsValue isKindOfClass:[NSNumber class]])
+            desc.components = componentsValue.intValue;
+        outputs.push_back(desc);
+    }
+    return outputs;
+}
+
+static int DetermineDefaultComponents(const std::string& categoryLower, const std::string& tokenLower)
+{
+    if (categoryLower == "color")
+        return 4;
+    if (categoryLower == "texcoord")
+        return 2;
+    if (categoryLower == "normal" || categoryLower == "tangent" || categoryLower == "binormal")
+        return 3;
+    if (tokenLower.find("tex") == 0)
+        return 2;
+    return 4;
+}
+
+static int ParseComponentsSuffix(const std::string& value)
+{
+    size_t underscore = value.rfind('_');
+    if (underscore == std::string::npos || underscore + 1 >= value.size())
+        return 0;
+    const char* start = value.c_str() + underscore + 1;
+    char* end = nullptr;
+    long parsed = strtol(start, &end, 10);
+    if (end == start || parsed <= 0)
+        return 0;
+    return static_cast<int>(parsed);
+}
+
+static bool ParseAttributeRequirementString(NSString* attrString, FragmentVaryingRequirement& outRequirement)
+{
+    if (!attrString || ![attrString isKindOfClass:[NSString class]])
+        return false;
+    const std::string value = NSStringToStdString(attrString);
+    if (value.empty())
+        return false;
+    std::string upper = value;
+    std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c) {
+        return static_cast<char>(std::toupper(c));
+    });
+    std::string token;
+    int components = 0;
+    if (upper.find("TEXCOORD") == 0)
+    {
+        size_t indexPos = strlen("TEXCOORD");
+        std::string indexDigits;
+        while (indexPos < upper.size() && std::isdigit(static_cast<unsigned char>(upper[indexPos])))
+        {
+            indexDigits.push_back(static_cast<char>(upper[indexPos]));
+            indexPos++;
+        }
+        token = "Tex" + indexDigits;
+        components = ParseComponentsSuffix(upper);
+        if (components <= 0)
+            components = 2;
+    }
+    else if (upper.find("COLOR") == 0)
+    {
+        std::string suffix = upper.substr(strlen("COLOR"));
+        token = suffix.empty() ? "Color" : "Color" + suffix;
+        components = ParseComponentsSuffix(upper);
+        if (components <= 0)
+            components = 4;
+    }
+    else
+    {
+        token = value;
+        components = ParseComponentsSuffix(upper);
+        if (components <= 0)
+            components = 4;
+    }
+    if (token.empty())
+        return false;
+    outRequirement.name = token;
+    outRequirement.normalizedName = ToLowerCopy(token);
+    outRequirement.components = components;
+    return true;
+}
+
+static std::vector<FragmentVaryingRequirement> BuildFragmentVaryingRequirements(
+    NSArray* metadataArray,
+    NSArray* attributeArray)
+{
+    std::unordered_map<std::string, FragmentVaryingRequirement> requirements;
+    if (metadataArray && [metadataArray isKindOfClass:[NSArray class]])
+    {
+        for (id entry in metadataArray)
+        {
+            if (![entry isKindOfClass:[NSDictionary class]])
+                continue;
+            NSDictionary* dict = (NSDictionary*)entry;
+            NSString* tokenValue = dict[@"token"];
+            if (!tokenValue || ![tokenValue isKindOfClass:[NSString class]])
+                continue;
+            const std::string token = NSStringToStdString(tokenValue);
+            std::string normalized = ToLowerCopy(token);
+            NSString* categoryValue = dict[@"category"];
+            std::string categoryLower;
+            if (categoryValue && [categoryValue isKindOfClass:[NSString class]])
+                categoryLower = ToLowerCopy(NSStringToStdString(categoryValue));
+            if (categoryLower == "position" || normalized == "position")
+                continue;
+            NSNumber* componentsValue = dict[@"components"];
+            int components = componentsValue ? componentsValue.intValue : 0;
+            if (components <= 0)
+                components = DetermineDefaultComponents(categoryLower, normalized);
+            FragmentVaryingRequirement requirement;
+            requirement.name = token;
+            requirement.normalizedName = normalized;
+            requirement.components = components;
+            requirements[normalized] = requirement;
+        }
+    }
+    if (requirements.empty() && attributeArray && [attributeArray isKindOfClass:[NSArray class]])
+    {
+        for (id item in attributeArray)
+        {
+            if (![item isKindOfClass:[NSString class]])
+                continue;
+            FragmentVaryingRequirement requirement;
+            if (!ParseAttributeRequirementString((NSString*)item, requirement))
+                continue;
+            if (requirement.normalizedName == "position")
+                continue;
+            requirements[requirement.normalizedName] = requirement;
+        }
+    }
+    std::vector<FragmentVaryingRequirement> result;
+    result.reserve(requirements.size());
+    for (const auto& kv : requirements)
+        result.push_back(kv.second);
+    if (result.empty() && metadataArray && [metadataArray isKindOfClass:[NSArray class]] && [metadataArray count] > 0 && g_requirementLogCount < 5)
+    {
+        fprintf(stderr, "MetalShaderManager: requirement extraction failed for metadata count=%ld\n",
+                (long)[metadataArray count]);
+        g_requirementLogCount++;
+    }
+    std::sort(result.begin(), result.end(), [](const FragmentVaryingRequirement& a, const FragmentVaryingRequirement& b) {
+        return a.normalizedName < b.normalizedName;
+    });
+    return result;
+}
+
 static std::string StripStagePrefix(const std::string& value)
 {
     static const char* prefixes[] = {
@@ -607,10 +822,183 @@ static std::string StripVertexSuffix(const std::string& value)
     return value;
 }
 
+static std::string StripPixelSuffix(const std::string& value)
+{
+    static const char* suffixes[] = {
+        "_ps50", "_ps40", "_ps30", "_ps20", "_ps3x", "_ps2x",
+        "_ps14", "_ps13", "_ps12", "_ps11", "_ps10", "_ps"
+    };
+    for (const char* suffix : suffixes)
+    {
+        const size_t length = strlen(suffix);
+        if (value.size() > length && value.compare(value.size() - length, length, suffix) == 0)
+        {
+            return value.substr(0, value.size() - length);
+        }
+    }
+    return value;
+}
+
 static std::string BuildStageAgnosticKey(const std::string& normalized)
 {
-    return StripVertexSuffix(StripStagePrefix(normalized));
+    return StripPixelSuffix(StripVertexSuffix(StripStagePrefix(normalized)));
 }
+
+static std::vector<std::string> BuildVertexLookupCandidates(const std::string& canonicalKey)
+{
+    std::vector<std::string> candidates;
+    std::unordered_set<std::string> seen;
+    auto pushCandidate = [&](const std::string& key)
+    {
+        if (!key.empty() && seen.insert(key).second)
+            candidates.push_back(key);
+    };
+
+    pushCandidate(canonicalKey);
+
+    std::string current = canonicalKey;
+    size_t depth = 0;
+    size_t position = current.rfind('_');
+    while (position != std::string::npos && depth < 8)
+    {
+        current = current.substr(0, position);
+        if (current.length() < 4)
+            break;
+        pushCandidate(current);
+        position = current.rfind('_');
+        depth++;
+    }
+
+    return candidates;
+}
+
+static bool StartsWith(const std::string& value, const std::string& prefix)
+{
+    return value.size() >= prefix.size() &&
+           value.compare(0, prefix.size(), prefix) == 0;
+}
+
+static const GeneratedVertexEntry* FindVertexEntryByOutputs(
+    const std::unordered_map<std::string, GeneratedVertexEntry>& entries,
+    const std::vector<FragmentVaryingRequirement>& requirements)
+{
+    if (requirements.empty())
+        return nullptr;
+    const GeneratedVertexEntry* bestEntry = nullptr;
+    int bestScore = -1;
+    for (const auto& kv : entries)
+    {
+        if (kv.second.outputs.empty())
+            continue;
+        std::unordered_map<std::string, int> outputMap;
+        for (const GeneratedVertexOutputDesc& output : kv.second.outputs)
+        {
+            const std::string key = ToLowerCopy(output.name);
+            const int components = output.components > 0 ? output.components : 4;
+            auto it = outputMap.find(key);
+            if (it == outputMap.end())
+                outputMap[key] = components;
+            else
+                it->second = std::max(it->second, components);
+        }
+        bool missing = false;
+        int matched = 0;
+        for (const FragmentVaryingRequirement& requirement : requirements)
+        {
+            auto it = outputMap.find(requirement.normalizedName);
+            if (it == outputMap.end() || it->second < requirement.components)
+            {
+                missing = true;
+                break;
+            }
+            matched++;
+        }
+        if (missing)
+            continue;
+        const int score = matched * 100 - static_cast<int>(outputMap.size());
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestEntry = &kv.second;
+        }
+    }
+    return bestEntry;
+}
+
+static const GeneratedVertexEntry* FindGeneratedVertexEntry(
+    const std::unordered_map<std::string, GeneratedVertexEntry>& entries,
+    const std::string& canonicalKey,
+    NSArray* fragmentVertexAttrMetaArray,
+    NSArray* fragmentVertexAttrArray)
+{
+    if (canonicalKey.empty() || entries.empty())
+        return nullptr;
+
+    const std::vector<FragmentVaryingRequirement> requirements =
+        BuildFragmentVaryingRequirements(fragmentVertexAttrMetaArray, fragmentVertexAttrArray);
+    if (!requirements.empty() && g_requirementLogCount < 5)
+    {
+        fprintf(stderr, "MetalShaderManager: fragment key '%s' requirement count=%zu\n",
+                canonicalKey.c_str(),
+                requirements.size());
+        g_requirementLogCount++;
+    }
+    const GeneratedVertexEntry* outputMatch = FindVertexEntryByOutputs(entries, requirements);
+    if (outputMatch)
+    {
+        if (iLog)
+        {
+            iLog->Log("MetalShaderManager: output matched fragment key '%s' to vertex entry '%s'\n",
+                      canonicalKey.c_str(),
+                      outputMatch->entryPoint.c_str());
+        }
+        else
+        {
+            fprintf(stderr, "MetalShaderManager: output matched fragment key '%s' to vertex entry '%s'\n",
+                    canonicalKey.c_str(),
+                    outputMatch->entryPoint.c_str());
+        }
+        return outputMatch;
+    }
+
+    const std::vector<std::string> candidates = BuildVertexLookupCandidates(canonicalKey);
+    for (const std::string& candidate : candidates)
+    {
+        auto it = entries.find(candidate);
+        if (it != entries.end())
+        {
+            if (candidate != canonicalKey && iLog)
+            {
+                iLog->Log("MetalShaderManager: mapped fragment key '%s' to vertex key '%s'\n",
+                          canonicalKey.c_str(), candidate.c_str());
+            }
+            return &it->second;
+        }
+    }
+
+    const GeneratedVertexEntry* bestEntry = nullptr;
+    const std::string* bestKey = nullptr;
+    for (const auto& kv : entries)
+    {
+        if (StartsWith(canonicalKey, kv.first))
+        {
+            if (!bestEntry || kv.first.length() > bestKey->length())
+            {
+                bestEntry = &kv.second;
+                bestKey = &kv.first;
+            }
+        }
+    }
+
+    if (bestEntry && bestKey && iLog)
+    {
+        iLog->Log("MetalShaderManager: using prefix vertex key '%s' for fragment key '%s'\n",
+                  bestKey->c_str(), canonicalKey.c_str());
+    }
+
+    return bestEntry;
+}
+
 }
 
 CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer, 
@@ -876,6 +1264,73 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
     }
 
     NSArray* entries = (NSArray*)manifestJson;
+
+    // First pass: cache all generated vertex entries so fragments can reference them
+    g_missingVertexLogCount = 0;
+    g_vertexMatchLogCount = 0;
+    size_t matchedFragmentVertexCount = 0;
+    size_t missingFragmentVertexCount = 0;
+
+    for (NSDictionary* entry in entries)
+    {
+        if (![entry isKindOfClass:[NSDictionary class]])
+            continue;
+
+        NSString* shaderName = entry[@"shader"];
+        NSString* normalizedName = entry[@"normalized"];
+        NSString* fragmentName = entry[@"entryPoint"];
+        if (!fragmentName)
+            fragmentName = entry[@"fragment"];
+        NSString* stageValue = entry[@"stage"];
+        NSArray* vertexAttrMetaArray = entry[@"vertexAttributeMetadata"];
+
+        if (!shaderName || !fragmentName)
+            continue;
+
+        std::string normalizedKey;
+        if (normalizedName && [normalizedName length] > 0)
+            normalizedKey = NormalizeShaderName([normalizedName UTF8String]);
+        else
+            normalizedKey = NormalizeShaderName([shaderName UTF8String]);
+        NSString* loweredStage = stageValue ? [stageValue lowercaseString] : @"fragment";
+        if (![loweredStage isEqualToString:@"vertex"])
+            continue;
+
+        const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
+        GeneratedVertexEntry vertexEntry;
+        vertexEntry.shaderName = NSStringToStdString(shaderName);
+        vertexEntry.normalizedName = normalizedKey;
+        vertexEntry.entryPoint = NSStringToStdString(fragmentName);
+        vertexEntry.attributes = BuildGeneratedVertexAttributes(vertexAttrMetaArray);
+        NSArray* vertexOutputsArray = entry[@"vertexOutputs"];
+        vertexEntry.outputs = BuildGeneratedVertexOutputs(vertexOutputsArray);
+        m_generatedVertexEntries[canonicalKey] = std::move(vertexEntry);
+        if (iLog)
+        {
+            iLog->Log("MetalShaderManager: cached generated vertex '%s' (key=%s)",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>",
+                      canonicalKey.c_str());
+        }
+        else
+        {
+            fprintf(stderr, "MetalShaderManager: cached generated vertex '%s' (key=%s)\n",
+                    shaderName ? [shaderName UTF8String] : "<unnamed>",
+                    canonicalKey.c_str());
+        }
+    }
+
+    if (iLog)
+    {
+        iLog->Log("MetalShaderManager: cached %zu generated vertex programs\n",
+                  m_generatedVertexEntries.size());
+    }
+    else
+    {
+        fprintf(stderr, "MetalShaderManager: cached %zu generated vertex programs\n",
+                m_generatedVertexEntries.size());
+    }
+
+    // Second pass: build fragment pipelines
     for (NSDictionary* entry in entries)
     {
         if (![entry isKindOfClass:[NSDictionary class]])
@@ -896,7 +1351,26 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         NSArray* maskArray = entry[@"maskReferences"];
         NSDictionary* pipelineDict = entry[@"pipeline"];
 
+        if (g_fragmentMetaLogCount < 5)
+        {
+            long metaCount = (vertexAttrMetaArray && [vertexAttrMetaArray isKindOfClass:[NSArray class]]) ? [vertexAttrMetaArray count] : -1;
+            long attrCount = (vertexAttrArray && [vertexAttrArray isKindOfClass:[NSArray class]]) ? [vertexAttrArray count] : -1;
+            fprintf(stderr, "MetalShaderManager: fragment '%s' metaCount=%ld attrCount=%ld\n",
+                    shaderName ? [shaderName UTF8String] : "<nil>",
+                    metaCount,
+                    attrCount);
+            g_fragmentMetaLogCount++;
+        }
         if (!shaderName || !fragmentName)
+            continue;
+
+        std::string normalizedKey;
+        if (normalizedName && [normalizedName length] > 0)
+            normalizedKey = NormalizeShaderName([normalizedName UTF8String]);
+        else
+            normalizedKey = NormalizeShaderName([shaderName UTF8String]);
+        NSString* loweredStage = stageValue ? [stageValue lowercaseString] : @"fragment";
+        if ([loweredStage isEqualToString:@"vertex"])
             continue;
 
         if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
@@ -906,33 +1380,38 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                       fragmentName ? [fragmentName UTF8String] : "<null>");
         }
 
-        std::string normalizedKey;
-        if (normalizedName && [normalizedName length] > 0)
-            normalizedKey = NormalizeShaderName([normalizedName UTF8String]);
-        else
-            normalizedKey = NormalizeShaderName([shaderName UTF8String]);
-        NSString* loweredStage = stageValue ? [stageValue lowercaseString] : @"fragment";
         const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
 
-        if ([loweredStage isEqualToString:@"vertex"])
+        const GeneratedVertexEntry* matchedVertexEntry =
+            FindGeneratedVertexEntry(m_generatedVertexEntries,
+                                     canonicalKey,
+                                     vertexAttrMetaArray,
+                                     vertexAttrArray);
+        if (matchedVertexEntry)
         {
-            GeneratedVertexEntry vertexEntry;
-            vertexEntry.shaderName = NSStringToStdString(shaderName);
-            vertexEntry.normalizedName = normalizedKey;
-            vertexEntry.entryPoint = NSStringToStdString(fragmentName);
-            vertexEntry.attributes = BuildGeneratedVertexAttributes(vertexAttrMetaArray);
-            m_generatedVertexEntries[canonicalKey] = std::move(vertexEntry);
+            matchedFragmentVertexCount++;
+        }
+        else
+        {
+            missingFragmentVertexCount++;
+        }
+
+        if (!matchedVertexEntry && g_missingVertexLogCount < kMaxMissingVertexLogs)
+        {
             if (iLog)
             {
-                iLog->Log("MetalShaderManager: cached generated vertex '%s' (key=%s)",
-                          shaderName ? [shaderName UTF8String] : "<unnamed>",
-                          canonicalKey.c_str());
+                iLog->Log("MetalShaderManager: missing generated vertex entry for key '%s' (shader '%s')\n",
+                          canonicalKey.c_str(),
+                          shaderName ? [shaderName UTF8String] : "<unnamed>");
             }
-            continue;
+            else
+            {
+                fprintf(stderr, "MetalShaderManager: missing generated vertex entry for key '%s' (shader '%s')\n",
+                        canonicalKey.c_str(),
+                        shaderName ? [shaderName UTF8String] : "<unnamed>");
+            }
+            g_missingVertexLogCount++;
         }
-        const auto generatedVertexIt = m_generatedVertexEntries.find(canonicalKey);
-        const GeneratedVertexEntry* matchedVertexEntry =
-            generatedVertexIt != m_generatedVertexEntries.end() ? &generatedVertexIt->second : nullptr;
 
         if (normalizedKey.find("envlight") != std::string::npos)
         {
@@ -988,7 +1467,22 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                       attributeSummary.hasBinormal ? 1 : 0,
                       attributeSummary.texCoordCount);
         }
+        const bool hasGeneratedVertexEntry = (matchedVertexEntry != nullptr);
+        if (hasGeneratedVertexEntry && g_vertexMatchLogCount < kMaxMissingVertexLogs)
+        {
+            if (iLog)
+            {
+                iLog->Log("MetalShaderManager: matched fragment key '%s' to vertex entry '%s'\n",
+                          canonicalKey.c_str(),
+                          matchedVertexEntry->entryPoint.c_str());
+            }
+            fprintf(stderr, "MetalShaderManager: matched fragment key '%s' to vertex entry '%s'\n",
+                    canonicalKey.c_str(),
+                    matchedVertexEntry->entryPoint.c_str());
+            g_vertexMatchLogCount++;
+        }
         VertexLayoutInfo layout = InferVertexLayout(attributeSummary, shaderName);
+        ApplyScreenVertexFallback(hasGeneratedVertexEntry, layout, attributeSummary, shaderName);
         if (forceTangentFrame)
         {
             layout.needsTangents = true;
@@ -1264,6 +1758,19 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 
         if (iLog)
             iLog->Log("MetalShaderManager: Registered generated shader '%s' (id=%d)\n", [shaderName UTF8String], shaderId);
+    }
+
+    if (iLog)
+    {
+        iLog->Log("MetalShaderManager: fragments matched to generated vertices=%zu, missing=%zu\n",
+                  matchedFragmentVertexCount,
+                  missingFragmentVertexCount);
+    }
+    else
+    {
+        fprintf(stderr, "MetalShaderManager: fragments matched to generated vertices=%zu, missing=%zu\n",
+                matchedFragmentVertexCount,
+                missingFragmentVertexCount);
     }
 }
 

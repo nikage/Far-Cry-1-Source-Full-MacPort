@@ -27,12 +27,19 @@ struct GeneratedVertexAttributeDesc
     int index = -1;
 };
 
+struct GeneratedVertexOutputDesc
+{
+    std::string name;
+    int components = 0;
+};
+
 struct GeneratedVertexEntry
 {
     std::string shaderName;
     std::string normalizedName;
     std::string entryPoint;
     std::vector<GeneratedVertexAttributeDesc> attributes;
+    std::vector<GeneratedVertexOutputDesc> outputs;
 };
 
 #endif

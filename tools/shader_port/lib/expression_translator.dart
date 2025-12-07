@@ -37,10 +37,19 @@ class ExpressionTranslator {
   String _sharedDifType = 'float3';
   bool _insideBlockComment = false;
   final Map<String, String> _variableTypes = <String, String>{};
+  late final Map<String, int> _inputComponentCounts =
+      _buildInputComponentCounts();
+  late final Map<String, String> _uniformTypes = {
+    for (final UniformBinding uniform in data.uniforms)
+      uniform.name: uniform.type,
+  };
+  late final Map<String, int> _attributeUsageRequirements =
+      _buildAttributeUsageRequirements();
   late final Set<String> _scalarUniforms = data.uniforms
       .where((UniformBinding u) => _isScalarType(u.type))
       .map((UniformBinding u) => u.name)
       .toSet();
+  final RegExp _simpleIdentifierPattern = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$');
 
   void _initializeMacroValues() {
     for (final MacroDefinition macro in macros) {
@@ -786,6 +795,105 @@ class ExpressionTranslator {
     return result;
   }
 
+  Map<String, int> _buildInputComponentCounts() {
+    final Map<String, int> counts = <String, int>{};
+    for (final Map<String, dynamic> entry in data.vertexAttributeMetadata) {
+      final String? token = entry['token'] as String?;
+      final int? components = entry['components'] as int?;
+      if (token == null || components == null) {
+        continue;
+      }
+      counts[token] = components;
+    }
+    return counts;
+  }
+
+  Map<String, int> _buildAttributeUsageRequirements() {
+    final Map<String, int> requirements = <String, int>{};
+    final RegExp attributePattern =
+        RegExp(r'IN\.([A-Za-z0-9_]+)(?![\.\[])');
+    for (final Map<String, dynamic> expr in data.coreExpressions) {
+      final String? lhs = expr['lhs'] as String?;
+      final String? rhs = (expr['rhs'] as String?)?.trim();
+      if (lhs == null || rhs == null || rhs.isEmpty) {
+        continue;
+      }
+      final int? inferred = _inferVectorComponentCount(lhs);
+      if (inferred == null) {
+        continue;
+      }
+      for (final RegExpMatch match in attributePattern.allMatches(rhs)) {
+        final String token = match.group(1)!;
+        final int current = requirements[token] ?? 0;
+        if (inferred > current) {
+          requirements[token] = inferred;
+        }
+      }
+    }
+    final RegExp assignmentPattern = RegExp(
+      r'^\s*(float[234]|half[234])\s+[A-Za-z_][A-Za-z0-9_]*\s*=\s*(.+);$',
+    );
+    for (final Map<String, String> block in data.positionScriptBlocks) {
+      final String content = block['content'] ?? '';
+      for (final String rawLine in content.split('\n')) {
+        final String line = rawLine.trim();
+        if (line.isEmpty) {
+          continue;
+        }
+        final RegExpMatch? match = assignmentPattern.firstMatch(line);
+        if (match == null) {
+          continue;
+        }
+        final String type = match.group(1)!;
+        final int targetComponents =
+            int.parse(type.replaceAll(RegExp(r'\D'), ''));
+        final String rhs = match.group(2)!;
+        for (final RegExpMatch attrMatch
+            in attributePattern.allMatches(rhs)) {
+          final String token = attrMatch.group(1)!;
+          final int current = requirements[token] ?? 0;
+          if (targetComponents > current) {
+            requirements[token] = targetComponents;
+          }
+        }
+      }
+    }
+    return requirements;
+  }
+
+  int? _inferVectorComponentCount(String declaration) {
+    final String trimmed = declaration.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final RegExp vectorPattern =
+        RegExp(r'^(float|half)([234])(?!x)\b', caseSensitive: false);
+    final RegExpMatch? vectorMatch = vectorPattern.firstMatch(trimmed);
+    if (vectorMatch != null) {
+      return int.tryParse(vectorMatch.group(2)!);
+    }
+    final RegExp scalarPattern =
+        RegExp(r'^(float|half)\b', caseSensitive: false);
+    if (scalarPattern.hasMatch(trimmed)) {
+      return 1;
+    }
+    return null;
+  }
+
+  String _expandAttributesByRequirement(String line) {
+    final RegExp pattern = RegExp(r'IN\.([A-Za-z0-9_]+)(?![\.\[])');
+    return line.replaceAllMapped(pattern, (Match match) {
+      final String token = match.group(1)!;
+      final int? required = _attributeUsageRequirements[token];
+      if (required == null) {
+        return match.group(0)!;
+      }
+      final String? expanded =
+          _expandAttributeForComponents(token, required);
+      return expanded ?? match.group(0)!;
+    });
+  }
+
   String _evaluateSimplePreprocessor(String source) {
     final List<_PreprocEvalFrame> stack = <_PreprocEvalFrame>[];
     bool currentActive = true;
@@ -975,7 +1083,29 @@ class ExpressionTranslator {
     return result;
   }
 
-  String _outputType(String field) => data.outputFieldTypes[field] ?? 'float4';
+  String _outputType(String field) {
+    if (data.stage == 'vertex' && field.toLowerCase() != 'color') {
+      final int? components = analyzer.outputComponentUsage[field];
+      if (components != null && components > 0 && components < 4) {
+        final int width = components < 2 ? 2 : components;
+        return _floatTypeForComponents(width);
+      }
+    }
+    return data.outputFieldTypes[field] ?? 'float4';
+  }
+
+  String _floatTypeForComponents(int components) {
+    switch (components) {
+      case 1:
+        return 'float';
+      case 2:
+        return 'float2';
+      case 3:
+        return 'float3';
+      default:
+        return 'float4';
+    }
+  }
 
   String _zeroValueForType(String type) {
     final String lower = type.toLowerCase();
@@ -1097,6 +1227,11 @@ class ExpressionTranslator {
     result = _expandSimpleMacros(result);
     _noteMacroReferences(result);
     result = _replaceInlineMacros(result);
+    result = _promoteMulArguments(result);
+    result = _promoteMatrixMultiplication(result);
+    result = _promoteDotArguments(result);
+    result = _promoteAttributeAssignments(result);
+    result = _coerceOutAssignment(result);
     for (final LineTransformer transformer in _transformers) {
       result = transformer.transform(result);
     }
@@ -1116,6 +1251,7 @@ class ExpressionTranslator {
       'uniforms.Normal;',
       'uniforms.Normal.xyz;',
     );
+    result = _expandAttributesByRequirement(result);
     return result;
   }
 
@@ -1149,6 +1285,9 @@ class ExpressionTranslator {
           'objToTangentSpace[2] = IN.TNormal;',
         ],
       };
+  static final RegExp _outAssignmentPattern = RegExp(
+    r'^(\s*)OUT\.([A-Za-z0-9_]+)\s*=\s*IN\.([A-Za-z0-9_]+);\s*$',
+  );
 
   String _replaceInlineMacros(String line) {
     String result = line;
@@ -1184,6 +1323,299 @@ class ExpressionTranslator {
     );
     return result;
   }
+
+  String _coerceOutAssignment(String line) {
+    final RegExpMatch? match = _outAssignmentPattern.firstMatch(line);
+    if (match == null) {
+      return line;
+    }
+    final String field = match.group(2)!;
+    final String attribute = match.group(3)!;
+    final int? attributeComponents = _inputComponentCounts[attribute];
+    if (attributeComponents == null || attributeComponents >= 4) {
+      return line;
+    }
+    final int? outputComponents = _componentsForOutputField(field);
+    if (outputComponents == null || outputComponents <= attributeComponents) {
+      return line;
+    }
+    final String? expanded =
+        _expandAttributeForComponents(attribute, outputComponents);
+    if (expanded == null) {
+      return line;
+    }
+    final String indent = match.group(1)!;
+    return '$indent'
+        'OUT.$field = $expanded;';
+  }
+
+  String _promoteMulArguments(String line) {
+    return line.replaceAllMapped(
+      RegExp(r'mul\s*\(\s*([A-Za-z0-9_\.]+)\s*,\s*IN\.([A-Za-z0-9_]+)\s*\)'),
+      (Match match) {
+        final String matrixExpr = match.group(1)!;
+        final String attribute = match.group(2)!;
+        final int? columns = _matrixColumnCount(matrixExpr);
+        if (columns == null) {
+          return match.group(0)!;
+        }
+        final String? expanded =
+            _expandAttributeForComponents(attribute, columns);
+        if (expanded == null) {
+          return match.group(0)!;
+        }
+        return 'mul($matrixExpr, $expanded)';
+      },
+    );
+  }
+
+  String _promoteMatrixMultiplication(String line) {
+    return line.replaceAllMapped(
+      RegExp(r'(\([^\)]+\)|[A-Za-z0-9_\.]+)\s*\*\s*\(?IN\.([A-Za-z0-9_]+)\)?'),
+      (Match match) {
+        final String matrixExpr = match.group(1)!;
+        final String attribute = match.group(2)!;
+        final String normalized = matrixExpr.trim().startsWith('(') &&
+                matrixExpr.trim().endsWith(')')
+            ? matrixExpr.trim().substring(1, matrixExpr.trim().length - 1)
+            : matrixExpr.trim();
+        final int? columns = _matrixColumnCount(normalized);
+        if (columns == null) {
+          return match.group(0)!;
+        }
+        final String? expanded =
+            _expandAttributeForComponents(attribute, columns);
+        if (expanded == null) {
+          return match.group(0)!;
+        }
+        return '$matrixExpr * $expanded';
+      },
+    );
+  }
+
+  String _promoteDotArguments(String line) {
+    return line.replaceAllMapped(
+      RegExp(r'dot\s*\(\s*([^\),]+)\s*,\s*([^\)]+)\s*\)'),
+      (Match match) {
+        final String firstExpr = match.group(1)!;
+        final String secondExpr = match.group(2)!;
+        final int? firstComponents =
+            _vectorComponentCountForExpression(firstExpr.trim());
+        final int? secondComponents =
+            _vectorComponentCountForExpression(secondExpr.trim());
+        final int target =
+            math.max(firstComponents ?? 0, secondComponents ?? 0);
+        final int resolved = target == 0
+            ? (firstComponents ?? secondComponents ?? 4)
+            : target;
+        final String adjustedFirst =
+            _coerceExpressionForComponents(firstExpr, resolved);
+        final String adjustedSecond =
+            _coerceExpressionForComponents(secondExpr, resolved);
+        return 'dot($adjustedFirst, $adjustedSecond)';
+      },
+    );
+  }
+
+  String _promoteAttributeAssignments(String line) {
+    final RegExp pattern = RegExp(
+      r'^(\s*)(float[234]|half[234])\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*IN\.([A-Za-z0-9_]+);\s*$',
+    );
+    final RegExpMatch? match = pattern.firstMatch(line);
+    if (match == null) {
+      return line;
+    }
+    final String type = match.group(2)!;
+    final int targetComponents = int.parse(type.replaceAll(RegExp(r'\D'), ''));
+    final String attribute = match.group(4)!;
+    final String? expanded =
+        _expandAttributeForComponents(attribute, targetComponents);
+    if (expanded == null) {
+      return line;
+    }
+    final String indent = match.group(1)!;
+    final String variable = match.group(3)!;
+    return '$indent$type $variable = $expanded;';
+  }
+
+  int? _matrixColumnCount(String expression) {
+    final String trimmed = expression.trim();
+    if (trimmed.startsWith('uniforms.')) {
+      final String name = trimmed.substring('uniforms.'.length);
+      return _matrixColumnsForType(_uniformTypes[name]);
+    }
+    if (_uniformTypes.containsKey(trimmed)) {
+      return _matrixColumnsForType(_uniformTypes[trimmed]);
+    }
+    final RegExp identifierPattern = RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$');
+    if (identifierPattern.hasMatch(trimmed)) {
+      return _matrixColumnsForType(_variableTypes[trimmed]);
+    }
+    return null;
+  }
+
+  int? _matrixColumnsForType(String? type) {
+    if (type == null) {
+      return null;
+    }
+    final RegExpMatch? match =
+        RegExp(r'float\d+x(\d+)').firstMatch(type.toLowerCase());
+    if (match == null) {
+      return null;
+    }
+    return int.tryParse(match.group(1)!);
+  }
+
+  int? _vectorComponentCountForExpression(String expression) {
+    final String trimmed = expression.trim();
+    if (trimmed.startsWith('IN.')) {
+      final String token = trimmed.substring(3).split(RegExp(r'[\.\[]')).first;
+      return _inputComponentCounts[token];
+    }
+    if (trimmed.startsWith('uniforms.')) {
+      final String name = trimmed.substring('uniforms.'.length);
+      return _vectorComponentsFromTypeName(_uniformTypes[name]);
+    }
+    if (_simpleIdentifierPattern.hasMatch(trimmed)) {
+      if (_uniformTypes.containsKey(trimmed)) {
+        return _vectorComponentsFromTypeName(_uniformTypes[trimmed]);
+      }
+      return _vectorComponentsFromTypeName(_variableTypes[trimmed]);
+    }
+    final RegExp constructorPattern =
+        RegExp(r'^(float|half)([234])\s*\(', caseSensitive: false);
+    final RegExpMatch? ctorMatch = constructorPattern.firstMatch(trimmed);
+    if (ctorMatch != null) {
+      return int.tryParse(ctorMatch.group(2)!);
+    }
+    return null;
+  }
+
+  int? _vectorComponentsFromTypeName(String? type) {
+    if (type == null) {
+      return null;
+    }
+    final String lower = type.toLowerCase();
+    if (lower.startsWith('float4') || lower.startsWith('half4')) {
+      return 4;
+    }
+    if (lower.startsWith('float3') || lower.startsWith('half3')) {
+      return 3;
+    }
+    if (lower.startsWith('float2') || lower.startsWith('half2')) {
+      return 2;
+    }
+    if (lower.startsWith('float') || lower.startsWith('half')) {
+      return 1;
+    }
+    return null;
+  }
+
+  String _coerceExpressionForComponents(
+    String expression,
+    int targetComponents,
+  ) {
+    final String trimmed = expression.trim();
+    if (trimmed.startsWith('IN.')) {
+      final String token = trimmed.substring(3).split(RegExp(r'[\.\[]')).first;
+      final String? expanded =
+          _expandAttributeForComponents(token, targetComponents);
+      if (expanded != null) {
+        return expanded;
+      }
+    }
+    final int? available = _vectorComponentCountForExpression(trimmed);
+    if (available == null || available == targetComponents) {
+      return expression;
+    }
+    if (available > targetComponents) {
+      return '${_parenthesizeExpression(trimmed)}${_swizzleSuffix(targetComponents)}';
+    }
+    return _expandExpressionWithPadding(trimmed, available, targetComponents);
+  }
+
+  String _parenthesizeExpression(String expression) {
+    final bool isSimple =
+        _simpleIdentifierPattern.hasMatch(expression) ||
+        expression.startsWith('uniforms.');
+    if (isSimple) {
+      return expression;
+    }
+    return '($expression)';
+  }
+
+  String _swizzleSuffix(int components) {
+    switch (components) {
+      case 1:
+        return '.x';
+      case 2:
+        return '.xy';
+      case 3:
+        return '.xyz';
+      default:
+        return '';
+    }
+  }
+
+  String _componentAccessor(String expression, int index) {
+    const List<String> swizzles = <String>['x', 'y', 'z', 'w'];
+    final String suffix = swizzles[index];
+    final String base = _parenthesizeExpression(expression);
+    return '$base.$suffix';
+  }
+
+  String _expandExpressionWithPadding(
+    String expression,
+    int available,
+    int targetComponents,
+  ) {
+    final List<String> components = <String>[];
+    for (int i = 0; i < available; i++) {
+      components.add(_componentAccessor(expression, i));
+    }
+    for (int i = available; i < targetComponents; i++) {
+      components.add(i == 3 ? '1.0' : '0.0');
+    }
+    return 'float$targetComponents(${components.join(', ')})';
+  }
+
+
+  String? _expandAttributeForComponents(String attribute, int targetComponents) {
+    final int? available = _inputComponentCounts[attribute];
+    if (available == null || available >= targetComponents) {
+      return null;
+    }
+    final List<String> swizzles = <String>['x', 'y', 'z', 'w'];
+    final List<String> components = <String>[];
+    for (int i = 0; i < available; i++) {
+      components.add('IN.$attribute.${swizzles[i]}');
+    }
+    for (int i = available; i < targetComponents; i++) {
+      components.add(i == 3 ? '1.0' : '0.0');
+    }
+    return 'float$targetComponents(${components.join(', ')})';
+  }
+
+  int? _componentsForOutputField(String field) {
+    final String? type = data.outputFieldTypes[field];
+    if (type == null || type.isEmpty) {
+      return null;
+    }
+    return _vectorComponentCount(type);
+  }
+
+  int _vectorComponentCount(String type) {
+    final RegExpMatch? match = RegExp(r'(\d)').firstMatch(type);
+    if (match == null) {
+      return 4;
+    }
+    final int? value = int.tryParse(match.group(1)!);
+    if (value == null || value == 0) {
+      return 4;
+    }
+    return value;
+  }
+
 
   String _applySampleAssignmentSuffix(String line) {
     final RegExp assignPattern = RegExp(

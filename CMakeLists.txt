@@ -139,6 +139,8 @@ if(APPLE)
         MACOSX_BUNDLE_IDENTIFIER "com.crytek.farcry"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/FARCRY/Info.plist.in"
     )
+
+    add_dependencies(FarCry XRenderMetal)
 endif()
 
 # Install
@@ -152,8 +154,13 @@ if(APPLE)
     )
     
     # Copy all dylibs and Metal shader libraries to the app bundle whenever FarCry or any dylib is rebuilt
+    set(FARCRY_BUNDLE_DIR ${CMAKE_BINARY_DIR}/FarCry.app)
+    set(FARCRY_BUNDLE_MACOS ${FARCRY_BUNDLE_DIR}/Contents/MacOS)
+    set(FARCRY_BUNDLE_RESOURCES ${FARCRY_BUNDLE_DIR}/Contents/Resources)
+    set(XRENDER_METAL_BINARY_DIR ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal)
+
     add_custom_command(TARGET FarCry POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_MACOS}
         COMMAND ${CMAKE_COMMAND} -E copy 
             $<TARGET_FILE:CrySystem>
             $<TARGET_FILE:Cry3DEngine>
@@ -168,7 +175,7 @@ if(APPLE)
             $<TARGET_FILE:CrySoundSystem>
             $<TARGET_FILE:CryGame>
             $<TARGET_FILE:XRenderMetal>
-            ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
+            ${FARCRY_BUNDLE_MACOS}
         COMMENT "Copying all dylibs to app bundle"
     )
     
@@ -177,25 +184,39 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/UtilShaders.metallib
             ${CMAKE_BINARY_DIR}/RenderDll/XRenderMetal/SpriteShaders.metallib
-            ${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/
+            ${FARCRY_BUNDLE_MACOS}
         COMMENT "Copying Metal shader libraries to app bundle"
         DEPENDS MetalShaders
     )
+
+    if(TARGET GeneratedMetalShaders)
+        add_dependencies(FarCry GeneratedMetalShaders)
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${XRENDER_METAL_BINARY_DIR}/GeneratedShaders.metallib
+                ${FARCRY_BUNDLE_RESOURCES}/GeneratedShaders.metallib
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_SOURCE_DIR}/RenderDll/XRenderMetal/Generated/generated_manifest.json
+                ${FARCRY_BUNDLE_RESOURCES}/generated_manifest.json
+            COMMENT "Copying generated Metal shader bundle artifacts"
+        )
+    endif()
     
     # Copy game assets to Resources directory
     if(EXISTS ${CMAKE_SOURCE_DIR}/fcsplash.bmp)
         add_custom_command(TARGET FarCry POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 ${CMAKE_SOURCE_DIR}/fcsplash.bmp
-                ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/fcsplash.bmp
+                ${FARCRY_BUNDLE_RESOURCES}/fcsplash.bmp
             COMMENT "Copying splash screen asset to Resources"
         )
     endif()
     
     # Create Levels directory in Resources
     add_custom_command(TARGET FarCry POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/Levels
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/Levels
         COMMENT "Creating Levels directory in Resources"
     )
     
@@ -249,10 +270,10 @@ if(APPLE)
     
     if(FCData_FOUND)
         add_custom_command(TARGET FarCry POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/FCData
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/FCData
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${FCData_PATH}
-                ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/FCData
+                ${FARCRY_BUNDLE_RESOURCES}/FCData
             COMMENT "Copying FCData directory with PAK files to Resources"
         )
     endif()
@@ -260,10 +281,10 @@ if(APPLE)
     set(SCRIPTS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Scripts)
     if(EXISTS ${SCRIPTS_SOURCE_DIR})
         add_custom_command(TARGET FarCry POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/Scripts
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/Scripts
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${SCRIPTS_SOURCE_DIR}
-                ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/Scripts
+                ${FARCRY_BUNDLE_RESOURCES}/Scripts
             COMMENT "Copying loose Scripts directory for runtime overrides"
         )
     else()
@@ -273,7 +294,7 @@ if(APPLE)
     set(CONVERTED_VIDEOS_ROOT "${CMAKE_SOURCE_DIR}/build/converted_videos" CACHE PATH "Root directory containing converted intro/demoloop videos")
 
     set(INTRO_VIDEOS_SOURCE_DIR ${CONVERTED_VIDEOS_ROOT}/english/English)
-    set(INTRO_VIDEOS_TARGET_DIR ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/languages/movies/english)
+    set(INTRO_VIDEOS_TARGET_DIR ${FARCRY_BUNDLE_RESOURCES}/languages/movies/english)
     if(EXISTS ${INTRO_VIDEOS_SOURCE_DIR})
         add_custom_command(TARGET FarCry POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory ${INTRO_VIDEOS_TARGET_DIR}
@@ -287,7 +308,7 @@ if(APPLE)
     endif()
 
     set(DEMO_LOOP_SOURCE_DIR ${CONVERTED_VIDEOS_ROOT}/english/DemoLoops)
-    set(DEMO_LOOP_TARGET_DIR ${CMAKE_BINARY_DIR}/FarCry.app/Contents/Resources/languages/movies/english/demoloops)
+    set(DEMO_LOOP_TARGET_DIR ${FARCRY_BUNDLE_RESOURCES}/languages/movies/english/demoloops)
     if(EXISTS ${DEMO_LOOP_SOURCE_DIR})
         add_custom_command(TARGET FarCry POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory ${DEMO_LOOP_TARGET_DIR}

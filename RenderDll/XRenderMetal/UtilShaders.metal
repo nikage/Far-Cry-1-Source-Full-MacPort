@@ -296,6 +296,20 @@ vertex VertexOut_Tex tex_vertex(VertexIn_P3F_TEX2F in [[stage_in]],
     return out;
 }
 
+vertex VertexOut_Tex screen_vertex(VertexIn_P3F_TEX2F in [[stage_in]],
+                                   constant Uniforms& uniforms [[buffer(METAL_VERTEX_UNIFORM_BUFFER_INDEX)]]) {
+    VertexOut_Tex out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.TexCoord0 = float4(in.texCoord, 0.0, 1.0);
+    if (uniforms.clipEnabled > 0.0) {
+        float3 worldPos = (uniforms.modelMatrix * float4(in.position, 1.0)).xyz;
+        out.clipDistance = dot(worldPos, uniforms.clipPlane.xyz) + uniforms.clipPlane.w;
+    } else {
+        out.clipDistance = 1.0;
+    }
+    return out;
+}
+
 struct VertexIn_P3F_N {
     float3 position [[attribute(0)]];
     float3 normal [[attribute(1)]];

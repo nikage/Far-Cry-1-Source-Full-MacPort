@@ -190,6 +190,12 @@ ParseResult _parseShaderContent(String content, String relativePath) {
     coreExpressions,
     coreFlow,
   );
+  final List<Map<String, dynamic>> appinAttributes =
+      _extractAppinAttributes(blocks);
+  if (appinAttributes.isNotEmpty) {
+    _mergeAttributeMetadata(vertexSummary.metadata, appinAttributes);
+  }
+  _dedupeAttributeMetadata(vertexSummary.metadata);
   final List<String> vertexAttributes = vertexSummary.semantics;
   final List<Map<String, dynamic>> vertexAttributeMetadata =
       vertexSummary.metadata;
@@ -261,6 +267,180 @@ List<Map<String, dynamic>> extractTextureStages(List<Block> blocks) {
     stages.add({'block': block.name, 'statements': statements});
   }
   return stages;
+}
+
+List<Map<String, dynamic>> _extractAppinAttributes(List<Block> blocks) {
+  final List<Map<String, dynamic>> attributes = <Map<String, dynamic>>[];
+  final RegExp structPattern = RegExp(
+    r'struct\s+appin\s*\{([^}]*)\}',
+    caseSensitive: false,
+    dotAll: true,
+  );
+  final RegExp fieldPattern = RegExp(
+    r'^\s*(float[234]?|half[234]?|float|half)\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z0-9_]+)\s*;',
+    caseSensitive: false,
+  );
+  final RegExp texMacroPattern = RegExp(r'^IN_T(\d+)', caseSensitive: false);
+  final RegExp colorMacroPattern = RegExp(r'^IN_C(\d+)', caseSensitive: false);
+  for (final Block block in blocks) {
+    if (block.name.toLowerCase() != 'declarationsscript') {
+      continue;
+    }
+    final RegExpMatch? match = structPattern.firstMatch(block.content);
+    if (match == null) {
+      continue;
+    }
+    final String body = match.group(1)!;
+    for (final String rawLine in body.split('\n')) {
+      final String line = rawLine.trim();
+      if (line.isEmpty || line.startsWith('//')) {
+        continue;
+      }
+      final RegExpMatch? fieldMatch = fieldPattern.firstMatch(line);
+      if (fieldMatch == null) {
+        if (line.startsWith('IN_P')) {
+          attributes.add({
+            'token': 'Position',
+            'semantic': 'POSITION',
+            'components': 4,
+            'category': 'position',
+            'source': 'macro',
+          });
+          continue;
+        }
+        if (line.startsWith('IN_N')) {
+          attributes.add({
+            'token': 'Normal',
+            'semantic': 'NORMAL',
+            'components': 3,
+            'category': 'normal',
+            'source': 'macro',
+          });
+          continue;
+        }
+        final RegExpMatch? texMatch = texMacroPattern.firstMatch(line);
+        if (texMatch != null) {
+          final int index = int.tryParse(texMatch.group(1)!) ?? 0;
+          attributes.add({
+            'token': 'TexCoord$index',
+            'semantic': 'TEXCOORD$index',
+            'components': 2,
+            'category': 'texcoord',
+            'index': index,
+            'source': 'macro',
+          });
+          continue;
+        }
+        final RegExpMatch? colorMatch = colorMacroPattern.firstMatch(line);
+        if (colorMatch != null) {
+          final int index = int.tryParse(colorMatch.group(1)!) ?? 0;
+          attributes.add({
+            'token': index == 0 ? 'Color' : 'Color$index',
+            'semantic': index == 0 ? 'COLOR' : 'COLOR$index',
+            'components': 4,
+            'category': 'color',
+            'index': index,
+            'source': 'macro',
+          });
+          continue;
+        }
+        continue;
+      }
+      final String type = fieldMatch.group(1)!;
+      final String name = fieldMatch.group(2)!;
+      final String semantic = fieldMatch.group(3)!;
+      final Map<String, dynamic> entry = <String, dynamic>{
+        'token': name,
+        'semantic': semantic.toUpperCase(),
+        'components': _vectorComponentsFromType(type),
+        'category': _categoryForSemantic(semantic),
+        'source': 'declaration',
+      };
+      if (semantic.toUpperCase().startsWith('TEXCOORD')) {
+        entry['index'] =
+            int.tryParse(RegExp(r'\d+').firstMatch(semantic)?.group(0) ?? '0');
+      }
+      attributes.add(entry);
+    }
+  }
+  return attributes;
+}
+
+void _mergeAttributeMetadata(
+  List<Map<String, dynamic>> existing,
+  List<Map<String, dynamic>> additions,
+) {
+  for (final Map<String, dynamic> addition in additions) {
+    final String? token = addition['token'] as String?;
+    if (token == null || token.isEmpty) {
+      continue;
+    }
+    final int index =
+        existing.indexWhere((Map<String, dynamic> entry) => entry['token'] == token);
+    if (index == -1) {
+      existing.add(Map<String, dynamic>.from(addition));
+      continue;
+    }
+    final String source =
+        (existing[index]['source'] as String?)?.toLowerCase() ?? '';
+    if (source == 'explicit') {
+      continue;
+    }
+    existing[index] = Map<String, dynamic>.from(addition);
+  }
+}
+
+void _dedupeAttributeMetadata(List<Map<String, dynamic>> metadata) {
+  final Set<String> seen = <String>{};
+  metadata.removeWhere((Map<String, dynamic> entry) {
+    final String? token = entry['token'] as String?;
+    if (token == null) {
+      return false;
+    }
+    final String lower = token.toLowerCase();
+    if (seen.contains(lower)) {
+      return true;
+    }
+    seen.add(lower);
+    return false;
+  });
+}
+
+int _vectorComponentsFromType(String type) {
+  final String lower = type.toLowerCase();
+  if (lower.startsWith('float4') || lower.startsWith('half4')) {
+    return 4;
+  }
+  if (lower.startsWith('float3') || lower.startsWith('half3')) {
+    return 3;
+  }
+  if (lower.startsWith('float2') || lower.startsWith('half2')) {
+    return 2;
+  }
+  return 1;
+}
+
+String _categoryForSemantic(String semantic) {
+  final String upper = semantic.toUpperCase();
+  if (upper.startsWith('POSITION')) {
+    return 'position';
+  }
+  if (upper.startsWith('NORMAL')) {
+    return 'normal';
+  }
+  if (upper.startsWith('TEXCOORD')) {
+    return 'texcoord';
+  }
+  if (upper.startsWith('COLOR')) {
+    return 'color';
+  }
+  if (upper.startsWith('TANGENT')) {
+    return 'tangent';
+  }
+  if (upper.startsWith('BINORMAL')) {
+    return 'binormal';
+  }
+  return 'custom';
 }
 
 List<Map<String, dynamic>> extractPassStates(List<Block> blocks) {
@@ -1376,10 +1556,20 @@ _VertexAttributeSummary _summaryFromExplicit(List<String> tokens) {
     final _ExplicitTokenParts parts = _parseExplicitToken(token);
     final _AttributeClassification classification =
         _classifyAttributeToken(parts.baseToken);
+    final String canonicalToken =
+        _canonicalAttributeToken(parts.originalToken, classification);
     final _AttributeUsage usage = _AttributeUsage(
-      parts.originalToken,
+      canonicalToken,
       source: 'explicit',
     )..markFullAccess();
+    if (_tryAppendTangentFrameAttributes(
+      semantics,
+      metadata,
+      usage,
+      classification,
+    )) {
+      continue;
+    }
     final int components =
         parts.components ?? classification.defaultComponents;
     final String? label =
@@ -1399,6 +1589,65 @@ _VertexAttributeSummary _summaryFromExplicit(List<String> tokens) {
   final List<String> uniqueSemantics = semantics.toSet().toList()..sort();
   metadata.sort(_compareAttributeMetadata);
   return _VertexAttributeSummary(uniqueSemantics, metadata);
+}
+
+bool _tryAppendTangentFrameAttributes(
+  List<String> semantics,
+  List<Map<String, dynamic>> metadata,
+  _AttributeUsage usage,
+  _AttributeClassification classification,
+) {
+  if (classification.category != 'tangentFrame') {
+    return false;
+  }
+  for (final String attribute in _tangentFrameAttributeTokens) {
+    final _AttributeUsage componentUsage =
+        _AttributeUsage(attribute, source: usage.source)..markFullAccess();
+    final _AttributeClassification componentClassification =
+        _classifyAttributeToken(attribute);
+    final String? label =
+        _semanticLabelForClassification(componentClassification, 3);
+    if (label != null) {
+      semantics.add(label);
+    }
+    metadata.add(
+      _buildAttributeMetadata(
+        componentUsage,
+        componentClassification,
+        3,
+        label: label,
+      ),
+    );
+  }
+  return true;
+}
+
+String _canonicalAttributeToken(
+  String originalToken,
+  _AttributeClassification classification,
+) {
+  final String lower = originalToken.toLowerCase();
+  switch (classification.category) {
+    case 'position':
+      return 'Position';
+    case 'normal':
+      if (lower.contains('tnormal')) {
+        return 'TNormal';
+      }
+      return 'Normal';
+    case 'tangent':
+      return 'Tangent';
+    case 'binormal':
+      return 'Binormal';
+    case 'color':
+      final int index = classification.index ?? 0;
+      return index == 0 ? 'Color' : 'Color$index';
+    case 'texcoord':
+      final int index = classification.index ?? 0;
+      return 'TexCoord$index';
+    default:
+      return originalToken;
+  }
 }
 
 _VertexAttributeSummary _summaryFromUsage(
@@ -1448,6 +1697,15 @@ String? _mapInputTokenToAttribute(String token) {
 }
 
 final RegExp _vertexInputPattern = RegExp(r'IN\.([A-Za-z0-9_]+)');
+const Map<String, List<String>> _macroVertexAttributeTokens =
+    <String, List<String>>{
+  'TANG_MATR': <String>['Tangent', 'Binormal', 'TNormal'],
+};
+const List<String> _tangentFrameAttributeTokens = <String>[
+  'Tangent',
+  'Binormal',
+  'TNormal',
+];
 
 class _ExplicitTokenParts {
   _ExplicitTokenParts(this.originalToken, this.baseToken, this.components);
@@ -1458,6 +1716,9 @@ class _ExplicitTokenParts {
 }
 
 _ExplicitTokenParts _parseExplicitToken(String token) {
+  if (token.toUpperCase().endsWith('_3X3')) {
+    return _ExplicitTokenParts(token, token, null);
+  }
   final RegExpMatch? match = RegExp(r'^(.*?)(?:_(\d+))?$').firstMatch(token);
   if (match == null) {
     return _ExplicitTokenParts(token, token, null);
@@ -1506,6 +1767,15 @@ Map<String, _AttributeUsage> _collectAttributeUsage(
         entry.markFullAccess();
       } else {
         entry.markFullAccess();
+      }
+    }
+    for (final MapEntry<String, List<String>> macro
+        in _macroVertexAttributeTokens.entries) {
+      if (!text.contains(macro.key)) {
+        continue;
+      }
+      for (final String macroToken in macro.value) {
+        usageFor(macroToken).markFullAccess();
       }
     }
   }
@@ -1617,7 +1887,8 @@ class _AttributeUsage {
     final int highest =
         maxComponent == 0 ? _countBits(swizzleMask) : maxComponent;
     final int required = highest == 0 ? defaultComponents : highest;
-    return _clampComponents(required > defaultComponents ? required : defaultComponents);
+    return _clampComponents(
+        required > defaultComponents ? required : defaultComponents);
   }
 }
 
@@ -1639,7 +1910,16 @@ class _AttributeClassification {
 
 _AttributeClassification _classifyAttributeToken(String token) {
   final String original = token;
-  String normalized = original.toLowerCase();
+  final String lowerOriginal = original.toLowerCase();
+  if (lowerOriginal == 'tang_3x3') {
+    return _AttributeClassification(
+      token: token,
+      category: 'tangentFrame',
+      semantic: 'TANGENT_FRAME',
+      defaultComponents: 9,
+    );
+  }
+  String normalized = lowerOriginal;
   normalized = normalized.replaceFirst(RegExp(r'^in\.'), '');
   final RegExp suffixDigits = RegExp(r'_(\d+)$');
   normalized = normalized.replaceFirst(suffixDigits, '');
@@ -1837,6 +2117,7 @@ int _clampComponents(int value) {
   }
   return value;
 }
+
 
 List<String> extractDirectives(String content) {
   final List<String> directives = [];

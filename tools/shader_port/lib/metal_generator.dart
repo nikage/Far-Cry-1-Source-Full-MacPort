@@ -2,6 +2,7 @@ library metal_generator;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 part 'shader_ir_models.dart';
 part 'shader_ir_parser.dart';
@@ -47,6 +48,8 @@ void main(List<String> args) {
     final List<Map<String, dynamic>> vertexInputs = isVertexStage
         ? _summarizeVertexInputs(data.vertexAttributeMetadata)
         : const [];
+    final List<Map<String, dynamic>> vertexOutputs =
+        isVertexStage ? summarizeVertexOutputs(data) : const [];
     manifestEntries.add({
       'source': relative,
       'metal': metalFileName,
@@ -61,6 +64,7 @@ void main(List<String> args) {
       'vertexAttributes': data.vertexAttributes,
       'vertexAttributeMetadata': data.vertexAttributeMetadata,
       if (vertexInputs.isNotEmpty) 'vertexInputs': vertexInputs,
+      if (vertexOutputs.isNotEmpty) 'vertexOutputs': vertexOutputs,
       'directives': result.directives,
       'maskReferences': data.maskReferences,
       'uniforms': data.uniforms
@@ -191,6 +195,41 @@ List<Map<String, dynamic>> _summarizeVertexInputs(
     attributeIndex++;
   }
   return result;
+}
+
+List<Map<String, dynamic>> summarizeVertexOutputs(ShaderIrData data) {
+  if (data.stage != 'vertex') {
+    return const [];
+  }
+  final _InOutAnalyzer analyzer = _InOutAnalyzer(
+    data.coreExpressions,
+    data.coreFlow,
+  );
+  final List<Map<String, dynamic>> outputs = <Map<String, dynamic>>[];
+  for (final String field in analyzer.outputFields) {
+    if (field == 'HPosition') {
+      continue;
+    }
+    final String lower = field.toLowerCase();
+    int components = analyzer.outputComponentUsage[field] ?? 4;
+    if (lower == 'color') {
+      components = 4;
+    } else if (components < 2) {
+      components = 2;
+    }
+    outputs.add(<String, dynamic>{
+      'name': field,
+      'components': components,
+    });
+  }
+  if (outputs.isEmpty) {
+    return const [];
+  }
+  outputs.sort(
+    (Map<String, dynamic> a, Map<String, dynamic> b) =>
+        (a['name'] as String).compareTo(b['name'] as String),
+  );
+  return outputs;
 }
 
 String normalizeName(String input) {

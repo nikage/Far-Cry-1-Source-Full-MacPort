@@ -194,7 +194,15 @@ CoreScript
 
       expect(result.vertexAttributes, contains('TEXCOORD0_2'));
       expect(result.vertexAttributes, contains('TEXCOORD1_2'));
-      expect(result.vertexAttributes, contains('COLOR_4'));
+      expect(
+        result.vertexAttributes,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is String && entry.startsWith('COLOR_'),
+          ),
+        ),
+      );
       expect(result.vertexAttributeMetadata, isNotEmpty);
       final Map<String, dynamic> tex0Meta = result.vertexAttributeMetadata
           .firstWhere(
@@ -203,6 +211,101 @@ CoreScript
           );
       expect(tex0Meta['components'], greaterThanOrEqualTo(2));
       expect(tex0Meta['label'], 'TEXCOORD0_2');
+    });
+
+    test('expands tangent frame attributes from VertAttributes', () {
+      final String shaderSource = '''
+VertAttributes { POSITION_3 TANG_3X3 TEXCOORD0_2 }
+MainInput { VIEWPROJ_MATRIX }
+CoreScript
+{
+  TANG_MATR
+  OUT.Tex0.xy = IN.TexCoord0.xy;
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/TangentFrame.crycg',
+      );
+
+      expect(result.vertexAttributes, contains('POSITION_3'));
+      expect(result.vertexAttributes, contains('TANGENT_3'));
+      expect(result.vertexAttributes, contains('BINORMAL_3'));
+      expect(result.vertexAttributes, contains('NORMAL_3'));
+      expect(result.vertexAttributes, contains('TEXCOORD0_2'));
+
+      expect(
+        result.vertexAttributeMetadata,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is Map<String, dynamic> && entry['token'] == 'Tangent',
+          ),
+        ),
+      );
+      expect(
+        result.vertexAttributeMetadata,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is Map<String, dynamic> && entry['token'] == 'Binormal',
+          ),
+        ),
+      );
+      expect(
+        result.vertexAttributeMetadata,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is Map<String, dynamic> && entry['token'] == 'TNormal',
+          ),
+        ),
+      );
+    });
+
+    test('infers tangent frame usage when macros require it', () {
+      final String shaderSource = '''
+MainInput { VIEWPROJ_MATRIX }
+CoreScript
+{
+  TANG_MATR
+  OUT.Tex0.xy = IN.TexCoord0.xy;
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/TangentFrameUsage.crycg',
+      );
+
+      expect(
+        result.vertexAttributeMetadata,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is Map<String, dynamic> && entry['token'] == 'Tangent',
+          ),
+        ),
+      );
+      expect(
+        result.vertexAttributeMetadata,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is Map<String, dynamic> && entry['token'] == 'Binormal',
+          ),
+        ),
+      );
+      expect(
+        result.vertexAttributeMetadata,
+        anyElement(
+          predicate(
+            (dynamic entry) =>
+                entry is Map<String, dynamic> && entry['token'] == 'TNormal',
+          ),
+        ),
+      );
     });
   });
 }

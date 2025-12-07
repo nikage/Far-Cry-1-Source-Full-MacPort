@@ -12,7 +12,8 @@ class MetalFragmentBuilder {
       _positionScriptBlocks = data.positionScriptBlocks {
     for (final String field in _analyzer.inputFields) {
       final String? override = _inputFieldTypeOverrides[field];
-      if (override == 'float') {
+      final int components = _attributeComponentCount(field);
+      if (override == 'float' || components == 1) {
         _scalarInputFields.add(field);
       }
     }
@@ -203,6 +204,9 @@ class MetalFragmentBuilder {
       ..._analyzer.outputFields,
       ...data.outputFieldTypes.keys,
     };
+    if (_isVertexStage) {
+      outputFields.add('HPosition');
+    }
     final List<String> sorted = outputFields.toList()..sort();
     for (final String field in sorted) {
       final String type = _outputType(field);
@@ -384,7 +388,12 @@ float3 CMKYToRGB(float4 vColor) {
     if (override != null) {
       return override;
     }
-    return 'float4';
+    int components = _attributeComponentCount(field);
+    final int required = _requiredComponentCount(field);
+    if (required > components) {
+      components = required;
+    }
+    return _attributeTypeForComponents(components);
   }
 
   String _attributeTypeForComponents(int components) {
@@ -404,7 +413,7 @@ float3 CMKYToRGB(float4 vColor) {
     final String category =
         (entry['category'] as String? ?? '').toLowerCase();
     if (category == 'color') {
-      return 'uchar4';
+      return 'float4';
     }
     final int components =
         entry['components'] is int ? entry['components'] as int : 4;
@@ -416,7 +425,6 @@ float3 CMKYToRGB(float4 vColor) {
     'Binormal': 'float3',
     'TNormal': 'float3',
     'Normal': 'float3',
-    'HeightMap': 'float',
   };
 
   String _resolvePositionFieldName() {
@@ -458,7 +466,16 @@ float3 CMKYToRGB(float4 vColor) {
   bool _hasPositionScript(String name) =>
       _positionScripts.contains(name.toLowerCase());
 
-  String _outputType(String field) => data.outputFieldTypes[field] ?? 'float4';
+  String _outputType(String field) {
+    if (_isVertexStage && field.toLowerCase() != 'color') {
+      final int? components = _analyzer.outputComponentUsage[field];
+      if (components != null && components > 0 && components < 4) {
+        final int width = components < 2 ? 2 : components;
+        return _attributeTypeForComponents(width);
+      }
+    }
+    return data.outputFieldTypes[field] ?? 'float4';
+  }
 
   void _computeSyntheticUniforms() {
     for (final MapEntry<String, String> entry in _macroUniformTypes.entries) {
@@ -584,9 +601,13 @@ float3 CMKYToRGB(float4 vColor) {
     final bool hasTexCoord6 =
         _analyzer.inputFields.contains('TexCoord6');
     if (hasTexCoord6) {
-      buffer.writeln('  float4 vBend = IN.TexCoord6;');
+      buffer.writeln(
+        '  float4 vBend = ${_expandedInputAttribute('TexCoord6', 4)};',
+      );
     } else if (hasTexCoord3) {
-      buffer.writeln('  float4 vBend = IN.TexCoord3;');
+      buffer.writeln(
+        '  float4 vBend = ${_expandedInputAttribute('TexCoord3', 4)};',
+      );
     } else {
       buffer.writeln('  float4 vBend = uniforms.Bend;');
     }
@@ -600,6 +621,55 @@ float3 CMKYToRGB(float4 vColor) {
     buffer.writeln('  vPos.xy += vP;');
     buffer.writeln('  float3 vDirect = normalize(vPos.xyz);');
     buffer.writeln('  vPos.xyz = vDirect * fLength;');
+  }
+
+  String _expandedInputAttribute(String token, int targetComponents) {
+    final int available = _attributeComponentCount(token);
+    if (available >= targetComponents) {
+      return 'IN.$token';
+    }
+    final List<String> swizzles = <String>['x', 'y', 'z', 'w'];
+    final List<String> parts = <String>[];
+    for (int i = 0; i < available; i++) {
+      parts.add('IN.$token.${swizzles[i]}');
+    }
+    for (int i = available; i < targetComponents; i++) {
+      parts.add(i == 3 ? '1.0' : '0.0');
+    }
+    return 'float$targetComponents(${parts.join(', ')})';
+  }
+
+  int _attributeComponentCount(String token) {
+    for (final Map<String, dynamic> entry in _vertexAttributeMetadata) {
+      if ((entry['token'] as String?) == token) {
+        final int? components = entry['components'] as int?;
+        if (components != null && components > 0) {
+          return components;
+        }
+        break;
+      }
+    }
+    return 4;
+  }
+
+  int _requiredComponentCount(String token) {
+    final int? usage = _analyzer.inputComponentUsage[token];
+    if (usage == null || usage <= 0) {
+      return 0;
+    }
+    return usage;
+  }
+
+  bool _isTexcoordToken(String token) {
+    for (final Map<String, dynamic> entry in _vertexAttributeMetadata) {
+      if ((entry['token'] as String?) == token) {
+        final String category =
+            (entry['category'] as String? ?? '').toLowerCase();
+        return category == 'texcoord';
+      }
+    }
+    final String lower = token.toLowerCase();
+    return lower.startsWith('tex');
   }
 
   void _writeHeatVisionSource(StringBuffer buffer) {
@@ -653,13 +723,18 @@ class _InOutAnalyzer {
   final List<Map<String, dynamic>> _expressions;
   final List<Map<String, dynamic>> _flow;
   final Set<String> _inputFields = <String>{};
+  final Map<String, int> _inputComponentUsage = <String, int>{};
   final Set<String> _outputFields = <String>{};
+  final Map<String, int> _outputComponentUsage = <String, int>{};
 
   List<String> get inputFields {
     final List<String> fields = _inputFields.toList();
     fields.sort();
     return fields;
   }
+
+  Map<String, int> get inputComponentUsage => _inputComponentUsage;
+  Map<String, int> get outputComponentUsage => _outputComponentUsage;
 
   List<String> get outputFields {
     final Set<String> fields = Set<String>.from(_outputFields);
@@ -693,12 +768,14 @@ class _InOutAnalyzer {
       final String? token = match.group(1);
       if (token != null && token.isNotEmpty) {
         _inputFields.add(token);
+        _trackComponentUsage(token, match.group(2));
       }
     }
     for (final RegExpMatch match in _outPattern.allMatches(content)) {
       final String? token = match.group(1);
       if (token != null && token.isNotEmpty) {
         _outputFields.add(token);
+        _trackOutputComponentUsage(token, match.group(2));
       }
     }
     for (final MapEntry<String, List<String>> entry
@@ -707,16 +784,118 @@ class _InOutAnalyzer {
         _inputFields.addAll(entry.value);
       }
     }
+    for (final MapEntry<String, Map<String, int>> hint
+        in _macroComponentHints.entries) {
+      if (content.contains(hint.key)) {
+        hint.value.forEach((String token, int components) {
+          _inputFields.add(token);
+          final int current = _inputComponentUsage[token] ?? 0;
+          if (components > current) {
+            _inputComponentUsage[token] = components;
+          }
+        });
+      }
+    }
   }
 
-  static final RegExp _inPattern = RegExp(r'IN\.([A-Za-z0-9_]+)');
-  static final RegExp _outPattern = RegExp(r'OUT\.([A-Za-z0-9_]+)');
+  static final RegExp _inPattern =
+      RegExp(r'IN\.([A-Za-z0-9_]+)(?:\.([A-Za-z0-9]+))?');
+  static final RegExp _outPattern =
+      RegExp(r'OUT\.([A-Za-z0-9_]+)(?:\.([A-Za-z0-9]+))?');
 
   static final Map<String, List<String>> _macroInputFields =
       <String, List<String>>{
         'TANG_MATR': <String>['Tangent', 'Binormal', 'TNormal'],
         'vNormal': <String>['Normal'],
       };
+
+  static final Map<String, Map<String, int>> _macroComponentHints =
+      <String, Map<String, int>>{
+    'texCUBE': <String, int>{
+      'Tex1': 3,
+      'Tex2': 3,
+      'Tex3': 3,
+    },
+  };
+
+  void _trackComponentUsage(String token, String? swizzle) {
+    if (swizzle == null || swizzle.isEmpty) {
+      return;
+    }
+    final int required = _swizzleWidth(swizzle);
+    if (required <= 0) {
+      return;
+    }
+    final int current = _inputComponentUsage[token] ?? 0;
+    if (required > current) {
+      _inputComponentUsage[token] = required;
+    }
+  }
+
+  void _trackOutputComponentUsage(String token, String? swizzle) {
+    int required;
+    if (swizzle == null || swizzle.isEmpty) {
+      required = 4;
+    } else {
+      required = _swizzleWidth(swizzle);
+    }
+    if (required <= 0) {
+      return;
+    }
+    final int current = _outputComponentUsage[token] ?? 0;
+    if (required > current) {
+      _outputComponentUsage[token] = required;
+    }
+  }
+
+  static int _swizzleWidth(String swizzle) {
+    int width = 0;
+    for (int i = 0; i < swizzle.length; i++) {
+      final int value = _componentIndex(swizzle[i]);
+      if (value > width) {
+        width = value;
+        if (width >= 4) {
+          return 4;
+        }
+      }
+    }
+    return width;
+  }
+
+  static int _componentIndex(String char) {
+    switch (char) {
+      case 'x':
+      case 'X':
+      case 'r':
+      case 'R':
+      case 's':
+      case 'S':
+        return 1;
+      case 'y':
+      case 'Y':
+      case 'g':
+      case 'G':
+      case 't':
+      case 'T':
+        return 2;
+      case 'z':
+      case 'Z':
+      case 'b':
+      case 'B':
+      case 'p':
+      case 'P':
+        return 3;
+      case 'w':
+      case 'W':
+      case 'a':
+      case 'A':
+      case 'q':
+      case 'Q':
+        return 4;
+      default:
+        return 0;
+    }
+  }
 }
 
 String translateType(String type) {
