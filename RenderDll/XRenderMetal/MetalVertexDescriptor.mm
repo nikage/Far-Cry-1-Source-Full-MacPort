@@ -19,6 +19,7 @@
 #include <cassert>
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 
 #ifdef max
 #undef max
@@ -575,17 +576,35 @@ void CMetalVertexDescriptorHelper::AttachTangentAttributes(MTLVertexDescriptor* 
         return;
 
     const NSUInteger tangentBufferIndex = kMetalVertexStream_Tangents;
-    descriptor.attributes[4].format = MTLVertexFormatFloat3;
-    descriptor.attributes[4].offset = offsetof(SPipTangents, m_Tangent);
-    descriptor.attributes[4].bufferIndex = tangentBufferIndex;
 
-    descriptor.attributes[5].format = MTLVertexFormatFloat3;
-    descriptor.attributes[5].offset = offsetof(SPipTangents, m_Binormal);
-    descriptor.attributes[5].bufferIndex = tangentBufferIndex;
+    NSUInteger tangentAttributeIndex = 0;
+    const NSUInteger maxAttributes = 31;
+    while (tangentAttributeIndex < maxAttributes)
+    {
+        if (descriptor.attributes[tangentAttributeIndex].format == MTLVertexFormatInvalid)
+            break;
+        tangentAttributeIndex++;
+    }
 
-    descriptor.attributes[6].format = MTLVertexFormatFloat3;
-    descriptor.attributes[6].offset = offsetof(SPipTangents, m_TNormal);
-    descriptor.attributes[6].bufferIndex = tangentBufferIndex;
+    if (tangentAttributeIndex + 2 >= maxAttributes)
+    {
+        fprintf(stderr,
+                "AttachTangentAttributes: Unable to allocate attribute slots for tangents (start=%lu)\n",
+                static_cast<unsigned long>(tangentAttributeIndex));
+        return;
+    }
+
+    descriptor.attributes[tangentAttributeIndex].format = MTLVertexFormatFloat3;
+    descriptor.attributes[tangentAttributeIndex].offset = offsetof(SPipTangents, m_Tangent);
+    descriptor.attributes[tangentAttributeIndex].bufferIndex = tangentBufferIndex;
+
+    descriptor.attributes[tangentAttributeIndex + 1].format = MTLVertexFormatFloat3;
+    descriptor.attributes[tangentAttributeIndex + 1].offset = offsetof(SPipTangents, m_Binormal);
+    descriptor.attributes[tangentAttributeIndex + 1].bufferIndex = tangentBufferIndex;
+
+    descriptor.attributes[tangentAttributeIndex + 2].format = MTLVertexFormatFloat3;
+    descriptor.attributes[tangentAttributeIndex + 2].offset = offsetof(SPipTangents, m_TNormal);
+    descriptor.attributes[tangentAttributeIndex + 2].bufferIndex = tangentBufferIndex;
 
     descriptor.layouts[tangentBufferIndex].stride = sizeof(SPipTangents);
     descriptor.layouts[tangentBufferIndex].stepRate = 1;

@@ -232,7 +232,7 @@ CoreScript
       expect(result.vertexAttributes, contains('POSITION_3'));
       expect(result.vertexAttributes, contains('TANGENT_3'));
       expect(result.vertexAttributes, contains('BINORMAL_3'));
-      expect(result.vertexAttributes, contains('NORMAL_3'));
+      expect(result.vertexAttributes, contains('TNORMAL_3'));
       expect(result.vertexAttributes, contains('TEXCOORD0_2'));
 
       expect(
@@ -306,6 +306,122 @@ CoreScript
           ),
         ),
       );
+    });
+
+    test('captures appin declarations with scalar components', () {
+      final String shaderSource = '''
+DeclarationsScript
+{
+  struct appin
+  {
+    float4 Position : POSITION;
+    float  HeightMap : BLENDWEIGHT;
+  };
+}
+CoreScript
+{
+  OUT.Color = float4(IN.HeightMap, 0, 0, 1);
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/AppinDeclarations.crycg',
+      );
+
+      final Map<String, dynamic> heightMapEntry = result.vertexAttributeMetadata
+          .firstWhere((Map<String, dynamic> entry) => entry['token'] == 'HeightMap');
+      expect(heightMapEntry['components'], 1);
+      expect(heightMapEntry['source'], 'declaration');
+      expect(heightMapEntry['semantic'], 'BLENDWEIGHT');
+    });
+
+    test('captures appin macros defined with IN_* tokens', () {
+      final String shaderSource = '''
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_N
+    IN_C0
+    IN_T0
+  };
+}
+CoreScript
+{
+  OUT.Color = IN.Color;
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/AppinMacros.crycg',
+      );
+
+      final Map<String, dynamic> positionEntry = result.vertexAttributeMetadata
+          .firstWhere((Map<String, dynamic> entry) => entry['token'] == 'Position');
+      expect(positionEntry['components'], 4);
+      expect(positionEntry['source'], 'macro');
+
+      final Map<String, dynamic> normalEntry = result.vertexAttributeMetadata
+          .firstWhere((Map<String, dynamic> entry) => entry['token'] == 'Normal');
+      expect(normalEntry['components'], 3);
+      expect(normalEntry['source'], 'macro');
+    });
+
+    test('macro metadata overrides explicit VertAttributes components', () {
+      final String shaderSource = '''
+VertAttributes { POSITION_3 TEXCOORD0_2 }
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+  };
+}
+CoreScript
+{
+  OUT.Color = float4(IN.Position, 1.0);
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/PositionMacroOverride.crycg',
+      );
+
+      final Map<String, dynamic> positionEntry = result.vertexAttributeMetadata
+          .firstWhere((Map<String, dynamic> entry) => entry['token'] == 'Position');
+      expect(positionEntry['components'], 4);
+      expect(positionEntry['source'], 'macro');
+    });
+
+    test('declarations override explicit vector component counts', () {
+      final String shaderSource = '''
+VertAttributes { BLENDWEIGHT_4 }
+DeclarationsScript
+{
+  struct appin
+  {
+    float HeightMap : BLENDWEIGHT;
+  };
+}
+CoreScript
+{
+  OUT.Color = float4(IN.HeightMap.xxx, 1.0);
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/HeightMapDeclarationOverride.crycg',
+      );
+
+      final Map<String, dynamic> heightMapEntry = result.vertexAttributeMetadata
+          .firstWhere((Map<String, dynamic> entry) => entry['token'] == 'HeightMap');
+      expect(heightMapEntry['components'], 1);
+      expect(heightMapEntry['source'], 'declaration');
     });
   });
 }

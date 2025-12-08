@@ -139,13 +139,13 @@ class MetalFragmentBuilder {
     if (attributes.isEmpty) {
       buffer.writeln('  float3 position [[attribute(0)]];');
     } else {
-      int attributeIndex = 0;
       for (final Map<String, dynamic> entry in attributes) {
+        final int attributeSlot =
+            entry['slot'] is int ? entry['slot'] as int : 0;
         final String name =
-            (entry['token'] as String?) ?? 'attr$attributeIndex';
+            (entry['token'] as String?) ?? 'attr$attributeSlot';
         final String type = _vertexAttributeType(entry);
-        buffer.writeln('  $type $name [[attribute($attributeIndex)]];');
-        attributeIndex++;
+        buffer.writeln('  $type $name [[attribute($attributeSlot)]];');
       }
     }
     buffer.writeln('};');
@@ -335,6 +335,17 @@ float3 CMKYToRGB(float4 vColor) {
       }
       buffer.writeln(_rewriteFloat3DecalColor(line));
     }
+    final Set<String> analyzerOutputs = Set<String>.from(_analyzer.outputFields);
+    data.outputFieldTypes.forEach((String field, String _) {
+      if (field == 'Color' || field == 'HPosition') {
+        return;
+      }
+      if (analyzerOutputs.contains(field)) {
+        return;
+      }
+      final String type = _outputType(field);
+      buffer.writeln('  OUT.$field = ${_zeroValueForType(type)};');
+    });
     final bool translatorAssignedHPosition = _translator.body
         .any((String line) => line.contains('OUT.HPosition'));
     if (_isVertexStage &&
@@ -385,6 +396,23 @@ float3 CMKYToRGB(float4 vColor) {
       default:
         return 'float4';
     }
+  }
+
+  String _zeroValueForType(String type) {
+    final String lower = type.toLowerCase();
+    if (lower.contains('float4')) {
+      return 'float4(0.0)';
+    }
+    if (lower.contains('float3')) {
+      return 'float3(0.0)';
+    }
+    if (lower.contains('float2')) {
+      return 'float2(0.0)';
+    }
+    if (lower.contains('float')) {
+      return '0.0';
+    }
+    return '$type(0.0)';
   }
 
   String _vertexAttributeType(Map<String, dynamic> entry) {

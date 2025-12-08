@@ -393,10 +393,7 @@ List<Map<String, dynamic>> _extractAppinAttributes(List<Block> blocks) {
       continue;
     }
     final RegExpMatch? match = structPattern.firstMatch(block.content);
-    if (match == null) {
-      continue;
-    }
-    final String body = match.group(1)!;
+    final String body = match == null ? block.content : match.group(1)!;
     for (final String rawLine in body.split('\n')) {
       final String line = rawLine.trim();
       if (line.isEmpty || line.startsWith('//')) {
@@ -487,12 +484,35 @@ void _mergeAttributeMetadata(
       existing.add(Map<String, dynamic>.from(addition));
       continue;
     }
-    final String source =
+    final String existingSource =
         (existing[index]['source'] as String?)?.toLowerCase() ?? '';
-    if (source == 'explicit') {
+    final String additionSource =
+        (addition['source'] as String?)?.toLowerCase() ?? '';
+    final int existingPriority = _attributeSourcePriority(existingSource);
+    final int additionPriority = _attributeSourcePriority(additionSource);
+    if (additionPriority <= existingPriority) {
       continue;
     }
     existing[index] = Map<String, dynamic>.from(addition);
+  }
+}
+
+int _attributeSourcePriority(String? source) {
+  switch (source) {
+    case 'declaration':
+      return 5;
+    case 'macro':
+      return 4;
+    case 'explicit':
+      return 3;
+    case 'implicit':
+      return 2;
+    case 'derived':
+      return 1;
+    case 'reflection':
+      return 0;
+    default:
+      return 5;
   }
 }
 
@@ -1650,7 +1670,24 @@ _VertexAttributeSummary deriveVertexAttributeSummary(
   List<Map<String, dynamic>> flow,
 ) {
   if (explicit.isNotEmpty) {
-    return _summaryFromExplicit(explicit);
+    final _VertexAttributeSummary explicitSummary =
+        _summaryFromExplicit(explicit);
+    final _VertexAttributeSummary usageSummary =
+        _summaryFromUsage(expressions, flow);
+    _mergeAttributeMetadata(explicitSummary.metadata, usageSummary.metadata);
+    explicitSummary.metadata.sort(_compareAttributeMetadata);
+    final Set<String> semantics = <String>{
+      ...explicitSummary.semantics,
+      ...usageSummary.semantics,
+    };
+    for (final Map<String, dynamic> entry in explicitSummary.metadata) {
+      final String? label = entry['label'] as String?;
+      if (label != null && label.isNotEmpty) {
+        semantics.add(label);
+      }
+    }
+    final List<String> mergedSemantics = semantics.toList()..sort();
+    return _VertexAttributeSummary(mergedSemantics, explicitSummary.metadata);
   }
   return _summaryFromUsage(expressions, flow);
 }
@@ -1806,6 +1843,7 @@ final RegExp _vertexInputPattern = RegExp(r'IN\.([A-Za-z0-9_]+)');
 const Map<String, List<String>> _macroVertexAttributeTokens =
     <String, List<String>>{
   'TANG_MATR': <String>['Tangent', 'Binormal', 'TNormal'],
+  'TANG_3X3': <String>['Tangent', 'Binormal', 'TNormal'],
 };
 const List<String> _tangentFrameAttributeTokens = <String>[
   'Tangent',
@@ -2147,10 +2185,14 @@ String? _semanticLabelForClassification(
   int components,
 ) {
   final int clamped = _clampComponents(components);
+  final String tokenLower = classification.token.toLowerCase();
   switch (classification.category) {
     case 'position':
       return 'POSITION_${clamped}';
     case 'normal':
+      if (tokenLower.contains('tnormal')) {
+        return 'TNORMAL_${clamped}';
+      }
       return 'NORMAL_${clamped}';
     case 'tangent':
       return 'TANGENT_${clamped}';
