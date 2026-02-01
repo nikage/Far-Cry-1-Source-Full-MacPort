@@ -21,6 +21,7 @@
 #include "MetalRenderer.m"
 #include "I3DEngine.h"
 #include "../Common/Textures/dxtlib.h"  // For nvDXT function signatures
+#include "../Common/Shadow_Renderer.h"  // For ShadowMapFrustum
 #include "CrySizer.h"
 #include <cmath>
 #include <algorithm>
@@ -30,6 +31,7 @@
 #include <cstdint>
 #include <utility>
 #include <cstdlib>
+#include <cstdarg>
 #include <fstream>
 #include <iomanip>
 #include <unistd.h>
@@ -1383,6 +1385,38 @@ bool CMetalRenderer::SetRenderTarget(int nHandle) {
 void CMetalRenderer::FlushTextMessages() {
   ASSERT_UTILITY_RENDERER_INIT();
   m_utilityRenderer->FlushTextMessages();
+}
+
+void CMetalRenderer::TextToScreen(float x, float y, const char * format, ...) {
+  if (!format || !iConsole)
+    return;
+    
+  char buffer[512];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buffer, sizeof(buffer), format, args);
+  va_end(args);
+  
+  CXFont* font = iConsole->GetFont();
+  if (font && m_utilityRenderer) {
+    WriteXY(font, (int)(0.01f * 800 * x), (int)(0.01f * 600 * y), 0.5f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, buffer);
+  }
+}
+
+void CMetalRenderer::TextToScreenColor(int x, int y, float r, float g, float b, float a, const char * format, ...) {
+  if (!format || !iConsole)
+    return;
+    
+  char buffer[512];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(buffer, sizeof(buffer), format, args);
+  va_end(args);
+  
+  CXFont* font = iConsole->GetFont();
+  if (font && m_utilityRenderer) {
+    WriteXY(font, (int)(0.01f * 800 * x), (int)(0.01f * 600 * y), 0.5f, 1.0f, r, g, b, a, buffer);
+  }
 }
 
 // Additional utility methods would be delegated similarly...
@@ -3354,10 +3388,45 @@ void CMetalRenderer::EF_SetClipPlane(bool bEnable, float *pPlane, bool bRefract)
 }
 
 void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) {
-    if (!lof)
+    if (!lof || !lof->pLs)
         return;
     
-    assert(false && "PrepareDepthMap not implemented");
+    if (!m_textureManager || !m_utilityRenderer) {
+        if (iLog)
+            iLog->Log("PrepareDepthMap: Texture manager or utility renderer not available\n");
+        return;
+    }
+    
+    int nShadowTexSize = lof->nTexSize;
+    if (nShadowTexSize < 32)
+        nShadowTexSize = 32;
+    
+    if (make_new_tid || !lof->depth_tex_id) {
+        int renderTargetId = m_utilityRenderer->CreateRenderTarget(nShadowTexSize, nShadowTexSize, eTF_DEPTH);
+        if (renderTargetId > 0) {
+            lof->depth_tex_id = renderTargetId;
+        }
+    }
+    
+    if (!lof->depth_tex_id) {
+        if (iLog)
+            iLog->Log("PrepareDepthMap: Failed to create shadow map texture\n");
+        return;
+    }
+    
+    int savedViewport[4];
+    GetViewport(&savedViewport[0], &savedViewport[1], &savedViewport[2], &savedViewport[3]);
+    
+    SetViewport(0, 0, nShadowTexSize, nShadowTexSize);
+    
+    if (m_utilityRenderer->SetRenderTarget(lof->depth_tex_id)) {
+        if (iLog)
+            iLog->Log("PrepareDepthMap: Shadow map render target set (%dx%d)\n", nShadowTexSize, nShadowTexSize);
+    }
+    
+    SetViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
+    
+    lof->bUpdateRequested = false;
 }
 
 void CMetalRenderer::EF_CheckOverflow(int nVerts, int nTris, CRendElement *re) {
@@ -3387,14 +3456,22 @@ void CMetalRenderer::EF_PipelineShutdown() {
 void CMetalRenderer::SetupShadowOnlyPass(int Num, ShadowMapFrustum * pFrustum, Vec3 * vShadowTrans, 
                                          const float fShadowScale, Vec3 vObjTrans, float fObjScale, 
                                          const Vec3 vObjAngles, Matrix44 * pObjMat) {
-    if (!pFrustum)
+    if (!pFrustum || !pFrustum->pLs)
         return;
     
-    assert(false && "SetupShadowOnlyPass not implemented");
+    if (iLog)
+        iLog->Log("SetupShadowOnlyPass: Configuring shadow pass %d (FOV=%.2f, scale=%.2f)\n", 
+                  Num, pFrustum->FOV, fShadowScale);
+    
+    if (pFrustum->depth_tex_id > 0 && m_utilityRenderer) {
+        m_utilityRenderer->SetRenderTarget(pFrustum->depth_tex_id);
+        SetViewport(0, 0, pFrustum->nTexSize, pFrustum->nTexSize);
+    }
 }
 
 void CMetalRenderer::DrawAllShadowsOnTheScreen() {
-    assert(false && "DrawAllShadowsOnTheScreen not implemented");
+    if (iLog)
+        iLog->Log("DrawAllShadowsOnTheScreen: Debug visualization not implemented\n");
 }
 
 void CMetalRenderer::Reset(void) {

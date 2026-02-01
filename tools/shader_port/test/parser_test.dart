@@ -423,5 +423,37 @@ CoreScript
       expect(heightMapEntry['components'], 1);
       expect(heightMapEntry['source'], 'declaration');
     });
+
+    test('captures vertout macros with component overrides', () {
+      final String shaderSource = '''
+DeclarationsScript
+{
+  struct vertout
+  {
+    float2 customTC : TEXCOORD2;
+    OUT_T0
+    OUT_T1_2
+  };
+  OUT_T0_T1_C0
+  OUT_T5_2
+  OUT_Color1
+}
+CoreScript
+{
+}
+''';
+
+      final ParseResult result = parseShaderFromSource(
+        shaderSource,
+        'Testing/VertoutDeclarations.crycg',
+      );
+
+      expect(result.outputFieldTypes['customTC'], 'float2');
+      expect(result.outputFieldTypes['Tex0'], 'float4');
+      expect(result.outputFieldTypes['Tex1'], 'float2');
+      expect(result.outputFieldTypes['Tex5'], 'float2');
+      expect(result.outputFieldTypes['Color'], 'float4');
+      expect(result.outputFieldTypes['Color1'], 'float4');
+    });
   });
 }

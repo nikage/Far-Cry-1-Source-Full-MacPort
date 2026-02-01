@@ -40,8 +40,7 @@ void main(List<String> args) {
       '-sdk',
       'macosx',
       'metal',
-      // FIXME: compile to metal 4
-      '-std=macos-metal2.0',
+      '-std=macos-metal4.0',
       '-c',
       metalFile.path,
       '-o',

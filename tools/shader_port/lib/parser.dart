@@ -1081,43 +1081,171 @@ class _OutputFieldSpec {
   final String type;
 }
 
-_OutputFieldSpec? _mapOutputMacroToSpec(String macro) {
-  switch (macro) {
-    case 'OUT_P':
-      return const _OutputFieldSpec('HPosition', 'float4');
-    case 'OUT_C0':
-      return const _OutputFieldSpec('Color', 'float4');
-    case 'OUT_C1':
-      return const _OutputFieldSpec('Color1', 'float4');
+class _MacroTokenResult {
+  const _MacroTokenResult(this.spec, {this.consumeNext = false});
+
+  final _OutputFieldSpec spec;
+  final bool consumeNext;
+}
+
+const Map<String, _OutputFieldSpec> _kSimpleOutputMacros =
+    <String, _OutputFieldSpec>{
+  'OUT_P': _OutputFieldSpec('HPosition', 'float4'),
+  'OUT_C0': _OutputFieldSpec('Color', 'float4'),
+  'OUT_C1': _OutputFieldSpec('Color1', 'float4'),
+  'OUT_COLOR': _OutputFieldSpec('Color', 'float4'),
+  'OUT_COLOR1': _OutputFieldSpec('Color1', 'float4'),
+  'OUT_DEPTH': _OutputFieldSpec('Depth', 'float'),
+};
+
+final RegExp _kOutMacroPattern = RegExp(r'\bOUT_[A-Za-z0-9_]+\b');
+
+Iterable<_OutputFieldSpec> _mapOutputMacroToSpecs(String macro) sync* {
+  final _OutputFieldSpec? predefined = _kSimpleOutputMacros[macro];
+  if (predefined != null) {
+    yield predefined;
+    return;
   }
-  final RegExp texPattern = RegExp(r'^OUT_T(\d+)(?:_(\d+))?$');
-  final RegExpMatch? match = texPattern.firstMatch(macro);
-  if (match != null) {
-    final String index = match.group(1)!;
-    final String? componentCount = match.group(2);
-    String type = 'float4';
-    if (componentCount != null) {
-      switch (componentCount) {
-        case '1':
-          type = 'float';
-          break;
-        case '2':
-          type = 'float2';
-          break;
-        case '3':
-          type = 'float3';
-          break;
-        case '4':
-          type = 'float4';
-          break;
-        default:
-          type = 'float$componentCount';
-          break;
+  if (!macro.startsWith('OUT_')) {
+    return;
+  }
+  final String descriptor = macro.substring(4);
+  if (descriptor.isEmpty) {
+    return;
+  }
+  final List<String> tokens =
+      descriptor.split('_').where((String token) => token.isNotEmpty).toList();
+  if (tokens.isEmpty) {
+    return;
+  }
+  int index = 0;
+  while (index < tokens.length) {
+    final String token = tokens[index];
+    final String? next =
+        index + 1 < tokens.length ? tokens[index + 1] : null;
+    final _MacroTokenResult? mapped = _mapOutputToken(token, next);
+    if (mapped != null) {
+      yield mapped.spec;
+      if (mapped.consumeNext) {
+        index++;
       }
     }
-    return _OutputFieldSpec('Tex$index', type);
+    index++;
+  }
+}
+
+_MacroTokenResult? _mapOutputToken(String token, String? nextToken) {
+  final String upper = token.toUpperCase();
+  if (upper == 'P') {
+    return const _MacroTokenResult(_OutputFieldSpec('HPosition', 'float4'));
+  }
+  final RegExp texPattern = RegExp(r'^T(\d+)$');
+  final RegExpMatch? texMatch = texPattern.firstMatch(upper);
+  if (texMatch != null) {
+    String type = 'float4';
+    bool consumeNext = false;
+    if (nextToken != null && RegExp(r'^\d+$').hasMatch(nextToken)) {
+      type = _typeForComponentCount(int.parse(nextToken));
+      consumeNext = true;
+    }
+    return _MacroTokenResult(
+      _OutputFieldSpec('Tex${texMatch.group(1)!}', type),
+      consumeNext: consumeNext,
+    );
+  }
+  final RegExp colorPattern = RegExp(r'^C(\d+)$');
+  final RegExpMatch? colorMatch = colorPattern.firstMatch(upper);
+  if (colorMatch != null) {
+    final int index = int.parse(colorMatch.group(1)!);
+    final String field = index == 0 ? 'Color' : 'Color$index';
+    return _MacroTokenResult(_OutputFieldSpec(field, 'float4'));
+  }
+  if (upper == 'COLOR') {
+    return const _MacroTokenResult(_OutputFieldSpec('Color', 'float4'));
+  }
+  if (upper.startsWith('COLOR')) {
+    final String suffix = upper.substring('COLOR'.length);
+    final int parsed = int.tryParse(suffix) ?? 0;
+    final String field = parsed == 0 ? 'Color' : 'Color$parsed';
+    return _MacroTokenResult(_OutputFieldSpec(field, 'float4'));
+  }
+  if (upper == 'DEPTH') {
+    return const _MacroTokenResult(_OutputFieldSpec('Depth', 'float'));
   }
   return null;
+}
+
+String _typeForComponentCount(int components) {
+  if (components <= 1) {
+    return 'float';
+  }
+  if (components == 2) {
+    return 'float2';
+  }
+  if (components == 3) {
+    return 'float3';
+  }
+  return 'float4';
+}
+
+Iterable<_OutputFieldSpec> _collectDeclaredOutputSpecs(String content) sync* {
+  yield* _extractMacroDeclaredOutputs(content);
+  yield* _extractStructDeclaredOutputs(content);
+}
+
+Iterable<_OutputFieldSpec> _extractMacroDeclaredOutputs(String content) sync* {
+  for (final RegExpMatch match in _kOutMacroPattern.allMatches(content)) {
+    yield* _mapOutputMacroToSpecs(match.group(0)!);
+  }
+}
+
+Iterable<_OutputFieldSpec> _extractStructDeclaredOutputs(String content) sync* {
+  final RegExp structPattern = RegExp(
+    r'struct\s+vertout\s*\{([\s\S]*?)\};',
+    caseSensitive: false,
+  );
+  final Iterable<RegExpMatch> matches = structPattern.allMatches(content);
+  if (matches.isEmpty) {
+    return;
+  }
+  final RegExp fieldPattern = RegExp(
+    r'(float[0-9]*(?:x[0-9]+)?|half[0-9]*|float|half)\s+([A-Za-z_][A-Za-z0-9_]*)',
+    caseSensitive: false,
+  );
+  for (final RegExpMatch match in matches) {
+    final String body = match.group(1)!;
+    for (final String rawLine in body.split('\n')) {
+      final String line = rawLine.split('//').first.trim();
+      if (line.isEmpty || line.startsWith('#')) {
+        continue;
+      }
+      final RegExpMatch? fieldMatch = fieldPattern.firstMatch(line);
+      if (fieldMatch == null) {
+        continue;
+      }
+      final String type = _canonicalizeOutputType(fieldMatch.group(1)!);
+      final String name = fieldMatch.group(2)!;
+      yield _OutputFieldSpec(name, type);
+    }
+  }
+}
+
+String _canonicalizeOutputType(String rawType) {
+  final String lower = rawType.toLowerCase();
+  if (lower.startsWith('half')) {
+    final String suffix = lower.substring(4);
+    if (suffix.isEmpty || suffix == '1') {
+      return 'float';
+    }
+    return 'float$suffix';
+  }
+  if (lower == 'float') {
+    return 'float';
+  }
+  if (lower.startsWith('float')) {
+    return lower;
+  }
+  return lower;
 }
 
 const Map<String, String> _passStateKeyLookup = {
@@ -2383,42 +2511,13 @@ List<Map<String, String>> extractPositionScriptBlocks(List<Block> blocks) {
 
 Map<String, String> extractOutputFieldTypes(List<Block> blocks) {
   final Map<String, String> result = <String, String>{};
-  final RegExp macroPattern = RegExp(r'OUT_[A-Za-z0-9_]+');
   for (final Block block in blocks) {
     if (block.name.toLowerCase() != 'declarationsscript') {
       continue;
     }
-    for (final RegExpMatch match in macroPattern.allMatches(block.content)) {
-      final String macro = match.group(0)!;
-      final _OutputFieldSpec? spec = _mapOutputMacroToSpec(macro);
-      if (spec != null) {
-        result.putIfAbsent(spec.field, () => spec.type);
-      }
-    }
-    final RegExp structPattern = RegExp(
-      r'struct\s+vertout\s*\{([\s\S]*?)\};',
-      multiLine: true,
-    );
-    final RegExpMatch? structMatch = structPattern.firstMatch(block.content);
-    if (structMatch != null) {
-      final String body = structMatch.group(1)!;
-      final List<String> structLines = body.split('\n');
-      for (final String rawLine in structLines) {
-        final String line = rawLine.trim();
-        if (line.isEmpty ||
-            line.startsWith('//') ||
-            line.startsWith('#')) {
-          continue;
-        }
-        final RegExpMatch? fieldMatch = RegExp(
-          r'(float[0-9]*(?:x[0-9]+)?)\s+([A-Za-z0-9_]+)',
-        ).firstMatch(line);
-        if (fieldMatch != null) {
-          final String type = fieldMatch.group(1)!;
-          final String name = fieldMatch.group(2)!;
-          result.putIfAbsent(name, () => type);
-        }
-      }
+    for (final _OutputFieldSpec spec
+        in _collectDeclaredOutputSpecs(block.content)) {
+      result.putIfAbsent(spec.field, () => spec.type);
     }
   }
   return result;

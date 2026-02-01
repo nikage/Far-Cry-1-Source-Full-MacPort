@@ -23,8 +23,40 @@ list(REMOVE_ITEM CRYMOVIE_SOURCES
 add_library(CryMovie SHARED ${CRYMOVIE_SOURCES} ${CRYMOVIE_HEADERS})
 
 # Find and link system Expat library
-find_library(EXPAT_LIBRARY expat)
+# Prefer homebrew expat .dylib over system .tbd files
+set(EXPAT_LIBRARY "")
+if(EXISTS "/Users/mykola/homebrew/opt/expat/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/Users/mykola/homebrew/opt/expat/lib/libexpat.dylib")
+elseif(EXISTS "/Users/mykola/homebrew/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/Users/mykola/homebrew/lib/libexpat.dylib")
+elseif(EXISTS "/opt/homebrew/opt/expat/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/opt/homebrew/opt/expat/lib/libexpat.dylib")
+elseif(EXISTS "/opt/homebrew/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/opt/homebrew/lib/libexpat.dylib")
+else()
+    set(CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib" ".a")
+    find_library(EXPAT_LIBRARY 
+        NAMES expat
+        PATHS 
+            /Users/mykola/homebrew/opt/expat/lib
+            /Users/mykola/homebrew/lib
+            /opt/homebrew/opt/expat/lib
+            /opt/homebrew/lib
+            /usr/local/lib
+            /usr/lib
+        NO_DEFAULT_PATH
+    )
+    if(NOT EXPAT_LIBRARY)
+        find_library(EXPAT_LIBRARY expat)
+    endif()
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP})
+endif()
+
 if(EXPAT_LIBRARY)
+    if(EXPAT_LIBRARY MATCHES "\\.tbd$")
+        message(FATAL_ERROR "Found .tbd stub instead of real library: ${EXPAT_LIBRARY}. Please ensure homebrew expat is installed: brew install expat")
+    endif()
     target_link_libraries(CryMovie PUBLIC ${EXPAT_LIBRARY})
     message(STATUS "Found Expat library: ${EXPAT_LIBRARY}")
 else()

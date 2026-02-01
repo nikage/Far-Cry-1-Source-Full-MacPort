@@ -9,6 +9,8 @@ class ExpressionTranslator {
     String? forcedReturnExpression,
   }) : _scalarInputFields = Set<String>.from(scalarInputFields),
       _transformers = transformers,
+      _resolvedOutputComponents =
+          _resolveOutputComponentCounts(data, analyzer),
       macros = data.coreMacros,
       _forcedReturnExpression = forcedReturnExpression {
     _initializeMacroValues();
@@ -43,6 +45,7 @@ class ExpressionTranslator {
     for (final UniformBinding uniform in data.uniforms)
       uniform.name: uniform.type,
   };
+  final Map<String, int> _resolvedOutputComponents;
   late final Map<String, int> _attributeUsageRequirements =
       _buildAttributeUsageRequirements();
   late final Set<String> _scalarUniforms = data.uniforms
@@ -1084,14 +1087,42 @@ class ExpressionTranslator {
   }
 
   String _outputType(String field) {
-    if (data.stage == 'vertex' && field.toLowerCase() != 'color') {
-      final int? components = analyzer.outputComponentUsage[field];
-      if (components != null && components > 0 && components < 4) {
-        final int width = components < 2 ? 2 : components;
-        return _floatTypeForComponents(width);
-      }
+    final String? declared = data.outputFieldTypes[field];
+    if (data.stage != 'vertex') {
+      return declared ?? 'float4';
     }
-    return data.outputFieldTypes[field] ?? 'float4';
+    final int? resolved = _resolvedOutputComponents[field];
+    if (resolved != null) {
+      return _floatTypeForComponents(resolved);
+    }
+    if (declared != null) {
+      return declared;
+    }
+    final int? usage = analyzer.outputComponentUsage[field];
+    if (usage != null && usage > 0) {
+      int width = usage;
+      if (width < 2) {
+        width = 2;
+      } else if (width > 4) {
+        width = 4;
+      }
+      return _floatTypeForComponents(width);
+    }
+    return 'float4';
+  }
+
+  int _componentCountFromType(String type) {
+    final String lower = type.toLowerCase();
+    if (lower.contains('float4')) {
+      return 4;
+    }
+    if (lower.contains('float3')) {
+      return 3;
+    }
+    if (lower.contains('float2')) {
+      return 2;
+    }
+    return 1;
   }
 
   String _floatTypeForComponents(int components) {
@@ -1232,6 +1263,7 @@ class ExpressionTranslator {
     result = _promoteDotArguments(result);
     result = _promoteAttributeAssignments(result);
     result = _coerceOutAssignment(result);
+    result = _coerceOutputVectorWidth(result);
     for (final LineTransformer transformer in _transformers) {
       result = transformer.transform(result);
     }
@@ -1287,6 +1319,9 @@ class ExpressionTranslator {
       };
   static final RegExp _outAssignmentPattern = RegExp(
     r'^(\s*)OUT\.([A-Za-z0-9_]+)\s*=\s*IN\.([A-Za-z0-9_]+);\s*$',
+  );
+  static final RegExp _outVectorAssignmentPattern = RegExp(
+    r'^(\s*)OUT\.([A-Za-z0-9_]+)\s*=\s*(.+);\s*$',
   );
 
   String _replaceInlineMacros(String line) {
@@ -1347,6 +1382,26 @@ class ExpressionTranslator {
     final String indent = match.group(1)!;
     return '$indent'
         'OUT.$field = $expanded;';
+  }
+
+  String _coerceOutputVectorWidth(String line) {
+    final RegExpMatch? match = _outVectorAssignmentPattern.firstMatch(line);
+    if (match == null) {
+      return line;
+    }
+    final String field = match.group(2)!;
+    final int? declaredComponents = _declaredComponentsForOutputField(field);
+    final int? resolvedComponents = _componentsForOutputField(field);
+    if (declaredComponents == null ||
+        resolvedComponents == null ||
+        declaredComponents >= resolvedComponents) {
+      return line;
+    }
+    final String swizzle = _componentSwizzle(declaredComponents);
+    final String indent = match.group(1)!;
+    final String expression = match.group(3)!.trim();
+    return '$indent'
+        'OUT.$field.$swizzle = $expression;';
   }
 
   String _promoteMulArguments(String line) {
@@ -1597,11 +1652,21 @@ class ExpressionTranslator {
   }
 
   int? _componentsForOutputField(String field) {
+    final String type = _outputType(field);
+    return _componentCountFromType(type);
+  }
+
+  int? _declaredComponentsForOutputField(String field) {
     final String? type = data.outputFieldTypes[field];
     if (type == null || type.isEmpty) {
       return null;
     }
-    return _vectorComponentCount(type);
+    return _componentCountFromType(type);
+  }
+
+  String _componentSwizzle(int components) {
+    const List<String> swizzles = <String>['x', 'y', 'z', 'w'];
+    return swizzles.take(components).join();
   }
 
   int _vectorComponentCount(String type) {

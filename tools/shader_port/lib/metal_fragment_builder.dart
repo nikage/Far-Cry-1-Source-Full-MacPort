@@ -12,6 +12,8 @@ class MetalFragmentBuilder {
           .map((String script) => script.toLowerCase())
           .toSet(),
       _positionScriptBlocks = data.positionScriptBlocks {
+    _resolvedOutputComponents =
+        _resolveOutputComponentCounts(data, _analyzer);
     for (final String field in _analyzer.inputFields) {
       final String? override = _inputFieldTypeOverrides[field];
       final int components = _attributeComponentCount(field);
@@ -29,6 +31,7 @@ class MetalFragmentBuilder {
   final List<Map<String, String>> _positionScriptBlocks;
   final List<Map<String, dynamic>> _vertexAttributeMetadata;
   final List<Map<String, dynamic>> _orderedVertexAttributes;
+  late final Map<String, int> _resolvedOutputComponents;
   final Set<String> _scalarInputFields = <String>{};
   bool _declaredDefaultVNormal = false;
   bool _wroteHPosition = false;
@@ -473,14 +476,28 @@ float3 CMKYToRGB(float4 vColor) {
       _positionScripts.contains(name.toLowerCase());
 
   String _outputType(String field) {
-    if (_isVertexStage && field.toLowerCase() != 'color') {
-      final int? components = _analyzer.outputComponentUsage[field];
-      if (components != null && components > 0 && components < 4) {
-        final int width = components < 2 ? 2 : components;
-        return _attributeTypeForComponents(width);
-      }
+    final String? declared = data.outputFieldTypes[field];
+    if (!_isVertexStage) {
+      return declared ?? 'float4';
     }
-    return data.outputFieldTypes[field] ?? 'float4';
+    final int? resolved = _resolvedOutputComponents[field];
+    if (resolved != null) {
+      return _attributeTypeForComponents(resolved);
+    }
+    if (declared != null) {
+      return declared;
+    }
+    final int? usage = _analyzer.outputComponentUsage[field];
+    if (usage != null && usage > 0) {
+      int width = usage;
+      if (width < 2) {
+        width = 2;
+      } else if (width > 4) {
+        width = 4;
+      }
+      return _attributeTypeForComponents(width);
+    }
+    return 'float4';
   }
 
   void _computeSyntheticUniforms() {

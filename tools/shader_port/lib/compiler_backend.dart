@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+typedef DxcProfileEntry = ({String entry, String profile});
+
 enum CompilerDiagnosticSeverity { info, warning, error }
 
 class CompilerDiagnostic {
@@ -27,6 +29,7 @@ class CompilerBackendConfig {
     this.metalShaderConverterPath,
     List<String>? includeDirs,
     List<String>? defines,
+    this.entryResolver,
   })  : includeDirs = includeDirs ?? const <String>[],
         defines = defines ?? const <String>[];
 
@@ -36,6 +39,7 @@ class CompilerBackendConfig {
   final String? metalShaderConverterPath;
   final List<String> includeDirs;
   final List<String> defines;
+  final DxcProfileEntry? Function(String relativePath)? entryResolver;
 }
 
 class CompilerArtifacts {
@@ -174,12 +178,16 @@ class CompilerBackend {
     String relativePath,
     List<CompilerDiagnostic> diagnostics,
   ) {
+    final DxcProfileEntry? resolved = config.entryResolver?.call(relativePath);
+    if (resolved == null) {
+      throw StateError('Missing DXC entry/profile for $relativePath');
+    }
     final List<String> args = <String>[
       input.path,
       '-E',
-      'Main',
+      resolved.entry,
       '-T',
-      _profileForPath(relativePath),
+      resolved.profile,
       '-Fo',
       output.path,
     ];
@@ -187,7 +195,14 @@ class CompilerBackend {
       args.add('-I$dir');
     }
     try {
+      if (config.dxcPath == null) {
+        throw StateError('dxc path is null');
+      }
       final ProcessResult result = Process.runSync(config.dxcPath!, args);
+      final bool succeeded = result.exitCode == 0;
+      if (!succeeded || _isVerbose()) {
+        stdout.writeln('dxc ${args.join(' ')} (exit ${result.exitCode})');
+      }
       if (result.exitCode != 0) {
         diagnostics.add(
           CompilerDiagnostic(
@@ -227,8 +242,15 @@ class CompilerBackend {
       metallib.path,
     ];
     try {
+      if (config.metalShaderConverterPath == null) {
+        throw StateError('metal-shader-converter path is null');
+      }
       final ProcessResult result =
           Process.runSync(config.metalShaderConverterPath!, args);
+      final bool succeeded = result.exitCode == 0;
+      if (!succeeded || _isVerbose()) {
+        stdout.writeln('metal-shader-converter ${args.join(' ')} (exit ${result.exitCode})');
+      }
       if (result.exitCode != 0) {
         diagnostics.add(
           CompilerDiagnostic(
@@ -276,5 +298,10 @@ class CompilerBackend {
     } catch (_) {
       return null;
     }
+  }
+
+  bool _isVerbose() {
+    final String? env = Platform.environment['CONVERTER_DEBUG_LOG'];
+    return env != null && env.toLowerCase() == 'true';
   }
 }

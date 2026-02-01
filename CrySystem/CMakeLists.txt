@@ -66,16 +66,72 @@ add_library(CrySystem SHARED ${CRYSYSTEM_SOURCES} ${CRYSYSTEM_HEADERS})
 target_link_libraries(CrySystem PUBLIC CryCommon)
 
 # Find and link system Expat library
-find_library(EXPAT_LIBRARY expat)
-find_path(EXPAT_INCLUDE_DIR expat.h
-    PATHS
-        /usr/include
-        /usr/local/include
-        /opt/homebrew/include
-    PATH_SUFFIXES
-        expat
-)
+# Prefer homebrew expat .dylib over system .tbd files
+set(EXPAT_LIBRARY "")
+set(EXPAT_INCLUDE_DIR "")
+
+# Try homebrew first - check if file exists
+if(EXISTS "/Users/mykola/homebrew/opt/expat/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/Users/mykola/homebrew/opt/expat/lib/libexpat.dylib")
+    if(EXISTS "/Users/mykola/homebrew/opt/expat/include/expat.h")
+        set(EXPAT_INCLUDE_DIR "/Users/mykola/homebrew/opt/expat/include")
+    endif()
+elseif(EXISTS "/Users/mykola/homebrew/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/Users/mykola/homebrew/lib/libexpat.dylib")
+    if(EXISTS "/Users/mykola/homebrew/include/expat.h")
+        set(EXPAT_INCLUDE_DIR "/Users/mykola/homebrew/include")
+    endif()
+elseif(EXISTS "/opt/homebrew/opt/expat/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/opt/homebrew/opt/expat/lib/libexpat.dylib")
+    if(EXISTS "/opt/homebrew/opt/expat/include/expat.h")
+        set(EXPAT_INCLUDE_DIR "/opt/homebrew/opt/expat/include")
+    endif()
+elseif(EXISTS "/opt/homebrew/lib/libexpat.dylib")
+    set(EXPAT_LIBRARY "/opt/homebrew/lib/libexpat.dylib")
+    if(EXISTS "/opt/homebrew/include/expat.h")
+        set(EXPAT_INCLUDE_DIR "/opt/homebrew/include")
+    endif()
+endif()
+
+# If not found via direct path, try find_library but exclude .tbd files
+if(NOT EXPAT_LIBRARY)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib" ".a")
+    find_library(EXPAT_LIBRARY 
+        NAMES expat
+        PATHS 
+            /Users/mykola/homebrew/opt/expat/lib
+            /Users/mykola/homebrew/lib
+            /opt/homebrew/opt/expat/lib
+            /opt/homebrew/lib
+            /usr/local/lib
+            /usr/lib
+        NO_DEFAULT_PATH
+    )
+    if(NOT EXPAT_LIBRARY)
+        find_library(EXPAT_LIBRARY expat)
+    endif()
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP})
+    
+    if(NOT EXPAT_INCLUDE_DIR)
+        find_path(EXPAT_INCLUDE_DIR expat.h
+            PATHS
+                /Users/mykola/homebrew/opt/expat/include
+                /Users/mykola/homebrew/include
+                /opt/homebrew/opt/expat/include
+                /opt/homebrew/include
+                /usr/include
+                /usr/local/include
+            PATH_SUFFIXES
+                expat
+        )
+    endif()
+endif()
+
 if(EXPAT_LIBRARY)
+    if(EXPAT_LIBRARY MATCHES "\\.tbd$")
+        message(FATAL_ERROR "Found .tbd stub instead of real library: ${EXPAT_LIBRARY}. Please ensure homebrew expat is installed: brew install expat")
+    endif()
     target_link_libraries(CrySystem PUBLIC ${EXPAT_LIBRARY})
     message(STATUS "Found Expat library: ${EXPAT_LIBRARY}")
     if(EXPAT_INCLUDE_DIR)

@@ -281,46 +281,24 @@ List<Map<String, dynamic>> summarizeVertexOutputs(ShaderIrData data) {
     data.coreExpressions,
     data.coreFlow,
   );
-  final List<Map<String, dynamic>> outputs = <Map<String, dynamic>>[];
-  for (final String field in analyzer.outputFields) {
-    if (field == 'HPosition') {
-      continue;
-    }
-    final String lower = field.toLowerCase();
-    int components = analyzer.outputComponentUsage[field] ?? 4;
-    if (lower == 'color') {
-      components = 4;
-    } else if (components < 2) {
-      components = 2;
-    }
-    outputs.add(<String, dynamic>{
-      'name': field,
-      'components': components,
-    });
-  }
-  if (outputs.isEmpty) {
+  final Map<String, int> resolved =
+      _resolveOutputComponentCounts(data, analyzer);
+  if (resolved.isEmpty) {
     return const [];
   }
-  final Map<String, String> declaredTypes = data.outputFieldTypes;
-  if (declaredTypes.isNotEmpty) {
-    final Set<String> existing = outputs
-        .map<String>((Map<String, dynamic> entry) => entry['name'] as String)
-        .toSet();
-    declaredTypes.forEach((String field, String type) {
-      if (field == 'HPosition' || existing.contains(field)) {
-        return;
-      }
-      outputs.add(<String, dynamic>{
-        'name': field,
-        'components': _componentCountFromType(type),
-      });
-      existing.add(field);
-    });
-  }
-  outputs.sort(
-    (Map<String, dynamic> a, Map<String, dynamic> b) =>
-        (a['name'] as String).compareTo(b['name'] as String),
-  );
+  final List<Map<String, dynamic>> outputs = resolved.entries
+      .where((MapEntry<String, int> entry) => entry.key != 'HPosition')
+      .map(
+        (MapEntry<String, int> entry) => <String, dynamic>{
+          'name': entry.key,
+          'components': entry.value,
+        },
+      )
+      .toList()
+    ..sort(
+      (Map<String, dynamic> a, Map<String, dynamic> b) =>
+          (a['name'] as String).compareTo(b['name'] as String),
+    );
   return outputs;
 }
 
@@ -336,6 +314,115 @@ int _componentCountFromType(String type) {
     return 2;
   }
   return 1;
+}
+
+final RegExp _kTexVaryingPattern = RegExp(r'^tex\d+$', caseSensitive: false);
+
+bool _isTexVaryingField(String field) => _kTexVaryingPattern.hasMatch(field);
+
+bool _isColorField(String field) => field.toLowerCase().startsWith('color');
+
+bool _isProjectiveTcField(String field) {
+  final String lower = field.toLowerCase();
+  if (lower.startsWith('texcoord')) {
+    return false;
+  }
+  return lower.contains('tc');
+}
+
+Map<String, int> _resolveOutputComponentCounts(
+  ShaderIrData data,
+  _InOutAnalyzer analyzer,
+) {
+  final Map<String, int> declaredComponents = <String, int>{
+    for (final MapEntry<String, String> entry in data.outputFieldTypes.entries)
+      entry.key: _componentCountFromType(entry.value),
+  };
+  final Map<String, int> resolved = <String, int>{};
+  final Map<String, int> attributeComponents = <String, int>{};
+
+  for (final Map<String, dynamic> entry in data.vertexAttributeMetadata) {
+    final String? token = (entry['token'] as String?)?.toLowerCase();
+    final int? components = entry['components'] as int?;
+    if (token == null || components == null) {
+      continue;
+    }
+    if (token.startsWith('texcoord')) {
+      final RegExpMatch? match = RegExp(r'^texcoord(\d+)$').firstMatch(token);
+      if (match != null) {
+        final String texName = 'Tex${match.group(1)}';
+        attributeComponents[texName] =
+            math.max(1, math.min(components, 4));
+      }
+    } else if (token == 'color') {
+      attributeComponents['Color'] = 4;
+    } else if (token.startsWith('color')) {
+      final String suffix = token.substring('color'.length);
+      if (suffix.isNotEmpty) {
+        final String name =
+            'Color${suffix[0].toUpperCase()}${suffix.substring(1)}';
+        attributeComponents[name] = math.max(1, math.min(components, 4));
+      }
+    }
+  }
+
+  int _applyOutputComponentRules(
+    String field,
+    int components, {
+    required bool enforceMinimum,
+  }) {
+    final int? attributeHint = attributeComponents[field];
+    if (attributeHint != null) {
+      components = math.max(components, attributeHint);
+    }
+    if (_isColorField(field) || field == 'HPosition') {
+      return 4;
+    }
+    if (_isProjectiveTcField(field)) {
+      components = math.max(components, 4);
+    }
+    if (components < 1) {
+      components = 1;
+    } else if (components > 4) {
+      components = 4;
+    }
+    if (enforceMinimum && components < 2) {
+      components = 2;
+    }
+    return components;
+  }
+
+  for (final String field in analyzer.outputFields) {
+    final int? usage = analyzer.outputComponentUsage[field];
+    int components = usage ?? 0;
+    if (components == 0 && declaredComponents.containsKey(field)) {
+      components = declaredComponents[field]!;
+    } else if (components == 0) {
+      components = 4;
+    }
+    resolved[field] = _applyOutputComponentRules(
+      field,
+      components,
+      enforceMinimum: true,
+    );
+  }
+
+  declaredComponents.forEach((String field, int components) {
+    if (resolved.containsKey(field)) {
+      return;
+    }
+    resolved[field] = _applyOutputComponentRules(
+      field,
+      components,
+      enforceMinimum: false,
+    );
+  });
+
+  if (resolved.containsKey('HPosition')) {
+    resolved['HPosition'] = 4;
+  }
+
+  return resolved;
 }
 
 String normalizeName(String input) {

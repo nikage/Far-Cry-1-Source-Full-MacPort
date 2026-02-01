@@ -266,6 +266,8 @@ public:
      * @see InitializeManagers() for initialization logic
      */
     void WriteXY(CXFont *currfont,int x,int y, float xscale,float yscale,float r,float g,float b,float a,const char *message, ...) override;
+    void TextToScreen(float x, float y, const char * format, ...) override;
+    void TextToScreenColor(int x, int y, float r, float g, float b, float a, const char * format, ...) override;
     void Draw2dText(float posX,float posY,const char *szText,SDrawTextInfo &info) override;
     void Draw2dImage(float xpos,float ypos,float w,float h,int texture_id,float s0=0,float t0=0,float s1=1,float t1=1,float angle=0,float r=1,float g=1,float b=1,float a=1,float z=1) override;
     void DrawImage(float xpos,float ypos,float w,float h,int texture_id,float s0,float t0,float s1,float t1,float r,float g,float b,float a) override;
