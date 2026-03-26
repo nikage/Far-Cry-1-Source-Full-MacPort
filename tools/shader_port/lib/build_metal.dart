@@ -40,7 +40,7 @@ void main(List<String> args) {
       '-sdk',
       'macosx',
       'metal',
-      '-std=macos-metal4.0',
+      '-std=metal4.0',
       '-c',
       metalFile.path,
       '-o',

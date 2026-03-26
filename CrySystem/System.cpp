@@ -13,6 +13,7 @@
 
 #include "stdafx.h"
 #include "System.h"
+#include <fstream>
 #include <time.h>
 #include <stdarg.h>
 //#include "ini_vars.h"
@@ -957,6 +958,9 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 	{
 		FRAME_PROFILER( "SysUpdate:PeekMessage",this,PROFILE_SYSTEM );
 
+		// #region agent log
+		{ static int _logCount = 0; if (_logCount++ < 3) { fprintf(stderr, "[DEBUG_LOG] {\"timestamp\":%ld,\"location\":\"System.cpp:960\",\"message\":\"Event processing block\",\"data\":{\"hWnd\":%d,\"isWindowsAPI\":1,\"count\":%d},\"hypothesisId\":\"E\",\"sessionId\":\"debug-session\"}\n", time(0)*1000, (m_hWnd?1:0), _logCount); fflush(stderr); } }
+		// #endregion
 		if (m_hWnd && ::IsWindow((HWND)m_hWnd))
 		{
 			MSG msg;
@@ -966,7 +970,7 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 				DispatchMessage(&msg);
 			}
 		}
-  }
+	}
 #elif defined(__APPLE__) && defined(__MACH__)
 	{
 		//printf("System::Update - BEFORE FRAME_PROFILER\n");
@@ -974,6 +978,9 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 		FRAME_PROFILER( "SysUpdate:NSAppEvents",this,PROFILE_SYSTEM );
 		//printf("System::Update - AFTER FRAME_PROFILER, before ProcessMacOSEvents\n");
 		// fflush(stdout);
+		// #region agent log
+		{ static int _logCount = 0; if (_logCount++ < 3) { fprintf(stderr, "[DEBUG_LOG] {\"timestamp\":%ld,\"location\":\"System.cpp:978\",\"message\":\"macOS event processing called\",\"data\":{\"count\":%d},\"hypothesisId\":\"E\",\"sessionId\":\"debug-session\"}\n", time(0)*1000, _logCount); fflush(stderr); } }
+		// #endregion
 		ProcessMacOSEvents();
 		//printf("System::Update - AFTER ProcessMacOSEvents\n");
 		// fflush(stdout);

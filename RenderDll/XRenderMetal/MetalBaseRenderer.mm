@@ -758,6 +758,13 @@ bool CMetalBaseRenderer::AcquireDrawableFromView()
 
 void CMetalBaseRenderer::BeginFrame()
 {
+    // #region agent debug
+    static int beginFrameCount = 0;
+    if (beginFrameCount++ < 5)
+        iLog->Log("[DEBUG_RENDERER] BeginFrame called (count=%d) init=%d device=%p queue=%p", 
+                 beginFrameCount, m_isInitialized, (void*)m_device, (void*)m_commandQueue);
+    // #endregion
+    
     if (!m_isInitialized || !m_device || !m_commandQueue)
         return;
     
@@ -1530,6 +1537,16 @@ void CMetalBaseRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
     if (!m_renderEncoder || nVerts <= 0 || Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
         return;
     
+    // #region agent debug - check for valid pipeline state
+    if (!m_currentPipelineState)
+    {
+        static int warnCount = 0;
+        if (warnCount++ < 3 && iLog)
+            iLog->Log("MetalRenderer: Skipping dynamic VB draw - no valid pipeline state (shaders may be missing)");
+        return;
+    }
+    // #endregion
+    
     if (m_shaderNeedsTangents)
     {
         if (iLog)
@@ -1554,6 +1571,16 @@ void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf,
 {
     if (!m_renderEncoder || !pBuf || nVerts <= 0)
         return;
+    
+    // #region agent debug - check for valid pipeline state
+    if (!m_currentPipelineState)
+    {
+        static int warnCount = 0;
+        if (warnCount++ < 3 && iLog)
+            iLog->Log("MetalRenderer: Skipping dynamic indexed draw - no valid pipeline state (shaders may be missing)");
+        return;
+    }
+    // #endregion
     
     if (m_shaderNeedsTangents)
     {

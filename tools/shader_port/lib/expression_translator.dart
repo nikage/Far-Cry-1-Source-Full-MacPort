@@ -32,6 +32,7 @@ class ExpressionTranslator {
   bool _usesNormalReference = false;
   bool _hasNewstDeclaration = false;
   final Set<String> _scalarVariables = <String>{};
+  final Set<String> _modifiedUniforms = <String>{};
   final Map<String, String> _activeMacroValues = <String, String>{};
   final Map<String, String> _inactiveMacroValues = <String, String>{};
   final Set<String> _macroFallbackReferences = <String>{};
@@ -1231,6 +1232,35 @@ class ExpressionTranslator {
     }
   }
 
+  String _rewriteUniformAssignment(String line) {
+    final RegExp uniformAssignmentPattern = RegExp(
+      r'^(\s*)([A-Za-z_][A-Za-z0-9_]*)(\.[xyzwrgba]+)?\s*=\s*(.+);$',
+    );
+    final RegExpMatch? match = uniformAssignmentPattern.firstMatch(line);
+    if (match == null) {
+      return line;
+    }
+    final String uniformName = match.group(2)!;
+    if (!_uniformTypes.containsKey(uniformName)) {
+      return line;
+    }
+    final String indent = match.group(1) ?? '';
+    final String? swizzle = match.group(3);
+    final String rhs = match.group(4)!;
+    final String uniformType = _uniformTypes[uniformName]!;
+    final StringBuffer result = StringBuffer();
+    if (!_modifiedUniforms.contains(uniformName)) {
+      _modifiedUniforms.add(uniformName);
+      result.writeln('$indent$uniformType _local_$uniformName = uniforms.$uniformName;');
+    }
+    if (swizzle != null) {
+      result.write('$indent _local_$uniformName$swizzle = $rhs;');
+    } else {
+      result.write('$indent _local_$uniformName = $rhs;');
+    }
+    return result.toString();
+  }
+
   String _rewriteLine(String line) {
     if (line.trimLeft().startsWith('#')) {
       return '';
@@ -1250,6 +1280,10 @@ class ExpressionTranslator {
       final String indent = ambientMatch.group(1)!;
       return '$indent'
           'OUT.Color = float4((uniforms.Ambient.xyz * decalColor.xyz), uniforms.Ambient.w * decalColor.w);';
+    }
+    final String uniformAssignmentResult = _rewriteUniformAssignment(line);
+    if (uniformAssignmentResult != line) {
+      return uniformAssignmentResult;
     }
     String result = _stripBlockComments(line);
     if (result.trim().isEmpty) {
@@ -1284,6 +1318,18 @@ class ExpressionTranslator {
       'uniforms.Normal.xyz;',
     );
     result = _expandAttributesByRequirement(result);
+    result = _replaceModifiedUniformReferences(result);
+    return result;
+  }
+
+  String _replaceModifiedUniformReferences(String line) {
+    String result = line;
+    for (final String uniformName in _modifiedUniforms) {
+      result = result.replaceAll(
+        'uniforms.$uniformName',
+        '_local_$uniformName',
+      );
+    }
     return result;
   }
 

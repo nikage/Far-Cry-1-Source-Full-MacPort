@@ -11,6 +11,8 @@
 //////////////////////////////////////////////////////////////////////
  
 #include "stdafx.h"
+#include <fstream>
+#include <ctime>
 #include <IStreamEngine.h>
 #include <ICryPak.h>
 #include "Game.h"
@@ -758,6 +760,9 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 		if (!bInEditor)
 		{
 			//-------------------------------------------------------------------------------------------------
+				// #region agent log
+				m_pLog->Log("[DEBUG_A] Before UISystem: bInEditor=%d, m_bDedicatedServer=%d", (bInEditor?1:0), (m_bDedicatedServer?1:0));
+				// #endregion
 				printf("CXGame::Init - Creating UI System (bInEditor=%d, m_bDedicatedServer=%d)\n", bInEditor ? 1 : 0, m_bDedicatedServer ? 1 : 0);
 				fflush(stdout);
 				m_pUISystem = new CUISystem;
@@ -767,6 +772,9 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 					printf("CXGame::Init - UI System object created, calling Create()\n");
 					fflush(stdout);
 					int createResult = m_pUISystem->Create(this, m_pSystem, m_pScriptSystem, "Scripts/MenuScreens/UISystem.lua", 1);
+					// #region agent log
+					m_pLog->Log("[DEBUG_A] UISystem Create result=%d, pUISystem=%p", createResult, (void*)m_pUISystem);
+					// #endregion
 					if (createResult)
 					{
 						printf("CXGame::Init - UI System created successfully\n");
@@ -794,6 +802,15 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 		if (m_pUISystem)
 		{
 			m_bMenuOverlay = 1;
+			// #region agent log
+			m_pLog->Log("[DEBUG_B] Menu overlay set: m_bMenuOverlay=%d, pUISystem=%p", m_bMenuOverlay, (void*)m_pUISystem);
+			// #endregion
+		}
+		else
+		{
+			// #region agent log
+			m_pLog->Log("[DEBUG_B] UISystem is NULL! Menu overlay NOT set!");
+			// #endregion
 		}
 		//------------------------------------------------------------------------------------------------- 
 	}
@@ -885,6 +902,9 @@ bool CXGame::Update()
 	static bool firstCall = true;
 	if (firstCall) {
 		CryLogAlways("CXGame::Update - FIRST CALL - entering main game loop");
+		// #region agent log
+		m_pLog->Log("[DEBUG_E] Game loop started: m_bMenuOverlay=%d, pUISystem=%p", m_bMenuOverlay, (void*)m_pUISystem);
+		// #endregion
 		firstCall = false;
 	}
 	
@@ -911,6 +931,9 @@ bool CXGame::Update()
 				bCanRender = true;
 			}
 		}
+		// #region agent log
+		{ static int _logCount = 0; if (_logCount++ < 3) { m_pLog->Log("[DEBUG_D] 3D Engine: bCanRender=%d, m_bMenuOverlay=%d, pUISystem=%p, count=%d", (bCanRender?1:0), m_bMenuOverlay, (void*)m_pUISystem, _logCount); } }
+		// #endregion
 		
 		m_p3DEngine->Enable(bCanRender ? 1 : 0);
 	}
@@ -921,6 +944,13 @@ bool CXGame::Update()
 	
 	bool bRenderFrame = (!m_pSystem->GetViewCamera().GetPos().IsZero() || m_bMenuOverlay || m_bUIOverlay) 
 											&& (g_Render ? g_Render->GetIVal() != 0 : true);
+	// #region agent debug
+	{ static int _logCount = 0; if (_logCount++ < 5) { 
+		Vec3 camPos = m_pSystem->GetViewCamera().GetPos();
+		m_pLog->Log("[DEBUG_F] bRenderFrame=%d camPosZero=%d m_bMenuOverlay=%d m_bUIOverlay=%d g_Render=%d",
+			bRenderFrame, camPos.IsZero(), m_bMenuOverlay, m_bUIOverlay, g_Render ? g_Render->GetIVal() : -1);
+	}}
+	// #endregion
 
 	CryLogAlways("CXGame::Update - checkpoint 4");
 
@@ -1117,8 +1147,17 @@ bool CXGame::Update()
 
 		if (m_bMenuOverlay || m_bUIOverlay)
 		{
+			// #region agent log
+			{ static int _logCount = 0; if (_logCount++ < 3) { m_pLog->Log("[DEBUG_C] UI Update/Draw called: m_bMenuOverlay=%d, m_bUIOverlay=%d, count=%d", m_bMenuOverlay, m_bUIOverlay, _logCount); } }
+			// #endregion
 			m_pUISystem->Update();			
 			m_pUISystem->Draw();
+		}
+		else
+		{
+			// #region agent log
+			{ static int _logCount = 0; if (_logCount++ < 3) { m_pLog->Log("[DEBUG_C] UI NOT updated: m_bMenuOverlay=%d, m_bUIOverlay=%d, pUISystem=%p", m_bMenuOverlay, m_bUIOverlay, (void*)m_pUISystem); } }
+			// #endregion
 		}
 	}
 

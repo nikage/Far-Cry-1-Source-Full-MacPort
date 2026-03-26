@@ -262,7 +262,7 @@ endif()
 # Note: Do NOT pass C++ include paths to Metal compiler
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
-    COMMAND xcrun -sdk macosx metal -std=macos-metal4.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air
+    COMMAND xcrun -sdk macosx metal -std=metal4.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air
     COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal
     COMMENT "Compiling UtilShaders"
@@ -271,7 +271,7 @@ add_custom_command(
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
-    COMMAND xcrun -sdk macosx metal -std=macos-metal4.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/SpriteShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.air
+    COMMAND xcrun -sdk macosx metal -std=metal4.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/SpriteShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.air
     COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/SpriteShaders.metal
     COMMENT "Compiling SpriteShaders"
