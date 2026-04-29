@@ -36,6 +36,14 @@ class SMaterial;
 class STexPic;
 class CMetalStateCache;
 
+// Safe downcast: verified by dynamic_cast in debug, zero-cost static_cast in release.
+template<typename T, typename U>
+static inline T* checked_cast(U* ptr)
+{
+    assert((!ptr || dynamic_cast<T*>(ptr)) && "checked_cast: type mismatch");
+    return static_cast<T*>(ptr);
+}
+
 // Metal base renderer class that implements core CRenderer functionality
 // Inherits from CRenderer which provides m_RP and other common renderer infrastructure
 class CMetalBaseRenderer : public CRenderer
@@ -110,6 +118,14 @@ public:
     virtual bool EnableFog(bool enable);
     virtual void SetFog(float density, float fogstart, float fogend, const float* color, int fogmode);
     void SetMaterialParams(const float* ambient, const float* diffuse, const float* specular);
+
+    bool InitHDRPipeline();
+    bool BeginHDRPass();
+    void DoBloomPass();
+    void EndHDRPass();
+
+    virtual id<MTLLibrary> GetShaderLibrary() = 0;
+    virtual id<MTLRenderPipelineState> GetFontPSO() = 0;
     virtual void EnableTexGen(bool enable);
     virtual void SetTexgen(float scaleX, float scaleY, float translateX = 0, float translateY = 0);
     virtual void SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2);
@@ -342,6 +358,7 @@ public:
     // Metal-specific members (public for manager access)
     id<MTLDevice> m_device;
     id<MTLCommandQueue> m_commandQueue;
+    id<MTLCommandQueue> m_blitCommandQueue;   // dedicated queue for texture uploads
     id<MTLRenderCommandEncoder> m_renderEncoder;
     MTKView* m_metalView;
     CAMetalLayer* m_metalLayer;
@@ -475,6 +492,7 @@ public:
     int m_currentDynamicVBPool;
     
     // Uniform buffer for MVP matrices and common parameters
+    static const int kMaxLights = 4;
     struct UniformBufferData
     {
         Matrix44 modelViewProjectionMatrix;
@@ -483,15 +501,21 @@ public:
         Matrix44 projectionMatrix;
         Vec3 cameraPos;
         float time;
+        // Primary light (kept for shader compatibility)
         Vec3 lightPos;
         float padding1;
         Vec3 lightColor;
         float padding2;
+        // Additional lights (up to kMaxLights total, index 0 mirrors lightPos/lightColor)
+        struct LightEntry { float pos[3]; float radius; float color[3]; float intensity; };
+        LightEntry lights[kMaxLights];
+        int numLights;
+        float pad3[3];
         float clipPlane[4];  // Normal.xyz + Distance
-        float clipEnabled;   // 1.0f if enabled, 0.0f if disabled
-        float clipRefract;   // 1.0f if refract mode, 0.0f if not
-        float fogScale;      // Linear fog: 1/(end-start)
-        float fogBias;       // Linear fog: end/(end-start)
+        float clipEnabled;
+        float clipRefract;
+        float fogScale;
+        float fogBias;
     };
     id<MTLBuffer> m_uniformBuffer;
     UniformBufferData* m_uniformBufferCPU;
@@ -510,6 +534,22 @@ public:
 
     // Static water Perlin noise table — vertex [[buffer(4)]] for water shaders
     id<MTLBuffer> m_waterNoiseBuffer;
+
+    // HDR rendering
+    id<MTLTexture>             m_hdrColorRT;       // RGBA16Float, RenderTarget | ShaderRead
+    id<MTLTexture>             m_hdrDepthRT;       // Depth32Float_Stencil8, Private
+    id<MTLRenderPipelineState> m_hdrToneMapPSO;    // full-screen Reinhard + gamma pass
+    id<MTLSamplerState>        m_hdrSampler;       // Linear sampler for tone-map input
+    bool                       m_hdrEnabled;
+    int                        m_hdrRTWidth;
+    int                        m_hdrRTHeight;
+    // Bloom chain (quarter-res)
+    id<MTLTexture>             m_bloomBrightRT;    // bright-pass output (1/4 size)
+    id<MTLTexture>             m_bloomBlurHRT;     // horizontal blur output
+    id<MTLTexture>             m_bloomBlurVRT;     // vertical blur output (final bloom)
+    id<MTLRenderPipelineState> m_hdrBrightPassPSO;
+    id<MTLRenderPipelineState> m_hdrBlurHPSO;
+    id<MTLRenderPipelineState> m_hdrBlurVPSO;
     
     // State cache
     std::unique_ptr<CMetalStateCache> m_stateCache;
@@ -519,6 +559,9 @@ public:
     int m_currentCullMode;
     bool m_fogEnabled;
     bool m_texGenEnabled;
+    float m_texGenScaleX, m_texGenScaleY;
+    float m_texGenTranslateX, m_texGenTranslateY;
+    float m_texGen3D[6];
     float m_lodBias;
     bool m_vSyncEnabled;
     bool m_shaderNeedsTangents;

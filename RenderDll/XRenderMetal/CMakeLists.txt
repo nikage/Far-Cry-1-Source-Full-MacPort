@@ -130,27 +130,35 @@ find_program(METAL_SHADER_CONVERTER_EXECUTABLE metal-shader-converter)
 set(GENERATED_METAL_METALLIB "")
 set(USE_HLSL_CONVERSION FALSE)
 
-# Check if Metal compiler is available
-find_program(METAL_COMPILER NAMES metal)
-if(NOT METAL_COMPILER)
-    execute_process(
-        COMMAND xcrun -sdk macosx metal --version
-        OUTPUT_QUIET
-        ERROR_QUIET
-        RESULT_VARIABLE METAL_CHECK_RESULT
-    )
-    if(METAL_CHECK_RESULT EQUAL 0)
-        set(METAL_COMPILER "xcrun -sdk macosx metal")
-        set(METAL_COMPILER_AVAILABLE TRUE)
-    else()
-        set(METAL_COMPILER_AVAILABLE FALSE)
-        message(WARNING "Metal compiler not available - shader compilation will be skipped. Install Metal Toolchain with: xcodebuild -downloadComponent MetalToolchain")
-    endif()
-else()
+# Check if Metal compiler is available.
+# `metal` lives inside the Xcode toolchain and is not on the standard PATH, so
+# find_program typically yields NOTFOUND on a standard Xcode install.  The xcrun
+# fallback is therefore the primary detection path on macOS.
+execute_process(
+    COMMAND xcrun -sdk macosx metal --version
+    OUTPUT_QUIET
+    ERROR_QUIET
+    RESULT_VARIABLE METAL_CHECK_RESULT
+)
+if(METAL_CHECK_RESULT EQUAL 0)
+    set(METAL_COMPILER "xcrun -sdk macosx metal")
     set(METAL_COMPILER_AVAILABLE TRUE)
+    message(STATUS "Metal compiler found via xcrun")
+else()
+    # xcrun failed — fall back to searching PATH (unusual; present for non-Apple toolchains)
+    find_program(METAL_COMPILER NAMES metal)
+    if(METAL_COMPILER)
+        set(METAL_COMPILER_AVAILABLE TRUE)
+        message(STATUS "Metal compiler found in PATH: ${METAL_COMPILER}")
+    else()
+        message(FATAL_ERROR "Metal compiler not found. "
+                            "Ensure Xcode is installed and selected:\n"
+                            "  sudo xcode-select -s /Applications/Xcode.app\n"
+                            "Then re-run cmake.")
+    endif()
 endif()
 
-if(DART_COMMAND AND METAL_COMPILER_AVAILABLE)
+if(DART_COMMAND)
     set(SHADER_PORT_ROOT ${CMAKE_SOURCE_DIR})
     set(SHADER_PARSER ${SHADER_PORT_ROOT}/tools/shader_port/lib/parser.dart)
     set(SHADER_METAL_GENERATOR ${SHADER_PORT_ROOT}/tools/shader_port/lib/metal_generator.dart)
@@ -224,41 +232,33 @@ if(DART_COMMAND AND METAL_COMPILER_AVAILABLE)
         set(GENERATED_METAL_METALLIB ${CONVERTER_METALLIB})
         message(STATUS "Using HLSL→Metal conversion pipeline (DXC: ${DXC_EXECUTABLE}, Converter: ${METAL_SHADER_CONVERTER_EXECUTABLE})")
     else()
-        if(METAL_COMPILER_AVAILABLE)
-            set(GENERATED_METAL_METALLIB ${CMAKE_CURRENT_BINARY_DIR}/GeneratedShaders.metallib)
-            set(GENERATED_AIR_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated_air)
-            set(METAL_BUILD_SCRIPT ${SHADER_PORT_ROOT}/tools/shader_port/lib/build_metal.dart)
-            add_custom_command(
-                OUTPUT ${GENERATED_METAL_METALLIB}
-                COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_AIR_DIR}
-                COMMAND ${DART_COMMAND} ${METAL_BUILD_SCRIPT} ${SHADER_PORT_ROOT} ${CMAKE_CURRENT_SOURCE_DIR}/Generated ${GENERATED_AIR_DIR} ${GENERATED_METAL_METALLIB}
-                DEPENDS ${GENERATED_STAMP} ${METAL_BUILD_SCRIPT}
-                COMMENT "Compiling generated Metal shaders (IR→Metal fallback)"
-                VERBATIM
-            )
-            add_custom_target(GeneratedMetalShaders ALL DEPENDS ${GENERATED_METAL_METALLIB})
-            add_dependencies(GeneratedMetalShaders GenerateMetalShaderSources)
-            if(NOT DXC_EXECUTABLE)
-                message(WARNING "DXC not found; falling back to IR→Metal conversion")
-            endif()
-            if(NOT METAL_SHADER_CONVERTER_EXECUTABLE)
-                message(WARNING "metal-shader-converter not found; falling back to IR→Metal conversion")
-            endif()
-        else()
-            message(WARNING "Metal compiler not available - GeneratedShaders.metallib will not be built. Shaders will need to be compiled manually.")
-            set(GENERATED_METAL_METALLIB "")
+        set(GENERATED_METAL_METALLIB ${CMAKE_CURRENT_BINARY_DIR}/GeneratedShaders.metallib)
+        set(GENERATED_AIR_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated_air)
+        set(METAL_BUILD_SCRIPT ${SHADER_PORT_ROOT}/tools/shader_port/lib/build_metal.dart)
+        add_custom_command(
+            OUTPUT ${GENERATED_METAL_METALLIB}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_AIR_DIR}
+            COMMAND ${DART_COMMAND} ${METAL_BUILD_SCRIPT} ${SHADER_PORT_ROOT} ${CMAKE_CURRENT_SOURCE_DIR}/Generated ${GENERATED_AIR_DIR} ${GENERATED_METAL_METALLIB}
+            DEPENDS ${GENERATED_STAMP} ${METAL_BUILD_SCRIPT}
+            COMMENT "Compiling generated Metal shaders (IR→Metal fallback)"
+            VERBATIM
+        )
+        add_custom_target(GeneratedMetalShaders ALL DEPENDS ${GENERATED_METAL_METALLIB})
+        add_dependencies(GeneratedMetalShaders GenerateMetalShaderSources)
+        if(NOT DXC_EXECUTABLE)
+            message(WARNING "DXC not found; falling back to IR→Metal conversion")
+        endif()
+        if(NOT METAL_SHADER_CONVERTER_EXECUTABLE)
+            message(WARNING "metal-shader-converter not found; falling back to IR→Metal conversion")
         endif()
     endif()
 else()
     if(NOT DART_COMMAND)
         message(WARNING "Dart executable not found; skipping generated Metal shader integration")
     endif()
-    if(NOT METAL_COMPILER_AVAILABLE)
-        message(WARNING "Metal compiler not available; skipping shader compilation")
-    endif()
 endif()
 
-# Compile Metal shaders at build time  
+# Compile Metal shaders at build time
 # Note: Do NOT pass C++ include paths to Metal compiler
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
@@ -283,12 +283,14 @@ add_custom_target(MetalShaders ALL
             ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
 )
 
-if(GENERATED_METAL_METALLIB)
-    if(USE_HLSL_CONVERSION)
-        add_dependencies(MetalShaders ConvertHLSLToMetal)
-    else()
-        add_dependencies(MetalShaders GeneratedMetalShaders)
-    endif()
+if(NOT GENERATED_METAL_METALLIB)
+    message(FATAL_ERROR "GENERATED_METAL_METALLIB is not set — generated game shaders will not be compiled.\n"
+                        "Ensure Dart is installed and on PATH (https://dart.dev/get-dart) then re-run cmake.")
+endif()
+if(USE_HLSL_CONVERSION)
+    add_dependencies(MetalShaders ConvertHLSLToMetal)
+else()
+    add_dependencies(MetalShaders GeneratedMetalShaders)
 endif()
 
 add_dependencies(XRenderMetal MetalShaders)
@@ -305,7 +307,6 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
     DESTINATION lib
 )
 
-if(GENERATED_METAL_METALLIB)
 install(FILES ${GENERATED_METAL_METALLIB}
               ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
     DESTINATION lib
@@ -317,29 +318,50 @@ if(USE_HLSL_CONVERSION)
     )
 endif()
 
-    set(DEFAULT_FARCRY_APP_BUNDLE "${CMAKE_BINARY_DIR}/FarCry.app")
-    set(FARCRY_APP_BUNDLE_DIR "${DEFAULT_FARCRY_APP_BUNDLE}" CACHE PATH "Location of FarCry.app for resource staging")
-    set(FARCRY_APP_RESOURCES_DIR "${FARCRY_APP_BUNDLE_DIR}/Contents/Resources")
+set(DEFAULT_FARCRY_APP_BUNDLE "${CMAKE_BINARY_DIR}/FarCry.app")
+set(FARCRY_APP_BUNDLE_DIR "${DEFAULT_FARCRY_APP_BUNDLE}" CACHE PATH "Location of FarCry.app for resource staging")
+set(FARCRY_APP_RESOURCES_DIR "${FARCRY_APP_BUNDLE_DIR}/Contents/Resources")
 
-    add_custom_command(
-        OUTPUT ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
-               ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_APP_RESOURCES_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_METAL_METALLIB} ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
-        DEPENDS ${GENERATED_METAL_METALLIB} ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
-        COMMENT "Staging generated Metal shaders into FarCry.app resources"
-        VERBATIM
-    )
+add_custom_command(
+    OUTPUT ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
+           ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_APP_RESOURCES_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_METAL_METALLIB} ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+    DEPENDS ${GENERATED_METAL_METALLIB} ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
+    COMMENT "Staging generated Metal shaders into FarCry.app resources"
+    VERBATIM
+)
 
-    add_custom_target(GeneratedMetalBundleResources ALL
-        DEPENDS ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
-                ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json)
-    if(USE_HLSL_CONVERSION)
-        add_dependencies(GeneratedMetalBundleResources ConvertHLSLToMetal)
-    else()
-        add_dependencies(GeneratedMetalBundleResources GeneratedMetalShaders)
+add_custom_target(GeneratedMetalBundleResources ALL
+    DEPENDS ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
+            ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json)
+if(USE_HLSL_CONVERSION)
+    add_dependencies(GeneratedMetalBundleResources ConvertHLSLToMetal)
+else()
+    add_dependencies(GeneratedMetalBundleResources GeneratedMetalShaders)
+endif()
+add_dependencies(MetalShaders GeneratedMetalBundleResources)
+
+# ------------------------------------------------------------------
+# Unit tests — pure-logic renderer functions (no Metal dependency)
+# ------------------------------------------------------------------
+if(BUILD_TESTING OR CMAKE_BUILD_TYPE STREQUAL "Debug")
+    enable_testing()
+    add_executable(RendererLogicTests test/RendererLogicTests.cpp)
+    target_include_directories(RendererLogicTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_features(RendererLogicTests PRIVATE cxx_std_14)
+    # Resolve libc++ headers in CLT-only environments
+    if(DEFINED LIBCXX_INCLUDE_DIR AND EXISTS "${LIBCXX_INCLUDE_DIR}")
+        target_include_directories(RendererLogicTests SYSTEM PRIVATE "${LIBCXX_INCLUDE_DIR}")
     endif()
-    add_dependencies(MetalShaders GeneratedMetalBundleResources)
+    # This target is pure-logic C++ (no heap bugs to catch) — opt out of the
+    # global Debug ASan flags to avoid libclang_rt.asan dyld initialisation
+    # hangs on machines where the ASan runtime deadlocks at startup.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(RendererLogicTests PRIVATE -fno-sanitize=address)
+        target_link_options(RendererLogicTests PRIVATE -fno-sanitize=address)
+    endif()
+    add_test(NAME RendererLogicTests COMMAND RendererLogicTests)
 endif()
 

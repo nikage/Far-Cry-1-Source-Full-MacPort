@@ -1,0 +1,43 @@
+---
+description: Require unit tests for every new feature or bugfix to prevent regression
+alwaysApply: true
+---
+
+# Unit Tests Required
+
+Every new feature and every bugfix must be accompanied by unit tests that cover the changed or added behavior.
+
+## Rules
+
+- **New feature** → add tests that verify the feature works as expected
+- **Bugfix** → add a regression test that would have caught the original bug
+- Tests must be placed in the appropriate test directory/file adjacent to the code under test
+- Do not ship code without tests unless the user explicitly opts out
+
+## Test placement
+
+| Source file | Test file |
+|---|---|
+| `src/foo/bar.dart` | `test/foo/bar_test.dart` |
+| `RenderDll/XRenderMetal/Foo.mm` | `RenderDll/XRenderMetal/test/FooTests.cpp` |
+
+## Examples
+
+```dart
+// ❌ BAD – bugfix with no regression test
+void fixedFunction() { ... }
+
+// ✅ GOOD – bugfix accompanied by a test that would have caught the bug
+void fixedFunction() { ... }
+
+test('fixedFunction returns correct value when input is empty', () {
+  expect(fixedFunction(''), equals(''));
+});
+```
+
+```cpp
+// ✅ GOOD – new feature with a corresponding test
+TEST(FooTest, NewFeatureHandlesEdgeCase) {
+    EXPECT_EQ(newFeature(0), expectedValue);
+}
+```

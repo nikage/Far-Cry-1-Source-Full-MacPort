@@ -1,0 +1,61 @@
+---
+description: No silent fails — every early return on a contract violation must assert
+globs: RenderDll/**/*.mm,RenderDll/**/*.m,RenderDll/**/*.cpp,RenderDll/**/*.h,FARCRY/**/*.cpp
+alwaysApply: false
+---
+
+# No Silent Fails
+
+A silent `return` / `return false` that swallows a programming error makes bugs invisible.
+
+## Rule
+
+Every early return that represents a **contract violation** (something that should never happen in correct code) must be preceded by an `assert`.
+
+A silent return is only acceptable for **expected runtime states** (e.g. feature disabled, no data yet).
+
+## Pattern
+
+```cpp
+// ❌ BAD — caller gets no signal that something is wrong
+if (!m_device || !m_renderEncoder)
+    return false;
+
+// ✅ GOOD — fires immediately in debug, still safe in release
+assert(m_device      && "MyFunc: device is nil");
+assert(m_renderEncoder && "MyFunc: no active render encoder");
+if (!m_device || !m_renderEncoder)
+    return false;
+```
+
+## Hot-path exception
+
+For functions called **every frame**, prefer a single combined assert so the message is still clear:
+
+```cpp
+assert(m_hdrEnabled && "DoBloomPass: HDR enabled but bloom resources are nil");
+if (!m_bloomBrightRT || !m_bloomBlurHRT)
+    return;
+```
+
+## Distinguish contract violations from soft skips
+
+| Situation | Pattern |
+|-----------|---------|
+| Nil pointer that should never be nil (`gRenDev`, device, PSO after init) | `assert` + `return` |
+| Feature disabled at runtime (HDR off, fog off) | silent `return` is fine |
+| Init failure already logged upstream | silent `return` is fine (error was reported at the source) |
+| PSO lookup returning nil (registry not populated) | `assert` — this is always a bug |
+
+## Downcasts
+
+Use `checked_cast<T>` (defined in `MetalBaseRenderer.m`) instead of bare `static_cast` for all `gRenDev` downcasts. It runs `dynamic_cast` in debug and `static_cast` in release.
+
+```cpp
+// ❌ BAD
+CMetalRenderer* r = static_cast<CMetalRenderer*>(gRenDev);
+
+// ✅ GOOD
+CMetalRenderer* r = checked_cast<CMetalRenderer>(gRenDev);
+assert(r && "MyFunc: gRenDev is not a CMetalRenderer");
+```

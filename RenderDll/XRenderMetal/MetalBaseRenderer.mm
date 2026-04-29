@@ -80,10 +80,28 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_materialBuffer(nil)
     , m_materialBufferCPU(nullptr)
     , m_waterNoiseBuffer(nil)
+    , m_hdrColorRT(nil)
+    , m_hdrDepthRT(nil)
+    , m_hdrToneMapPSO(nil)
+    , m_hdrSampler(nil)
+    , m_hdrEnabled(false)
+    , m_hdrRTWidth(0)
+    , m_hdrRTHeight(0)
+    , m_bloomBrightRT(nil)
+    , m_bloomBlurHRT(nil)
+    , m_bloomBlurVRT(nil)
+    , m_hdrBrightPassPSO(nil)
+    , m_hdrBlurHPSO(nil)
+    , m_hdrBlurVPSO(nil)
     , m_currentState(0)
     , m_currentCullMode(R_CULL_BACK)
     , m_fogEnabled(false)
     , m_texGenEnabled(false)
+    , m_texGenScaleX(1.0f)
+    , m_texGenScaleY(1.0f)
+    , m_texGenTranslateX(0.0f)
+    , m_texGenTranslateY(0.0f)
+    , m_texGen3D{}
     , m_lodBias(0.0f)
     , m_vSyncEnabled(true)
     , m_shaderNeedsTangents(false)
@@ -249,6 +267,7 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     m_currentPipelineState = nil;
     m_currentDepthStencilState = nil;
     m_commandQueue = nil;
+    m_blitCommandQueue = nil;
     m_device = nil;
     m_metalView = nil;
     m_metalLayer = nil;
@@ -274,16 +293,19 @@ void CMetalBaseRenderer::TrackCommandBuffer(id<MTLCommandBuffer> buffer)
     m_activeCommandBuffers.push_back(buffer);
     iLog->Log("TrackCommandBuffer: Now tracking %zu command buffer(s)\n", m_activeCommandBuffers.size());
     
-    // Add completion handler to auto-remove from tracking
+    // Add completion handler: remove from tracking list and accumulate GPU timing
     [buffer addCompletedHandler:^(id<MTLCommandBuffer> completedBuffer) {
         std::lock_guard<std::mutex> lock(m_commandBufferMutex);
-        
-        // Remove from active list
+
         auto it = std::find(m_activeCommandBuffers.begin(), m_activeCommandBuffers.end(), completedBuffer);
         if (it != m_activeCommandBuffers.end()) {
             m_activeCommandBuffers.erase(it);
-            iLog->Log("TrackCommandBuffer: Command buffer completed, %zu remaining\n", m_activeCommandBuffers.size());
         }
+
+        // Accumulate GPU frame time into SPipeStat::m_fFlushTime (milliseconds)
+        const CFTimeInterval gpuMs = (completedBuffer.GPUEndTime - completedBuffer.GPUStartTime) * 1000.0;
+        if (gpuMs > 0.0)
+            m_RP.m_PS.m_fFlushTime += static_cast<float>(gpuMs);
     }];
 }
 
@@ -336,7 +358,16 @@ bool CMetalBaseRenderer::InitializeCommandQueue()
         iLog->LogError("Failed to create Metal command queue\n");
         return false;
     }
-    
+    [m_commandQueue setLabel:@"FarCryCommandQueue"];
+
+    m_blitCommandQueue = [m_device newCommandQueue];
+    if (!m_blitCommandQueue)
+    {
+        iLog->LogError("Failed to create Metal blit command queue\n");
+        return false;
+    }
+    [m_blitCommandQueue setLabel:@"FarCryBlitQueue"];
+
     return true;
 }
 
@@ -391,6 +422,7 @@ bool CMetalBaseRenderer::InitializeUniformBuffers()
         iLog->Log("Error: Failed to create uniform buffer\n");
         return false;
     }
+    [m_uniformBuffer setLabel:@"GlobalUniforms"];
     
     m_uniformBufferCPU = (UniformBufferData*)[m_uniformBuffer contents];
     
@@ -423,6 +455,7 @@ bool CMetalBaseRenderer::InitializeUniformBuffers()
         iLog->Log("Error: Failed to create material uniform buffer\n");
         return false;
     }
+    [m_materialBuffer setLabel:@"MaterialUniforms"];
     m_materialBufferCPU = (MaterialUniformsData*)[m_materialBuffer contents];
     if (m_materialBufferCPU) {
         memset(m_materialBufferCPU, 0, matSize);
@@ -510,6 +543,16 @@ void CMetalBaseRenderer::CleanupUniformBuffers()
     m_materialBuffer = nil;
     m_materialBufferCPU = nullptr;
     m_waterNoiseBuffer = nil;
+    m_hdrColorRT = nil;
+    m_hdrDepthRT = nil;
+    m_hdrToneMapPSO = nil;
+    m_hdrSampler = nil;
+    m_bloomBrightRT = nil;
+    m_bloomBlurHRT  = nil;
+    m_bloomBlurVRT  = nil;
+    m_hdrBrightPassPSO = nil;
+    m_hdrBlurHPSO      = nil;
+    m_hdrBlurVPSO      = nil;
 }
 
 bool CMetalBaseRenderer::InitializeDepthStencilTextures()
@@ -1106,13 +1149,29 @@ void CMetalBaseRenderer::UpdateUniformBuffer()
     m_uniformBufferCPU->cameraPos = camPos;
     m_uniformBufferCPU->time = iTimer ? iTimer->GetCurrTime() : 0.0f;
     
-    m_uniformBufferCPU->lightPos   = Vec3(0, 100, 0);
-    m_uniformBufferCPU->lightColor = Vec3(1, 1, 1);
-    // Use the first active dynamic light when available
-    if (m_RP.m_NumActiveDLights > 0 && m_RP.m_pActiveDLights[0]) {
-        const CDLight* pLight = m_RP.m_pActiveDLights[0];
-        m_uniformBufferCPU->lightPos   = pLight->m_Origin;
-        m_uniformBufferCPU->lightColor = Vec3(pLight->m_Color.r, pLight->m_Color.g, pLight->m_Color.b);
+    // Build light list from active dynamic lights
+    m_uniformBufferCPU->numLights = 0;
+    for (int li = 0; li < m_RP.m_NumActiveDLights && li < kMaxLights; ++li) {
+        const CDLight* pL = m_RP.m_pActiveDLights[li];
+        if (!pL) continue;
+        auto& entry = m_uniformBufferCPU->lights[m_uniformBufferCPU->numLights];
+        entry.pos[0] = pL->m_Origin.x; entry.pos[1] = pL->m_Origin.y; entry.pos[2] = pL->m_Origin.z;
+        entry.radius = pL->m_fRadius;
+        entry.color[0] = pL->m_Color.r; entry.color[1] = pL->m_Color.g; entry.color[2] = pL->m_Color.b;
+        entry.intensity = pL->m_Color.a > 0.f ? pL->m_Color.a : 1.f;
+        m_uniformBufferCPU->numLights++;
+    }
+    // Primary light aliases light[0] (or a sun/ambient fallback)
+    if (m_uniformBufferCPU->numLights > 0) {
+        auto& e0 = m_uniformBufferCPU->lights[0];
+        m_uniformBufferCPU->lightPos   = Vec3(e0.pos[0], e0.pos[1], e0.pos[2]);
+        m_uniformBufferCPU->lightColor = Vec3(e0.color[0] * e0.intensity,
+                                              e0.color[1] * e0.intensity,
+                                              e0.color[2] * e0.intensity);
+    } else {
+        // No dynamic lights — use a high overhead directional fill light so scene isn't black
+        m_uniformBufferCPU->lightPos   = Vec3(0, 500, 0);
+        m_uniformBufferCPU->lightColor = Vec3(0.6f, 0.6f, 0.6f);
     }
     
     // Initialize clip plane data
@@ -1968,12 +2027,264 @@ void CMetalBaseRenderer::SetMaterialParams(const float* ambient, const float* di
     }
 }
 
-void CMetalBaseRenderer::SetTexgen(float scaleX, float scaleY, float translateX, float translateY)
+bool CMetalBaseRenderer::InitHDRPipeline()
 {
+    if (!m_device || m_hdrColorRT)
+        return m_hdrColorRT != nil;
+
+    const int w = m_width  > 0 ? m_width  : 1920;
+    const int h = m_height > 0 ? m_height : 1080;
+    m_hdrRTWidth  = w;
+    m_hdrRTHeight = h;
+
+    // HDR colour target — RGBA16Float, readable as shader texture
+    MTLTextureDescriptor *colorDesc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                          width:w height:h mipmapped:NO];
+    colorDesc.usage       = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    colorDesc.storageMode = MTLStorageModePrivate;
+    m_hdrColorRT = [m_device newTextureWithDescriptor:colorDesc];
+    if (m_hdrColorRT) [m_hdrColorRT setLabel:@"HDRColorRT"];
+
+    // HDR depth target — Depth32Float_Stencil8
+    MTLTextureDescriptor *depthDesc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float_Stencil8
+                                                          width:w height:h mipmapped:NO];
+    depthDesc.usage       = MTLTextureUsageRenderTarget;
+    depthDesc.storageMode = MTLStorageModePrivate;
+    m_hdrDepthRT = [m_device newTextureWithDescriptor:depthDesc];
+    if (m_hdrDepthRT) [m_hdrDepthRT setLabel:@"HDRDepthRT"];
+
+    // Build tone-map PSO: fullscreen triangle VS + Reinhard FS
+    id<MTLLibrary> lib = GetShaderLibrary();
+    if (!lib) return false;
+
+    id<MTLFunction> vsFunc = [lib newFunctionWithName:@"hdr_fullscreen_vertex"];
+    id<MTLFunction> fsFunc = [lib newFunctionWithName:@"hdr_tonemap_fragment"];
+    if (!vsFunc || !fsFunc) return false;
+
+    MTLRenderPipelineDescriptor *psoDesc = [[MTLRenderPipelineDescriptor alloc] init];
+    psoDesc.label                           = @"HDRToneMapPSO";
+    psoDesc.vertexFunction                  = vsFunc;
+    psoDesc.fragmentFunction                = fsFunc;
+    psoDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    psoDesc.depthAttachmentPixelFormat      = MTLPixelFormatInvalid;
+
+    NSError *err = nil;
+    m_hdrToneMapPSO = [m_device newRenderPipelineStateWithDescriptor:psoDesc error:&err];
+    if (!m_hdrToneMapPSO) {
+        iLog->Log("HDR ToneMap PSO error: %s",
+                  err ? [[err localizedDescription] UTF8String] : "unknown");
+        return false;
+    }
+
+    // Linear clamp sampler (reused every frame)
+    MTLSamplerDescriptor *sDesc = [[MTLSamplerDescriptor alloc] init];
+    sDesc.minFilter = MTLSamplerMinMagFilterLinear;
+    sDesc.magFilter = MTLSamplerMinMagFilterLinear;
+    sDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
+    sDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
+    m_hdrSampler = [m_device newSamplerStateWithDescriptor:sDesc];
+
+    // Build bloom PSOs (bright-pass + separable Gaussian blur)
+    auto makePSO = [&](NSString* fsName, NSString* label,
+                       MTLPixelFormat fmt) -> id<MTLRenderPipelineState> {
+        id<MTLFunction> fs = [lib newFunctionWithName:fsName];
+        if (!fs) return nil;
+        MTLRenderPipelineDescriptor *d = [[MTLRenderPipelineDescriptor alloc] init];
+        d.label                           = label;
+        d.vertexFunction                  = vsFunc;
+        d.fragmentFunction                = fs;
+        d.colorAttachments[0].pixelFormat = fmt;
+        d.depthAttachmentPixelFormat      = MTLPixelFormatInvalid;
+        NSError *e = nil;
+        id<MTLRenderPipelineState> pso = [m_device newRenderPipelineStateWithDescriptor:d error:&e];
+        if (!pso && e)
+            iLog->Log("HDR PSO '%s' error: %s", [label UTF8String], [[e localizedDescription] UTF8String]);
+        return pso;
+    };
+    m_hdrBrightPassPSO = makePSO(@"hdr_brightpass_fragment", @"HDRBrightPassPSO",
+                                 MTLPixelFormatRGBA16Float);
+    m_hdrBlurHPSO      = makePSO(@"hdr_blur_h_fragment",     @"HDRBlurHPSO",
+                                 MTLPixelFormatRGBA16Float);
+    m_hdrBlurVPSO      = makePSO(@"hdr_blur_v_fragment",     @"HDRBlurVPSO",
+                                 MTLPixelFormatRGBA16Float);
+
+    // Quarter-res bloom targets
+    const int bw = std::max(1, w / 4);
+    const int bh = std::max(1, h / 4);
+    auto makeBloomTex = [&](NSString* label) -> id<MTLTexture> {
+        MTLTextureDescriptor *bd =
+            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                              width:bw height:bh mipmapped:NO];
+        bd.usage       = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        bd.storageMode = MTLStorageModePrivate;
+        id<MTLTexture> t = [m_device newTextureWithDescriptor:bd];
+        if (t) [t setLabel:label];
+        return t;
+    };
+    m_bloomBrightRT = makeBloomTex(@"BloomBrightRT");
+    m_bloomBlurHRT  = makeBloomTex(@"BloomBlurHRT");
+    m_bloomBlurVRT  = makeBloomTex(@"BloomBlurVRT");
+
+    return m_hdrColorRT != nil && m_hdrToneMapPSO != nil;
 }
 
+static void runFullscreenPass(id<MTLCommandBuffer> cb,
+                              id<MTLRenderPipelineState> pso,
+                              id<MTLTexture> srcTex,
+                              id<MTLSamplerState> samp,
+                              id<MTLTexture> dstTex,
+                              NSString* label)
+{
+    MTLRenderPassDescriptor *rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+    rpd.colorAttachments[0].texture     = dstTex;
+    rpd.colorAttachments[0].loadAction  = MTLLoadActionDontCare;
+    rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+    id<MTLRenderCommandEncoder> enc = [cb renderCommandEncoderWithDescriptor:rpd];
+    if (!enc) return;
+    [enc setLabel:label];
+    [enc setRenderPipelineState:pso];
+    [enc setFragmentTexture:srcTex atIndex:0];
+    [enc setFragmentSamplerState:samp atIndex:0];
+    [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+    [enc endEncoding];
+}
+
+void CMetalBaseRenderer::DoBloomPass()
+{
+    if (!m_currentCommandBuffer || !m_hdrColorRT
+        || !m_hdrBrightPassPSO || !m_hdrBlurHPSO || !m_hdrBlurVPSO
+        || !m_bloomBrightRT || !m_bloomBlurHRT || !m_bloomBlurVRT)
+    {
+        if (m_hdrEnabled)
+        {
+            static bool s_logged = false;
+            if (!s_logged) {
+                s_logged = true;
+                if (iLog)
+                    iLog->Log("DoBloomPass: HDR enabled but bloom PSOs/RTs are nil — skipping bloom (install full Xcode to compile bloom shaders)");
+            }
+        }
+        return;
+    }
+
+    runFullscreenPass(m_currentCommandBuffer, m_hdrBrightPassPSO,
+                      m_hdrColorRT,    m_hdrSampler, m_bloomBrightRT, @"BloomBrightPass");
+    runFullscreenPass(m_currentCommandBuffer, m_hdrBlurHPSO,
+                      m_bloomBrightRT, m_hdrSampler, m_bloomBlurHRT,  @"BloomBlurH");
+    runFullscreenPass(m_currentCommandBuffer, m_hdrBlurVPSO,
+                      m_bloomBlurHRT,  m_hdrSampler, m_bloomBlurVRT,  @"BloomBlurV");
+}
+
+bool CMetalBaseRenderer::BeginHDRPass()
+{
+    // m_currentCommandBuffer nil here is always a bug: BeginHDRPass is only
+    // called from EF_EndEf3D which runs inside an active frame.
+    assert(m_currentCommandBuffer && "BeginHDRPass: no active command buffer");
+    if (!m_currentCommandBuffer)
+        return false;
+
+    // m_hdrColorRT nil means InitHDRPipeline failed (already logged at init
+    // time). Log once so the frame-level fallback is visible without spam.
+    if (!m_hdrColorRT) {
+        static bool s_logged = false;
+        if (!s_logged) {
+            iLog->Log("BeginHDRPass: HDR colour RT is nil — falling back to LDR\n");
+            s_logged = true;
+        }
+        return false;
+    }
+
+    // End the previous encoder if active
+    if (m_renderEncoder) {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
+
+    MTLRenderPassDescriptor *hdrRPD = [MTLRenderPassDescriptor renderPassDescriptor];
+    hdrRPD.colorAttachments[0].texture     = m_hdrColorRT;
+    hdrRPD.colorAttachments[0].loadAction  = MTLLoadActionClear;
+    hdrRPD.colorAttachments[0].storeAction = MTLStoreActionStore;
+    hdrRPD.colorAttachments[0].clearColor  = MTLClearColorMake(0, 0, 0, 1);
+    hdrRPD.depthAttachment.texture         = m_hdrDepthRT;
+    hdrRPD.depthAttachment.loadAction      = MTLLoadActionClear;
+    hdrRPD.depthAttachment.storeAction     = MTLStoreActionDontCare;
+    hdrRPD.depthAttachment.clearDepth      = 1.0;
+
+    m_renderEncoder = [[m_currentCommandBuffer
+        renderCommandEncoderWithDescriptor:hdrRPD] retain];
+    if (m_renderEncoder) [m_renderEncoder setLabel:@"HDRScenePass"];
+    return m_renderEncoder != nil;
+}
+
+void CMetalBaseRenderer::EndHDRPass()
+{
+    assert(m_hdrColorRT      && "EndHDRPass: HDR colour RT is nil");
+    assert(m_currentCommandBuffer && "EndHDRPass: no active command buffer");
+    assert(m_hdrToneMapPSO   && "EndHDRPass: tone-map PSO is nil");
+    if (!m_hdrColorRT || !m_currentCommandBuffer || !m_hdrToneMapPSO)
+        return;
+
+    // End the HDR scene encoder so bloom passes can open their own encoders
+    if (m_renderEncoder) {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
+
+    // Bloom chain: each pass opens/closes its own encoder (no active encoder here)
+    DoBloomPass();
+
+    // Use the drawable that was already acquired in AcquireDrawableFromLayer/View
+    id<MTLTexture> dstTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
+    if (!dstTexture) return;
+
+    MTLRenderPassDescriptor *tonemapRPD = [MTLRenderPassDescriptor renderPassDescriptor];
+    tonemapRPD.colorAttachments[0].texture     = dstTexture;
+    tonemapRPD.colorAttachments[0].loadAction  = MTLLoadActionDontCare;
+    tonemapRPD.colorAttachments[0].storeAction = MTLStoreActionStore;
+
+    id<MTLRenderCommandEncoder> tonemapEncoder =
+        [m_currentCommandBuffer renderCommandEncoderWithDescriptor:tonemapRPD];
+    if (!tonemapEncoder) return;
+    [tonemapEncoder setLabel:@"HDRToneMapPass"];
+    [tonemapEncoder setRenderPipelineState:m_hdrToneMapPSO];
+    [tonemapEncoder setFragmentTexture:m_hdrColorRT atIndex:0];
+    [tonemapEncoder setFragmentTexture:(m_bloomBlurVRT ? m_bloomBlurVRT : m_hdrColorRT) atIndex:1];
+    [tonemapEncoder setFragmentSamplerState:m_hdrSampler atIndex:0];
+    [tonemapEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+    [tonemapEncoder endEncoding];
+    // Drawable is presented in EndFrame via the normal m_currentDrawable path
+}
+
+// SetTexgen / SetTexgen3D — fixed-function-era texture coordinate generation API.
+//
+// In D3D8/9 and OpenGL these configured hardware texgen (eye-plane, camera-space
+// position projection). Metal has no fixed-function texgen; the vertex shader is
+// solely responsible for UV generation. These methods therefore store the parameters
+// for potential use as vertex-shader uniforms but do not drive any hardware state.
+//
+// There are zero call sites outside renderer DLLs in the current codebase — the
+// parameters are preserved to avoid silent data loss if a caller is introduced.
+
+void CMetalBaseRenderer::SetTexgen(float scaleX, float scaleY, float translateX, float translateY)
+{
+    m_texGenEnabled    = true;
+    m_texGenScaleX     = scaleX;
+    m_texGenScaleY     = scaleY;
+    m_texGenTranslateX = translateX;
+    m_texGenTranslateY = translateY;
+}
+
+// SetTexgen3D — planar texgen with arbitrary world-space S and T planes.
+// S plane normal: (x1, y1, z1), T plane normal: (x2, y2, z2).
 void CMetalBaseRenderer::SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2)
 {
+    m_texGenEnabled = true;
+    m_texGen3D[0] = x1; m_texGen3D[1] = y1; m_texGen3D[2] = z1;
+    m_texGen3D[3] = x2; m_texGen3D[4] = y2; m_texGen3D[5] = z2;
 }
 
 void CMetalBaseRenderer::SetLodBias(float value)
@@ -2392,6 +2703,20 @@ void CMetalBaseRenderer::Release()
 
 void CMetalBaseRenderer::FreeResources(int nFlags)
 {
+    if (nFlags & FRR_REINITHW)
+    {
+        CleanupUniformBuffers();
+        CleanupDepthStencilTextures();
+        CleanupDynamicVBPools();
+    }
+
+    if (nFlags == FRR_ALL)
+    {
+        WaitForAllCommandBuffers();
+        CleanupDynamicVBPools();
+        CleanupUniformBuffers();
+        CleanupDepthStencilTextures();
+    }
 }
 
 void CMetalBaseRenderer::RefreshResources(int nFlags)

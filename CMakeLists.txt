@@ -13,6 +13,26 @@ if(APPLE)
         add_compile_definitions(_CPU_ARM64=1)
         add_compile_options(-mcpu=apple-m1)
     endif()
+
+    # Ensure C++ stdlib headers are found when only CLT is installed
+    execute_process(
+        COMMAND xcrun --sdk macosx --show-sdk-path
+        OUTPUT_VARIABLE MACOS_SDK_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE XCRUN_SDK_RESULT
+    )
+    if(XCRUN_SDK_RESULT EQUAL 0 AND MACOS_SDK_PATH)
+        set(LIBCXX_INCLUDE_DIR "${MACOS_SDK_PATH}/usr/include/c++/v1")
+        if(EXISTS "${LIBCXX_INCLUDE_DIR}")
+            include_directories(SYSTEM "${LIBCXX_INCLUDE_DIR}")
+            message(STATUS "Added libc++ include path: ${LIBCXX_INCLUDE_DIR}")
+        else()
+            message(WARNING "macOS SDK found at ${MACOS_SDK_PATH} but libc++ headers not present at expected path")
+        endif()
+    else()
+        message(WARNING "xcrun could not locate the macOS SDK — libc++ headers may be missing. "
+                        "Run: xcode-select --install")
+    endif()
     
     # Find frameworks
     find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
@@ -63,6 +83,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Add CryCommon as interface library
+enable_testing()
 add_subdirectory(CryCommon)
 
 # Add embedded resources for macOS
