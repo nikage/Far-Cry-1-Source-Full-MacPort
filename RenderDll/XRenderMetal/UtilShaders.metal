@@ -30,6 +30,7 @@ struct VertexOut {
     float2 texCoord;
     float4 Color;
     float clipDistance; // Distance to clip plane for fragment clipping
+    float fog [[user(fog)]]; // Linear fog factor (0=fully fogged, 1=clear)
 };
 
 // Uniform buffer for transformation matrices - MUST match UniformBufferData in MetalBaseRenderer.h exactly
@@ -47,8 +48,17 @@ struct Uniforms {
     float4 clipPlane;      // Normal.xyz + Distance
     float clipEnabled;     // 1.0f if enabled, 0.0f if disabled
     float clipRefract;     // 1.0f if refract mode, 0.0f if not
-    float padding3;        // Maintain 16-byte alignment
-    float padding4;        // Maintain 16-byte alignment
+    float fogScale;        // 1/(fogEnd - fogStart) for linear fog
+    float fogBias;         // fogEnd/(fogEnd - fogStart) for linear fog
+};
+
+struct MaterialUniforms {
+    float4 Ambient;      // Cg PS c0
+    float4 Diffuse;      // Cg PS c1
+    float4 Specular;     // Cg PS c2
+    float4 InlineDef0;   // Cg PS c3 — bias/scale/constants
+    float4 InlineDef1;   // Cg PS c4
+    float4 FogColor;     // GlobalFogColor (c7/c31 depending on shader)
 };
 
 // Basic vertex shader
@@ -72,6 +82,10 @@ vertex VertexOut basic_vertex(VertexIn in [[stage_in]],
         out.clipDistance = 1.0; // Always pass when clipping disabled
     }
     
+    // Linear fog factor: 1=clear, 0=fully fogged
+    float eyeZ = out.position.z / out.position.w;
+    out.fog = saturate(uniforms.fogBias - uniforms.fogScale * eyeZ);
+    
     // Pass through texture coordinates and color
     out.texCoord = in.texCoord;
     out.Color = in.color;
@@ -81,7 +95,8 @@ vertex VertexOut basic_vertex(VertexIn in [[stage_in]],
 
 // Basic fragment shader with texture and lighting
 fragment float4 basic_fragment(VertexOut in [[stage_in]],
-                              constant Uniforms& uniforms [[buffer(0)]],
+                              constant Uniforms& uniforms [[buffer(METAL_FRAGMENT_UNIFORM_BUFFER_INDEX)]],
+                              constant MaterialUniforms& mat [[buffer(METAL_MATERIAL_BUFFER_INDEX)]],
                               texture2d<float> baseTexture [[texture(0)]],
                               sampler textureSampler [[sampler(0)]]) {
     
@@ -112,9 +127,13 @@ fragment float4 basic_fragment(VertexOut in [[stage_in]],
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     float3 specular = specularStrength * spec * uniforms.lightColor;
     
-    // Combine lighting with texture (no materialColor in our structure)
     float3 lighting = ambient + diffuse + specular;
     float4 finalColor = float4(lighting, 1.0) * textureColor * in.Color;
+    
+    // Apply linear fog
+    if (uniforms.fogScale > 0.0) {
+        finalColor.rgb = mix(mat.FogColor.rgb, finalColor.rgb, in.fog);
+    }
     
     return finalColor;
 }

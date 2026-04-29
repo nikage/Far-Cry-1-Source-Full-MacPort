@@ -77,6 +77,9 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_currentDynamicVBPool(0)
     , m_uniformBuffer(nil)
     , m_uniformBufferCPU(nullptr)
+    , m_materialBuffer(nil)
+    , m_materialBufferCPU(nullptr)
+    , m_waterNoiseBuffer(nil)
     , m_currentState(0)
     , m_currentCullMode(R_CULL_BACK)
     , m_fogEnabled(false)
@@ -408,6 +411,65 @@ bool CMetalBaseRenderer::InitializeUniformBuffers()
         m_uniformBufferCPU->clipPlane[1] = 0.0f;
         m_uniformBufferCPU->clipPlane[2] = 0.0f;
         m_uniformBufferCPU->clipPlane[3] = 0.0f;
+        m_uniformBufferCPU->fogScale = 0.0f;
+        m_uniformBufferCPU->fogBias  = 1.0f;
+    }
+
+    // Allocate the per-draw material uniform buffer (shared, small)
+    size_t matSize = sizeof(MaterialUniformsData);
+    m_materialBuffer = [m_device newBufferWithLength:matSize
+                                            options:MTLResourceStorageModeShared];
+    if (!m_materialBuffer) {
+        iLog->Log("Error: Failed to create material uniform buffer\n");
+        return false;
+    }
+    m_materialBufferCPU = (MaterialUniformsData*)[m_materialBuffer contents];
+    if (m_materialBufferCPU) {
+        memset(m_materialBufferCPU, 0, matSize);
+        // Default white material
+        m_materialBufferCPU->Ambient[0] = m_materialBufferCPU->Ambient[1] = m_materialBufferCPU->Ambient[2] = m_materialBufferCPU->Ambient[3] = 1.0f;
+        m_materialBufferCPU->Diffuse[0] = m_materialBufferCPU->Diffuse[1] = m_materialBufferCPU->Diffuse[2] = m_materialBufferCPU->Diffuse[3] = 1.0f;
+        m_materialBufferCPU->Specular[3] = 1.0f;
+        m_materialBufferCPU->FogColor[3] = 1.0f;
+    }
+
+    // Build static water Perlin noise table (mirrors D3D c30..c95, 66 float4 entries)
+    // Permutation table generated from classic Perlin noise permutation array
+    static const float kPerlinPerm[256] = {
+        151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,
+        140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,
+        247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,
+        57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,
+        74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,
+        60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,
+        65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,
+        200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,
+        52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,
+        207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,
+        119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,
+        129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,
+        218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,
+        81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,
+        184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,
+        222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+    };
+    struct WaterNoiseEntry { float x, y, z, w; };
+    const int kNoiseCount = 66;
+    m_waterNoiseBuffer = [m_device newBufferWithLength:kNoiseCount * sizeof(WaterNoiseEntry)
+                                              options:MTLResourceStorageModeShared];
+    if (m_waterNoiseBuffer) {
+        WaterNoiseEntry* tbl = (WaterNoiseEntry*)[m_waterNoiseBuffer contents];
+        for (int i = 0; i < kNoiseCount; ++i) {
+            int p0 = (int)kPerlinPerm[(i * 4 + 0) & 0xFF];
+            int p1 = (int)kPerlinPerm[(i * 4 + 1) & 0xFF];
+            int p2 = (int)kPerlinPerm[(i * 4 + 2) & 0xFF];
+            int p3 = (int)kPerlinPerm[(i * 4 + 3) & 0xFF];
+            tbl[i].x = (p0 / 255.0f) * 2.0f - 1.0f;
+            tbl[i].y = (p1 / 255.0f) * 2.0f - 1.0f;
+            tbl[i].z = (p2 / 255.0f) * 2.0f - 1.0f;
+            tbl[i].w = (p3 / 255.0f) * 2.0f - 1.0f;
+        }
+        [m_waterNoiseBuffer setLabel:@"WaterNoiseTable"];
     }
     
     return true;
@@ -445,6 +507,9 @@ void CMetalBaseRenderer::CleanupUniformBuffers()
 {
     m_uniformBuffer = nil;
     m_uniformBufferCPU = nullptr;
+    m_materialBuffer = nil;
+    m_materialBufferCPU = nullptr;
+    m_waterNoiseBuffer = nil;
 }
 
 bool CMetalBaseRenderer::InitializeDepthStencilTextures()
@@ -1041,8 +1106,14 @@ void CMetalBaseRenderer::UpdateUniformBuffer()
     m_uniformBufferCPU->cameraPos = camPos;
     m_uniformBufferCPU->time = iTimer ? iTimer->GetCurrTime() : 0.0f;
     
-    m_uniformBufferCPU->lightPos = Vec3(0, 100, 0);
+    m_uniformBufferCPU->lightPos   = Vec3(0, 100, 0);
     m_uniformBufferCPU->lightColor = Vec3(1, 1, 1);
+    // Use the first active dynamic light when available
+    if (m_RP.m_NumActiveDLights > 0 && m_RP.m_pActiveDLights[0]) {
+        const CDLight* pLight = m_RP.m_pActiveDLights[0];
+        m_uniformBufferCPU->lightPos   = pLight->m_Origin;
+        m_uniformBufferCPU->lightColor = Vec3(pLight->m_Color.r, pLight->m_Color.g, pLight->m_Color.b);
+    }
     
     // Initialize clip plane data
     if (m_clipPlaneEnabled) {
@@ -1848,11 +1919,53 @@ bool CMetalBaseRenderer::EnableFog(bool enable)
 void CMetalBaseRenderer::SetFog(float density, float fogstart, float fogend, 
                                const float* color, int fogmode)
 {
+    if (!m_uniformBufferCPU)
+        return;
+
+    float range = fogend - fogstart;
+    if (range > 0.0001f) {
+        m_uniformBufferCPU->fogScale = 1.0f / range;
+        m_uniformBufferCPU->fogBias  = fogend / range;
+    } else {
+        m_uniformBufferCPU->fogScale = 0.0f;
+        m_uniformBufferCPU->fogBias  = 1.0f;
+    }
+
+    if (m_materialBufferCPU && color) {
+        m_materialBufferCPU->FogColor[0] = color[0];
+        m_materialBufferCPU->FogColor[1] = color[1];
+        m_materialBufferCPU->FogColor[2] = color[2];
+        m_materialBufferCPU->FogColor[3] = color[3];
+    }
 }
 
 void CMetalBaseRenderer::EnableTexGen(bool enable)
 {
     m_texGenEnabled = enable;
+}
+
+void CMetalBaseRenderer::SetMaterialParams(const float* ambient, const float* diffuse, const float* specular)
+{
+    if (!m_materialBufferCPU)
+        return;
+    if (ambient) {
+        m_materialBufferCPU->Ambient[0] = ambient[0];
+        m_materialBufferCPU->Ambient[1] = ambient[1];
+        m_materialBufferCPU->Ambient[2] = ambient[2];
+        m_materialBufferCPU->Ambient[3] = ambient[3];
+    }
+    if (diffuse) {
+        m_materialBufferCPU->Diffuse[0] = diffuse[0];
+        m_materialBufferCPU->Diffuse[1] = diffuse[1];
+        m_materialBufferCPU->Diffuse[2] = diffuse[2];
+        m_materialBufferCPU->Diffuse[3] = diffuse[3];
+    }
+    if (specular) {
+        m_materialBufferCPU->Specular[0] = specular[0];
+        m_materialBufferCPU->Specular[1] = specular[1];
+        m_materialBufferCPU->Specular[2] = specular[2];
+        m_materialBufferCPU->Specular[3] = specular[3];
+    }
 }
 
 void CMetalBaseRenderer::SetTexgen(float scaleX, float scaleY, float translateX, float translateY)

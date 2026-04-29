@@ -109,6 +109,7 @@ public:
     virtual void SetCullMode(int mode = R_CULL_BACK);
     virtual bool EnableFog(bool enable);
     virtual void SetFog(float density, float fogstart, float fogend, const float* color, int fogmode);
+    void SetMaterialParams(const float* ambient, const float* diffuse, const float* specular);
     virtual void EnableTexGen(bool enable);
     virtual void SetTexgen(float scaleX, float scaleY, float translateX = 0, float translateY = 0);
     virtual void SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2);
@@ -489,11 +490,26 @@ public:
         float clipPlane[4];  // Normal.xyz + Distance
         float clipEnabled;   // 1.0f if enabled, 0.0f if disabled
         float clipRefract;   // 1.0f if refract mode, 0.0f if not
-        float padding3;      // Maintain 16-byte alignment
-        float padding4;      // Maintain 16-byte alignment
+        float fogScale;      // Linear fog: 1/(end-start)
+        float fogBias;       // Linear fog: end/(end-start)
     };
     id<MTLBuffer> m_uniformBuffer;
     UniformBufferData* m_uniformBufferCPU;
+
+    // Per-draw material parameters — bound to fragment [[buffer(1)]]
+    struct MaterialUniformsData {
+        float Ambient[4];    // Cg PS c0
+        float Diffuse[4];    // Cg PS c1
+        float Specular[4];   // Cg PS c2
+        float InlineDef0[4]; // Cg PS c3 — bias/scale/constant values
+        float InlineDef1[4]; // Cg PS c4
+        float FogColor[4];   // GlobalFogColor (c7/c31 depending on shader)
+    };
+    id<MTLBuffer> m_materialBuffer;
+    MaterialUniformsData* m_materialBufferCPU;
+
+    // Static water Perlin noise table — vertex [[buffer(4)]] for water shaders
+    id<MTLBuffer> m_waterNoiseBuffer;
     
     // State cache
     std::unique_ptr<CMetalStateCache> m_stateCache;

@@ -1969,6 +1969,10 @@ void CMetalShaderManager::SetShaderUniforms(id<MTLRenderCommandEncoder> encoder,
         [encoder setVertexBuffer:m_renderer->m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
         [encoder setFragmentBuffer:m_renderer->m_uniformBuffer offset:0 atIndex:kMetalFragmentUniformSlot];
     }
+    if (m_renderer->m_materialBuffer)
+    {
+        [encoder setFragmentBuffer:m_renderer->m_materialBuffer offset:0 atIndex:kMetalMaterialSlot];
+    }
 }
 
 int CMetalShaderManager::AllocateShaderId()
