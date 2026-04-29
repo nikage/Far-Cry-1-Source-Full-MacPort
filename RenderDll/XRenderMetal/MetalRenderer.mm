@@ -1143,23 +1143,159 @@ bool CMetalRenderer::EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex,
 
 // Note: EF_CreateRE is implemented in CMetalBaseRenderer
 
-void CMetalRenderer::EF_StartEf() { m_shaderManager->EF_StartEf(); }
+void CMetalRenderer::EF_StartEf() {
+  CRenderer::EF_StartEf();
+  if (m_shaderManager) {
+    m_shaderManager->EF_StartEf();
+  }
+}
 
 CCObject *CMetalRenderer::EF_GetObject(bool bTemp, int num) {
-
   return m_shaderManager->EF_GetObject(bTemp, num);
 }
 
 void CMetalRenderer::EF_AddEf(int NumFog, CRendElement *re, IShader *ef,
                               SRenderShaderResources *sr, CCObject *obj,
                               int nTempl, IShader *efState, int nSort) {
-
-  m_shaderManager->EF_AddEf(NumFog, re, ef, sr, obj, nTempl, efState, nSort);
+  CRenderer::EF_AddEf_NotVirtual(NumFog, re, ef, sr, obj, nTempl, efState, nSort);
 }
 
 void CMetalRenderer::EF_EndEf3D(int nFlags) {
+  const int recurse = SRendItem::m_RecurseLevel - 1;
+  if (recurse < 0) {
+    iLog->Log("Error: EF_EndEf3D without EF_StartEf");
+    return;
+  }
 
-  m_shaderManager->EF_EndEf3D(nFlags);
+  // Record end-of-list positions for all sort buckets
+  for (int i = 0; i < NUMRI_LISTS; ++i) {
+    SRendItem::m_EndRI[recurse][i] = SRendItem::m_RendItems[i].Num();
+  }
+
+  // Sort opaque items (GENERAL bucket) by shader/material for state batching
+  {
+    const int nStart = SRendItem::m_StartRI[recurse][EFSLIST_GENERAL_ID];
+    const int nEnd   = SRendItem::m_EndRI[recurse][EFSLIST_GENERAL_ID];
+    if (nEnd > nStart) {
+      SRendItemPre *pItems = &SRendItem::m_RendItems[EFSLIST_GENERAL_ID][nStart];
+      std::sort(pItems, pItems + (nEnd - nStart),
+        [](const SRendItemPre &a, const SRendItemPre &b) {
+          return a.SortVal.SortVal < b.SortVal.SortVal;
+        });
+    }
+  }
+
+  // Sort transparent/distance items
+  {
+    const int nStart = SRendItem::m_StartRI[recurse][EFSLIST_DISTSORT_ID];
+    const int nEnd   = SRendItem::m_EndRI[recurse][EFSLIST_DISTSORT_ID];
+    if (nEnd > nStart) {
+      SRendItemPre *pItems = &SRendItem::m_RendItems[EFSLIST_DISTSORT_ID][nStart];
+      std::sort(pItems, pItems + (nEnd - nStart),
+        [](const SRendItemPre &a, const SRendItemPre &b) {
+          return a.fDist > b.fDist;  // back-to-front for transparency
+        });
+    }
+  }
+
+  // Obtain (or create) the render encoder for this frame
+  id<MTLRenderCommandEncoder> encoder = m_renderEncoder;
+  if (!encoder) {
+    iLog->Log("Warning: EF_EndEf3D — no active render encoder");
+    SRendItem::m_RecurseLevel--;
+    return;
+  }
+
+  // Draw helper: iterate one render-item bucket
+  auto drawBucket = [&](int bucketId) {
+    const int nStart = SRendItem::m_StartRI[recurse][bucketId];
+    const int nEnd   = SRendItem::m_EndRI[recurse][bucketId];
+
+    SShader *prevShader = nullptr;
+
+    for (int i = nStart; i < nEnd; ++i) {
+      SRendItemPre &ri = SRendItem::m_RendItems[bucketId][i];
+
+      SShader *pShader = nullptr;
+      SShader *pShaderState = nullptr;
+      SRenderShaderResources *pRes = nullptr;
+      int nObject = 0;
+      int numFog = 0;
+      SRendItem::mfGet(ri.SortVal, &nObject, &pShader, &pShaderState, &numFog, &pRes);
+
+      if (!pShader || !ri.Item)
+        continue;
+
+      // Update model matrix from the object
+      CCObject *pObj = (nObject > 0 && nObject < (int)m_RP.m_TempObjects.Num())
+                       ? m_RP.m_TempObjects[nObject] : nullptr;
+      if (pObj && m_uniformBufferCPU) {
+        m_uniformBufferCPU->modelMatrix = pObj->m_Matrix;
+        // Recompute MVP
+        m_uniformBufferCPU->modelViewProjectionMatrix =
+          m_projectionMatrix * m_viewMatrix * pObj->m_Matrix;
+      }
+
+      // Apply material colours from shader resources
+      if (pRes && m_materialBufferCPU) {
+        if (pRes->m_LMaterial) {
+          m_materialBufferCPU->Ambient[0]  = pRes->m_LMaterial->Front.m_Ambient.r;
+          m_materialBufferCPU->Ambient[1]  = pRes->m_LMaterial->Front.m_Ambient.g;
+          m_materialBufferCPU->Ambient[2]  = pRes->m_LMaterial->Front.m_Ambient.b;
+          m_materialBufferCPU->Ambient[3]  = pRes->m_LMaterial->Front.m_Ambient.a;
+          m_materialBufferCPU->Diffuse[0]  = pRes->m_LMaterial->Front.m_Diffuse.r;
+          m_materialBufferCPU->Diffuse[1]  = pRes->m_LMaterial->Front.m_Diffuse.g;
+          m_materialBufferCPU->Diffuse[2]  = pRes->m_LMaterial->Front.m_Diffuse.b;
+          m_materialBufferCPU->Diffuse[3]  = pRes->m_LMaterial->Front.m_Diffuse.a;
+          m_materialBufferCPU->Specular[0] = pRes->m_LMaterial->Front.m_Specular.r;
+          m_materialBufferCPU->Specular[1] = pRes->m_LMaterial->Front.m_Specular.g;
+          m_materialBufferCPU->Specular[2] = pRes->m_LMaterial->Front.m_Specular.b;
+          m_materialBufferCPU->Specular[3] = pRes->m_LMaterial->Front.m_Specular.a;
+        }
+      }
+
+      // Bind PSO — use shader name to look up generated Metal pipeline
+      if (pShader != prevShader && m_shaderManager) {
+        id<MTLRenderPipelineState> pso =
+          m_shaderManager->GetPipelineStateForShader(pShader->m_Name.c_str());
+        if (!pso) {
+          // Fall back to the format-based PSO
+          pso = m_shaderManager->GetPipelineStateForFormat(
+              m_RP.m_CurVFormat);
+        }
+        if (pso) {
+          [encoder setRenderPipelineState:pso];
+          prevShader = pShader;
+        }
+      }
+
+      // Bind global and material uniforms
+      if (m_uniformBuffer) {
+        [encoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+        [encoder setFragmentBuffer:m_uniformBuffer offset:0 atIndex:kMetalFragmentUniformSlot];
+      }
+      if (m_materialBuffer) {
+        [encoder setFragmentBuffer:m_materialBuffer offset:0 atIndex:kMetalMaterialSlot];
+      }
+
+      // Let the render element issue the actual Metal draw call
+      SShaderPass *pPass = (pShader->m_HWTechniques.Num() > 0 &&
+                            pShader->m_HWTechniques[0]->m_Passes.Num() > 0)
+                           ? pShader->m_HWTechniques[0]->m_Passes[0] : nullptr;
+      m_RP.m_pCurObject    = pObj;
+      m_RP.m_pShader       = pShader;
+      m_RP.m_pShaderResources = pRes;
+      m_RP.m_pRE = ri.Item;
+      ri.Item->mfDraw(pShader, pPass);
+    }
+  };
+
+  // Draw buckets in order: preprocess → stencil shadow → general → unsorted → distsort → last
+  drawBucket(EFSLIST_GENERAL_ID);
+  drawBucket(EFSLIST_DISTSORT_ID);
+  drawBucket(EFSLIST_LAST_ID);
+
+  SRendItem::m_RecurseLevel--;
 }
 
 bool CMetalRenderer::EF_IsFakeDLight(CDLight *Source) {
