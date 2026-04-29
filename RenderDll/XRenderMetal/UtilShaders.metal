@@ -636,3 +636,10 @@ fragment float4 sky_fragment(VertexOut in [[stage_in]],
     float3 direction = normalize(in.worldPos);
     return skyTexture.sample(textureSampler, direction);
 }
+
+// Depth-only vertex shader for shadow map generation
+// No fragment output — only writes to depth attachment
+vertex float4 depth_vertex(VertexIn in [[stage_in]],
+                           constant Uniforms& uniforms [[buffer(METAL_VERTEX_UNIFORM_BUFFER_INDEX)]]) {
+    return uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+}

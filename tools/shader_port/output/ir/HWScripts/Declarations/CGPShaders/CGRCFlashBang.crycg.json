@@ -1,0 +1,238 @@
+{
+  "name": "CGRCFlashBang",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCFlashBang.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n#ifdef OPENGL\r\n    uniform samplerRECT baseMap : texunit0,\r\n    uniform samplerRECT flashMap : texunit1,\r\n#endif    \r\n#ifdef D3D\r\n    uniform sampler2D baseMap : texunit0,\r\n    uniform sampler2D flashMap : texunit1,\r\n#endif    \r\n    uniform float4 FlashBang"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n    struct vertout\r\n    {\r\n      OUT_T0\r\n      OUT_T1\r\n    };\r\n\r\n    FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n    // load the decal\r\n#ifdef OPENGL\r\n    float4 screenColor = texRECT(baseMap, IN.Tex0.xy);\r\n    float4 flashColor = texRECT(flashMap, IN.Tex1.xy);\r\n#endif    \r\n#ifdef D3D\r\n    float4 screenColor = tex2D(baseMap, IN.Tex0.xy);\r\n    float4 flashColor = tex2D(flashMap, IN.Tex1.xy);\r\n#endif    \r\n\r\n    float3 color = (flashColor.xyz * 4) + FlashBang.w;\r\n    \r\n    //OUT.Color.xyz = lerp(screenColor.xyz, color.xyz, FlashBang.w);\r\n    OUT.Color.xyz = screenColor.xyz*(1-FlashBang.w)+ color.xyz*FlashBang.w;\r\n    \r\n    OUT.Color.a = 1; //saturate(1-FlashBang.w)*0.75;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 screenColor",
+      "rhs": "texRECT(baseMap, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 screenColor = texRECT(baseMap, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 flashColor",
+      "rhs": "texRECT(flashMap, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 flashColor = texRECT(flashMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 screenColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 screenColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 flashColor",
+      "rhs": "tex2D(flashMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 flashColor = tex2D(flashMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "(flashColor.xyz * 4) + FlashBang.w",
+      "textureSample": false,
+      "raw": "float3 color = (flashColor.xyz * 4) + FlashBang.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "OUT.Color.xyz = lerp(screenColor.xyz, color.xyz, FlashBang.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "screenColor.xyz*(1-FlashBang.w)+ color.xyz*FlashBang.w",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = screenColor.xyz*(1-FlashBang.w)+ color.xyz*FlashBang.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "1 //saturate(1-FlashBang.w)*0.75",
+      "textureSample": false,
+      "raw": "OUT.Color.a = 1; //saturate(1-FlashBang.w)*0.75;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 screenColor = texRECT(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 flashColor = texRECT(flashMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 screenColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 flashColor = tex2D(flashMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = (flashColor.xyz * 4) + FlashBang.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = screenColor.xyz*(1-FlashBang.w)+ color.xyz*FlashBang.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = 1; //saturate(1-FlashBang.w)*0.75",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

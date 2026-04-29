@@ -1,0 +1,567 @@
+{
+  "name": "CGVProgOcean_NoHeight",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgOcean_NoHeight.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 NORMAL_3"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n        VIEWPROJ_MATRIX,\r\n        CAMERA_POS,\r\n        uniform float4 PosScale,\r\n        uniform float4 PosOffset,\r\n        uniform float3 ColorMinFresnel,\r\n        uniform float3 ColorMaxFresnel,\r\n        uniform float4 RippleTexGen0,\r\n        uniform float4 RippleTexGen1,\r\n        uniform float4x4 ReflectMatrix,\r\n        uniform float4 Constants,\r\n        uniform float4 WaterParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        // define inputs from application\r\n        struct appin\r\n        {\r\n          float4 Position  : POSITION;\r\n          float3 Normal    : NORMAL;\r\n        };\r\n\r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float2 Tex0 : TEXCOORD0;\r\n          float4 Tex1 : TEXCOORD1;\r\n          float4 Color : COLOR0;\r\n          float3 Color1 : COLOR1;\r\n          //float FogC : FOG;\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float4 vPos = IN.Position * PosScale + PosOffset;\r\n        \r\n        // Apply curvature\r\n        float4 vCam = vPos - CameraPos;\r\n        vCam.z = 0;          \r\n        float fSqCamDist = dot(vCam, vCam);\r\n        vPos.z = vPos.z + Constants.x * -fSqCamDist;\r\n                  \r\n        // Calculate fog\r\n        float4 vPosReal = vPos;\r\n        vPosReal.z = vPosReal.z + WaterParams.x;\r\n        vCam = vPosReal - CameraPos;\r\n        float fiDist = rsqrt(dot(vCam, vCam));\r\n        float fDist = 1 / fiDist;\r\n        //OUT.FogC = fDist.x;\r\n        \r\n        // Don't deform near to camera \r\n        //float fScale = step(8, fDist);\r\n        //vPos.z = vPos.z * fScale + WaterParams.x;\r\n        vPos.z = vPos.z + WaterParams.x;\r\n\r\n        float3 normal = normalize(IN.Normal);\r\n        \r\n        // Normalize camera vector\r\n        vCam.xyz = vCam.xyz * fiDist;\r\n\r\n        // Two sided lighting\r\n        float fDotNorm = dot(vCam.xyz, normal);\r\n        fDotNorm = fDotNorm * sign(fDotNorm);\r\n\r\n        // calculate approximated fresnel term F\r\n        //                  1\r\n        // F = ---------------------------\r\n        //     ( 1 + E.N ) ^ Fresnel_Power_Factor\r\n        OUT.Color.xyz = fDotNorm.xxx;\r\n        float fFresnel = 1 / pow((fDotNorm + 1), Constants.y);\r\n        OUT.Color1.xyz = lerp(ColorMinFresnel, ColorMaxFresnel, fFresnel);\r\n        \r\n        OUT.HPosition = mul(ModelViewProj, vPos);\r\n        \r\n        OUT.Tex0.x = dot(vPos, RippleTexGen0);\r\n        OUT.Tex0.y = dot(vPos, RippleTexGen1);\r\n        \r\n        float4 vTexRefl = mul(ReflectMatrix, vPos);\r\n        //OUT.Tex1.xyzw = vTexRefl.xyww;\r\n  #ifdef PROJECTEDENVBUMP\r\n        OUT.Tex1 = vTexRefl;\r\n  #endif        \r\n  #ifdef OTHER\r\n        OUT.Tex1.xy = vTexRefl.xy * (1 / vTexRefl.w);\r\n  #endif"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 vPos",
+      "rhs": "IN.Position * PosScale + PosOffset",
+      "textureSample": false,
+      "raw": "float4 vPos = IN.Position * PosScale + PosOffset;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Apply curvature",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vCam",
+      "rhs": "vPos - CameraPos",
+      "textureSample": false,
+      "raw": "float4 vCam = vPos - CameraPos;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vCam.z",
+      "rhs": "0",
+      "textureSample": false,
+      "raw": "vCam.z = 0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fSqCamDist",
+      "rhs": "dot(vCam, vCam)",
+      "textureSample": false,
+      "raw": "float fSqCamDist = dot(vCam, vCam);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vPos.z",
+      "rhs": "vPos.z + Constants.x * -fSqCamDist",
+      "textureSample": false,
+      "raw": "vPos.z = vPos.z + Constants.x * -fSqCamDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calculate fog",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vPosReal",
+      "rhs": "vPos",
+      "textureSample": false,
+      "raw": "float4 vPosReal = vPos;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vPosReal.z",
+      "rhs": "vPosReal.z + WaterParams.x",
+      "textureSample": false,
+      "raw": "vPosReal.z = vPosReal.z + WaterParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vCam",
+      "rhs": "vPosReal - CameraPos",
+      "textureSample": false,
+      "raw": "vCam = vPosReal - CameraPos;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fiDist",
+      "rhs": "rsqrt(dot(vCam, vCam))",
+      "textureSample": false,
+      "raw": "float fiDist = rsqrt(dot(vCam, vCam));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDist",
+      "rhs": "1 / fiDist",
+      "textureSample": false,
+      "raw": "float fDist = 1 / fiDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "OUT.FogC = fDist.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Don't deform near to camera",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float fScale = step(8, fDist);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "vPos.z = vPos.z * fScale + WaterParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vPos.z",
+      "rhs": "vPos.z + WaterParams.x",
+      "textureSample": false,
+      "raw": "vPos.z = vPos.z + WaterParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 normal",
+      "rhs": "normalize(IN.Normal)",
+      "textureSample": false,
+      "raw": "float3 normal = normalize(IN.Normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Normalize camera vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vCam.xyz",
+      "rhs": "vCam.xyz * fiDist",
+      "textureSample": false,
+      "raw": "vCam.xyz = vCam.xyz * fiDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Two sided lighting",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDotNorm",
+      "rhs": "dot(vCam.xyz, normal)",
+      "textureSample": false,
+      "raw": "float fDotNorm = dot(vCam.xyz, normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fDotNorm",
+      "rhs": "fDotNorm * sign(fDotNorm)",
+      "textureSample": false,
+      "raw": "fDotNorm = fDotNorm * sign(fDotNorm);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "calculate approximated fresnel term F",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "1",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "F = ---------------------------",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "( 1 + E.N ) ^ Fresnel_Power_Factor",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "fDotNorm.xxx",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = fDotNorm.xxx;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnel",
+      "rhs": "1 / pow((fDotNorm + 1), Constants.y)",
+      "textureSample": false,
+      "raw": "float fFresnel = 1 / pow((fDotNorm + 1), Constants.y);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color1.xyz",
+      "rhs": "lerp(ColorMinFresnel, ColorMaxFresnel, fFresnel)",
+      "textureSample": false,
+      "raw": "OUT.Color1.xyz = lerp(ColorMinFresnel, ColorMaxFresnel, fFresnel);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.HPosition",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "OUT.HPosition = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "dot(vPos, RippleTexGen0)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = dot(vPos, RippleTexGen0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "dot(vPos, RippleTexGen1)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = dot(vPos, RippleTexGen1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vTexRefl",
+      "rhs": "mul(ReflectMatrix, vPos)",
+      "textureSample": false,
+      "raw": "float4 vTexRefl = mul(ReflectMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "OUT.Tex1.xyzw = vTexRefl.xyww;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef PROJECTEDENVBUMP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1",
+      "rhs": "vTexRefl",
+      "textureSample": false,
+      "raw": "OUT.Tex1 = vTexRefl;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "PROJECTEDENVBUMP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef OTHER",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "vTexRefl.xy * (1 / vTexRefl.w)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = vTexRefl.xy * (1 / vTexRefl.w);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "NORMAL_3",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "declaration"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    }
+  ],
+  "directives": [
+    "Projected"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vPos = IN.Position * PosScale + PosOffset",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vCam = vPos - CameraPos",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vCam.z = 0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fSqCamDist = dot(vCam, vCam)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPos.z = vPos.z + Constants.x * -fSqCamDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vPosReal = vPos",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPosReal.z = vPosReal.z + WaterParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vCam = vPosReal - CameraPos",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fiDist = rsqrt(dot(vCam, vCam))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDist = 1 / fiDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPos.z = vPos.z + WaterParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 normal = normalize(IN.Normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vCam.xyz = vCam.xyz * fiDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDotNorm = dot(vCam.xyz, normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fDotNorm = fDotNorm * sign(fDotNorm)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = fDotNorm.xxx",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnel = 1 / pow((fDotNorm + 1), Constants.y)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color1.xyz = lerp(ColorMinFresnel, ColorMaxFresnel, fFresnel)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.HPosition = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = dot(vPos, RippleTexGen0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = dot(vPos, RippleTexGen1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vTexRefl = mul(ReflectMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef PROJECTEDENVBUMP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1 = vTexRefl",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OTHER",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = vTexRefl.xy * (1 / vTexRefl.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "OTHER",
+    "PROJECTEDENVBUMP"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Color": "float4",
+    "Color1": "float3"
+  }
+}

@@ -3547,6 +3547,7 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
     if (nShadowTexSize < 32)
         nShadowTexSize = 32;
     
+    // Create or reuse the shadow depth render target
     if (make_new_tid || !lof->depth_tex_id) {
         int renderTargetId = m_utilityRenderer->CreateRenderTarget(nShadowTexSize, nShadowTexSize, eTF_DEPTH);
         if (renderTargetId > 0) {
@@ -3560,17 +3561,68 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
         return;
     }
     
-    int savedViewport[4];
-    GetViewport(&savedViewport[0], &savedViewport[1], &savedViewport[2], &savedViewport[3]);
-    
-    SetViewport(0, 0, nShadowTexSize, nShadowTexSize);
-    
-    if (m_utilityRenderer->SetRenderTarget(lof->depth_tex_id)) {
-        if (iLog)
-            iLog->Log("PrepareDepthMap: Shadow map render target set (%dx%d)\n", nShadowTexSize, nShadowTexSize);
+    // End any ongoing render pass before starting the shadow pass
+    if (m_renderEncoder) {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
     }
     
-    SetViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
+    id<MTLTexture> depthTex = m_utilityRenderer->GetRenderTargetDepthTexture(lof->depth_tex_id);
+    if (!depthTex || !m_currentCommandBuffer) {
+        lof->bUpdateRequested = false;
+        return;
+    }
+    
+    // Build a depth-only render pass descriptor
+    MTLRenderPassDescriptor *shadowDesc = [MTLRenderPassDescriptor renderPassDescriptor];
+    shadowDesc.depthAttachment.texture     = depthTex;
+    shadowDesc.depthAttachment.loadAction  = MTLLoadActionClear;
+    shadowDesc.depthAttachment.storeAction = MTLStoreActionStore;
+    shadowDesc.depthAttachment.clearDepth  = 1.0;
+
+    id<MTLRenderCommandEncoder> shadowEncoder =
+        [m_currentCommandBuffer renderCommandEncoderWithDescriptor:shadowDesc];
+    if (!shadowEncoder) {
+        lof->bUpdateRequested = false;
+        return;
+    }
+    [shadowEncoder setLabel:@"ShadowDepthPass"];
+
+    // Set the light's view-projection matrix into the uniform buffer
+    // debugLightFrustumMatrix is the proj, debugLightViewMatrix is the view
+    if (m_uniformBufferCPU) {
+        Matrix44 lightView, lightProj;
+        memcpy(&lightView,  lof->debugLightViewMatrix,    sizeof(Matrix44));
+        memcpy(&lightProj,  lof->debugLightFrustumMatrix, sizeof(Matrix44));
+        m_uniformBufferCPU->viewMatrix       = lightView;
+        m_uniformBufferCPU->projectionMatrix = lightProj;
+        m_uniformBufferCPU->modelMatrix.SetIdentity();
+        m_uniformBufferCPU->modelViewProjectionMatrix = lightProj * lightView;
+        [shadowEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+    }
+
+    // Get the depth-only PSO
+    id<MTLRenderPipelineState> depthPSO = m_shaderManager
+        ? m_shaderManager->GetPipelineStateForShader("depth") : nil;
+    if (depthPSO) {
+        [shadowEncoder setRenderPipelineState:depthPSO];
+
+        // Draw shadow casters from the model list
+        if (lof->pEntityList) {
+            for (int i = 0; i < lof->pEntityList->Count(); ++i) {
+                IEntityRender* pEnt = (*lof->pEntityList)[i];
+                if (pEnt) {
+                    pEnt->DrawShadowVolumes(this, lof, false);
+                }
+            }
+        }
+    }
+
+    [shadowEncoder endEncoding];
+    
+    // Restore the main render encoder viewport
+    SetViewport(0, 0, m_width, m_height);
     
     lof->bUpdateRequested = false;
 }
@@ -3593,10 +3645,25 @@ STexPic* CMetalRenderer::EF_MakePhongTexture(int Exp) {
 }
 
 void CMetalRenderer::EF_PipelineShutdown() {
-    // Clean up shader pipeline resources
+    // Flush any in-flight command buffers
+    if (m_renderEncoder) {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
+    if (m_currentCommandBuffer) {
+        [m_currentCommandBuffer commit];
+        [m_currentCommandBuffer waitUntilCompleted];
+        m_currentCommandBuffer = nil;
+    }
+
+    // Release PSO cache and all shader resources
     if (m_shaderManager) {
         m_shaderManager->ClearAllShaders();
     }
+
+    // Release per-draw buffers
+    CleanupUniformBuffers(); // releases m_uniformBuffer, m_materialBuffer, m_waterNoiseBuffer
 }
 
 void CMetalRenderer::SetupShadowOnlyPass(int Num, ShadowMapFrustum * pFrustum, Vec3 * vShadowTrans, 

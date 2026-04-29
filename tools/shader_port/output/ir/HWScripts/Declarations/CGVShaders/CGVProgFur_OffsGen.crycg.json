@@ -1,0 +1,291 @@
+{
+  "name": "CGVProgFur_OffsGen",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgFur_OffsGen.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TANG_3X3 TEXCOORD0_2"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 Force, uniform float4 Damping, uniform float4 Omega, uniform float4 ScaleBiasTC"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1_2\r\n          OUT_T2\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float2 tc;\r\n        tc.xy = (IN.TexCoord0.xy + ScaleBiasTC.zw)*ScaleBiasTC.xy;\r\n        OUT.HPosition.xy = tc * 2 - 1;\r\n        OUT.HPosition.zw = float2(0.5, 1);\r\n        OUT.Tex0.x = tc.x;\r\n        OUT.Tex0.y = 1-tc.y;\r\n        \r\n        float3 vForce = Force.xyz - cross(Omega.xyz, vPos.xyz);\r\n        \r\n        float fFS = dot(IN.Tangent.xyz, vForce.xyz);\r\n        float fFT = dot(IN.Binormal.xyz, vForce.xyz);\r\n        float fST = dot(IN.Binormal.xyz, IN.Tangent.xyz);\r\n        float fDet = 1 / (1 - fST*fST);\r\n        \r\n        OUT.Tex1.x = fDet * (fFS - fFT * fST);\r\n        OUT.Tex1.y = fDet * (fFT - fFS * fST);\r\n        OUT.Tex2.xyz = Damping.xyz;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "statement",
+      "raw": "float2 tc;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tc.xy",
+      "rhs": "(IN.TexCoord0.xy + ScaleBiasTC.zw)*ScaleBiasTC.xy",
+      "textureSample": false,
+      "raw": "tc.xy = (IN.TexCoord0.xy + ScaleBiasTC.zw)*ScaleBiasTC.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.HPosition.xy",
+      "rhs": "tc * 2 - 1",
+      "textureSample": false,
+      "raw": "OUT.HPosition.xy = tc * 2 - 1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.HPosition.zw",
+      "rhs": "float2(0.5, 1)",
+      "textureSample": false,
+      "raw": "OUT.HPosition.zw = float2(0.5, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "tc.x",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = tc.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "1-tc.y",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = 1-tc.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vForce",
+      "rhs": "Force.xyz - cross(Omega.xyz, vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 vForce = Force.xyz - cross(Omega.xyz, vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFS",
+      "rhs": "dot(IN.Tangent.xyz, vForce.xyz)",
+      "textureSample": false,
+      "raw": "float fFS = dot(IN.Tangent.xyz, vForce.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFT",
+      "rhs": "dot(IN.Binormal.xyz, vForce.xyz)",
+      "textureSample": false,
+      "raw": "float fFT = dot(IN.Binormal.xyz, vForce.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fST",
+      "rhs": "dot(IN.Binormal.xyz, IN.Tangent.xyz)",
+      "textureSample": false,
+      "raw": "float fST = dot(IN.Binormal.xyz, IN.Tangent.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDet",
+      "rhs": "1 / (1 - fST*fST)",
+      "textureSample": false,
+      "raw": "float fDet = 1 / (1 - fST*fST);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.x",
+      "rhs": "fDet * (fFS - fFT * fST)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.x = fDet * (fFS - fFT * fST);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.y",
+      "rhs": "fDet * (fFT - fFS * fST)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.y = fDet * (fFT - fFS * fST);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "Damping.xyz",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = Damping.xyz;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "derived",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 tc",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tc.xy = (IN.TexCoord0.xy + ScaleBiasTC.zw)*ScaleBiasTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.HPosition.xy = tc * 2 - 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.HPosition.zw = float2(0.5, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = tc.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = 1-tc.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vForce = Force.xyz - cross(Omega.xyz, vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFS = dot(IN.Tangent.xyz, vForce.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFT = dot(IN.Binormal.xyz, vForce.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fST = dot(IN.Binormal.xyz, IN.Tangent.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDet = 1 / (1 - fST*fST)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.x = fDet * (fFS - fFT * fST)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.y = fDet * (fFT - fFS * fST)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = Damping.xyz",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosNULL"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float4"
+  }
+}

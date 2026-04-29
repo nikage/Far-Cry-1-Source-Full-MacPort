@@ -1,0 +1,314 @@
+{
+  "name": "CGVProgFurTempl",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgFurTempl.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TANG_3X3 TEXCOORD0_2"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 Modifiers, uniform float4 FurParams, LIGHT_POS, CAMERA_POS, uniform float4 ScaleBiasTC"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          float4 Position  : POSITION;\r\n          IN_TANGVECS\r\n          float4 TexCoord0 : TEXCOORD0;\r\n        };\r\n        \r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float2 Tex0       : TEXCOORDN;\r\n          float4 Tex1       : TEXCOORDN;\r\n          float4 Tex2       : TEXCOORDN;\r\n          float2 Tex3       : TEXCOORDN;\r\n          float2 Tex4       : TEXCOORDN;\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // FurParams.x = FurScaleX\r\n        // FurParams.y = FurScaleY\r\n        \r\n        // Modifiers.x = FurLength\r\n        // Modifiers.w = FurOffsetScale\r\n        OUT.Tex0.xy = (IN.TexCoord0.xy+ScaleBiasTC.zw)*ScaleBiasTC.xy;\r\n        OUT.Tex3.xy = IN.TexCoord0.xy * FurParams.xy;\r\n\r\n        TANG_MATR\r\n\r\n        // store normalized light vector\r\n        float3 lightVec = normalize(LightPos.xyz - vPos.xyz);\r\n        OUT.Tex1.xyz  = mul(objToTangentSpace, lightVec);\r\n\r\n        // compute view vector\r\n        float3 viewVec = CameraPos.xyz - vPos.xyz;\r\n\r\n        // compute half angle vector\r\n        float3 halfAngleVector = lightVec.xyz + normalize(viewVec);\r\n        OUT.Tex2.xyz = normalize(mul(objToTangentSpace, halfAngleVector));\r\n        \r\n        float2 vRadius = float2(1, 1); //IN.TexCoord0.xy;\r\n        float2 vScale = float2(0.5, 0.5); //IN.TexCoord0.xy;\r\n        vRadius.xy = vRadius.xy / (vRadius.xy + Modifiers.xx);\r\n        OUT.Tex4.xy = vRadius.xy * vScale.xy * Modifiers.ww;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "FurParams.x = FurScaleX",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "FurParams.y = FurScaleY",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Modifiers.x = FurLength",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Modifiers.w = FurOffsetScale",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "(IN.TexCoord0.xy+ScaleBiasTC.zw)*ScaleBiasTC.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = (IN.TexCoord0.xy+ScaleBiasTC.zw)*ScaleBiasTC.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xy",
+      "rhs": "IN.TexCoord0.xy * FurParams.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xy = IN.TexCoord0.xy * FurParams.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "normalize(LightPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 lightVec = normalize(LightPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xyz",
+      "rhs": "mul(objToTangentSpace, lightVec)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xyz  = mul(objToTangentSpace, lightVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 viewVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute half angle vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 halfAngleVector",
+      "rhs": "lightVec.xyz + normalize(viewVec)",
+      "textureSample": false,
+      "raw": "float3 halfAngleVector = lightVec.xyz + normalize(viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "normalize(mul(objToTangentSpace, halfAngleVector))",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = normalize(mul(objToTangentSpace, halfAngleVector));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vRadius",
+      "rhs": "float2(1, 1) //IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "float2 vRadius = float2(1, 1); //IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vScale",
+      "rhs": "float2(0.5, 0.5) //IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "float2 vScale = float2(0.5, 0.5); //IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vRadius.xy",
+      "rhs": "vRadius.xy / (vRadius.xy + Modifiers.xx)",
+      "textureSample": false,
+      "raw": "vRadius.xy = vRadius.xy / (vRadius.xy + Modifiers.xx);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex4.xy",
+      "rhs": "vRadius.xy * vScale.xy * Modifiers.ww",
+      "textureSample": false,
+      "raw": "OUT.Tex4.xy = vRadius.xy * vScale.xy * Modifiers.ww;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "derived",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = (IN.TexCoord0.xy+ScaleBiasTC.zw)*ScaleBiasTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xy = IN.TexCoord0.xy * FurParams.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = normalize(LightPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xyz  = mul(objToTangentSpace, lightVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 halfAngleVector = lightVec.xyz + normalize(viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = normalize(mul(objToTangentSpace, halfAngleVector))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vRadius = float2(1, 1); //IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vScale = float2(0.5, 0.5); //IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vRadius.xy = vRadius.xy / (vRadius.xy + Modifiers.xx)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex4.xy = vRadius.xy * vScale.xy * Modifiers.ww",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosFur"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float2",
+    "Tex4": "float2"
+  }
+}

@@ -1,0 +1,464 @@
+{
+  "name": "CGRCAmbient_AlphaGlow_EnvCMSpec_PS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCAmbient_AlphaGlow_EnvCMSpec_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D bumpMap : texunit1,\r\n                  uniform samplerCUBE envMap : texunit2,\r\n                  uniform float4 Ambient,\r\n                  uniform float4 EnvMapParams,\r\n                  uniform float4 FresnelParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the bump normal\r\n        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);\r\n\r\n        // normalize post-filtered bump normals\r\n        bumpNormal.xyz = normalize(bumpNormal.xyz);\r\n\r\n        half fEnvmapAmount = EnvMapParams.x;\r\n\r\n        half fFresnelScale = FresnelParams.x;\r\n        half fFresnelBias = FresnelParams.y;\r\n        half fFresnelPow = FresnelParams.z;\r\n\r\n        // Calc Reflection Vector\r\n        half3x3 worldTangentSpace;\r\n        worldTangentSpace[0] = IN.Tex3.xyz;\r\n        worldTangentSpace[1] = IN.Tex4.xyz;\r\n        worldTangentSpace[2] = IN.Tex5.xyz;\r\n\r\n        float3 viewVec = normalize(IN.Tex2.xyz);\r\n        half NdotE = dot(bumpNormal.xyz, viewVec);\r\n        half3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);\r\n        half3 worldReflectVec = mul(reflectVect, worldTangentSpace);\r\n\r\n        // Calc Fresnel factor\r\n        half fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);\r\n\r\n        // Calc environment\r\n        half3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;\r\n        env *= fresnel;\r\n        \r\n        amb = Ambient.xyz * decalColor.xyz + decalColor.w * decalColor.xyz;\r\n        \r\n        OUT.Color.xyz = amb + env;\r\n        OUT.Color.w = Ambient.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize post-filtered bump normals",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal.xyz",
+      "rhs": "normalize(bumpNormal.xyz)",
+      "textureSample": false,
+      "raw": "bumpNormal.xyz = normalize(bumpNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fEnvmapAmount",
+      "rhs": "EnvMapParams.x",
+      "textureSample": false,
+      "raw": "half fEnvmapAmount = EnvMapParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fFresnelScale",
+      "rhs": "FresnelParams.x",
+      "textureSample": false,
+      "raw": "half fFresnelScale = FresnelParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fFresnelBias",
+      "rhs": "FresnelParams.y",
+      "textureSample": false,
+      "raw": "half fFresnelBias = FresnelParams.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fFresnelPow",
+      "rhs": "FresnelParams.z",
+      "textureSample": false,
+      "raw": "half fFresnelPow = FresnelParams.z;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calc Reflection Vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "half3x3 worldTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[0]",
+      "rhs": "IN.Tex3.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[0] = IN.Tex3.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[1]",
+      "rhs": "IN.Tex4.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[1] = IN.Tex4.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[2]",
+      "rhs": "IN.Tex5.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[2] = IN.Tex5.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(IN.Tex2.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(IN.Tex2.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half NdotE",
+      "rhs": "dot(bumpNormal.xyz, viewVec)",
+      "textureSample": false,
+      "raw": "half NdotE = dot(bumpNormal.xyz, viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half3 reflectVect",
+      "rhs": "(2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec)",
+      "textureSample": false,
+      "raw": "half3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half3 worldReflectVec",
+      "rhs": "mul(reflectVect, worldTangentSpace)",
+      "textureSample": false,
+      "raw": "half3 worldReflectVec = mul(reflectVect, worldTangentSpace);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calc Fresnel factor",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fresnel",
+      "rhs": "fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale)",
+      "textureSample": false,
+      "raw": "half fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calc environment",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half3 env",
+      "rhs": "texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount",
+      "textureSample": true,
+      "raw": "half3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "env *",
+      "rhs": "fresnel",
+      "textureSample": false,
+      "raw": "env *= fresnel;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "amb",
+      "rhs": "Ambient.xyz * decalColor.xyz + decalColor.w * decalColor.xyz",
+      "textureSample": false,
+      "raw": "amb = Ambient.xyz * decalColor.xyz + decalColor.w * decalColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "amb + env",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = amb + env;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "Ambient.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = Ambient.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_3",
+    "TEXCOORD3_3",
+    "TEXCOORD4_3",
+    "TEXCOORD5_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_3"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_3"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal.xyz = normalize(bumpNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fEnvmapAmount = EnvMapParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fFresnelScale = FresnelParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fFresnelBias = FresnelParams.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fFresnelPow = FresnelParams.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half3x3 worldTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[0] = IN.Tex3.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[1] = IN.Tex4.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[2] = IN.Tex5.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(IN.Tex2.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half NdotE = dot(bumpNormal.xyz, viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half3 worldReflectVec = mul(reflectVect, worldTangentSpace)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env *= fresnel",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "amb = Ambient.xyz * decalColor.xyz + decalColor.w * decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = amb + env",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = Ambient.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4"
+  }
+}

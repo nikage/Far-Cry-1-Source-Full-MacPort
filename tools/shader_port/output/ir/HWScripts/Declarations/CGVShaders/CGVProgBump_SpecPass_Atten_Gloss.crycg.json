@@ -1,0 +1,312 @@
+{
+  "name": "CGVProgBump_SpecPass_Atten_Gloss",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgBump_SpecPass_Atten_Gloss.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": " uniform float4x4 ModelViewProj, uniform float4 LightPos, uniform float4 CameraPos, uniform float4 AttenInfo"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1_2\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xy = IN.TexCoord0.xy;\r\n        OUT.Tex1.xy = IN.TexCoord0.xy;\r\n        OUT.Tex4.xy = IN.TexCoord0.xy;\r\n\r\n        TANG_MATR\r\n\r\n        float3 lVec = LightPos.xyz - vPos.xyz;\r\n        float3 lightVec = mul(objToTangentSpace, lVec);          \r\n        float3 vDist = lightVec * (AttenInfo.x * AttenInfo.y) + AttenInfo.y;\r\n\r\n        // transform light vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex3.xyz = vDist;\r\n        OUT.Color.xyz = vDist;\r\n        \r\n        // store normalized light vector\r\n        float3 vVec = CameraPos.xyz - vPos.xyz;\r\n        float3 viewVec = mul(objToTangentSpace, vVec);\r\n\r\n        // compute half angle vector\r\n        float3 halfAngleVector = normalize(viewVec) + normalize(lightVec);\r\n\r\n        // transform light vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex2.xyz = halfAngleVector;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex4.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex4.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lVec",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lVec = LightPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "mul(objToTangentSpace, lVec)",
+      "textureSample": false,
+      "raw": "float3 lightVec = mul(objToTangentSpace, lVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vDist",
+      "rhs": "lightVec * (AttenInfo.x * AttenInfo.y) + AttenInfo.y",
+      "textureSample": false,
+      "raw": "float3 vDist = lightVec * (AttenInfo.x * AttenInfo.y) + AttenInfo.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform light vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xyz",
+      "rhs": "vDist",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xyz = vDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "vDist",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = vDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 vVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "mul(objToTangentSpace, vVec)",
+      "textureSample": false,
+      "raw": "float3 viewVec = mul(objToTangentSpace, vVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute half angle vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 halfAngleVector",
+      "rhs": "normalize(viewVec) + normalize(lightVec)",
+      "textureSample": false,
+      "raw": "float3 halfAngleVector = normalize(viewVec) + normalize(lightVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform light vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "halfAngleVector",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = halfAngleVector;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "derived",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex4.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lVec = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = mul(objToTangentSpace, lVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vDist = lightVec * (AttenInfo.x * AttenInfo.y) + AttenInfo.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xyz = vDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = vDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = mul(objToTangentSpace, vVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 halfAngleVector = normalize(viewVec) + normalize(lightVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = halfAngleVector",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float2",
+    "Color": "float4"
+  }
+}

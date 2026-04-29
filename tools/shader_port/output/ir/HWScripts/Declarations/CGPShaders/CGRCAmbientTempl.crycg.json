@@ -1,0 +1,2425 @@
+{
+  "name": "CGRCAmbientTempl",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCAmbientTempl.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n        uniform sampler2D baseMap : register(sn),\r\n#if %BUMP_MAP\r\n  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING\r\n        uniform sampler2D bumpMap : register(sn),\r\n  #endif\r\n#endif  \r\n#if %TEMP_LM\r\n        uniform sampler2D lightMap : register(sn),\r\n#elif %TEMP_DOT3LM\r\n        uniform sampler2D lightMap : register(sn),\r\n        uniform sampler2D lightDirMap : register(sn),\r\n#endif        \r\n#if %ENVCMAMB\r\n        uniform samplerCUBE envMap : register(sn),\r\n  #if %ENVCM_MASKED\r\n        uniform sampler2D glossMap : register(sn),\r\n  #endif\r\n#elif %ENVCMSPEC\r\n        uniform samplerCUBE envMap : register(sn),\r\n  #if %GLOSS_MAP\r\n        uniform sampler2D glossMap : register(sn),\r\n  #endif        \r\n#endif\r\n\r\n# ifdef _HDRLM\r\n        uniform sampler2D lightMapHDR : register(sn),\r\n# endif\r\n# ifdef _3DC_A\r\n        uniform sampler2D bumpHeight : register(sn),\r\n# endif\r\n\r\n        uniform float4 Ambient,\r\n#if %ENVCMAMB\r\n        uniform float4 Reflect,\r\n#elif %ENVCMSPEC\r\n        uniform float4 EnvMapParams,\r\n        uniform float4 FresnelParams,\r\n#endif\r\n#if %OFFSETBUMPMAPPING\r\n        uniform float4 BumpOffset,\r\n#endif"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float4 baseTC     : TEXCOORDN;\r\n#if %BUMP_MAP\r\n  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING\r\n          float4 bumpTC     : TEXCOORDN;\r\n  #endif\r\n#endif  \r\n#if %TEMP_LM || %TEMP_DOT3LM || %BUMP_ZCORRECT\r\n          float4 lmTC_ZW    : TEXCOORDN;\r\n#endif\r\n#if %TEMP_DOT3LM\r\n          float4 lmdirTC    : TEXCOORDN;\r\n#endif\r\n\r\n          float4 Color      : COLOR0;\r\n\r\n#if %ENVCMAMB\r\n          float4 envTC      : TEXCOORDN;\r\n#elif %ENVCMSPEC\r\n          float4 tangVec    : TEXCOORDN;\r\n          float4 binormVec  : TEXCOORDN;\r\n          float4 normVec    : TEXCOORDN;\r\n#endif          \r\n#if %OFFSETBUMPMAPPING || %ENVCMSPEC\r\n          float4 viewVec    : TEXCOORDN;\r\n#endif          \r\n        };\r\n\r\n# ifdef _HDR_MRT\r\n        FOUT_2\r\n# else\r\n  #if %BUMP_ZCORRECT\r\n        FOUT_DEPTH\r\n  #else\r\n        FOUT\r\n  #endif\r\n# endif"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\r\n        float2 baseTC = IN.baseTC.xy;\r\n\r\n#if %BUMP_MAP\r\n  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING\r\n        float2 bumpTC = IN.bumpTC.xy;\r\n  #endif\r\n#endif\r\n\r\n#if %OFFSETBUMPMAPPING\r\n# ifdef _3DC_A\r\n        FLOAT fHeight = EXPAND(tex2D(bumpHeight, IN.bumpTC.xy).x);\r\n# else\r\n        FLOAT fHeight = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a);\r\n# endif        \r\n        fHeight *= BumpOffset.x;\r\n        FLOAT3 viewVec = normalize(IN.viewVec.xyz);\r\n        bumpTC = bumpTC + viewVec.xy * fHeight;\r\n        baseTC = baseTC + viewVec.xy * fHeight;\r\n#endif\r\n\r\n        FLOAT3 bumpNormal = float3(0,0,1);\r\n\r\n#if %BUMP_MAP\r\n  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING\r\n        bumpNormal = GetNormalMap(bumpMap, bumpTC.xy);\r\n    #endif\r\n  #endif\r\n#endif\r\n\r\n#if %BUMP_ZCORRECT\r\n// Calculate depth bias.\r\n  # ifdef _3DC_A\r\n        FLOAT height = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);\r\n  # else\r\n        FLOAT height = EXPAND(tex2D(bumpMap, bumpTC.xy).a);\r\n  # endif\r\n        FLOAT fZ = DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw);\r\n#else\r\n        FLOAT fZ = 1;\r\n#endif\r\n\r\n        // load the decal\r\n        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);\r\n        FLOAT fAlpha = decalColor.a;\r\n\r\n        // Compute diffuse contribution\r\n#if %TEMP_LM\r\n        // load the lm\r\n        FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);\r\n        FLOAT3 dif = (decalColor.xyz * lmColor.xyz);\r\n        dif = HDREncodeLM(dif);\r\n#elif %TEMP_DOT3LM\r\n        // load the lm\r\n        FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);\r\n        // load the lm dir\r\n        FLOAT4 lmDir = tex2D(lightDirMap, IN.lmTC_ZW.xy);\r\n        FLOAT lmNdotL = saturate(dot( EXPAND(lmDir.xyz), bumpNormal.xyz));\r\n        FLOAT  lmIntens = lmNdotL * lmColor.a + (1-lmColor.a);\r\n    # ifdef _HDRLM\r\n        // Decode RGBE LM HDR color\r\n        FLOAT4 lmHDRColor = tex2D(lightMapHDR, IN.lmTC_ZW.xy);\r\n        FLOAT fExp = ( lmHDRColor.a * 256 - HDR_EXP_OFFSET );\r\n\t      FLOAT fScale = pow( HDR_EXP_BASE, fExp );\r\n\t      FLOAT3 dif = lmHDRColor.xyz * fScale * lmIntens;\r\n    # else\r\n        FLOAT3 dif = HDREncodeLM(lmColor.xyz * lmDir.a * lmIntens);\r\n    # endif        \r\n        dif *= decalColor.xyz;\r\n#else\r\n        FLOAT3 dif = float3(0,0,0);\r\n#endif        \r\n\r\n        // Compute ambient contribution\r\n#if %TEMP_ENVLIGHT\r\n        FLOAT3 amb = decalColor.xyz * IN.Color.xyz;\r\n#elif %ENVCMAMB\r\n        // load the environment map\r\n        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);\r\n        FLOAT fLerp = Reflect.a;\r\n  #if %ENVCM_MASKED\r\n        // load the gloss\r\n        fLerp *= tex2D(glossMap, IN.baseTC.zw).a;\r\n  #endif\r\n        FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);\r\n#elif %ENVCMSPEC\r\n        FLOAT fEnvmapAmount = EnvMapParams.x;\r\n\r\n        float fFresnelScale = FresnelParams.x;\r\n        float fFresnelBias = FresnelParams.y;\r\n        float fFresnelPow = FresnelParams.z;\r\n\r\n        // Calc Reflection Vector\r\n        float3x3 worldTangentSpace;\r\n        worldTangentSpace[0] = IN.tangVec.xyz;\r\n        worldTangentSpace[1] = IN.binormVec.xyz;\r\n        worldTangentSpace[2] = IN.normVec.xyz;\r\n\r\n      #if !%OFFSETBUMPMAPPING\r\n        float3 viewVec = normalize(IN.viewVec.xyz);\r\n      #endif        \r\n        float NdotE = dot(bumpNormal.xyz, viewVec);\r\n        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);\r\n        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);\r\n\r\n        // Calc Fresnel factor\r\n        FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);\r\n\r\n        // Calc environment\r\n        FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;\r\n        env *= fresnel;\r\n  #if GLOSS_MAP\r\n        // load the gloss\r\n        FLOAT4 glossColor = tex2D(glossMap, IN.baseTC.zw);\r\n        env *= glossColor.xyz;\r\n  #elif %GLOSS_DIFFUSEALPHA\r\n        env *= fAlpha;\r\n  #endif\r\n        FLOAT3 amb = decalColor.xyz * Ambient.xyz + env;\r\n#else\r\n        FLOAT3 amb = decalColor.xyz * Ambient.xyz;\r\n#endif\r\n\r\n#if %ALPHAGLOW\r\n        amb += fAlpha * decalColor.xyz;\r\n#endif\r\n        amb = HDREncodeAmb(amb);\r\n\r\n#if %VERTCOLORS\r\n        amb *= IN.Color.xyz;\r\n#endif\r\n\r\n        // Finally add them all together\r\n        FLOAT3 finalColor = amb + dif;\r\n        FLOAT fOutA = 1;\r\n                \r\n#if %ALPHAGLOW && %TEMP_DOT3LM\r\n// Fake (for compatibility with old system)\r\n// Should be removed        \r\n        fOutA = fAlpha * Ambient.w;        \r\n#elif !%ALPHAGLOW && %DIFFUSEALPHA\r\n        fOutA = fAlpha * Ambient.w;\r\n#else\r\n        fOutA = Ambient.w;\r\n#endif        \r\n        FLOAT _fFogFrac = IN.Color.w;\r\n        HDROutput(OUT, FLOAT4 (finalColor.xyz, fOutA), fZ, GlobalFogColor.xyz, _fFogFrac);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float2 baseTC",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "float2 baseTC = IN.baseTC.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 bumpTC",
+      "rhs": "IN.bumpTC.xy",
+      "textureSample": false,
+      "raw": "float2 bumpTC = IN.bumpTC.xy;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %OFFSETBUMPMAPPING",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _3DC_A",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fHeight",
+      "rhs": "EXPAND(tex2D(bumpHeight, IN.bumpTC.xy).x)",
+      "textureSample": true,
+      "raw": "FLOAT fHeight = EXPAND(tex2D(bumpHeight, IN.bumpTC.xy).x);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_3DC_A",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# else",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fHeight",
+      "rhs": "EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a)",
+      "textureSample": true,
+      "raw": "FLOAT fHeight = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fHeight *",
+      "rhs": "BumpOffset.x",
+      "textureSample": false,
+      "raw": "fHeight *= BumpOffset.x;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 viewVec",
+      "rhs": "normalize(IN.viewVec.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 viewVec = normalize(IN.viewVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpTC",
+      "rhs": "bumpTC + viewVec.xy * fHeight",
+      "textureSample": false,
+      "raw": "bumpTC = bumpTC + viewVec.xy * fHeight;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "baseTC",
+      "rhs": "baseTC + viewVec.xy * fHeight",
+      "textureSample": false,
+      "raw": "baseTC = baseTC + viewVec.xy * fHeight;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 bumpNormal",
+      "rhs": "float3(0,0,1)",
+      "textureSample": false,
+      "raw": "FLOAT3 bumpNormal = float3(0,0,1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal",
+      "rhs": "GetNormalMap(bumpMap, bumpTC.xy)",
+      "textureSample": false,
+      "raw": "bumpNormal = GetNormalMap(bumpMap, bumpTC.xy);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_ZCORRECT",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calculate depth bias.",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _3DC_A",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT height",
+      "rhs": "EXPAND(tex2D(bumpHeight, bumpTC.xy).x)",
+      "textureSample": true,
+      "raw": "FLOAT height = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_3DC_A",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# else",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT height",
+      "rhs": "EXPAND(tex2D(bumpMap, bumpTC.xy).a)",
+      "textureSample": true,
+      "raw": "FLOAT height = EXPAND(tex2D(bumpMap, bumpTC.xy).a);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fZ",
+      "rhs": "DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw)",
+      "textureSample": false,
+      "raw": "FLOAT fZ = DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fZ",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "FLOAT fZ = 1;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 decalColor",
+      "rhs": "tex2D(baseMap, baseTC.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fAlpha",
+      "rhs": "decalColor.a",
+      "textureSample": false,
+      "raw": "FLOAT fAlpha = decalColor.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Compute diffuse contribution",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_LM",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the lm",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 lmColor",
+      "rhs": "tex2D(lightMap, IN.lmTC_ZW.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 dif",
+      "rhs": "(decalColor.xyz * lmColor.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 dif = (decalColor.xyz * lmColor.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "dif",
+      "rhs": "HDREncodeLM(dif)",
+      "textureSample": false,
+      "raw": "dif = HDREncodeLM(dif);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %TEMP_DOT3LM",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the lm",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 lmColor",
+      "rhs": "tex2D(lightMap, IN.lmTC_ZW.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "load the lm dir",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 lmDir",
+      "rhs": "tex2D(lightDirMap, IN.lmTC_ZW.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 lmDir = tex2D(lightDirMap, IN.lmTC_ZW.xy);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT lmNdotL",
+      "rhs": "saturate(dot( EXPAND(lmDir.xyz), bumpNormal.xyz))",
+      "textureSample": false,
+      "raw": "FLOAT lmNdotL = saturate(dot( EXPAND(lmDir.xyz), bumpNormal.xyz));",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT  lmIntens",
+      "rhs": "lmNdotL * lmColor.a + (1-lmColor.a)",
+      "textureSample": false,
+      "raw": "FLOAT  lmIntens = lmNdotL * lmColor.a + (1-lmColor.a);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _HDRLM",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Decode RGBE LM HDR color",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_HDRLM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 lmHDRColor",
+      "rhs": "tex2D(lightMapHDR, IN.lmTC_ZW.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 lmHDRColor = tex2D(lightMapHDR, IN.lmTC_ZW.xy);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_HDRLM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fExp",
+      "rhs": "( lmHDRColor.a * 256 - HDR_EXP_OFFSET )",
+      "textureSample": false,
+      "raw": "FLOAT fExp = ( lmHDRColor.a * 256 - HDR_EXP_OFFSET );",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_HDRLM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fScale",
+      "rhs": "pow( HDR_EXP_BASE, fExp )",
+      "textureSample": false,
+      "raw": "FLOAT fScale = pow( HDR_EXP_BASE, fExp );",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_HDRLM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 dif",
+      "rhs": "lmHDRColor.xyz * fScale * lmIntens",
+      "textureSample": false,
+      "raw": "FLOAT3 dif = lmHDRColor.xyz * fScale * lmIntens;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_HDRLM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# else",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 dif",
+      "rhs": "HDREncodeLM(lmColor.xyz * lmDir.a * lmIntens)",
+      "textureSample": false,
+      "raw": "FLOAT3 dif = HDREncodeLM(lmColor.xyz * lmDir.a * lmIntens);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "dif *",
+      "rhs": "decalColor.xyz",
+      "textureSample": false,
+      "raw": "dif *= decalColor.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 dif",
+      "rhs": "float3(0,0,0)",
+      "textureSample": false,
+      "raw": "FLOAT3 dif = float3(0,0,0);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Compute ambient contribution",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_ENVLIGHT",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "decalColor.xyz * IN.Color.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = decalColor.xyz * IN.Color.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %ENVCMAMB",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the environment map",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 envColor",
+      "rhs": "texCUBE(envMap, IN.envTC.xyz)",
+      "textureSample": true,
+      "raw": "FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fLerp",
+      "rhs": "Reflect.a",
+      "textureSample": false,
+      "raw": "FLOAT fLerp = Reflect.a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ENVCM_MASKED",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the gloss",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fLerp *",
+      "rhs": "tex2D(glossMap, IN.baseTC.zw).a",
+      "textureSample": true,
+      "raw": "fLerp *= tex2D(glossMap, IN.baseTC.zw).a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp)",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %ENVCMSPEC",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fEnvmapAmount",
+      "rhs": "EnvMapParams.x",
+      "textureSample": false,
+      "raw": "FLOAT fEnvmapAmount = EnvMapParams.x;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnelScale",
+      "rhs": "FresnelParams.x",
+      "textureSample": false,
+      "raw": "float fFresnelScale = FresnelParams.x;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnelBias",
+      "rhs": "FresnelParams.y",
+      "textureSample": false,
+      "raw": "float fFresnelBias = FresnelParams.y;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnelPow",
+      "rhs": "FresnelParams.z",
+      "textureSample": false,
+      "raw": "float fFresnelPow = FresnelParams.z;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "Calc Reflection Vector",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 worldTangentSpace;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[0]",
+      "rhs": "IN.tangVec.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[0] = IN.tangVec.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[1]",
+      "rhs": "IN.binormVec.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[1] = IN.binormVec.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[2]",
+      "rhs": "IN.normVec.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[2] = IN.normVec.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%OFFSETBUMPMAPPING",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(IN.viewVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(IN.viewVec.xyz);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotE",
+      "rhs": "dot(bumpNormal.xyz, viewVec)",
+      "textureSample": false,
+      "raw": "float NdotE = dot(bumpNormal.xyz, viewVec);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflectVect",
+      "rhs": "(2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec)",
+      "textureSample": false,
+      "raw": "float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldReflectVec",
+      "rhs": "mul(reflectVect, worldTangentSpace)",
+      "textureSample": false,
+      "raw": "float3 worldReflectVec = mul(reflectVect, worldTangentSpace);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "Calc Fresnel factor",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fresnel",
+      "rhs": "fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale)",
+      "textureSample": false,
+      "raw": "FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "Calc environment",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 env",
+      "rhs": "texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount",
+      "textureSample": true,
+      "raw": "FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "env *",
+      "rhs": "fresnel",
+      "textureSample": false,
+      "raw": "env *= fresnel;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if GLOSS_MAP",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the gloss",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "GLOSS_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 glossColor",
+      "rhs": "tex2D(glossMap, IN.baseTC.zw)",
+      "textureSample": true,
+      "raw": "FLOAT4 glossColor = tex2D(glossMap, IN.baseTC.zw);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "GLOSS_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "env *",
+      "rhs": "glossColor.xyz",
+      "textureSample": false,
+      "raw": "env *= glossColor.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "GLOSS_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %GLOSS_DIFFUSEALPHA",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "env *",
+      "rhs": "fAlpha",
+      "textureSample": false,
+      "raw": "env *= fAlpha;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%GLOSS_DIFFUSEALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "decalColor.xyz * Ambient.xyz + env",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = decalColor.xyz * Ambient.xyz + env;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "decalColor.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = decalColor.xyz * Ambient.xyz;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ALPHAGLOW",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "amb +",
+      "rhs": "fAlpha * decalColor.xyz",
+      "textureSample": false,
+      "raw": "amb += fAlpha * decalColor.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ALPHAGLOW",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "amb",
+      "rhs": "HDREncodeAmb(amb)",
+      "textureSample": false,
+      "raw": "amb = HDREncodeAmb(amb);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %VERTCOLORS",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "amb *",
+      "rhs": "IN.Color.xyz",
+      "textureSample": false,
+      "raw": "amb *= IN.Color.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%VERTCOLORS",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 finalColor",
+      "rhs": "amb + dif",
+      "textureSample": false,
+      "raw": "FLOAT3 finalColor = amb + dif;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fOutA",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "FLOAT fOutA = 1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ALPHAGLOW && %TEMP_DOT3LM",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Fake (for compatibility with old system)",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ALPHAGLOW && %TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "Should be removed",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ALPHAGLOW && %TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fOutA",
+      "rhs": "fAlpha * Ambient.w",
+      "textureSample": false,
+      "raw": "fOutA = fAlpha * Ambient.w;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ALPHAGLOW && %TEMP_DOT3LM",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif !%ALPHAGLOW && %DIFFUSEALPHA",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fOutA",
+      "rhs": "fAlpha * Ambient.w",
+      "textureSample": false,
+      "raw": "fOutA = fAlpha * Ambient.w;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "!%ALPHAGLOW && %DIFFUSEALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fOutA",
+      "rhs": "Ambient.w",
+      "textureSample": false,
+      "raw": "fOutA = Ambient.w;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT _fFogFrac",
+      "rhs": "IN.Color.w",
+      "textureSample": false,
+      "raw": "FLOAT _fFogFrac = IN.Color.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "HDROutput(OUT, FLOAT4 (finalColor.xyz, fOutA), fZ, GlobalFogColor.xyz, _fFogFrac);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "COLOR_4",
+    "NORMAL_3",
+    "POSITION_3",
+    "TANGENT_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "binormVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Color",
+      "semantic": "COLOR0",
+      "components": 4,
+      "category": "color",
+      "source": "declaration"
+    },
+    {
+      "token": "normVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "tangVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "baseTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "bumpTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "envTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "lmTC_ZW",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "viewVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "HPosition",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    },
+    {
+      "token": "lmdirTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 baseTC = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 bumpTC = IN.bumpTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _3DC_A",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fHeight = EXPAND(tex2D(bumpHeight, IN.bumpTC.xy).x)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fHeight = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fHeight *= BumpOffset.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 viewVec = normalize(IN.viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpTC = bumpTC + viewVec.xy * fHeight",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "baseTC = baseTC + viewVec.xy * fHeight",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 bumpNormal = float3(0,0,1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal = GetNormalMap(bumpMap, bumpTC.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_ZCORRECT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _3DC_A",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT height = EXPAND(tex2D(bumpHeight, bumpTC.xy).x)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT height = EXPAND(tex2D(bumpMap, bumpTC.xy).a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fZ = DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fZ = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 decalColor = tex2D(baseMap, baseTC.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fAlpha = decalColor.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_LM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 dif = (decalColor.xyz * lmColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dif = HDREncodeLM(dif)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %TEMP_DOT3LM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 lmDir = tex2D(lightDirMap, IN.lmTC_ZW.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT lmNdotL = saturate(dot( EXPAND(lmDir.xyz), bumpNormal.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT  lmIntens = lmNdotL * lmColor.a + (1-lmColor.a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _HDRLM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 lmHDRColor = tex2D(lightMapHDR, IN.lmTC_ZW.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fExp = ( lmHDRColor.a * 256 - HDR_EXP_OFFSET )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fScale = pow( HDR_EXP_BASE, fExp )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 dif = lmHDRColor.xyz * fScale * lmIntens",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 dif = HDREncodeLM(lmColor.xyz * lmDir.a * lmIntens)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dif *= decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 dif = float3(0,0,0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_ENVLIGHT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = decalColor.xyz * IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMAMB",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fLerp = Reflect.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ENVCM_MASKED",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fLerp *= tex2D(glossMap, IN.baseTC.zw).a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMSPEC",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fEnvmapAmount = EnvMapParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnelScale = FresnelParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnelBias = FresnelParams.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnelPow = FresnelParams.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 worldTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[0] = IN.tangVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[1] = IN.binormVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[2] = IN.normVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(IN.viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotE = dot(bumpNormal.xyz, viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldReflectVec = mul(reflectVect, worldTangentSpace)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env *= fresnel",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if GLOSS_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 glossColor = tex2D(glossMap, IN.baseTC.zw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env *= glossColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %GLOSS_DIFFUSEALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env *= fAlpha",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = decalColor.xyz * Ambient.xyz + env",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = decalColor.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ALPHAGLOW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "amb += fAlpha * decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "amb = HDREncodeAmb(amb)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %VERTCOLORS",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "amb *= IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 finalColor = amb + dif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fOutA = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ALPHAGLOW && %TEMP_DOT3LM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fOutA = fAlpha * Ambient.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif !%ALPHAGLOW && %DIFFUSEALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fOutA = fAlpha * Ambient.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fOutA = Ambient.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT _fFogFrac = IN.Color.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "HDROutput(OUT, FLOAT4 (finalColor.xyz, fOutA), fZ, GlobalFogColor.xyz, _fFogFrac)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "ALPHAGLOW",
+    "BUMP_MAP",
+    "BUMP_ZCORRECT",
+    "DIFFUSEALPHA",
+    "ENVCMAMB",
+    "ENVCMSPEC",
+    "ENVCM_MASKED",
+    "GLOSS_DIFFUSEALPHA",
+    "GLOSS_MAP",
+    "OFFSETBUMPMAPPING",
+    "TEMP_DOT3LM",
+    "TEMP_ENVLIGHT",
+    "TEMP_LM",
+    "VERTCOLORS",
+    "_3DC_A",
+    "_HDRLM",
+    "_HDR_MRT"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "baseTC": "float4",
+    "bumpTC": "float4",
+    "lmTC_ZW": "float4",
+    "lmdirTC": "float4",
+    "Color": "float4",
+    "envTC": "float4",
+    "tangVec": "float4",
+    "binormVec": "float4",
+    "normVec": "float4",
+    "viewVec": "float4"
+  }
+}

@@ -992,6 +992,20 @@ bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
     return true;
 }
 
+id<MTLTexture> CMetalUtilityRenderer::GetRenderTargetDepthTexture(int nHandle) const
+{
+    if (nHandle <= 0 || nHandle >= (int)m_renderTargets.size())
+        return nil;
+    return m_renderTargets[nHandle].depthTexture;
+}
+
+id<MTLTexture> CMetalUtilityRenderer::GetRenderTargetColorTexture(int nHandle) const
+{
+    if (nHandle <= 0 || nHandle >= (int)m_renderTargets.size())
+        return nil;
+    return m_renderTargets[nHandle].colorTexture;
+}
+
 float CMetalUtilityRenderer::EF_GetWaterZElevation(float fX, float fY)
 {
     // Get water Z elevation

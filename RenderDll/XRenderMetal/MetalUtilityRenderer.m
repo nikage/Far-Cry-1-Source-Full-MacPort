@@ -121,6 +121,8 @@ public:
     int CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF);
     bool DestroyRenderTarget(int nHandle);
     bool SetRenderTarget(int nHandle);
+    id<MTLTexture> GetRenderTargetDepthTexture(int nHandle) const;
+    id<MTLTexture> GetRenderTargetColorTexture(int nHandle) const;
     float EF_GetWaterZElevation(float fX, float fY);
 
 protected:

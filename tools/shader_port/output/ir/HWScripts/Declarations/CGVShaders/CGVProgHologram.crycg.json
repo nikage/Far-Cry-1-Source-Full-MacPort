@@ -1,0 +1,318 @@
+{
+  "name": "CGVProgHologram",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgHologram.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 TNORMAL_3"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  VIEWPROJ_MATRIX,  \r\n  uniform float4   CameraPos,  \r\n  uniform float4   TexGenRipple0,\r\n  uniform float4   TexGenRipple1,\r\n  uniform float4   TexShiftRipple,\r\n  uniform float4   TexDetailScale,\r\n  uniform float4   TexMovSpeed,\r\n  uniform float4   ScreenSize"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n    IN_TN\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1_2\r\n    OUT_T2_2\r\n    OUT_C0\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "         \r\n  \r\n  float3 viewVec = normalize(CameraPos.xyz-vPos.xyz);\r\n  float  fDot =dot(viewVec, IN.TNormal.xyz);\r\n  fDot*=fDot;  \r\n  //fDot=max(fDot*0.5+0.5, 0);\r\n \r\n  // output texture coordinates           \r\n  OUT.Tex0.xy = float2(fDot, 1);\r\n  OUT.Tex1.xy = IN.TexCoord0.xy;\r\n\r\n  float4 vHPos = mul(ModelViewProj, vPos);     \r\n  float2 vTex=(vHPos.xy/vHPos.w  + 1)*0.5;  \r\n  \r\n  vTex.x*=15;  \r\n  vTex.y-=2*sin(TexShiftRipple.x*100);\r\n  OUT.Tex2.xy = vTex.xy;\r\n\r\n# ifdef _HDR\r\n  float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);\r\n  OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);\r\n# endif        \r\n\r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(CameraPos.xyz-vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(CameraPos.xyz-vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float  fDot",
+      "rhs": "dot(viewVec, IN.TNormal.xyz)",
+      "textureSample": false,
+      "raw": "float  fDot =dot(viewVec, IN.TNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fDot*",
+      "rhs": "fDot",
+      "textureSample": false,
+      "raw": "fDot*=fDot;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "fDot=max(fDot*0.5+0.5, 0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "float2(fDot, 1)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = float2(fDot, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vHPos",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "float4 vHPos = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vTex",
+      "rhs": "(vHPos.xy/vHPos.w  + 1)*0.5",
+      "textureSample": false,
+      "raw": "float2 vTex=(vHPos.xy/vHPos.w  + 1)*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.x*",
+      "rhs": "15",
+      "textureSample": false,
+      "raw": "vTex.x*=15;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.y-",
+      "rhs": "2*sin(TexShiftRipple.x*100)",
+      "textureSample": false,
+      "raw": "vTex.y-=2*sin(TexShiftRipple.x*100);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xy",
+      "rhs": "vTex.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xy = vTex.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _HDR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float ffCameraSpacePosZ",
+      "rhs": "dot(ModelViewProj._31_32_33_34, vPos)",
+      "textureSample": false,
+      "raw": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_HDR",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyzw",
+      "rhs": "clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_HDR",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(CameraPos.xyz-vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float  fDot =dot(viewVec, IN.TNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fDot*=fDot",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = float2(fDot, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHPos = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTex=(vHPos.xy/vHPos.w  + 1)*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.x*=15",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.y-=2*sin(TexShiftRipple.x*100)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xy = vTex.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _HDR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_HDR"
+  ],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float2",
+    "Color": "float4"
+  }
+}

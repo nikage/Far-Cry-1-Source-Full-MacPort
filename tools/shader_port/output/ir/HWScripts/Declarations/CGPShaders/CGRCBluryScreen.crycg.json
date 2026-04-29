@@ -1,0 +1,253 @@
+{
+  "name": "CGRCBluryScreen",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCBluryScreen.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " \r\n#ifdef OPENGL\r\n\tuniform samplerRECT baseMap0 : texunit0,    \r\n  uniform samplerRECT baseMap1 : texunit1,\r\n#endif  \r\n#ifdef D3D\r\n\tuniform sampler2D baseMap0 : texunit0,    \r\n  uniform sampler2D baseMap1 : texunit1,\r\n#endif  \r\n    uniform float4 fBluryParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\tstruct vertout\r\n\t{\r\n\t  OUT_T0\r\n\t  OUT_T1\r\n\t};\r\n\r\n\tFOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\t// load the decal\r\n#ifdef OPENGL\r\n\tfloat4 fColor0 = texRECT(baseMap0, IN.Tex0.xy);\r\n\tfloat4 fColor1 = texRECT(baseMap1, IN.Tex1.xy);\r\n#endif\r\n#ifdef D3D\r\n\tfloat4 fColor0 = tex2D(baseMap0, IN.Tex0.xy);\r\n\tfloat4 fColor1 = tex2D(baseMap1, IN.Tex1.xy);\r\n#endif\r\n\r\n\tfloat fTemp = dot(float3(0.33, 0.59, 0.11), fColor0.xyz);\r\n\tfloat3 fDesaturated= fTemp*fBluryParams.xyz; //lerp(fColor0.xyz, fTemp, 0.5)\r\n\r\n\t// finally add them all together\t\r\n\tOUT.Color.xyz = lerp(fColor1.xyz, fDesaturated*fDesaturated*4, fBluryParams.w);                \r\n\tOUT.Color.w = 1.0f;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fColor0",
+      "rhs": "texRECT(baseMap0, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 fColor0 = texRECT(baseMap0, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fColor1",
+      "rhs": "texRECT(baseMap1, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 fColor1 = texRECT(baseMap1, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fColor0",
+      "rhs": "tex2D(baseMap0, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 fColor0 = tex2D(baseMap0, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fColor1",
+      "rhs": "tex2D(baseMap1, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 fColor1 = tex2D(baseMap1, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fTemp",
+      "rhs": "dot(float3(0.33, 0.59, 0.11), fColor0.xyz)",
+      "textureSample": false,
+      "raw": "float fTemp = dot(float3(0.33, 0.59, 0.11), fColor0.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fDesaturated",
+      "rhs": "fTemp*fBluryParams.xyz //lerp(fColor0.xyz, fTemp, 0.5)",
+      "textureSample": false,
+      "raw": "float3 fDesaturated= fTemp*fBluryParams.xyz; //lerp(fColor0.xyz, fTemp, 0.5)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "lerp(fColor1.xyz, fDesaturated*fDesaturated*4, fBluryParams.w)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = lerp(fColor1.xyz, fDesaturated*fDesaturated*4, fBluryParams.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1.0f",
+      "textureSample": false,
+      "raw": "OUT.Color.w = 1.0f;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fColor0 = texRECT(baseMap0, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fColor1 = texRECT(baseMap1, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fColor0 = tex2D(baseMap0, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fColor1 = tex2D(baseMap1, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fTemp = dot(float3(0.33, 0.59, 0.11), fColor0.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fDesaturated= fTemp*fBluryParams.xyz; //lerp(fColor0.xyz, fTemp, 0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = lerp(fColor1.xyz, fDesaturated*fDesaturated*4, fBluryParams.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = 1.0f",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

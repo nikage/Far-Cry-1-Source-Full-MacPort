@@ -1,0 +1,288 @@
+{
+  "name": "CGRCShadow_PartPoint_Depth2_1Samples",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCShadow_PartPoint_Depth2_1Samples.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D shadMap0 : register(s0),\r\n                  uniform sampler2D baseMap : register(s1),\r\n                  uniform float4 Ambient,\r\n                  uniform float4 Diffuse,\r\n                  uniform float4 Fading"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex1.xy);\r\n\r\n        float3 dif = (decalColor.xyz * Diffuse.xyz * IN.Color1.xyz * IN.Color.xyz) * 2;\r\n        float3 amb = decalColor.xyz * Ambient.xyz;\r\n\r\n        // load the 1 shadow sample\r\n        float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);\r\n        float shad = shadColor0.r/8 + shadColor0.g;\r\n        float fZ = IN.Tex2.x / IN.Tex2.y;\r\n        shad = shad - fZ;\r\n        //float fCompare = step(shad, 0.0);\r\n        float fCompare = saturate(-shad*10);\r\n        fCompare = fCompare * shadColor0.a * Fading.x;\r\n                \r\n        OUT.Color.xyz = amb + dif * (1-fCompare);\r\n        OUT.Color.w = decalColor.w * Ambient.w * IN.Color.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "(decalColor.xyz * Diffuse.xyz * IN.Color1.xyz * IN.Color.xyz) * 2",
+      "textureSample": false,
+      "raw": "float3 dif = (decalColor.xyz * Diffuse.xyz * IN.Color1.xyz * IN.Color.xyz) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 amb",
+      "rhs": "decalColor.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "float3 amb = decalColor.xyz * Ambient.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the 1 shadow sample",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadColor0",
+      "rhs": "tex2Dproj(shadMap0, IN.Tex0.xyzw)",
+      "textureSample": true,
+      "raw": "float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float shad",
+      "rhs": "shadColor0.r/8 + shadColor0.g",
+      "textureSample": false,
+      "raw": "float shad = shadColor0.r/8 + shadColor0.g;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fZ",
+      "rhs": "IN.Tex2.x / IN.Tex2.y",
+      "textureSample": false,
+      "raw": "float fZ = IN.Tex2.x / IN.Tex2.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad",
+      "rhs": "shad - fZ",
+      "textureSample": false,
+      "raw": "shad = shad - fZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float fCompare = step(shad, 0.0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fCompare",
+      "rhs": "saturate(-shad*10)",
+      "textureSample": false,
+      "raw": "float fCompare = saturate(-shad*10);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fCompare",
+      "rhs": "fCompare * shadColor0.a * Fading.x",
+      "textureSample": false,
+      "raw": "fCompare = fCompare * shadColor0.a * Fading.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "amb + dif * (1-fCompare)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = amb + dif * (1-fCompare);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w * Ambient.w * IN.Color.a",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w * Ambient.w * IN.Color.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_4",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_4"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = (decalColor.xyz * Diffuse.xyz * IN.Color1.xyz * IN.Color.xyz) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 amb = decalColor.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float shad = shadColor0.r/8 + shadColor0.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fZ = IN.Tex2.x / IN.Tex2.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad = shad - fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fCompare = saturate(-shad*10)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fCompare = fCompare * shadColor0.a * Fading.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = amb + dif * (1-fCompare)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w * Ambient.w * IN.Color.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

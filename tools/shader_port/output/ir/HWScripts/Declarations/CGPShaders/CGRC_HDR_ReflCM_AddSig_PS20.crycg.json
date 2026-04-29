@@ -1,0 +1,181 @@
+{
+  "name": "CGRC_HDR_ReflCM_AddSig_PS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRC_HDR_ReflCM_AddSig_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform samplerCUBE reflMap : texunit0,\r\n  uniform sampler2D baseMap : texunit1"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_C0\r\n    OUT_C1\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float3 vRefl = texCUBE(reflMap, IN.Tex0.xyz).xyz * IN.Color.xyz + IN.Color1.xyz;\r\n  float4 vBase = tex2D(baseMap, IN.Tex1.xy);\r\n  float4 vColor;\r\n  vColor.xyz = HDREncodeAmb(vRefl.xyz + vBase.xyz - 0.5);\r\n  vColor.a = vBase.a * IN.Color.a;\r\n\r\n  OUT.Color = vColor;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 vRefl",
+      "rhs": "texCUBE(reflMap, IN.Tex0.xyz).xyz * IN.Color.xyz + IN.Color1.xyz",
+      "textureSample": true,
+      "raw": "float3 vRefl = texCUBE(reflMap, IN.Tex0.xyz).xyz * IN.Color.xyz + IN.Color1.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vBase",
+      "rhs": "tex2D(baseMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 vBase = tex2D(baseMap, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float4 vColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vColor.xyz",
+      "rhs": "HDREncodeAmb(vRefl.xyz + vBase.xyz - 0.5)",
+      "textureSample": false,
+      "raw": "vColor.xyz = HDREncodeAmb(vRefl.xyz + vBase.xyz - 0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vColor.a",
+      "rhs": "vBase.a * IN.Color.a",
+      "textureSample": false,
+      "raw": "vColor.a = vBase.a * IN.Color.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "vColor",
+      "textureSample": false,
+      "raw": "OUT.Color = vColor;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_3",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_3"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vRefl = texCUBE(reflMap, IN.Tex0.xyz).xyz * IN.Color.xyz + IN.Color1.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vBase = tex2D(baseMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vColor.xyz = HDREncodeAmb(vRefl.xyz + vBase.xyz - 0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vColor.a = vBase.a * IN.Color.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = vColor",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

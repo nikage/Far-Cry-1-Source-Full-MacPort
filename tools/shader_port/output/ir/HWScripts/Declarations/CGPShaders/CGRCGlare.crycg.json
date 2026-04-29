@@ -1,0 +1,355 @@
+{
+  "name": "CGRCGlare",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCGlare.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " \r\n#ifdef OPENGL\r\n    uniform samplerRECT ScreenTex : texunit0,\r\n    uniform samplerRECT GlareTex : texunit1,\r\n#endif\r\n#ifdef D3D\r\n    uniform sampler2D ScreenTex : texunit0,\r\n    uniform sampler2D GlareTex : texunit1,\r\n#endif\r\n    uniform float4    vSaturationAmount,\r\n    uniform float4    vConstrastAmount,\r\n    uniform float4    vConstrastAmount02"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n    struct vertout\r\n    {\r\n      OUT_T0\r\n      OUT_T1\r\n    };\r\n\r\n    FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "         \r\n#ifdef OPENGL\r\n    // get screen\r\n    float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy);\r\n    // get glare map\r\n    float4 fGlareColor  = texRECT(GlareTex, IN.Tex1.xy);\r\n#endif\r\n#ifdef D3D\r\n    // get screen\r\n    float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy);\r\n    // get glare map\r\n    float4 fGlareColor  = tex2D(GlareTex, IN.Tex1.xy);\r\n#endif\r\n    \r\n    // ## Add glare to scene ##    \r\n    float3 vFinalGlareColor=saturate(fGlareColor.xyz+fScreenColor.xyz);\r\n    float3 vLum=dot(fScreenColor.xyz, float3(0.3, 0.59, 0.11));        \r\n    float3 vFinalComposing=saturate(fScreenColor.xyz*(1-vLum.z) + vFinalGlareColor.xyz*vLum.z );\r\n            \r\n    // ## adjust scene saturation ##\r\n    //float3 vSceneLuminosity = saturate(dot(float3(0.33, 0.59, 0.11), vFinalComposing.xyz));        \r\n    float3 vSaturationAdjust=saturate(vFinalComposing.xyz*(1-vSaturationAmount.w) + vLum.xyz*vSaturationAmount.w );\r\n                \r\n    // ## adjust scene contrast ##  Optimization: Not used anymore                    \r\n    //float  fContrastLerp=saturate(fGlareColor.w*vConstrastAmount.w+vConstrastAmount02.w);    \r\n    //float3 vConstrastAdjust=saturate(lerp( 2*(vSaturationAdjust.xyz-0.5), vSaturationAdjust.xyz, fContrastLerp));\r\n                                                \r\n    OUT.Color.xyz =vSaturationAdjust;\r\n    OUT.Color.w=1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "get screen",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fScreenColor",
+      "rhs": "texRECT(ScreenTex, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "comment",
+      "value": "get glare map",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fGlareColor",
+      "rhs": "texRECT(GlareTex, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 fGlareColor  = texRECT(GlareTex, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "comment",
+      "value": "get screen",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fScreenColor",
+      "rhs": "tex2D(ScreenTex, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "get glare map",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fGlareColor",
+      "rhs": "tex2D(GlareTex, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 fGlareColor  = tex2D(GlareTex, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "## Add glare to scene ##",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFinalGlareColor",
+      "rhs": "saturate(fGlareColor.xyz+fScreenColor.xyz)",
+      "textureSample": false,
+      "raw": "float3 vFinalGlareColor=saturate(fGlareColor.xyz+fScreenColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vLum",
+      "rhs": "dot(fScreenColor.xyz, float3(0.3, 0.59, 0.11))",
+      "textureSample": false,
+      "raw": "float3 vLum=dot(fScreenColor.xyz, float3(0.3, 0.59, 0.11));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFinalComposing",
+      "rhs": "saturate(fScreenColor.xyz*(1-vLum.z) + vFinalGlareColor.xyz*vLum.z )",
+      "textureSample": false,
+      "raw": "float3 vFinalComposing=saturate(fScreenColor.xyz*(1-vLum.z) + vFinalGlareColor.xyz*vLum.z );",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "## adjust scene saturation ##",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float3 vSceneLuminosity = saturate(dot(float3(0.33, 0.59, 0.11), vFinalComposing.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vSaturationAdjust",
+      "rhs": "saturate(vFinalComposing.xyz*(1-vSaturationAmount.w) + vLum.xyz*vSaturationAmount.w )",
+      "textureSample": false,
+      "raw": "float3 vSaturationAdjust=saturate(vFinalComposing.xyz*(1-vSaturationAmount.w) + vLum.xyz*vSaturationAmount.w );",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "## adjust scene contrast ##  Optimization: Not used anymore",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float  fContrastLerp=saturate(fGlareColor.w*vConstrastAmount.w+vConstrastAmount02.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float3 vConstrastAdjust=saturate(lerp( 2*(vSaturationAdjust.xyz-0.5), vSaturationAdjust.xyz, fContrastLerp));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "vSaturationAdjust",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz =vSaturationAdjust;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w=1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fGlareColor  = texRECT(GlareTex, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fGlareColor  = tex2D(GlareTex, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFinalGlareColor=saturate(fGlareColor.xyz+fScreenColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vLum=dot(fScreenColor.xyz, float3(0.3, 0.59, 0.11))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFinalComposing=saturate(fScreenColor.xyz*(1-vLum.z) + vFinalGlareColor.xyz*vLum.z )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vSaturationAdjust=saturate(vFinalComposing.xyz*(1-vSaturationAmount.w) + vLum.xyz*vSaturationAmount.w )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz =vSaturationAdjust",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w=1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

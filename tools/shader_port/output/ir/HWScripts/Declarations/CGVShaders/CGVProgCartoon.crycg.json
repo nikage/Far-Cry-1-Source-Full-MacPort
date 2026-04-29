@@ -1,0 +1,135 @@
+{
+  "name": "CGVProgCartoon",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgCartoon.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  uniform float4x4 ModelViewProj,\r\n  \r\n  uniform float4   vTexCoordScale,\r\n  uniform float4   Offset0,\r\n  uniform float4   Offset1,\r\n  uniform float4   Offset2,\r\n  uniform float4   Offset3"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_T2\r\n    OUT_T3\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "  \r\n  OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset0.xy;\r\n  OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset1.xy;\r\n  OUT.Tex2.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset2.xy;\r\n  OUT.Tex3.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset3.xy;\r\n  \r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy*vTexCoordScale.xy+Offset0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy*vTexCoordScale.xy+Offset1.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset1.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xy",
+      "rhs": "IN.TexCoord0.xy*vTexCoordScale.xy+Offset2.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset2.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xy",
+      "rhs": "IN.TexCoord0.xy*vTexCoordScale.xy+Offset3.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset3.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset1.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset2.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset3.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4"
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "name": "CGVProgGlare",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgGlare.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  VIEWPROJ_MATRIX,\r\n\r\n  // texture offsets\r\n  uniform float4 vTexCoordScale01,\r\n  uniform float4 vTexCoordScale02,\r\n  uniform float4 vTexCoordScale03,\r\n  uniform float4 vTexCoordScale04"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1_2\r\n    OUT_T2_2\r\n    OUT_T3_2\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\r\n  // output texture coordinates\r\n  OUT.Tex0.xy = (IN.TexCoord0.xy+vTexCoordScale01.zw)*vTexCoordScale01.xy;\r\n  OUT.Tex1.xy = (IN.TexCoord0.xy+vTexCoordScale02.zw)*vTexCoordScale02.xy;\r\n  OUT.Tex2.xy = (IN.TexCoord0.xy+vTexCoordScale03.zw)*vTexCoordScale03.xy;\r\n  OUT.Tex3.xy = (IN.TexCoord0.xy+vTexCoordScale04.zw)*vTexCoordScale04.xy;\r\n    \r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "output texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "(IN.TexCoord0.xy+vTexCoordScale01.zw)*vTexCoordScale01.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = (IN.TexCoord0.xy+vTexCoordScale01.zw)*vTexCoordScale01.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "(IN.TexCoord0.xy+vTexCoordScale02.zw)*vTexCoordScale02.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = (IN.TexCoord0.xy+vTexCoordScale02.zw)*vTexCoordScale02.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xy",
+      "rhs": "(IN.TexCoord0.xy+vTexCoordScale03.zw)*vTexCoordScale03.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xy = (IN.TexCoord0.xy+vTexCoordScale03.zw)*vTexCoordScale03.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xy",
+      "rhs": "(IN.TexCoord0.xy+vTexCoordScale04.zw)*vTexCoordScale04.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xy = (IN.TexCoord0.xy+vTexCoordScale04.zw)*vTexCoordScale04.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = (IN.TexCoord0.xy+vTexCoordScale01.zw)*vTexCoordScale01.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = (IN.TexCoord0.xy+vTexCoordScale02.zw)*vTexCoordScale02.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xy = (IN.TexCoord0.xy+vTexCoordScale03.zw)*vTexCoordScale03.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xy = (IN.TexCoord0.xy+vTexCoordScale04.zw)*vTexCoordScale04.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float2",
+    "Tex3": "float2"
+  }
+}

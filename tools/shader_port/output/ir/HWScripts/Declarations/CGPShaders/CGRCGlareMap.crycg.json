@@ -1,0 +1,277 @@
+{
+  "name": "CGRCGlareMap",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCGlareMap.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " \r\n#ifdef OPENGL\r\n\tuniform samplerRECT baseMap : texunit0,\r\n\tuniform samplerRECT glareAmountMap : texunit1,\r\n#endif\r\n#ifdef D3D\r\n\tuniform sampler2D baseMap : texunit0,\r\n\tuniform sampler2D glareAmountMap : texunit1,\r\n#endif\r\n\tuniform float4 vGlare,\r\n\tuniform float4 vGlareAmount"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\tstruct vertout\r\n\t{\r\n\t  OUT_T0\r\n\t  OUT_T1\r\n\t};\r\n\r\n\tFOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n#ifdef OPENGL\r\n\t// load the decal\r\n\tfloat4 glareColor = texRECT(baseMap, IN.Tex0.xy);\r\n\tfloat4 glareAmount= texRECT(glareAmountMap, IN.Tex1.xy);\r\n#endif\r\n#ifdef D3D\r\n\t// load the decal\r\n\tfloat4 glareColor = tex2D(baseMap, IN.Tex0.xy);\r\n\tfloat4 glareAmount= tex2D(glareAmountMap, IN.Tex1.xy);\r\n#endif\r\n\r\n\t     \r\n\t// remove dark pixels, leave brightest ones (color-threshold)*MaxAmount\r\n\t// BTW: i've add to negate vGlare.xyz values from CPP code, since CG generates really wrong instruction on this..\r\n  float3 fGlareMap=saturate(glareColor.xyz+vGlare.xyz)*vGlare.w;\r\n  fGlareMap*=2*fGlareMap;  \r\n    \r\n\t\r\n\tOUT.Color.xyz = fGlareMap*saturate((1-glareAmount.xyz)+vGlareAmount.xyz); \r\n\tOUT.Color.a = glareAmount.z;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 glareColor",
+      "rhs": "texRECT(baseMap, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 glareColor = texRECT(baseMap, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 glareAmount",
+      "rhs": "texRECT(glareAmountMap, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 glareAmount= texRECT(glareAmountMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 glareColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 glareColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 glareAmount",
+      "rhs": "tex2D(glareAmountMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 glareAmount= tex2D(glareAmountMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "remove dark pixels, leave brightest ones (color-threshold)*MaxAmount",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "BTW: i've add to negate vGlare.xyz values from CPP code, since CG generates really wrong instruction on this..",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fGlareMap",
+      "rhs": "saturate(glareColor.xyz+vGlare.xyz)*vGlare.w",
+      "textureSample": false,
+      "raw": "float3 fGlareMap=saturate(glareColor.xyz+vGlare.xyz)*vGlare.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fGlareMap*",
+      "rhs": "2*fGlareMap",
+      "textureSample": false,
+      "raw": "fGlareMap*=2*fGlareMap;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "fGlareMap*saturate((1-glareAmount.xyz)+vGlareAmount.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = fGlareMap*saturate((1-glareAmount.xyz)+vGlareAmount.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "glareAmount.z",
+      "textureSample": false,
+      "raw": "OUT.Color.a = glareAmount.z;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 glareColor = texRECT(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 glareAmount= texRECT(glareAmountMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 glareColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 glareAmount= tex2D(glareAmountMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fGlareMap=saturate(glareColor.xyz+vGlare.xyz)*vGlare.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fGlareMap*=2*fGlareMap",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = fGlareMap*saturate((1-glareAmount.xyz)+vGlareAmount.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = glareAmount.z",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

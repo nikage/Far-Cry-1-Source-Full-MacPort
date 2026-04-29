@@ -1,0 +1,203 @@
+{
+  "name": "CGRCTerrain_2Layers_Only",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCTerrain_2Layers_Only.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D detMap0 : texunit0,\r\n                  uniform sampler2D detMap1 : texunit1"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the detail\r\n        float4 detColor0 = tex2D(detMap0, IN.Tex0.xy);\r\n        float4 detColor1 = tex2D(detMap1, IN.Tex1.xy);\r\n        \r\n        detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);\r\n        detColor1.xyz = detColor1.xyz*IN.Color1.b + 0.5*(1-IN.Color1.b);\r\n        float3 color = detColor0.xyz * detColor1.xyz * 2;\r\n        OUT.Color.xyz = color.xyz;\r\n        OUT.Color.a = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the detail",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 detColor0",
+      "rhs": "tex2D(detMap0, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 detColor0 = tex2D(detMap0, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 detColor1",
+      "rhs": "tex2D(detMap1, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 detColor1 = tex2D(detMap1, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "detColor0.xyz",
+      "rhs": "detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b)",
+      "textureSample": false,
+      "raw": "detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "detColor1.xyz",
+      "rhs": "detColor1.xyz*IN.Color1.b + 0.5*(1-IN.Color1.b)",
+      "textureSample": false,
+      "raw": "detColor1.xyz = detColor1.xyz*IN.Color1.b + 0.5*(1-IN.Color1.b);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "detColor0.xyz * detColor1.xyz * 2",
+      "textureSample": false,
+      "raw": "float3 color = detColor0.xyz * detColor1.xyz * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.a = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 detColor0 = tex2D(detMap0, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 detColor1 = tex2D(detMap1, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "detColor1.xyz = detColor1.xyz*IN.Color1.b + 0.5*(1-IN.Color1.b)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = detColor0.xyz * detColor1.xyz * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

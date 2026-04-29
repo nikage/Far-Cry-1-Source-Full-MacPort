@@ -1,0 +1,137 @@
+{
+  "name": "CGVProgTerrain_DetTex",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgTerrain_DetTex.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4 DetTexGen0, uniform float4 DetTexGen1"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.x = dot(BaseTexGen0, vPos);          \r\n        OUT.Tex0.y = dot(BaseTexGen1, vPos);          \r\n        OUT.Tex1.x = dot(DetTexGen0, vPos);          \r\n        OUT.Tex1.y = dot(DetTexGen1, vPos);          \r\n        OUT.Color.xyz = IN.Color.www;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "dot(BaseTexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = dot(BaseTexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "dot(BaseTexGen1, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = dot(BaseTexGen1, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.x",
+      "rhs": "dot(DetTexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.x = dot(DetTexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.y",
+      "rhs": "dot(DetTexGen1, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.y = dot(DetTexGen1, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.www",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = IN.Color.www;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = dot(BaseTexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = dot(BaseTexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.x = dot(DetTexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.y = dot(DetTexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = IN.Color.www",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Color": "float4"
+  }
+}

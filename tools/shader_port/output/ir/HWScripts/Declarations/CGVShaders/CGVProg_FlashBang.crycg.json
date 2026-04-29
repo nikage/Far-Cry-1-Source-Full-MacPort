@@ -1,0 +1,91 @@
+{
+  "name": "CGVProg_FlashBang",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProg_FlashBang.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " \r\n\tVIEWPROJ_MATRIX,\r\n\t\r\n\tuniform float4   vTexCoordScale // need uv scale, for rectangular textures in gl..."
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\tstruct appin\r\n\t{\r\n\t  IN_P\r\n\t  IN_T0\r\n\t};\r\n\tstruct vertout\r\n\t{\r\n\t  OUT_P\r\n\t  OUT_T0_2\r\n\t  OUT_T1_2\r\n\t};"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\tOUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy;\r\n\tOUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.zw;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy*vTexCoordScale.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy*vTexCoordScale.zw",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.zw;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.zw",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2"
+  }
+}
