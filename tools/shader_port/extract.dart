@@ -1,16 +1,38 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/args.dart';
+import 'package:path/path.dart' as p;
+
 void main(List<String> args) {
-  final Directory root = (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
+  final ArgParser argParser = ArgParser()
+    ..addOption(
+      'pak-file',
+      help: 'Path to Shaders.pak. Defaults to <root>/FCData/Shaders.pak.',
+    )
+    ..addOption(
+      'output-dir',
+      help:
+          'Directory where unpacked shader files are written. '
+          'Defaults to <root>/Shaders/Legacy.',
+    );
+  final ArgResults parsed = argParser.parse(args);
+  final Directory root =
+      (parsed.rest.isEmpty ? Directory.current : Directory(parsed.rest.first)).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath = root.path.endsWith(sep) ? root.path : root.path + sep;
-  final File pakFile = File(rootPath + 'FCData${sep}Shaders.pak');
+
+  final File pakFile = parsed['pak-file'] != null
+      ? File(parsed['pak-file'] as String)
+      : File(rootPath + 'FCData${sep}Shaders.pak');
   if (!pakFile.existsSync()) {
     stderr.writeln('Missing file: ${pakFile.path}');
     exit(1);
   }
-  final Directory targetDir = Directory(rootPath + 'Shaders${sep}Legacy');
+
+  final Directory targetDir = parsed['output-dir'] != null
+      ? Directory(parsed['output-dir'] as String).absolute
+      : Directory(rootPath + 'Shaders${sep}Legacy');
   targetDir.createSync(recursive: true);
   final Directory staging = Directory.systemTemp.createTempSync('shader_pak_extract_');
   final ProcessResult unzipResult = Process.runSync('unzip', ['-qo', pakFile.path, '-d', staging.path]);
@@ -37,7 +59,9 @@ void main(List<String> args) {
     });
   }
   staging.deleteSync(recursive: true);
-  final File manifestFile = File(rootPath + 'tools${sep}shader_port${sep}output${sep}extracted_shaders.json');
+  final File manifestFile = File(
+    p.join(rootPath, 'tools', 'shader_port', 'output', 'extracted_shaders.json'),
+  );
   manifestFile.parent.createSync(recursive: true);
   manifestFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifest));
   stdout.writeln('Extracted ${manifest.length} shader scripts to ${targetDir.path}');

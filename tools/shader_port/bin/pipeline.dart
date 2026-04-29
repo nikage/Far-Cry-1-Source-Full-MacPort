@@ -12,6 +12,20 @@ Future<void> main(List<String> args) async {
       defaultsTo: Directory.current.path,
       help: 'Workspace root that contains Shaders/, RenderDll/, etc.',
     )
+    ..addOption(
+      'pak-file',
+      help:
+          'Path to Shaders.pak. '
+          'Defaults to <root>/Assets/FCData/Shaders.pak, '
+          'then <root>/FCData/Shaders.pak.',
+    )
+    ..addOption(
+      'shaders-dir',
+      help:
+          'Directory containing unpacked .crycg/.cryps files. '
+          'Defaults to <root>/Assets/Shaders/Source/Shaders, '
+          'then <root>/Shaders/Legacy.',
+    )
     ..addFlag(
       'extract',
       defaultsTo: true,
@@ -66,6 +80,18 @@ Future<void> main(List<String> args) async {
     return;
   }
 
+  // Resolve default pak file and shaders directory, preferring the Assets/ layout.
+  final String resolvedPakFile = results['pak-file'] as String? ??
+      _firstExisting([
+        p.join(rootDir.path, 'Assets', 'FCData', 'Shaders.pak'),
+        p.join(rootDir.path, 'FCData', 'Shaders.pak'),
+      ]);
+  final String resolvedShadersDir = results['shaders-dir'] as String? ??
+      _firstExisting([
+        p.join(rootDir.path, 'Assets', 'Shaders', 'Source', 'Shaders'),
+        p.join(rootDir.path, 'Shaders', 'Legacy'),
+      ]);
+
   final bool verbose = results['verbose'] as bool;
   Future<void> runDart(String script, List<String> scriptArgs) async {
     final String scriptPath = p.normalize(p.join(rootDir.path, script));
@@ -79,11 +105,17 @@ Future<void> main(List<String> args) async {
   }
 
   if (results['extract'] as bool) {
-    await runDart('tools/shader_port/extract.dart', <String>[rootDir.path]);
+    await runDart('tools/shader_port/extract.dart', <String>[
+      rootDir.path,
+      '--pak-file', resolvedPakFile,
+    ]);
   }
 
   if (results['parse'] as bool) {
-    await runDart('tools/shader_port/lib/parser.dart', <String>[rootDir.path]);
+    await runDart('tools/shader_port/lib/parser.dart', <String>[
+      rootDir.path,
+      '--shaders-dir', resolvedShadersDir,
+    ]);
   }
 
   if (results['generate'] as bool) {
@@ -124,6 +156,17 @@ void _printUsage(ArgParser parser, [String? error]) {
   }
   stderr.writeln('Usage: dart run bin/pipeline.dart [options]');
   stderr.writeln(parser.usage);
+}
+
+/// Returns the first path in [candidates] that exists on disk,
+/// or the last candidate as a fallback (so callers get a meaningful error).
+String _firstExisting(List<String> candidates) {
+  for (final String path in candidates) {
+    if (File(path).existsSync() || Directory(path).existsSync()) {
+      return path;
+    }
+  }
+  return candidates.last;
 }
 
 Future<void> _runProcess(

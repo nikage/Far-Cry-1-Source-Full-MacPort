@@ -99,20 +99,34 @@ void main(List<String> args) {
     ..addOption('clang-path')
     ..addOption('dxc-path')
     ..addOption('metal-shader-converter-path')
-    ..addOption('cache-dir');
+    ..addOption('cache-dir')
+    ..addOption(
+      'shaders-dir',
+      help:
+          'Directory containing the unpacked .crycg/.cryps files. '
+          'Defaults to <root>/Shaders/Legacy.',
+    )
+    ..addOption(
+      'output-dir',
+      help:
+          'Directory where parsed IR JSON files are written. '
+          'Defaults to <root>/tools/shader_port/output/ir.',
+    );
   final ArgResults parsedArgs = parser.parse(args);
   final Directory root =
       (parsedArgs.rest.isEmpty ? Directory.current : Directory(parsedArgs.rest.first)).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath = root.path.endsWith(sep) ? root.path : root.path + sep;
-  final Directory legacyDir = Directory(rootPath + 'Shaders${sep}Legacy');
+  final Directory legacyDir = parsedArgs['shaders-dir'] != null
+      ? Directory(parsedArgs['shaders-dir'] as String).absolute
+      : Directory(rootPath + 'Shaders${sep}Legacy');
   if (!legacyDir.existsSync()) {
     stderr.writeln('Missing directory: ${legacyDir.path}');
     exit(1);
   }
-  final Directory outputDir = Directory(
-    rootPath + 'tools${sep}shader_port${sep}output${sep}ir',
-  );
+  final Directory outputDir = parsedArgs['output-dir'] != null
+      ? Directory(parsedArgs['output-dir'] as String).absolute
+      : Directory(rootPath + 'tools${sep}shader_port${sep}output${sep}ir');
   outputDir.createSync(recursive: true);
   final List<Map<String, dynamic>> index = [];
   final bool useCompilerResolver = parsedArgs['use-compiler-resolver'] as bool? ?? false;

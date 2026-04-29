@@ -479,6 +479,8 @@ Levels
 Scripts
 fcsplash.bmp
 RenderDll/XRenderMetal/Generated
+# But track the manifest — MetalShaderLoader needs it at runtime
+!RenderDll/XRenderMetal/Generated/generated_manifest.json
 /tools/shader_port/output/hlsl/Shaders/HWScripts/Declarations/CGPShaders/CGPSBump_DiffSpec_MultipleLight_PS.crycg.hlsl
 /tools/shader_port/output/hlsl/Shaders/HWScripts/Declarations/CGPShaders/CGPSBumpOffset.crycg.hlsl
 /tools/shader_port/output/hlsl/Shaders/HWScripts/Declarations/CGPShaders/CGPSScreen.crycg.hlsl
