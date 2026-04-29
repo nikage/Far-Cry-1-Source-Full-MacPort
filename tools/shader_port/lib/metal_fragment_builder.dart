@@ -363,9 +363,15 @@ float3 CMKYToRGB(float4 vColor) {
 
   List<String> _buildParameters() {
     final List<String> params = <String>['$_inputStructName IN [[stage_in]]'];
-  if (data.uniforms.isNotEmpty || _syntheticUniforms.isNotEmpty) {
-    params.add('constant ${data.uniformStruct}& uniforms [[buffer(0)]]');
-  }
+    if (data.uniforms.isNotEmpty || _syntheticUniforms.isNotEmpty) {
+      // Slot assignments must not collide with global engine bindings:
+      //   Vertex:   [[buffer(0)]] = vertex stream, [[buffer(2)]] = global Uniforms,
+      //             [[buffer(5)]] = per-shader generated uniforms
+      //   Fragment: [[buffer(0)]] = global Uniforms, [[buffer(1)]] = MaterialUniforms,
+      //             [[buffer(2)]] = per-shader generated uniforms
+      final int slot = data.stage == 'vertex' ? 5 : 2;
+      params.add('constant ${data.uniformStruct}& uniforms [[buffer($slot)]]');
+    }
   for (final TextureBinding texture in data.textures) {
       params.add(
         '${translateTextureType(texture.type)} ${texture.name} [[texture(${texture.slot})]]',

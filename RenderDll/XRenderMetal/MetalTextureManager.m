@@ -77,7 +77,8 @@ public:
     virtual ~CMetalTextureManager();
 
     // Texture Management Interface
-    
+
+    void Update(float fTime);
     void SetTexture(int tnum, ETexType Type = eTT_Base);
     id<MTLTexture> GetBoundFragmentTexture(int index) const;
     id<MTLSamplerState> GetBoundFragmentSampler(int index) const;
@@ -273,6 +274,9 @@ protected:
     int m_lastBoundStage;
     std::array<int, 16> m_stageTextureIds;
     
+    // Animated-texture time (advanced each frame by Update())
+    float m_animTime;
+
     // Display gamma correction
     float m_gammaValue;      // Gamma delta value (added to base gamma)
     bool m_gammaEnabled;     // True if gamma correction is active

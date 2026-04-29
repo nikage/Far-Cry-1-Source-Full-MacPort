@@ -43,6 +43,23 @@ if(APPLE)
     find_library(CORE_FOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
     find_library(CARBON_FRAMEWORK Carbon REQUIRED)
     find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
+
+    # Require the Metal shader compiler (xcrun metal).
+    # The binary lives inside the Xcode toolchain and is not on $PATH,
+    # so find_program is unreliable — use xcrun directly.
+    execute_process(
+        COMMAND xcrun -sdk macosx metal --version
+        OUTPUT_QUIET
+        ERROR_QUIET
+        RESULT_VARIABLE METAL_COMPILER_CHECK
+    )
+    if(NOT METAL_COMPILER_CHECK EQUAL 0)
+        message(FATAL_ERROR "Metal shader compiler not found.\n"
+                            "Ensure Xcode is installed and selected as the active developer directory:\n"
+                            "  sudo xcode-select -s /Applications/Xcode.app\n"
+                            "Then re-run cmake.")
+    endif()
+    message(STATUS "Metal shader compiler: found (xcrun metal)")
 endif()
 
 # Include directories

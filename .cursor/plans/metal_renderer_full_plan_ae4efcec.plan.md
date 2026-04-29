@@ -56,8 +56,11 @@ todos:
   - id: p3-dart-tests
     content: "Dart toolchain: Write unit tests for parser and generators against known .crycg input/output pairs"
     status: completed
+  - id: p3-manifest-pairing-crycg
+    content: Extend parser.dart to walk Technique { Pass { VertexProgram / FragmentProgram } } blocks and emit vertexEntryPoint into manifest — resolves remaining 451 (76%) unpaired fragment shaders
+    status: pending
   - id: p3-shader-ambient
-    content: Port CGRCAmbient* (3 PS instructions, trivial) — validates full toolchain end-to-end
+    content: Port CGRCAmbient* (3 PS instructions, trivial) — validates full toolchain end-to-end; xcrun metal now available, CMake reconfigure + build required
     status: pending
   - id: p3-shader-geometry
     content: Port CGRCBump_Diff*, CGRCBump_DiffSpec*, CGRCBump_Spec* — drop normCubeMap, use normalize()
@@ -91,13 +94,13 @@ todos:
     status: pending
   - id: p3-envlight-fix
     content: Implement env_light function constant; remove envlight skip in MetalShaderLoader.mm
-    status: pending
+    status: completed
   - id: p4-ef-pipeline
     content: Implement EF_StartEf, EF_AddEf, EF_EndEf3D in MetalShaderManager — the ENTIRE 3D sort/draw pipeline is currently stubs
     status: completed
   - id: p4-shadow-pipeline
     content: Complete PrepareDepthMap shadow draw loop — currently only creates RT, never encodes depth draws
-    status: in_progress
+    status: completed
   - id: p4-hdr-pipeline
     content: Wire HDR float16 RT — luminance, bloom downsample chain, tone-map final pass
     status: completed
@@ -139,17 +142,21 @@ isProject: false
 
 # Metal Renderer — Completion Plan (Reassessed)
 
-## True State of the Port
+## Current State of the Port (updated)
 
-After deep code analysis, the port is **significantly more incomplete than the file count suggests**. The `XRenderMetal` directory has 20 files, but the core 3D rendering pipeline is entirely unimplemented:
+The core infrastructure, pipeline, and toolchain are now implemented. Remaining work is shader compilation/validation and the `.crycg` technique-pass parser for vertex pairing.
 
-- `EF_StartEf`, `EF_AddEf`, `EF_EndEf3D` in `MetalShaderManager.mm` — **comment-only stubs**
-- `PrepareDepthMap` in `MetalRenderer.mm` — creates an RT but **never encodes depth draws**
-- `generated_manifest.json` — **does not exist** in the repo (404)
-- `tools/shader_port/` Dart toolchain — **does not exist** in the repo
-- Fragment uniform inconsistency — util shaders use `[[buffer(0)]]`, generated shader path uses `setFragmentBytes` at index **2** — **these conflict**
+**Completed since initial assessment:**
+- `EF_StartEf`, `EF_AddEf`, `EF_EndEf3D` — fully implemented (sort buckets, PSO lookup, draw loop)
+- `PrepareDepthMap` — shadow encoder, `DrawEntity` loop, restore pass
+- `generated_manifest.json` — exists (589 entries, 23% with `vertexEntryPoint`)
+- `tools/shader_port/` Dart toolchain — 995 generated `.metal` files, manifest, unit tests
+- Fragment uniform slot conflict — resolved; per-shader uniforms at slots 2/5, global at 0/2
+- `xcrun metal` — available (Xcode 16.4); CMake detection fixed to use `xcrun` first
 
-What is actually functional: Metal device init, basic 2D image/sprite rendering, texture DDS/BC loading, PSO/state caches, vertex descriptors, macOS input/sound/filesystem.
+**Remaining open items:**
+- Shader compilation validation — all `p3-shader-*` need CMake reconfigure + build + visual test
+- `p3-manifest-pairing-crycg` — 76% of fragment entries lack `vertexEntryPoint`; requires `.crycg` technique parsing in `parser.dart`
 
 ---
 
@@ -168,11 +175,11 @@ What is actually functional: Metal device init, basic 2D image/sprite rendering,
 | CMake macOS build system                            | Per-module `CMakeLists.txt`                     | Present, generator expressions broken                     |
 | macOS platform layer                                | `CryCommon/MacOSspecific.h`, `platform_macos.h` | Present                                                   |
 | macOS input/sound/filesystem/events                 | Various CryXxx/MacOS*                           | Present                                                   |
-| Shader loader architecture                          | `MetalShaderLoader.mm`                          | Framework present, `generated_manifest.json` missing      |
-| EF_ render pipeline (3D geometry)                   | `MetalShaderManager.mm`                         | **ALL STUBS**                                             |
-| Shadow map depth rendering                          | `MetalRenderer.mm`                              | RT creation only, no draws                                |
-| HDR pipeline                                        | Nowhere                                         | Not started                                               |
-| Dart shader toolchain                               | `tools/shader_port/`                            | **Does not exist**                                        |
+| Shader loader architecture                          | `MetalShaderLoader.mm`                          | ✅ Manifest present (589 entries); function constants wired |
+| EF_ render pipeline (3D geometry)                   | `MetalShaderManager.mm`                         | ✅ Implemented — sort buckets, PSO lookup, draw loop      |
+| Shadow map depth rendering                          | `MetalRenderer.mm`                              | ✅ Shadow encoder + DrawEntity loop                       |
+| HDR pipeline                                        | `MetalBaseRenderer.mm` / `UtilShaders.metal`    | ✅ float16 RT, Reinhard tone-map, bloom chain             |
+| Dart shader toolchain                               | `tools/shader_port/`                            | ✅ 995 generated .metal files; manifest 23% vertex-paired |
 
 
 ---

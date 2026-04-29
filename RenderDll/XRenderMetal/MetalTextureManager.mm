@@ -17,6 +17,7 @@
 
 #include "MetalTextureManager.m"
 #include "MetalRenderer.m"
+#include "PixelFormatUtils.h"
 #include "../../CryFont/FBitmap.h"
 #include "ICryPak.h"
 #include "I3DEngine.h"
@@ -36,7 +37,7 @@
 
 int SShaderTexUnit::mfSetTexture(int nt)
 {
-    CMetalRenderer* renderer = static_cast<CMetalRenderer*>(gRenDev);
+    CMetalRenderer* renderer = checked_cast<CMetalRenderer>(gRenDev);
     if (!renderer)
         return 0;
     CMetalTextureManager* textureManager = renderer->GetTextureManager();
@@ -52,6 +53,19 @@ class CCamera;
 extern ISystem *iSystem;
 
 // Simple implementation of StripExtension for Metal renderer
+// Unpack packed 16-bit pixel formats to RGBA8 in-place (returns new data vector)
+static std::vector<byte> UnpackPackedFormat(const byte* src, int width, int height, ETEX_Format fmt)
+{
+    using PF = PackedPixelFormat;
+    PF pf;
+    if (fmt == eTF_4444)         pf = PF::kPF_4444;
+    else if (fmt == eTF_1555)    pf = PF::kPF_1555;
+    else if (fmt == eTF_0555)    pf = PF::kPF_0555;
+    else                          pf = PF::kPF_0565;
+    auto out = UnpackPackedPixels(reinterpret_cast<const uint8_t*>(src), width, height, pf);
+    return std::vector<byte>(out.begin(), out.end());
+}
+
 static void StripExtension(const char *in, char *out)
 {
     if (!in || !out)
@@ -890,6 +904,7 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     , m_currentTextureSlot(0)
     , m_currentTexture(nil)
     , m_whiteTexture(nil)
+    , m_animTime(0.f)
     , m_gammaValue(1.0f)
     , m_gammaEnabled(false)
     , m_savedViewportWidth(0)
@@ -920,6 +935,11 @@ CMetalTextureManager::~CMetalTextureManager()
         ReleaseSamplerState(entry.second);
     }
     m_samplerCache.clear();
+}
+
+void CMetalTextureManager::Update(float fTime)
+{
+    m_animTime = fTime;
 }
 
 void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
@@ -1182,10 +1202,22 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     if (!texture)
         return 0;
     
+    // CPU-side unpack for packed 16-bit formats before GPU upload
+    const bool isPackedFmt = (eTFDst == eTF_4444 || eTFDst == eTF_1555 ||
+                              eTFDst == eTF_0555 || eTFDst == eTF_0565);
+    std::vector<byte> unpackedDlvmData;
+    const byte* uploadSrc = data;
+    if (isPackedFmt && !isCompressed)
+    {
+        unpackedDlvmData = UnpackPackedFormat(data, w, h, eTFDst);
+        uploadSrc = unpackedDlvmData.data();
+    }
+
     const int uploadLevels = canGenerateMips ? 1 : mipLevels;
     const size_t blockSize = isCompressed ? DxtBlockSize(eTFDst) : 0;
-    const int effectiveBpp = std::max(1, bytesPerPixel);
-    const byte* source = data;
+    // Packed formats expand to RGBA8 (4 bpp) after unpack
+    const int effectiveBpp = isPackedFmt ? 4 : std::max(1, bytesPerPixel);
+    const byte* source = uploadSrc;
     int levelWidth = w;
     int levelHeight = h;
     
@@ -1208,9 +1240,16 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
         levelHeight = std::max(1, levelHeight >> 1);
     }
     
-    if (canGenerateMips && m_renderer->m_commandQueue)
+    // Use the dedicated blit queue for mip generation
+    // (MTLStorageModeShared textures: replaceRegion is a synchronous CPU write,
+    //  visible to GPU commands committed afterward — no cross-queue fence needed)
+    id<MTLCommandQueue> blitQ = m_renderer->m_blitCommandQueue
+                                    ? m_renderer->m_blitCommandQueue
+                                    : m_renderer->m_commandQueue;
+    if (canGenerateMips && blitQ)
     {
-        id<MTLCommandBuffer> commandBuffer = [m_renderer->m_commandQueue commandBuffer];
+        id<MTLCommandBuffer> commandBuffer = [blitQ commandBuffer];
+        [commandBuffer setLabel:@"MipGenBlit"];
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
         [blitEncoder generateMipmapsForTexture:texture];
         [blitEncoder endEncoding];
@@ -1407,10 +1446,25 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
     int levelWidth = width;
     int levelHeight = height;
     byte* source = data.data();
+
+    // For packed formats, unpack the entire image to RGBA8 before upload
+    std::vector<byte> unpackedData;
+    const bool isPackedFormat = (detectedFormat == eTF_4444 ||
+                                 detectedFormat == eTF_1555 ||
+                                 detectedFormat == eTF_0555 ||
+                                 detectedFormat == eTF_0565);
+    if (isPackedFormat && !IsCompressedETEXFormat(detectedFormat))
+    {
+        unpackedData = UnpackPackedFormat(source, width, height, detectedFormat);
+        source = unpackedData.data();
+        // Treat as 4-byte-per-pixel after unpacking
+    }
     
     for (int level = 0; level < uploadLevels; ++level)
     {
-        const size_t bytesPerRow = ComputeBytesPerRow(detectedFormat, levelWidth, effectiveBpp);
+        const size_t bytesPerRow = isPackedFormat
+            ? (size_t)levelWidth * 4   // unpacked RGBA8
+            : ComputeBytesPerRow(detectedFormat, levelWidth, effectiveBpp);
         const size_t levelBytes = IsCompressedETEXFormat(detectedFormat)
             ? ComputeCompressedLevelSize(levelWidth, levelHeight, detectedFormat)
             : bytesPerRow * static_cast<size_t>(levelHeight);
@@ -2431,6 +2485,14 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
     
     m_savedViewportWidth = width;
     m_savedViewportHeight = height;
+
+    // Activate the sprite PSO so DrawDynVB doesn't skip font quads
+    id<MTLRenderPipelineState> fontPSO = m_renderer->GetFontPSO();
+    if (fontPSO) {
+        m_renderer->m_currentPipelineState = fontPSO;
+        if (m_renderer->m_renderEncoder)
+            [m_renderer->m_renderEncoder setRenderPipelineState:fontPSO];
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -3483,6 +3545,17 @@ void CMetalTextureManager::ApplyTexUnit(int stage, SShaderTexUnit& unit)
     if (!m_renderer || !m_renderer->m_renderEncoder)
         return;
     m_lastBoundStage = std::max(0, std::min(stage, static_cast<int>(m_stageTextureIds.size()) - 1));
+
+    if (unit.m_AnimInfo && unit.m_AnimInfo->m_Time > 0.0001f
+        && unit.m_AnimInfo->m_NumAnimTexs > 0
+        && !m_renderer->m_bPauseTimer)
+    {
+        const int frame = static_cast<int>(m_animTime / unit.m_AnimInfo->m_Time)
+                          % unit.m_AnimInfo->m_NumAnimTexs;
+        if (frame >= 0 && frame < unit.m_AnimInfo->m_TexPics.Num())
+            unit.m_TexPic = unit.m_AnimInfo->m_TexPics[frame];
+    }
+
     id<MTLTexture> texture = nil;
     if (unit.m_ITexPic)
     {
@@ -3746,6 +3819,52 @@ bool CMetalTextureManager::LoadTextureData(const char* filename, std::vector<byt
                 }
 
                 delete pImageFile;
+
+                // --- ImageIO in-memory fallback for JPEG/TGA/PNG on macOS ---
+                {
+                    @autoreleasepool
+                    {
+                        CFDataRef cfData = CFDataCreateWithBytesNoCopy(
+                            kCFAllocatorDefault,
+                            fileData.data(),
+                            (CFIndex)fileData.size(),
+                            kCFAllocatorNull);
+                        CGImageSourceRef src = cfData
+                            ? CGImageSourceCreateWithData(cfData, nil)
+                            : nil;
+                        CGImageRef cgImg = src
+                            ? CGImageSourceCreateImageAtIndex(src, 0, nil)
+                            : nil;
+                        if (cgImg)
+                        {
+                            width  = (int)CGImageGetWidth(cgImg);
+                            height = (int)CGImageGetHeight(cgImg);
+                            format = eTF_8888;
+                            mipCount = 1;
+                            size_t rowBytes = (size_t)width * 4;
+                            data.assign(rowBytes * height, 0);
+                            CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+                            CGContextRef ctx = CGBitmapContextCreate(
+                                data.data(), width, height, 8, rowBytes, cs,
+                                kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+                            if (ctx)
+                            {
+                                CGContextDrawImage(ctx,
+                                    CGRectMake(0, 0, width, height), cgImg);
+                                CGContextRelease(ctx);
+                                TraceTextureLoad(
+                                    "LoadTextureData: ImageIO fallback ok '%s' %dx%d",
+                                    filename, width, height);
+                            }
+                            CGColorSpaceRelease(cs);
+                            CGImageRelease(cgImg);
+                        }
+                        if (src) CFRelease(src);
+                        if (cfData) CFRelease(cfData);
+                        if (!data.empty() && width > 0 && height > 0)
+                            return true;
+                    }
+                }
             }
             else
             {

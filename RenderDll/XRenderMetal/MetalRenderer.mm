@@ -20,9 +20,11 @@
 #include "MetalRenderPCH.h"
 #include "MetalRenderer.m"
 #include "I3DEngine.h"
+#include "CryCommon/IEntityRenderState.h"
 #include "../Common/Textures/dxtlib.h"  // For nvDXT function signatures
 #include "../Common/Shadow_Renderer.h"  // For ShadowMapFrustum
 #include "CrySizer.h"
+#include <atomic>
 #include <cmath>
 #include <algorithm>
 #include <vector>
@@ -264,9 +266,8 @@ CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
       m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0),
-      m_debugPipelineState(nil), m_metalDumpStatsFlag(0), m_diagOutputPath() {
-  // Managers will be initialized in Init() after Metal device is created
-}
+      m_debugPipelineState(nil), m_metalDumpStatsFlag(0),
+      m_metalGPUCaptureFlag(0), m_diagOutputPath() {}
 
 CMetalRenderer::~CMetalRenderer() {
   UnregisterMetalConsoleVariables();
@@ -1144,6 +1145,15 @@ bool CMetalRenderer::EF_SetLightHole(Vec3 vPos, Vec3 vNormal, int idTex,
 // Note: EF_CreateRE is implemented in CMetalBaseRenderer
 
 void CMetalRenderer::EF_StartEf() {
+  if (iTimer)
+    m_RP.m_RealTime = iTimer->GetCurrTime();
+
+  // Drain GPU flush time accumulated by command-buffer completion handlers
+  // (background threads). exchange(0) is the only safe write from this thread.
+  const float gpuMs = m_pendingGpuFlushMs.exchange(0.0f, std::memory_order_relaxed);
+  if (gpuMs > 0.0f)
+    m_RP.m_PS.m_fFlushTime += gpuMs;
+
   CRenderer::EF_StartEf();
   if (m_shaderManager) {
     m_shaderManager->EF_StartEf();
@@ -1165,6 +1175,14 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
   if (recurse < 0) {
     iLog->Log("Error: EF_EndEf3D without EF_StartEf");
     return;
+  }
+
+  // HDR: if flag set and HDR pipeline ready, render into float16 RT
+  bool useHDR = (nFlags & SHDF_ALLOWHDR) && m_hdrEnabled
+                && m_hdrColorRT != nil;
+  if (useHDR) {
+    assert(m_hdrToneMapPSO && "HDR pipeline not initialised before EF_EndEf3D — call InitHDRPipeline() at startup");
+    useHDR = BeginHDRPass();
   }
 
   // Record end-of-list positions for all sort buckets
@@ -1278,10 +1296,18 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         [encoder setFragmentBuffer:m_materialBuffer offset:0 atIndex:kMetalMaterialSlot];
       }
 
+      // Bind water noise table for water/ocean shaders
+      if (m_waterNoiseBuffer && pShader) {
+        const char* sName = pShader->m_Name.c_str();
+        if (sName && (strstr(sName, "water") || strstr(sName, "Water")
+                      || strstr(sName, "ocean") || strstr(sName, "Ocean")))
+          [encoder setVertexBuffer:m_waterNoiseBuffer offset:0 atIndex:kMetalWaterNoiseSlot];
+      }
+
       // Let the render element issue the actual Metal draw call
       SShaderPass *pPass = (pShader->m_HWTechniques.Num() > 0 &&
                             pShader->m_HWTechniques[0]->m_Passes.Num() > 0)
-                           ? pShader->m_HWTechniques[0]->m_Passes[0] : nullptr;
+                           ? &pShader->m_HWTechniques[0]->m_Passes[0] : nullptr;
       m_RP.m_pCurObject    = pObj;
       m_RP.m_pShader       = pShader;
       m_RP.m_pShaderResources = pRes;
@@ -1294,6 +1320,9 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
   drawBucket(EFSLIST_GENERAL_ID);
   drawBucket(EFSLIST_DISTSORT_ID);
   drawBucket(EFSLIST_LAST_ID);
+
+  // HDR: tone-map the float16 RT into the drawable
+  if (useHDR) EndHDRPass();
 
   SRendItem::m_RecurseLevel--;
 }
@@ -1430,15 +1459,24 @@ void CMetalRenderer::DeleteLeafBuffer(CLeafBuffer *pLBuffer) {
 void CMetalRenderer::WriteXY(CXFont *currfont, int x, int y, float xscale,
                              float yscale, float r, float g, float b, float a,
                              const char *message, ...) {
-  ASSERT_UTILITY_RENDERER_INIT();
-  m_utilityRenderer->WriteXY(currfont, x, y, xscale, yscale, r, g, b, a,
-                               message);
+  if (!message) return;
+  char buf[4096];
+  va_list args;
+  va_start(args, message);
+  vsnprintf(buf, sizeof(buf), message, args);
+  va_end(args);
+
+  SDrawTextInfo ti;
+  ti.xscale = xscale;
+  ti.yscale = yscale;
+  ti.color[0] = r; ti.color[1] = g; ti.color[2] = b; ti.color[3] = a;
+  ti.xfont = currfont;
+  CRenderer::Draw2dText((float)x, (float)y, buf, ti);
 }
 
 void CMetalRenderer::Draw2dText(float posX, float posY, const char *szText,
                                 SDrawTextInfo &info) {
-  ASSERT_UTILITY_RENDERER_INIT();
-  m_utilityRenderer->Draw2dText(posX, posY, szText, info);
+  CRenderer::Draw2dText(posX, posY, szText, info);
 }
 
 void CMetalRenderer::Draw2dImage(float xpos, float ypos, float w, float h,
@@ -1593,6 +1631,13 @@ bool CMetalRenderer::InitializeManagers() {
     return false;
   }
   assert(m_utilityRenderer && "InitializeManagers: Utility renderer creation failed!");
+
+  // Initialise HDR pipeline if the engine CVar is set
+  m_hdrEnabled = (CV_r_hdrrendering != 0);
+  if (m_hdrEnabled && !InitHDRPipeline()) {
+    iLog->Log("Warning: HDR pipeline init failed – disabling HDR\n");
+    m_hdrEnabled = false;
+  }
 
   return true;
 }
@@ -2056,12 +2101,12 @@ void CMetalRenderer::EnableTexGen(bool enable) {
 
 void CMetalRenderer::SetTexgen(float scaleX, float scaleY, float translateX,
                                float translateY) {
-  m_texGenEnabled = true;
+  CMetalBaseRenderer::SetTexgen(scaleX, scaleY, translateX, translateY);
 }
 
 void CMetalRenderer::SetTexgen3D(float x1, float y1, float z1, float x2,
                                  float y2, float z2) {
-  m_texGenEnabled = true;
+  CMetalBaseRenderer::SetTexgen3D(x1, y1, z1, x2, y2, z2);
 }
 
 void CMetalRenderer::SetLodBias(float value) {
@@ -2193,16 +2238,14 @@ void CMetalRenderer::ScreenShot(const char *filename) {
 
   if (filename && filename[0] != '\0') {
     size_t len = strlen(filename);
-    if (len >= sizeof(path))
-      len = sizeof(path) - 1;
+    if (len >= sizeof(path)) len = sizeof(path) - 1;
     memcpy(path, filename, len);
     path[len] = '\0';
   } else {
     for (int i = 0; i < 10000; ++i) {
       sprintf(path, "FarCry%04d.tga", i);
       FILE* fp = fxopen(path, "rb");
-      if (!fp)
-        break;
+      if (!fp) break;
       fclose(fp);
       path[0] = '\0';
     }
@@ -2212,49 +2255,73 @@ void CMetalRenderer::ScreenShot(const char *filename) {
     }
   }
 
-  if (!m_currentDrawable || !m_currentDrawable.texture) {
-    iLog->Log("ScreenShot: No drawable available\n");
+  // Prefer the drawable acquired this frame; fall back to the HDR RT if called
+  // outside a frame. Never call nextDrawable here — it dequeues a slot that
+  // would never be presented, starving the triple-buffer pool.
+  id<MTLTexture> srcTex = nil;
+  if (m_currentDrawable && m_currentDrawable.texture)
+    srcTex = m_currentDrawable.texture;
+  else if (m_hdrColorRT)
+    srcTex = m_hdrColorRT;
+  if (!srcTex) {
+    iLog->Log("ScreenShot: No drawable or HDR RT available\n");
     return;
   }
 
-  id<MTLTexture> texture = m_currentDrawable.texture;
-  const NSUInteger width = texture.width;
-  const NSUInteger height = texture.height;
-
+  const NSUInteger width  = srcTex.width;
+  const NSUInteger height = srcTex.height;
   if (width == 0 || height == 0) {
     iLog->Log("ScreenShot: Invalid drawable dimensions (%lu x %lu)\n",
-              static_cast<unsigned long>(width),
-              static_cast<unsigned long>(height));
+              (unsigned long)width, (unsigned long)height);
     return;
   }
 
-  const NSUInteger bytesPerPixel = 4;
-  const NSUInteger bytesPerRow = width * bytesPerPixel;
-  std::vector<uint8_t> bgra(width * height * bytesPerPixel);
+  // Blit GPU texture → CPU-readable staging buffer
+  const NSUInteger bytesPerRow = width * 4;
+  id<MTLBuffer> staging = [m_device newBufferWithLength:bytesPerRow * height
+                                               options:MTLResourceStorageModeShared];
+  if (!staging) { iLog->Log("ScreenShot: staging alloc failed\n"); return; }
 
-  MTLRegion region = MTLRegionMake2D(0, 0, width, height);
-  [texture getBytes:bgra.data()
-        bytesPerRow:bytesPerRow
-        fromRegion:region
-       mipmapLevel:0];
+  // End active encoder if any
+  if (m_renderEncoder) {
+    [m_renderEncoder endEncoding];
+    [m_renderEncoder release];
+    m_renderEncoder = nil;
+  }
 
-  std::vector<uint8_t> rgba(bgra.size());
+  id<MTLCommandBuffer> cb   = [m_commandQueue commandBuffer];
+  id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+  [blit copyFromTexture:srcTex
+           sourceSlice:0
+           sourceLevel:0
+          sourceOrigin:MTLOriginMake(0, 0, 0)
+            sourceSize:MTLSizeMake(width, height, 1)
+              toBuffer:staging
+     destinationOffset:0
+destinationBytesPerRow:bytesPerRow
+destinationBytesPerImage:bytesPerRow * height];
+  [blit endEncoding];
+  [cb commit];
+  [cb waitUntilCompleted];
+
+  // BGRA → RGBA
+  const uint8_t* src = (const uint8_t*)staging.contents;
+  std::vector<uint8_t> rgba(width * height * 4);
   for (NSUInteger y = 0; y < height; ++y) {
-    uint8_t* bgraRow = bgra.data() + y * bytesPerRow;
-    uint8_t* rgbaRow = rgba.data() + y * bytesPerRow;
+    const uint8_t* row = src + y * bytesPerRow;
+    uint8_t* dst = rgba.data() + y * bytesPerRow;
     for (NSUInteger x = 0; x < width; ++x) {
-      const NSUInteger idx = x * bytesPerPixel;
-      rgbaRow[idx + 0] = bgraRow[idx + 2];
-      rgbaRow[idx + 1] = bgraRow[idx + 1];
-      rgbaRow[idx + 2] = bgraRow[idx + 0];
-      rgbaRow[idx + 3] = bgraRow[idx + 3];
+      dst[x*4+0] = row[x*4+2]; // R
+      dst[x*4+1] = row[x*4+1]; // G
+      dst[x*4+2] = row[x*4+0]; // B
+      dst[x*4+3] = row[x*4+3]; // A
     }
   }
 
+  [staging release];
+
   if (!CRenderer::SaveTga(rgba.data(), FORMAT_32_BIT,
-                          static_cast<int>(width),
-                          static_cast<int>(height),
-                          path, true)) {
+                          (int)width, (int)height, path, true)) {
     iLog->Log("ScreenShot: Failed to save %s\n", path);
   } else {
     iLog->Log("ScreenShot saved to %s\n", path);
@@ -2536,6 +2603,20 @@ void CMetalRenderer::DisplaySplash() {
 
 // Missing IRenderer method implementations
 void CMetalRenderer::BeginFrame() {
+  if (m_textureManager)
+    m_textureManager->Update(m_RP.m_RealTime);
+
+#ifdef DEBUG
+  if (m_metalGPUCaptureFlag > 0) {
+    MTLCaptureManager* capMgr = [MTLCaptureManager sharedCaptureManager];
+    MTLCaptureDescriptor* desc = [[MTLCaptureDescriptor alloc] init];
+    desc.captureObject = m_device;
+    NSError* captureErr = nil;
+    if (![capMgr startCaptureWithDescriptor:desc error:&captureErr])
+      iLog->Log("GPU Capture start failed: %s\n", captureErr ? [[captureErr localizedDescription] UTF8String] : "");
+  }
+#endif
+
   CMetalBaseRenderer::BeginFrame();
 }
 
@@ -2551,6 +2632,14 @@ void CMetalRenderer::Update() {
 void CMetalRenderer::EndFrame() {
   FlushDebugCommands();
   CMetalBaseRenderer::EndFrame();
+
+#ifdef DEBUG
+  if (m_metalGPUCaptureFlag > 0) {
+    [[MTLCaptureManager sharedCaptureManager] stopCapture];
+    m_metalGPUCaptureFlag = 0;
+  }
+#endif
+
   if (m_metalDumpStatsFlag > 0) {
     DumpMetalDiagnostics();
     m_metalDumpStatsFlag = 0;
@@ -2563,6 +2652,12 @@ void CMetalRenderer::RegisterMetalConsoleVariables()
     return;
   iConsole->Register("metal_dumpstats", &m_metalDumpStatsFlag, 0, 0,
                      "Set to 1 to log Metal renderer diagnostics at the end of the next frame");
+
+#ifdef DEBUG
+  // Register GPU capture trigger (DEBUG builds only)
+  iConsole->Register("metal_gpucapture", &m_metalGPUCaptureFlag, 0, 0,
+                     "Set to 1 to trigger a single-frame GPU capture via MTLCaptureManager");
+#endif
 }
 
 void CMetalRenderer::UnregisterMetalConsoleVariables()
@@ -2570,6 +2665,9 @@ void CMetalRenderer::UnregisterMetalConsoleVariables()
   if (!iConsole)
     return;
   iConsole->UnregisterVariable("metal_dumpstats");
+#ifdef DEBUG
+  iConsole->UnregisterVariable("metal_gpucapture");
+#endif
 }
 
 void CMetalRenderer::DumpMetalDiagnostics() const
@@ -3044,17 +3142,22 @@ void CMetalRenderer::PostLoad() {
   m_bTemporaryDisabledSFX = false;
 }
 
+// Tears down the renderer.  Sequence:
+//   1. Unregister console variables (must happen before device is released).
+//   2. Delegate to CMetalBaseRenderer::ShutDown which:
+//        - Waits for all in-flight command buffers to complete.
+//        - Ends and releases m_renderEncoder if active.
+//        - Commits and nils m_currentCommandBuffer.
+//        - Releases m_currentDrawable.
+//        - Destroys all pools, uniform buffers, depth targets, and caches.
+//        - Nils m_device, m_commandQueue, m_blitCommandQueue, m_metalLayer.
+//        - Sets m_isInitialized = false.
+//
+// @param bReInit  If true the engine plans to re-initialize; buffers may be
+//                 recreated without a full device teardown.
 void CMetalRenderer::ShutDown(bool bReInit) {
   UnregisterMetalConsoleVariables();
-  Release();
-  
-  if (m_currentCommandBuffer) {
-    [m_currentCommandBuffer commit];
-    m_currentCommandBuffer = nil;
-  }
-  
-  m_renderEncoder = nil;
-  m_isInitialized = false;
+  CMetalBaseRenderer::ShutDown(bReInit);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -3608,15 +3711,33 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
     if (depthPSO) {
         [shadowEncoder setRenderPipelineState:depthPSO];
 
-        // Draw shadow casters from the model list
-        if (lof->pEntityList) {
-            for (int i = 0; i < lof->pEntityList->Count(); ++i) {
-                IEntityRender* pEnt = (*lof->pEntityList)[i];
-                if (pEnt) {
-                    pEnt->DrawShadowVolumes(this, lof, false);
+        // Bind global uniforms (light-space matrices already written above)
+        [shadowEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+
+        // Swap in the shadow encoder as the active encoder so that
+        // EF_AddEf/mfDraw calls in DrawEntity submit to the depth pass.
+        id<MTLRenderCommandEncoder> savedEncoder = m_renderEncoder;
+        m_renderEncoder = shadowEncoder;
+
+        if (lof->pEntityList)
+        {
+            SRendParams shadowParams;
+            shadowParams.nDLightMask = 0;
+            for (int i = 0; i < lof->pEntityList->Count(); ++i)
+            {
+                IEntityRender* pEnt = lof->pEntityList->GetAt(i);
+                if (pEnt)
+                {
+                    const Vec3& pos = pEnt->GetPos();
+                    shadowParams.vPos    = pos;
+                    shadowParams.pMatrix = nullptr;
+                    pEnt->DrawEntity(shadowParams);
                 }
             }
         }
+
+        // Restore main encoder
+        m_renderEncoder = savedEncoder;
     }
 
     [shadowEncoder endEncoding];

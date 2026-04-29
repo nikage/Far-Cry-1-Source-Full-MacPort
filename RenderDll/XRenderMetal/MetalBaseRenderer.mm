@@ -302,10 +302,16 @@ void CMetalBaseRenderer::TrackCommandBuffer(id<MTLCommandBuffer> buffer)
             m_activeCommandBuffers.erase(it);
         }
 
-        // Accumulate GPU frame time into SPipeStat::m_fFlushTime (milliseconds)
+        // Accumulate GPU frame time into the atomic; drained on the render thread
+        // at BeginFrame to avoid a data race on m_RP.m_PS.m_fFlushTime.
         const CFTimeInterval gpuMs = (completedBuffer.GPUEndTime - completedBuffer.GPUStartTime) * 1000.0;
-        if (gpuMs > 0.0)
-            m_RP.m_PS.m_fFlushTime += static_cast<float>(gpuMs);
+        if (gpuMs > 0.0) {
+            float prev = m_pendingGpuFlushMs.load(std::memory_order_relaxed);
+            while (!m_pendingGpuFlushMs.compare_exchange_weak(
+                       prev, prev + static_cast<float>(gpuMs),
+                       std::memory_order_relaxed, std::memory_order_relaxed))
+                ;
+        }
     }];
 }
 
@@ -2044,7 +2050,11 @@ bool CMetalBaseRenderer::InitHDRPipeline()
     colorDesc.usage       = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
     colorDesc.storageMode = MTLStorageModePrivate;
     m_hdrColorRT = [m_device newTextureWithDescriptor:colorDesc];
-    if (m_hdrColorRT) [m_hdrColorRT setLabel:@"HDRColorRT"];
+    if (!m_hdrColorRT) {
+        iLog->Log("InitHDRPipeline: failed to allocate HDRColorRT (%dx%d RGBA16Float)\n", w, h);
+        return false;
+    }
+    [m_hdrColorRT setLabel:@"HDRColorRT"];
 
     // HDR depth target — Depth32Float_Stencil8
     MTLTextureDescriptor *depthDesc =
@@ -2053,7 +2063,12 @@ bool CMetalBaseRenderer::InitHDRPipeline()
     depthDesc.usage       = MTLTextureUsageRenderTarget;
     depthDesc.storageMode = MTLStorageModePrivate;
     m_hdrDepthRT = [m_device newTextureWithDescriptor:depthDesc];
-    if (m_hdrDepthRT) [m_hdrDepthRT setLabel:@"HDRDepthRT"];
+    if (!m_hdrDepthRT) {
+        iLog->Log("InitHDRPipeline: failed to allocate HDRDepthRT (%dx%d Depth32Float_Stencil8)\n", w, h);
+        [m_hdrColorRT release]; m_hdrColorRT = nil;
+        return false;
+    }
+    [m_hdrDepthRT setLabel:@"HDRDepthRT"];
 
     // Build tone-map PSO: fullscreen triangle VS + Reinhard FS
     id<MTLLibrary> lib = GetShaderLibrary();
@@ -2710,7 +2725,7 @@ void CMetalBaseRenderer::FreeResources(int nFlags)
         CleanupDynamicVBPools();
     }
 
-    if (nFlags == FRR_ALL)
+    if (nFlags & FRR_ALL)
     {
         WaitForAllCommandBuffers();
         CleanupDynamicVBPools();

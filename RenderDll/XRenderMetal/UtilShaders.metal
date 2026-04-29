@@ -34,6 +34,13 @@ struct VertexOut {
 };
 
 // Uniform buffer for transformation matrices - MUST match UniformBufferData in MetalBaseRenderer.h exactly
+struct LightEntry {
+    float3 pos;
+    float  radius;
+    float3 color;
+    float  intensity;
+};
+
 struct Uniforms {
     float4x4 modelViewProjectionMatrix;
     float4x4 modelMatrix;
@@ -41,13 +48,22 @@ struct Uniforms {
     float4x4 projectionMatrix;
     float3 cameraPos;
     float time;
+    // Primary light alias (mirrors lights[0])
     float3 lightPos;
     float padding1;
     float3 lightColor;
     float padding2;
+    // Full light list (up to 4 dynamic lights)
+    LightEntry lights[4];
+    int    numLights;
+    // Three float scalars (alignof=4) to bridge to the next 16-byte boundary.
+    // Do NOT use float3 here — float3 has alignof=16 in MSL which would insert
+    // 12 bytes of implicit padding before it, shifting clipPlane by 16 bytes vs
+    // the C++ layout (float pad3[3] is 4-byte aligned, no implicit gap).
+    float  _pad3_0, _pad3_1, _pad3_2;
     float4 clipPlane;      // Normal.xyz + Distance
-    float clipEnabled;     // 1.0f if enabled, 0.0f if disabled
-    float clipRefract;     // 1.0f if refract mode, 0.0f if not
+    float clipEnabled;
+    float clipRefract;
     float fogScale;        // 1/(fogEnd - fogStart) for linear fog
     float fogBias;         // fogEnd/(fogEnd - fogStart) for linear fog
 };
@@ -642,4 +658,85 @@ fragment float4 sky_fragment(VertexOut in [[stage_in]],
 vertex float4 depth_vertex(VertexIn in [[stage_in]],
                            constant Uniforms& uniforms [[buffer(METAL_VERTEX_UNIFORM_BUFFER_INDEX)]]) {
     return uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+}
+
+// ---- HDR tone-mapping pass ----
+// Full-screen triangle: vertex positions are generated in the shader from vertex ID.
+
+struct HDROut {
+    float4 position [[position]];
+    float2 texCoord;
+};
+
+vertex HDROut hdr_fullscreen_vertex(uint vid [[vertex_id]]) {
+    // Full-screen triangle from vertex ID (no vertex buffer needed).
+    // uv.xy covers [0,2] × [0,2] so the single triangle covers clip space.
+    // Metal NDC: Y = +1 is screen top. Metal textures: V = 0 is texture top.
+    // Therefore texCoord.y must be flipped: V = 1 - uv.y so that the
+    // bottom of the screen (NDC Y = -1) reads the bottom of the source texture.
+    HDROut out;
+    float2 uv    = float2((vid & 1u) ? 2.0 : 0.0, (vid & 2u) ? 2.0 : 0.0);
+    out.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+    out.texCoord = float2(uv.x, 1.0 - uv.y);
+    return out;
+}
+
+fragment float4 hdr_tonemap_fragment(HDROut in [[stage_in]],
+                                     texture2d<float> hdrTex  [[texture(0)]],
+                                     texture2d<float> bloomTex [[texture(1)]],
+                                     sampler samp [[sampler(0)]]) {
+    float3 hdrColor  = hdrTex.sample(samp, in.texCoord).rgb;
+    float3 bloomColor = bloomTex.sample(samp, in.texCoord).rgb;
+
+    // Additive bloom before tone-mapping
+    hdrColor += bloomColor * 0.25;
+
+    // Reinhard tone-mapping
+    float3 mapped = hdrColor / (hdrColor + float3(1.0));
+
+    // Gamma correction (approximate sRGB)
+    mapped = pow(mapped, float3(1.0 / 2.2));
+
+    return float4(mapped, 1.0);
+}
+
+// ------------------------------------------------------------------
+// HDR Bloom chain: bright-pass + separable Gaussian blur
+// ------------------------------------------------------------------
+
+fragment float4 hdr_brightpass_fragment(HDROut in [[stage_in]],
+                                        texture2d<float> hdrTex [[texture(0)]],
+                                        sampler samp [[sampler(0)]]) {
+    float3 color = hdrTex.sample(samp, in.texCoord).rgb;
+    // Extract pixels brighter than threshold
+    float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
+    float threshold  = 1.0;
+    float contribution = max(0.0, brightness - threshold);
+    return float4(color * (contribution / max(brightness, 0.0001)), 1.0);
+}
+
+fragment float4 hdr_blur_h_fragment(HDROut in [[stage_in]],
+                                    texture2d<float> src [[texture(0)]],
+                                    sampler samp [[sampler(0)]]) {
+    constexpr float weights[5] = { 0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216 };
+    float2 texOffset = float2(1.0 / float(src.get_width()), 0.0);
+    float3 result = src.sample(samp, in.texCoord).rgb * weights[0];
+    for (int i = 1; i < 5; ++i) {
+        result += src.sample(samp, in.texCoord + texOffset * float(i)).rgb * weights[i];
+        result += src.sample(samp, in.texCoord - texOffset * float(i)).rgb * weights[i];
+    }
+    return float4(result, 1.0);
+}
+
+fragment float4 hdr_blur_v_fragment(HDROut in [[stage_in]],
+                                    texture2d<float> src [[texture(0)]],
+                                    sampler samp [[sampler(0)]]) {
+    constexpr float weights[5] = { 0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216 };
+    float2 texOffset = float2(0.0, 1.0 / float(src.get_height()));
+    float3 result = src.sample(samp, in.texCoord).rgb * weights[0];
+    for (int i = 1; i < 5; ++i) {
+        result += src.sample(samp, in.texCoord + texOffset * float(i)).rgb * weights[i];
+        result += src.sample(samp, in.texCoord - texOffset * float(i)).rgb * weights[i];
+    }
+    return float4(result, 1.0);
 }

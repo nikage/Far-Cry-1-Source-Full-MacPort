@@ -124,6 +124,10 @@ public:
     id<MTLTexture> GetRenderTargetDepthTexture(int nHandle) const;
     id<MTLTexture> GetRenderTargetColorTexture(int nHandle) const;
     float EF_GetWaterZElevation(float fX, float fY);
+    id<MTLRenderPipelineState> GetSpritePSO() {
+        if (!m_spritePipelineState) CreateSpritePipelineState();
+        return m_spritePipelineState;
+    }
 
 protected:
     // Metal-specific utility rendering

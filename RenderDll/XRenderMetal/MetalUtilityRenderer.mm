@@ -17,6 +17,7 @@
 
 #include "MetalUtilityRenderer.m"
 #include "MetalBaseRenderer.m"
+#include "MetalRenderer.m"
 #include "MetalTextureManager.m"
 #include "MetalShaderManager.m"
 #include "I3DEngine.h"
@@ -184,7 +185,6 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     assert(m_renderer != nullptr && "Draw2dImage: renderer cannot be null");
     assert(w > 0.0f && "Draw2dImage: width must be positive");
     assert(h > 0.0f && "Draw2dImage: height must be positive");
-    assert(angle == 0.0f && "Draw2dImage: angle rotation not supported yet");
     assert(r >= 0.0f && r <= 1.0f && "Draw2dImage: red component must be in range [0,1]");
     assert(g >= 0.0f && g <= 1.0f && "Draw2dImage: green component must be in range [0,1]");
     assert(b >= 0.0f && b <= 1.0f && "Draw2dImage: blue component must be in range [0,1]");
@@ -259,17 +259,35 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
         float color[4];
     };
     
-    // Metal's texture coordinate system has (0,0) at the bottom-left, while CryEngine
-    // UI code assumes (0,0) at the top-left. Flip the V component so UI textures
-    // render with the same orientation as the original D3D implementation.
+    // Metal V is bottom-up; CryEngine UI assumes top-down — flip V
     const float texTop = 1.0f - t0;
     const float texBottom = 1.0f - t1;
-    
+
+    // Rotate quad corners around centre when angle != 0 (angle is in degrees)
+    float cx = (x0_ndc + x1_ndc) * 0.5f;
+    float cy = (y0_ndc + y1_ndc) * 0.5f;
+    float cosA = 1.0f, sinA = 0.0f;
+    if (angle != 0.0f) {
+        const float rad = angle * (3.14159265f / 180.0f);
+        cosA = cosf(rad);
+        sinA = sinf(rad);
+    }
+    auto rotateNDC = [&](float px, float py, float& rx, float& ry) {
+        float lx = px - cx, ly = py - cy;
+        rx = cx + lx * cosA - ly * sinA;
+        ry = cy + lx * sinA + ly * cosA;
+    };
+    float rx0, ry0, rx1, ry1, rx2, ry2, rx3, ry3;
+    rotateNDC(x0_ndc, y0_ndc, rx0, ry0);
+    rotateNDC(x0_ndc, y1_ndc, rx1, ry1);
+    rotateNDC(x1_ndc, y0_ndc, rx2, ry2);
+    rotateNDC(x1_ndc, y1_ndc, rx3, ry3);
+
     QuadVertex vertices[4] = {
-        {{x0_ndc, y0_ndc}, {s0, texTop},    {r, g, b, a}},  // v0: Top-left
-        {{x0_ndc, y1_ndc}, {s0, texBottom}, {r, g, b, a}},  // v1: Bottom-left
-        {{x1_ndc, y0_ndc}, {s1, texTop},    {r, g, b, a}},  // v2: Top-right
-        {{x1_ndc, y1_ndc}, {s1, texBottom}, {r, g, b, a}}   // v3: Bottom-right
+        {{rx0, ry0}, {s0, texTop},    {r, g, b, a}},  // v0: Top-left
+        {{rx1, ry1}, {s0, texBottom}, {r, g, b, a}},  // v1: Bottom-left
+        {{rx2, ry2}, {s1, texTop},    {r, g, b, a}},  // v2: Top-right
+        {{rx3, ry3}, {s1, texBottom}, {r, g, b, a}}   // v3: Bottom-right
     };
     
     // Create temporary vertex buffer for this quad
@@ -380,15 +398,24 @@ void CMetalUtilityRenderer::SetLineWidth(float fWidth)
 
 void CMetalUtilityRenderer::DrawLine(const Vec3& vPos1, const Vec3& vPos2)
 {
-    // Draw 3D line
-    // This would queue the line for rendering
+    CMetalRenderer* r = checked_cast<CMetalRenderer>(gRenDev);
+    if (r) r->QueueDebugLine(vPos1, vPos2, CFColor(1,1,1,1), 0);
 }
 
 void CMetalUtilityRenderer::DrawLineColor(const Vec3& vPos1, const CFColor& vColor1, 
                                          const Vec3& vPos2, const CFColor& vColor2)
 {
-    // Draw colored line
-    // This would queue the colored line for rendering
+    CMetalRenderer* r = checked_cast<CMetalRenderer>(gRenDev);
+    if (!r) return;
+    // QueueDebugLine is single-colour; approximate gradient via two half-segments
+    Vec3 mid = (vPos1 + vPos2) * 0.5f;
+    CFColor midColor(
+        (vColor1.r + vColor2.r) * 0.5f,
+        (vColor1.g + vColor2.g) * 0.5f,
+        (vColor1.b + vColor2.b) * 0.5f,
+        (vColor1.a + vColor2.a) * 0.5f);
+    r->QueueDebugLine(vPos1, mid, vColor1, 0);
+    r->QueueDebugLine(mid,  vPos2, vColor2,  0);
 }
 
 void CMetalUtilityRenderer::Graph(byte* g, int x, int y, int wdt, int hgt, int nC, int type, char* text, CFColor& color, float fScale)
@@ -399,8 +426,12 @@ void CMetalUtilityRenderer::Graph(byte* g, int x, int y, int wdt, int hgt, int n
 
 void CMetalUtilityRenderer::DrawBall(float x, float y, float z, float radius)
 {
-    // Draw ball
-    // This would queue the ball for rendering
+    CMetalRenderer* r = checked_cast<CMetalRenderer>(gRenDev);
+    if (!r) return;
+    Vec3 center(x, y, z);
+    Vec3 mins(x - radius, y - radius, z - radius);
+    Vec3 maxs(x + radius, y + radius, z + radius);
+    r->QueueDebugSphere(mins, maxs, CFColor(1, 1, 0, 1), /*solid=*/false);
 }
 
 void CMetalUtilityRenderer::DrawBall(const Vec3& pos, float radius)
@@ -410,8 +441,8 @@ void CMetalUtilityRenderer::DrawBall(const Vec3& pos, float radius)
 
 void CMetalUtilityRenderer::DrawPoint(float x, float y, float z, float fSize)
 {
-    // Draw point
-    // This would queue the point for rendering
+    CMetalRenderer* r = checked_cast<CMetalRenderer>(gRenDev);
+    if (r) r->QueueDebugPoint(Vec3(x, y, z), CFColor(1, 1, 1, 1), 0);
 }
 
 void CMetalUtilityRenderer::FlushTextMessages()
@@ -463,14 +494,74 @@ void CMetalUtilityRenderer::ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int
     assert(pRGB != nullptr && "ReadFrameBuffer: output buffer cannot be null");
     assert(nSizeX > 0 && "ReadFrameBuffer: width must be positive");
     assert(nSizeY > 0 && "ReadFrameBuffer: height must be positive");
-    assert(nScaledX >= 0 && "ReadFrameBuffer: scaled width cannot be negative");
-    assert(nScaledY >= 0 && "ReadFrameBuffer: scaled height cannot be negative");
     
-    if (!pRGB)
-        return;
-        
-    // Read frame buffer
-    // This would read from the Metal drawable
+    if (!pRGB || nSizeX <= 0 || nSizeY <= 0) return;
+    if (!m_renderer || !m_renderer->m_device) return;
+
+    // End any active render encoder before blitting
+    if (m_renderer->m_renderEncoder)
+    {
+        [m_renderer->m_renderEncoder endEncoding];
+        [m_renderer->m_renderEncoder release];
+        m_renderer->m_renderEncoder = nil;
+    }
+
+    // Use the current frame's already-acquired drawable — do not call nextDrawable
+    id<MTLTexture> srcTex = m_renderer->m_currentDrawable
+                                ? m_renderer->m_currentDrawable.texture
+                                : nil;
+    if (!srcTex) return;
+
+    int srcW = (int)srcTex.width;
+    int srcH = (int)srcTex.height;
+    int dstW = (nScaledX > 0) ? nScaledX : nSizeX;
+    int dstH = (nScaledY > 0) ? nScaledY : nSizeY;
+
+    // Create a readback buffer (BGRA8, 4 bytes/pixel)
+    NSUInteger bytesPerRow = (NSUInteger)srcW * 4;
+    NSUInteger totalBytes  = bytesPerRow * (NSUInteger)srcH;
+    id<MTLBuffer> readback = [m_renderer->m_device
+        newBufferWithLength:totalBytes
+                   options:MTLResourceStorageModeShared];
+    if (!readback) return;
+
+    id<MTLCommandBuffer> cb = [m_renderer->m_commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
+    [blit copyFromTexture:srcTex
+             sourceSlice:0
+             sourceLevel:0
+            sourceOrigin:MTLOriginMake(0, 0, 0)
+              sourceSize:MTLSizeMake(srcW, srcH, 1)
+                toBuffer:readback
+       destinationOffset:0
+  destinationBytesPerRow:bytesPerRow
+destinationBytesPerImage:totalBytes];
+    [blit endEncoding];
+    [cb commit];
+    [cb waitUntilCompleted];
+
+    // Copy BGRA → RGB(A) into output buffer, cropped/scaled if needed
+    const unsigned char* src = (const unsigned char*)readback.contents;
+    const int copyW = (srcW < dstW) ? srcW : dstW;
+    const int copyH = (srcH < dstH) ? srcH : dstH;
+    const int channels = bRGBA ? 4 : 3;
+
+    for (int row = 0; row < copyH; ++row)
+    {
+        const unsigned char* srcRow = src + row * bytesPerRow;
+        unsigned char* dstRow = pRGB + row * dstW * channels;
+        for (int col = 0; col < copyW; ++col)
+        {
+            // Metal BGRA → RGB/RGBA
+            dstRow[col * channels + 0] = srcRow[col * 4 + 2]; // R
+            dstRow[col * channels + 1] = srcRow[col * 4 + 1]; // G
+            dstRow[col * channels + 2] = srcRow[col * 4 + 0]; // B
+            if (bRGBA)
+                dstRow[col * channels + 3] = srcRow[col * 4 + 3]; // A
+        }
+    }
+    // readback was allocated with newBufferWithLength: (retain +1); release after copy
+    [readback release];
 }
 
 void CMetalUtilityRenderer::SetFogColor(float* color)

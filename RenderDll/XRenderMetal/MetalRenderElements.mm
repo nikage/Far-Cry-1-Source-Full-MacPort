@@ -15,6 +15,8 @@
 
 #if defined(__APPLE__) && defined(__MACH__)
 
+#include <vector>
+#include <cstdint>
 #include "MetalBaseRenderer.m"
 #include "MetalRenderer.m"
 #include "MetalTextureManager.m"
@@ -101,7 +103,8 @@ public:
     {
         assert(gRenDev && "CMetalRESky::DrawSkySphere - gRenDev is null!");
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalRESky::DrawSkySphere - no active render encoder");
         if (!r || !r->m_renderEncoder)
             return;
         
@@ -164,10 +167,45 @@ public:
             }
         }
         
+        assert(!vertices.empty() && !indices.empty() && "CMetalRESky::DrawSkySphere - sky geometry is empty");
         if (!vertices.empty() && !indices.empty())
         {
-            r->SetCullMode(R_CULL_NONE);
-            r->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
+            CMetalRenderer* renderer = checked_cast<CMetalRenderer>(gRenDev);
+            assert(renderer && renderer->GetShaderManager() && "CMetalREFogVolume: renderer or shader manager is null");
+            if (!renderer || !renderer->GetShaderManager()) return;
+
+            id<MTLRenderCommandEncoder> enc = r->m_renderEncoder;
+
+            id<MTLRenderPipelineState> pso =
+                renderer->GetShaderManager()->GetPipelineStateForShader("color");
+            if (!pso)
+                pso = renderer->GetShaderManager()->GetPipelineStateForFormat(VERTEX_FORMAT_P3F_COL4UB);
+            assert(pso && "CMetalREFogVolume: no PSO found for color/P3F_COL4UB vertex format");
+            if (!pso) {
+                static bool s_logged = false;
+                if (!s_logged) { iLog->Log("CMetalRESky::DrawSkySphere: no PSO for color/P3F_COL4UB — sky sphere not drawn\n"); s_logged = true; }
+                return;
+            }
+
+            id<MTLBuffer> vbuf = [r->m_device
+                newBufferWithBytes:vertices.data()
+                            length:vertices.size() * sizeof(struct_VERTEX_FORMAT_P3F_COL4UB)
+                           options:MTLResourceStorageModeShared];
+            id<MTLBuffer> ibuf = [r->m_device
+                newBufferWithBytes:indices.data()
+                            length:indices.size() * sizeof(uint16_t)
+                           options:MTLResourceStorageModeShared];
+
+            [enc setRenderPipelineState:pso];
+            [enc setVertexBuffer:vbuf   offset:0 atIndex:0];
+            [enc setVertexBuffer:r->m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:(NSUInteger)indices.size()
+                             indexType:MTLIndexTypeUInt16
+                           indexBuffer:ibuf
+                     indexBufferOffset:0];
+            [vbuf release];
+            [ibuf release];
         }
     }
     
@@ -176,15 +214,43 @@ public:
         assert(gRenDev && "CMetalRESky::DrawFogLayer - gRenDev is null!");
         assert(m_parrFogLayer && "CMetalRESky::DrawFogLayer - fog layer is null!");
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalRESky::DrawFogLayer - no active render encoder");
         if (!r || !r->m_renderEncoder || !m_parrFogLayer)
             return false;
         
         if (m_parrFogLayer->Count() == 0)
             return false;
-        
-        r->SetCullMode(R_CULL_NONE);
-        r->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
+
+        CMetalRenderer* renderer = checked_cast<CMetalRenderer>(gRenDev);
+        assert(renderer && renderer->GetShaderManager() && "CMetalREFogLayer: renderer or shader manager is null");
+        if (!renderer || !renderer->GetShaderManager()) return false;
+
+        id<MTLRenderPipelineState> pso =
+            renderer->GetShaderManager()->GetPipelineStateForShader("color");
+        assert(pso && "CMetalREFogLayer: no PSO found for color shader");
+        if (!pso) {
+            static bool s_logged = false;
+            if (!s_logged) { iLog->Log("CMetalRESky::DrawFogLayer: no PSO for color shader — fog layer not drawn\n"); s_logged = true; }
+            return false;
+        }
+
+        // Fog layer is a list of P3F_COL4UB quads — draw as triangle list
+        const int nFogVerts = m_parrFogLayer->Count();
+        id<MTLBuffer> vbuf = [r->m_device
+            newBufferWithBytes:&m_parrFogLayer->GetAt(0)
+                        length:(NSUInteger)nFogVerts * sizeof(struct_VERTEX_FORMAT_P3F_COL4UB)
+                       options:MTLResourceStorageModeShared];
+
+        [r->m_renderEncoder setRenderPipelineState:pso];
+        [r->m_renderEncoder setVertexBuffer:vbuf offset:0 atIndex:0];
+        [r->m_renderEncoder setVertexBuffer:r->m_uniformBuffer
+                                     offset:0
+                                    atIndex:kMetalVertexUniformSlot];
+        [r->m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle
+                               vertexStart:0
+                               vertexCount:(NSUInteger)nFogVerts];
+        [vbuf release];
         
         return true;
     }
@@ -193,7 +259,8 @@ public:
     {
         assert(gRenDev && "CMetalRESky::DrawBlackPortal - gRenDev is null!");
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalRESky::DrawBlackPortal - no active render encoder");
         if (!r || !r->m_renderEncoder)
             return false;
         
@@ -241,7 +308,8 @@ public:
         assert(ef && "CMetalRECommon::mfDraw - ef is null!");
         assert(gRenDev && "CMetalRECommon::mfDraw - gRenDev is null!");
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalRECommon::mfDraw - no active render encoder");
         if (!r || !r->m_renderEncoder)
             return false;
         
@@ -426,7 +494,8 @@ public:
         if (!gRenDev || !m_pBuffer || !m_pChunk)
             return false;
         
-        CMetalRenderer* renderer = static_cast<CMetalRenderer*>(gRenDev);
+        CMetalRenderer* renderer = checked_cast<CMetalRenderer>(gRenDev);
+        assert(renderer && "CMetalREOcean: gRenDev is null");
         if (!renderer || !renderer->m_renderEncoder)
             return false;
         
@@ -481,7 +550,8 @@ public:
         assert(ef && "CMetalRETriMesh::mfDraw - ef is null!");
         assert(gRenDev && "CMetalRETriMesh::mfDraw - gRenDev is null!");
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalRETriMesh::mfDraw - no active render encoder");
         if (!r || !r->m_renderEncoder)
             return false;
         
@@ -523,7 +593,8 @@ public:
         assert(ef && "CMetalREPrefabGeom::mfDraw - ef is null!");
         assert(gRenDev && "CMetalREPrefabGeom::mfDraw - gRenDev is null!");
         
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalREPrefabGeom::mfDraw - no active render encoder");
         if (!r || !r->m_renderEncoder)
             return false;
         
@@ -597,6 +668,8 @@ public:
         {
             gRenDev->ReleaseBuffer(m_pBuffer);
         }
+        [m_metalVB release]; m_metalVB = nil;
+        [m_metalIB release]; m_metalIB = nil;
     }
     
     virtual void mfPrepare()
@@ -612,64 +685,185 @@ public:
         gRenDev->m_RP.m_RendNumVerts = 0;
     }
     
+    /// Renders the ocean surface into the active render encoder.
+    ///
+    /// Draw sequence each frame:
+    ///   1. Lazy-init GPU buffers via GenerateGeometry() on first call.
+    ///   2. Animate CPU vertices with Update(realTime * speed).
+    ///   3. Upload via FlushVerticesToGPU() (shared-memory memcpy, no blit).
+    ///   4. Bind "ocean" PSO (falls back to VERTEX_FORMAT_P3F_TEX2F generic PSO).
+    ///   5. Issue indexed draw with global uniforms at kMetalVertexUniformSlot.
+    ///
+    /// @return true on successful draw, false if any required resource is missing.
     virtual bool mfDraw(SShader *ef, SShaderPass *sfm)
     {
         assert(ef && "CMetalREOcean::mfDraw - ef is null!");
         assert(gRenDev && "CMetalREOcean::mfDraw - gRenDev is null!");
-        
         if (!gRenDev)
             return false;
-        
-        CMetalBaseRenderer* r = static_cast<CMetalBaseRenderer*>(gRenDev);
+
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_renderEncoder && "CMetalREOcean::mfDraw - no active render encoder");
         if (!r || !r->m_renderEncoder)
             return false;
-        
+
+        // Lazy init
+        if (!m_metalVB)
+            GenerateGeometry();
+        assert(m_metalVB && m_metalIB && "CMetalREOcean::mfDraw - GenerateGeometry failed to create GPU buffers");
+        if (!m_metalVB || !m_metalIB)
+            return false;
+
         Update(r->m_RP.m_RealTime * m_fSpeed);
-        
-        r->SetCullMode(R_CULL_BACK);
+        FlushVerticesToGPU();
+
+        r->SetCullMode(R_CULL_NONE);
         r->SetState(GS_DEPTHWRITE | GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA);
-        
+
+        CMetalRenderer* renderer = checked_cast<CMetalRenderer>(gRenDev);
+        assert(renderer && renderer->GetShaderManager() && "CMetalREOcean::mfDraw: renderer or shader manager is null");
+        if (!renderer || !renderer->GetShaderManager()) return false;
+
+        id<MTLRenderPipelineState> pso =
+            renderer->GetShaderManager()->GetPipelineStateForShader("ocean");
+        if (!pso)
+            pso = renderer->GetShaderManager()->GetPipelineStateForFormat(VERTEX_FORMAT_P3F_TEX2F);
+        assert(pso && "CMetalREOcean::mfDraw: no PSO found for ocean/P3F_TEX2F vertex format");
+        if (!pso) {
+            static bool s_logged = false;
+            if (!s_logged) { iLog->Log("CMetalREOcean::mfDraw: no PSO for ocean/P3F_TEX2F — ocean not drawn\n"); s_logged = true; }
+            return false;
+        }
+        [r->m_renderEncoder setRenderPipelineState:pso];
+
+        [r->m_renderEncoder setVertexBuffer:m_metalVB offset:0 atIndex:kMetalVertexStream_General];
+        [r->m_renderEncoder setVertexBuffer:r->m_uniformBuffer
+                                     offset:0
+                                    atIndex:kMetalVertexUniformSlot];
+        [r->m_renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                       indexCount:m_indexCount
+                                        indexType:MTLIndexTypeUInt16
+                                      indexBuffer:m_metalIB
+                                indexBufferOffset:0];
         return true;
     }
     
-    /// Generates the ocean geometry mesh
-    /// 
-    /// Creates a (OCEANGRID+1) x (OCEANGRID+1) grid of vertices for the ocean surface.
-    /// This is called once during initialization to set up the base mesh structure.
-    /// The actual vertex positions are updated each frame in Update().
+    /// Allocates and initialises the static ocean mesh on the GPU (called lazily on
+    /// the first mfDraw).
     ///
-    /// Implementation: Currently a placeholder - full implementation would:
-    /// - Initialize vertex positions in a regular grid
-    /// - Set up texture coordinates
-    /// - Generate index buffer for triangle strips
+    /// Builds an (OCEANGRID+1) × (OCEANGRID+1) grid centred at the world origin.
+    /// Each vertex stores: pos(3) + normal(3) + uv(2) as tightly-packed floats.
+    /// Indices are stored as uint16 triangle lists (2 tris per quad cell).
+    ///
+    /// The resulting MTLBuffers use MTLResourceStorageModeShared so that
+    /// FlushVerticesToGPU() can memcpy updated heights without a blit encoder.
+    ///
+    /// Sets m_cellSize and m_halfW which are reused every frame in Update().
     void GenerateGeometry()
     {
+        assert(gRenDev && "CMetalREOcean::GenerateGeometry - gRenDev is null!");
+        if (!gRenDev) return;
+        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
+        assert(r && r->m_device && "CMetalREOcean::GenerateGeometry - no Metal device");
+        if (!r || !r->m_device) return;
+
+        static_assert((OCEANGRID + 1) * (OCEANGRID + 1) <= 65535,
+                      "OCEANGRID too large: vertex count exceeds uint16_t index range");
+
+        const int N = OCEANGRID;
+        m_cellSize = 2.0f;
+        m_halfW = N * m_cellSize * 0.5f;
+        const float cellSize = m_cellSize;
+        const float halfW    = m_halfW;
+
+        // Vertex layout: position(3) + normal(3) + uv(2) stored as floats = 8 floats
+        const int numVerts = (N + 1) * (N + 1);
+        m_cpuVerts.resize(numVerts * 8);
+        for (int z = 0; z <= N; ++z) {
+            for (int x = 0; x <= N; ++x) {
+                int idx = (z * (N + 1) + x) * 8;
+                m_cpuVerts[idx + 0] = x * cellSize - halfW; // pos.x
+                m_cpuVerts[idx + 1] = 0.f;                  // pos.y (height)
+                m_cpuVerts[idx + 2] = z * cellSize - halfW; // pos.z
+                m_cpuVerts[idx + 3] = 0.f;                  // normal.x
+                m_cpuVerts[idx + 4] = 1.f;                  // normal.y
+                m_cpuVerts[idx + 5] = 0.f;                  // normal.z
+                m_cpuVerts[idx + 6] = (float)x / N;         // uv.u
+                m_cpuVerts[idx + 7] = (float)z / N;         // uv.v
+            }
+        }
+
+        // Index buffer: 2 triangles per cell
+        const int numQuads = N * N;
+        m_indexCount = numQuads * 6;
+        m_cpuIndices.resize(m_indexCount);
+        int ii = 0;
+        for (int z = 0; z < N; ++z) {
+            for (int x = 0; x < N; ++x) {
+                uint16_t tl = static_cast<uint16_t>(z * (N + 1) + x);
+                uint16_t tr = tl + 1;
+                uint16_t bl = tl + (N + 1);
+                uint16_t br = bl + 1;
+                m_cpuIndices[ii++] = tl; m_cpuIndices[ii++] = bl; m_cpuIndices[ii++] = tr;
+                m_cpuIndices[ii++] = tr; m_cpuIndices[ii++] = bl; m_cpuIndices[ii++] = br;
+            }
+        }
+
+        NSUInteger vbSize = m_cpuVerts.size() * sizeof(float);
+        NSUInteger ibSize = m_indexCount * sizeof(uint16_t);
+        m_metalVB = [r->m_device newBufferWithBytes:m_cpuVerts.data()
+                                             length:vbSize
+                                            options:MTLResourceStorageModeShared];
+        m_metalIB = [r->m_device newBufferWithBytes:m_cpuIndices.data()
+                                             length:ibSize
+                                            options:MTLResourceStorageModeShared];
+        if (m_metalVB) [m_metalVB setLabel:@"OceanVB"];
+        if (m_metalIB) [m_metalIB setLabel:@"OceanIB"];
     }
     
-    /// Updates ocean wave simulation for the current frame
+    /// Animates the ocean surface in the CPU vertex array for the given time.
     ///
-    /// Performs FFT-based wave generation using Phillips spectrum.
-    /// Updates height field, normals, and displacement vectors for choppy waves.
+    /// Uses a sum of three sinusoidal waves (different frequencies and phases) scaled
+    /// by m_fWaveHeight to produce a plausible ocean swell.  Only the Y (height)
+    /// component of each vertex is modified; normals are not recomputed here.
     ///
-    /// @param fTime Current simulation time in seconds
+    /// @param fTime  Simulation time in seconds (typically m_RP.m_RealTime * m_fSpeed).
     ///
-    /// Algorithm:
-    /// 1. Compute wave spectrum in frequency domain (FFT)
-    /// 2. Apply dispersion relation for water waves
-    /// 3. Transform to spatial domain (inverse FFT)
-    /// 4. Calculate normals from height gradients
-    /// 5. Apply displacement for choppy wave effect
-    ///
-    /// Performance: O(N² log N) where N = OCEANGRID (64)
-    ///
-    /// Implementation: Currently a placeholder - full implementation would:
-    /// - Calculate H(k,t) from H0(k) and dispersion relation
-    /// - Perform 2D FFT to get height field
-    /// - Compute displacement vectors (Dx, Dy)
-    /// - Calculate normals (Nx, Ny)
-    /// - Update vertex buffer with new positions and normals
+    /// Call FlushVerticesToGPU() after this to push the changes to the MTLBuffer.
     void Update(float fTime)
     {
+        if (m_cpuVerts.empty()) return;
+        const int N = OCEANGRID;
+        const float cellSize = m_cellSize;
+        const float halfW    = m_halfW;
+        const float waveScale = m_fWaveHeight * 0.5f;
+        const float freq0 = 0.5f, freq1 = 0.9f, freq2 = 1.4f;
+
+        for (int z = 0; z <= N; ++z) {
+            for (int x = 0; x <= N; ++x) {
+                int idx = (z * (N + 1) + x) * 8;
+                float wx = x * cellSize - halfW;
+                float wz = z * cellSize - halfW;
+                float h = waveScale * (
+                    sinf(wx * 0.07f + fTime * freq0) * cosf(wz * 0.06f + fTime * freq1) +
+                    0.5f * sinf(wx * 0.13f - fTime * freq2 + wz * 0.11f));
+                m_cpuVerts[idx + 1] = h;
+            }
+        }
+    }
+
+    /// Copies the CPU-side vertex array into the MTLBuffer.
+    ///
+    /// Safe to call every frame because m_metalVB uses MTLResourceStorageModeShared
+    /// (CPU and GPU share the same physical pages).  No blit encoder or synchronisation
+    /// is needed — Metal guarantees the copy is visible to the GPU for the next
+    /// command buffer that references the buffer.
+    void FlushVerticesToGPU()
+    {
+        if (!m_metalVB || m_cpuVerts.empty()) return;
+        void* dst = [m_metalVB contents];
+        if (dst)
+            memcpy(dst, m_cpuVerts.data(), m_cpuVerts.size() * sizeof(float));
     }
     
     /// Queries the water surface elevation at a world position
@@ -752,6 +946,17 @@ private:
     float m_DY[OCEANGRID][OCEANGRID]; ///< Displacement Y for choppy waves
     float m_Pos[OCEANGRID+1][OCEANGRID+1][2]; ///< Final vertex XY positions
     Vec3d m_Normals[OCEANGRID+1][OCEANGRID+1]; ///< Final vertex normals
+
+    // Metal GPU resources
+    id<MTLBuffer> m_metalVB = nil;
+    id<MTLBuffer> m_metalIB = nil;
+    int m_indexCount = 0;
+    std::vector<float>    m_cpuVerts;
+    std::vector<uint16_t> m_cpuIndices;
+
+    // Grid layout constants (set once in GenerateGeometry, reused in Update)
+    float m_cellSize = 2.0f;
+    float m_halfW    = 0.0f;
 };
 
 CMetalREOcean* CMetalREOcean::m_pStaticOcean = nullptr;

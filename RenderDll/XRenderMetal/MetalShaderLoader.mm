@@ -92,10 +92,6 @@ struct FragmentVaryingRequirement
 VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metadata, int textureCount, NSString* shaderName)
 {
     VertexAttributeSummary summary;
-    if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
-    {
-        iLog->Log("BuildAttributeSummary: shader '%s' metadata count=%d", [shaderName UTF8String], metadata ? (int)[metadata count] : -1);
-    }
     bool populatedFromMetadata = false;
     if (metadata && [metadata isKindOfClass:[NSArray class]] && [metadata count] > 0)
     {
@@ -138,12 +134,6 @@ VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metad
                     if ([lowered containsString:@"tnormal"] || [lowered containsString:@"t_normal"])
                     {
                         summary.hasTNormal = true;
-                        if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
-                        {
-                            iLog->Log("BuildAttributeSummary: shader '%s' detected TNormal token '%s'",
-                                      [shaderName UTF8String],
-                                      [token UTF8String]);
-                        }
                     }
                 }
             }
@@ -202,13 +192,7 @@ VertexAttributeSummary BuildAttributeSummary(NSArray* attributes, NSArray* metad
                 summary.hasBinormal = true;
                 summary.hasTNormal = true;
             }
-            if ([lowerName containsString:@"envlight"])
-            {
-                summary.hasTNormal = true;
-                summary.hasTangent = true;
-                summary.hasBinormal = true;
-            }
-            else if (!hasExplicitAttributes)
+            if (!hasExplicitAttributes)
             {
                 if ([lowerName containsString:@"vegetation"] ||
                     [lowerName containsString:@"plants"])
@@ -395,6 +379,80 @@ static NSString* NormalizeBlendString(NSString* value)
     lowered = [lowered stringByReplacingOccurrencesOfString:@"-" withString:@""];
     lowered = [lowered stringByReplacingOccurrencesOfString:@" " withString:@""];
     return lowered;
+}
+
+// ------------------------------------------------------------------
+// Function constant indices — must match the declarations used in
+// all generated .metal shader files (see Generated/Common.metal plan)
+// ------------------------------------------------------------------
+static const uint32_t kFC_FogEnabled     = 0;
+static const uint32_t kFC_HdrEnabled     = 1;
+static const uint32_t kFC_GlossAlpha     = 2;
+static const uint32_t kFC_EnvLight       = 3;
+static const uint32_t kFC_AttenEnabled   = 4;
+static const uint32_t kFC_ProjLight      = 5;
+static const uint32_t kFC_PlantsBending  = 6;
+static const uint32_t kFC_AlphaGlow      = 7;
+static const uint32_t kFC_MultipleLights = 8;
+static const uint32_t kFC_HighPrecision  = 9;
+
+// Build MTLFunctionConstantValues from a shader's normalized name and
+// its manifest directive list. Called before newFunctionWithName:constantValues:error:
+// so that Metal can specialise function-constant branches at PSO compile time.
+static MTLFunctionConstantValues* BuildFunctionConstants(NSString* lowerName,
+                                                          NSArray* directives)
+{
+    MTLFunctionConstantValues* cv = [[MTLFunctionConstantValues alloc] init];
+
+    bool fog_enabled     = false;
+    bool hdr_enabled     = false;
+    bool gloss_alpha     = false;
+    bool env_light       = false;
+    bool atten_enabled   = false;
+    bool proj_light      = false;
+    bool plants_bending  = false;
+    bool alpha_glow      = false;
+    bool multiple_lights = false;
+    bool high_precision  = false;
+
+    if (lowerName)
+    {
+        env_light       = [lowerName containsString:@"envlight"];
+        alpha_glow      = [lowerName containsString:@"alphaglow"];
+        gloss_alpha     = [lowerName containsString:@"glossalpha"];
+        multiple_lights = [lowerName containsString:@"multiplelight"];
+        atten_enabled   = [lowerName containsString:@"atten"];
+        proj_light      = [lowerName containsString:@"proj"];
+        plants_bending  = [lowerName containsString:@"plants"] ||
+                          [lowerName containsString:@"vegetation"];
+    }
+
+    if (directives && [directives isKindOfClass:[NSArray class]])
+    {
+        for (id dir in directives)
+        {
+            NSString* d = [NSString stringWithFormat:@"%@", dir].lowercaseString;
+            if ([d isEqualToString:@"hdr"] || [d containsString:@"hdr"])
+                hdr_enabled = true;
+            if ([d containsString:@"fog"])
+                fog_enabled = true;
+            if ([d containsString:@"highprecision"] || [d containsString:@"high_precision"])
+                high_precision = true;
+        }
+    }
+
+    [cv setConstantValue:&fog_enabled      type:MTLDataTypeBool atIndex:kFC_FogEnabled];
+    [cv setConstantValue:&hdr_enabled      type:MTLDataTypeBool atIndex:kFC_HdrEnabled];
+    [cv setConstantValue:&gloss_alpha      type:MTLDataTypeBool atIndex:kFC_GlossAlpha];
+    [cv setConstantValue:&env_light        type:MTLDataTypeBool atIndex:kFC_EnvLight];
+    [cv setConstantValue:&atten_enabled    type:MTLDataTypeBool atIndex:kFC_AttenEnabled];
+    [cv setConstantValue:&proj_light       type:MTLDataTypeBool atIndex:kFC_ProjLight];
+    [cv setConstantValue:&plants_bending   type:MTLDataTypeBool atIndex:kFC_PlantsBending];
+    [cv setConstantValue:&alpha_glow       type:MTLDataTypeBool atIndex:kFC_AlphaGlow];
+    [cv setConstantValue:&multiple_lights  type:MTLDataTypeBool atIndex:kFC_MultipleLights];
+    [cv setConstantValue:&high_precision   type:MTLDataTypeBool atIndex:kFC_HighPrecision];
+
+    return [cv autorelease];
 }
 
 static MTLBlendFactor BlendFactorFromString(NSString* value)
@@ -1090,6 +1148,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     
     iLog->Log("Shader library loaded successfully\n");
     
+    m_defaultLibrary = defaultLibrary;
     CreateDefaultShaders(defaultLibrary);
     LoadGeneratedShaders(defaultLibrary);
     if (iLog)
@@ -1373,13 +1432,6 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         if ([loweredStage isEqualToString:@"vertex"])
             continue;
 
-        if (shaderName && [shaderName rangeOfString:@"envlight" options:NSCaseInsensitiveSearch].length > 0 && iLog)
-        {
-            iLog->Log("MetalShaderManager: processing shader '%s' fragment '%s'",
-                      [shaderName UTF8String],
-                      fragmentName ? [fragmentName UTF8String] : "<null>");
-        }
-
         const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
 
         const GeneratedVertexEntry* matchedVertexEntry =
@@ -1413,32 +1465,22 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             g_missingVertexLogCount++;
         }
 
-        if (normalizedKey.find("envlight") != std::string::npos)
-        {
-            if (iLog)
-                iLog->Log("MetalShaderManager: normalized key candidate '%s'", normalizedKey.c_str());
-            continue;
-        }
+        NSArray* directivesArray = [shaderDict objectForKey:@"directives"];
+        MTLFunctionConstantValues* funcConstants = BuildFunctionConstants(lowerName, directivesArray);
 
-        bool forceTangentFrame = (normalizedKey == "cgvprogbump_diffspec_envlight_vs20");
-        if (fragmentName)
-        {
-            NSString* lowerFragment = [fragmentName lowercaseString];
-            if ([lowerFragment containsString:@"envlight"])
-            {
-                forceTangentFrame = true;
-                if (iLog)
-                    iLog->Log("MetalShaderManager: fragment '%s' flagged for tangent stream", [fragmentName UTF8String]);
-                if (shaderName && iLog)
-                    iLog->Log("MetalShaderManager: envlight shader entry name '%s'", [shaderName UTF8String]);
-            }
-        }
+        // Tangent-frame requirement is determined solely by vertex attribute metadata
+        bool forceTangentFrame = false;
 
-        id<MTLFunction> fragmentFunction = [generatedLibrary newFunctionWithName:fragmentName];
+        NSError* funcErr = nil;
+        id<MTLFunction> fragmentFunction = [generatedLibrary newFunctionWithName:fragmentName
+                                                                  constantValues:funcConstants
+                                                                           error:&funcErr];
         if (!fragmentFunction)
         {
             if (iLog)
-                iLog->Log("MetalShaderManager: Missing generated fragment function '%s'\n", [fragmentName UTF8String]);
+                iLog->Log("MetalShaderManager: Missing generated fragment function '%s' (error: %s)\n",
+                          [fragmentName UTF8String],
+                          funcErr ? [[funcErr localizedDescription] UTF8String] : "unknown");
             continue;
         }
 
@@ -1455,18 +1497,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                       NSStringFromClass([vertexAttrMetaArray class]).UTF8String);
         }
         VertexAttributeSummary attributeSummary = BuildAttributeSummary(vertexAttrArray, vertexAttrMetaArray, textureCount, shaderName);
-        if (attributeSummary.hasTNormal && iLog)
-        {
-            iLog->Log("MetalShaderManager: '%s' metadata reports TNormal", shaderName ? [shaderName UTF8String] : "<unnamed>");
-        }
-        if (forceTangentFrame && iLog)
-        {
-            iLog->Log("EnvLight summary: hasTNormal=%d hasTangent=%d hasBinormal=%d texCoords=%d",
-                      attributeSummary.hasTNormal ? 1 : 0,
-                      attributeSummary.hasTangent ? 1 : 0,
-                      attributeSummary.hasBinormal ? 1 : 0,
-                      attributeSummary.texCoordCount);
-        }
+        // Use metadata to decide tangent-frame requirement
+        forceTangentFrame = attributeSummary.hasTNormal || attributeSummary.hasTangent || attributeSummary.hasBinormal;
         const bool hasGeneratedVertexEntry = (matchedVertexEntry != nullptr);
         if (hasGeneratedVertexEntry && g_vertexMatchLogCount < kMaxMissingVertexLogs)
         {
@@ -1513,38 +1545,6 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                       shaderName ? [shaderName UTF8String] : "<unnamed>",
                       vertexFormat);
         }
-        if (shaderName && ([shaderName isEqualToString:@"CGVProgShadow_Depth2_3Samples"] ||
-            [shaderName isEqualToString:@"CGRCRefractive"] ||
-            [shaderName isEqualToString:@"CGVProgHeatHaze"] ||
-            [shaderName isEqualToString:@"CGVProgBump_DiffSpec_EnvLight_VS20"]))
-        {
-            const int hasExplicitAttributes = vertexAttrArray && [vertexAttrArray count] > 0 ? 1 : 0;
-            const int needsTangentFrame = (attributeSummary.hasTangent || attributeSummary.hasBinormal || attributeSummary.hasTNormal) ? 1 : 0;
-            iLog->Log("MetalShaderManager: summary for '%s': texCoords=%d color0=%d normal=%d tangents=%d explicit=%d\n",
-                      [shaderName UTF8String],
-                      attributeSummary.texCoordCount,
-                      attributeSummary.hasColor0 ? 1 : 0,
-                      attributeSummary.hasNormal ? 1 : 0,
-                      needsTangentFrame,
-                      hasExplicitAttributes);
-            if (iLog)
-                iLog->Log("MetalShaderManager: '%s' using vertex function %s, format %d (texCoords=%d color=%d color1=%d tangents=%d)\n",
-                          [shaderName UTF8String],
-                          [vertexFunctionName UTF8String],
-                          vertexFormat,
-                          layout.hasTexCoords ? 1 : 0,
-                          layout.hasColor ? 1 : 0,
-                          layout.hasSecondColor ? 1 : 0,
-                          layout.needsTangents ? 1 : 0);
-            fprintf(stderr, "MetalShaderManager: '%s' using vertex function %s, format %d (tex=%d color=%d color1=%d tangents=%d)\n",
-                    [shaderName UTF8String],
-                    [vertexFunctionName UTF8String],
-                    vertexFormat,
-                    layout.hasTexCoords ? 1 : 0,
-                    layout.hasColor ? 1 : 0,
-                    layout.hasSecondColor ? 1 : 0,
-                    layout.needsTangents ? 1 : 0);
-        }
         id<MTLFunction> vertexFunction = nil;
         bool usedGeneratedVertex = false;
 
@@ -1558,7 +1558,10 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                 NSString* generatedVertexName = [NSString stringWithUTF8String:matchedVertexEntry->entryPoint.c_str()];
                 if (generatedVertexName && [generatedVertexName length] > 0)
                 {
-                    id<MTLFunction> generatedVertexFunction = [generatedLibrary newFunctionWithName:generatedVertexName];
+                    NSError* vertFuncErr = nil;
+                    id<MTLFunction> generatedVertexFunction = [generatedLibrary newFunctionWithName:generatedVertexName
+                                                                                    constantValues:funcConstants
+                                                                                             error:&vertFuncErr];
                     if (generatedVertexFunction)
                     {
                         vertexFunction = generatedVertexFunction;
@@ -1669,7 +1672,9 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                 iLog->Log("MetalShaderManager: Skipping shader '%s' due to pipeline creation failure\n",
                           shaderName ? [shaderName UTF8String] : "<unnamed>");
             }
-            // TODO: remove once envlight shader is fixed
+            // PSO creation failure: log clearly and skip this shader.
+            // Once the generated metallib is compiled (requires full Xcode + xcrun metal),
+            // PSO creation will succeed and this branch will not be reached.
             if (iLog)
             {
                 iLog->Log("MetalShaderManager: continuing despite shader '%s' failure", normalizedKey.c_str());
@@ -1910,17 +1915,11 @@ id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions
                     iLog->Log("CreatePipelineState: Detected tangent attribute mismatch for shader '%s'", shaderName);
                 }
             }
-            if (shaderInfo && shaderInfo->name == "cgvprogbump_diffspec_envlight_vs20")
-                m_lastPipelineHadTangentMismatch = true;
         }
         else
         {
             iLog->Log("CreatePipelineState failed for shader '%s' VS '%s' / FS '%s' with unknown error\n", shaderName, vsName, fsName);
             fprintf(stderr, "CreatePipelineState failed for shader '%s' VS '%s' / FS '%s' with unknown error\n", shaderName, vsName, fsName);
-            if (shaderInfo && shaderInfo->name == "cgvprogbump_diffspec_envlight_vs20")
-            {
-                m_lastPipelineHadTangentMismatch = true;
-            }
         }
         
         NSString* compilerError = error.userInfo[@"MTLCompilerErrorKey"];

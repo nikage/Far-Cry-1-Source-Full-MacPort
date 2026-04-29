@@ -23,6 +23,7 @@
 #include "MetalRenderPCH.h"
 #include "MetalStateCache.m"
 #include "MetalRenderElements.m"
+#include <atomic>
 #include <unordered_map>
 
 // Forward declarations
@@ -411,6 +412,9 @@ public:
     // Command buffer tracking for proper shutdown
     std::vector<id<MTLCommandBuffer>> m_activeCommandBuffers;
     std::mutex m_commandBufferMutex;
+    // GPU flush time accumulator: written from completion handler threads,
+    // drained on the render thread at the start of each frame.
+    std::atomic<float> m_pendingGpuFlushMs{0.0f};
     
     // Render state
     id<MTLRenderPipelineState> m_currentPipelineState;

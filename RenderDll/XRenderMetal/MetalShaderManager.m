@@ -295,6 +295,8 @@ public:
     id<MTLRenderPipelineState> GetPipelineStateForShader(const char* shaderName);
     id<MTLRenderPipelineState> GetPipelineStateForFormat(int vertexFormat);
 
+    id<MTLLibrary> GetDefaultLibrary() const { return m_defaultLibrary; }
+
 protected:
     // Metal-specific shader management
     bool InitializeDefaultShaderLibrary();
@@ -336,6 +338,7 @@ protected:
     CMetalBaseRenderer* m_renderer;
     CMetalTextureManager* m_textureManager;
     id<MTLLibrary> m_generatedLibrary;
+    id<MTLLibrary> m_defaultLibrary;
     
     // Internal methods
     int AllocateShaderId();

@@ -71186,7 +71186,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogrefractive_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_ProjSingleLight_Atten_EnvLight_PS20.crycg.json",
@@ -71848,7 +71849,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTerrain_1Layers.crycg.json",
@@ -71949,7 +71951,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_1layers_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCFlare.crycg.json",
@@ -72229,7 +72232,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdoffocaldist_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCWater_PS20.crycg.json",
@@ -72368,7 +72372,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCMotion.crycg.json",
@@ -72479,7 +72484,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogmotion_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_Gloss_EnvCM.crycg.json",
@@ -73194,7 +73200,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprog_brushedmetal_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLights_Proj_GlossAlpha.crycg.json",
@@ -73806,7 +73813,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogglassdispersioncm_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_Neg_2Samples.crycg.json",
@@ -74520,7 +74528,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_1samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_HP_NoAtten.crycg.json",
@@ -75631,7 +75640,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partproj_depth2_1samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_DownScale2x2_Bilinear_PS20.crycg.json",
@@ -77281,7 +77291,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_refr_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_BrightPassFilter_PS20.crycg.json",
@@ -77413,7 +77424,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdoffocaldist_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCLightTempl_PS30.crycg.json",
@@ -77715,7 +77727,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproglighttempl_vs30_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCAmbient_AlphaGlow_EnvCMSpec_PS20.crycg.json",
@@ -77958,7 +77971,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_2samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCGeomRefraction.crycg.json",
@@ -78064,7 +78078,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproggeomrefraction_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Gloss_EnvCM_PowerGlossAlpha_PS20.crycg.json",
@@ -79157,7 +79172,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_1layers_only_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCHeatSourceDecode.crycg.json",
@@ -79947,7 +79963,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCPlants.crycg.json",
@@ -80250,7 +80267,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogindoorwaterspec_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCFogVol.crycg.json",
@@ -80310,7 +80328,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogfogvol_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Spec_PowerGlossAlpha_PS20.crycg.json",
@@ -80858,7 +80877,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogfurtempl_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_ProjSingleLight_Plants_Bump.crycg.json",
@@ -81134,7 +81154,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCNegTexAddColor.crycg.json",
@@ -81259,7 +81280,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogcolortransfer_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_GlossAlpha_EnvLight_PS20.crycg.json",
@@ -81968,7 +81990,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproglava_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_SingleLight_Atten_Plants_Mult.crycg.json",
@@ -82167,7 +82190,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproglight_diffpass_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_GlossAlpha_EnvCM_PowerGlossAlpha_PS20.crycg.json",
@@ -83078,7 +83102,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogoceanwater_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Atten_Gloss_EnvLight_PS20.crycg.json",
@@ -83467,7 +83492,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogheathaze_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCDofFocalDistNoUV.crycg.json",
@@ -83521,7 +83547,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdoffocaldistnouv_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBlurRECT.crycg.json",
@@ -83841,7 +83868,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogmetallic_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_EnvCMSpec_PowerGlossAlpha_PS20.crycg.json",
@@ -84718,7 +84746,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdoffocaldistnouv_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCFog.crycg.json",
@@ -84794,7 +84823,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogfog_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCAmbient_Alpha.crycg.json",
@@ -85343,7 +85373,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproghologram_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCAmbient_AlphaGlow.crycg.json",
@@ -85509,7 +85540,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_3layers_only_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_ResampleAvgLum_PS20.crycg.json",
@@ -86245,7 +86277,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_2samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadowDepth_2Samples.crycg.json",
@@ -86800,7 +86833,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdefault_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCGlare.crycg.json",
@@ -86889,7 +86923,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogglare_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_1Samples_EnvLight.crycg.json",
@@ -86980,7 +87015,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_1samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_Depth2_3Samples.crycg.json",
@@ -87115,7 +87151,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_3samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCScreen.crycg.json",
@@ -87185,7 +87222,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogscreen_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCSubSurface_pp.crycg.json",
@@ -87293,7 +87331,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsubsurface_pp_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_ProjAtten_Gloss_EnvLight_PS20.crycg.json",
@@ -89563,7 +89602,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogiridescence_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGReflectCMap_ColConst.crycg.json",
@@ -90084,7 +90124,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_lake_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_ProjSingleLight_Atten_EnvCM_PS20.crycg.json",
@@ -90603,7 +90644,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbubble_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_Gloss_EnvCM_PS20.crycg.json",
@@ -90878,7 +90920,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogglass_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Gloss_EnvLight.crycg.json",
@@ -91243,7 +91286,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogscreen_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTex2.crycg.json",
@@ -91395,7 +91439,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogheatvision_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Spec_Proj_GlossAlpha_PS20.crycg.json",
@@ -92408,7 +92453,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadowgendiffusealpha_depth_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_MergeTextures_3_PS20.crycg.json",
@@ -92899,7 +92945,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogblur_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_3Samples.crycg.json",
@@ -93012,7 +93059,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_3samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_GlossAlpha_PS20.crycg.json",
@@ -93446,7 +93494,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partproj_depth2_3samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Atten_GlossAlpha_PowerGlossAlpha_PS20.crycg.json",
@@ -93741,7 +93790,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_3samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCLight_InvSingleLight.crycg.json",
@@ -95073,7 +95123,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogtexshadow_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCInvulnerabilityMetal.crycg.json",
@@ -95161,7 +95212,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproginvulnerabilitymetal_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBlurSep.crycg.json",
@@ -95229,7 +95281,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogblursep_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_SingleLight_Proj_Gloss_EnvCMSpec_PS20.crycg.json",
@@ -96627,7 +96680,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrainshadow_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCMotionAmount.crycg.json",
@@ -97050,7 +97104,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_gloss_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLights_PS20.crycg.json",
@@ -97652,7 +97707,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprognightvisionglare_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_SingleLight_Plants_Mult.crycg.json",
@@ -98350,7 +98406,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogoutdoorwaterrefraction_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Spec_Proj_Gloss_PowerGlossAlpha_PS20.crycg.json",
@@ -98869,7 +98926,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_cm_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTex_AlphaGlow_EnvCM.crycg.json",
@@ -99088,7 +99146,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterraincaust_2layers_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffPass_Terrain_ProjSingleLight_VertAtten.crycg.json",
@@ -100739,7 +100798,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproglighttempl_vs30_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTexLM_EnvCM.crycg.json",
@@ -100836,7 +100896,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texlm_envcm_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCOcean_NoRefl.crycg.json",
@@ -100944,7 +101005,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogocean_norefl_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_ProjSingleLight_Plants.crycg.json",
@@ -101233,7 +101295,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_4samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTerrain_1Layers_VF.crycg.json",
@@ -101356,7 +101419,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_1layers_vf_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCDof.crycg.json",
@@ -101827,7 +101891,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_2samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_Depth2_4Samples_EnvLight.crycg.json",
@@ -101988,7 +102053,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_4samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Gloss_EnvCMSpec_PS20.crycg.json",
@@ -102298,7 +102364,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partproj_depth2_2samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_HP_NoAtten_GlossAlpha_EnvCM.crycg.json",
@@ -102728,7 +102795,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_2layers_vf_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRefractCMap1_ColConstRGB.crycg.json",
@@ -103548,7 +103616,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbump_specpass_gloss_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTexDOT3LM_EnvCMSpec_PS20.crycg.json",
@@ -103714,7 +103783,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_ReflLight_Overlay.crycg.json",
@@ -104535,7 +104605,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogpredator_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_GlossAlpha_EnvCM_PS20.crycg.json",
@@ -105859,7 +105930,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_1samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Spec.crycg.json",
@@ -105951,7 +106023,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbump_specpass_gloss_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCLight_Diff_Proj.crycg.json",
@@ -106267,7 +106340,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproglightvol_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCRefractiveOverlay.crycg.json",
@@ -106374,7 +106448,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogrefractiveoverlay_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_GlossAlpha_EnvLight.crycg.json",
@@ -107150,7 +107225,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdecal_2d_atten_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTexDOT3LM_EnvCM_PS20.crycg.json",
@@ -107281,7 +107357,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_HP_ProjNoAtten_GlossAlpha_EnvCM.crycg.json",
@@ -107713,7 +107790,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsimple_tex_envcmspec_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCAmbientTempl.crycg.json",
@@ -107938,7 +108016,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogambienttempl_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_MergeTextures_1_PS20.crycg.json",
@@ -108820,7 +108899,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogocean_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCNightVision.crycg.json",
@@ -108899,7 +108979,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprognightvision_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_SingleLight_AlphaGlow_EnvLight.crycg.json",
@@ -109810,7 +109891,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_beach_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_SingleLight_Atten_AlphaGlow_EnvLight.crycg.json",
@@ -111078,7 +111160,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogcaust_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Atten_GlossAlpha_PS20.crycg.json",
@@ -111650,7 +111733,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbeam_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCHeatSource.crycg.json",
@@ -111752,7 +111836,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogheatsource_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Atten_EnvCMSpec_PowerGlossAlpha_PS20.crycg.json",
@@ -112345,7 +112430,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogfur_offsgen_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCWater.crycg.json",
@@ -112490,7 +112576,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCLight_Decal_Diff_SingleLight.crycg.json",
@@ -112824,7 +112911,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwater_beach_refr_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCLuminosity.crycg.json",
@@ -112976,7 +113064,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrainshadow_depth_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_2Samples_EnvLight.crycg.json",
@@ -113083,7 +113172,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_2samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_SingleLight_Plants.crycg.json",
@@ -114087,7 +114177,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_depth2_1samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_GlossAlpha_EnvCM.crycg.json",
@@ -115299,7 +115390,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partproj_depth_1samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_GlossAlpha_EnvLight.crycg.json",
@@ -115563,7 +115655,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partpoint_depth_1samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_ProjAtten_Gloss_EnvCM_PS20.crycg.json",
@@ -116007,7 +116100,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_3layers_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCMatrix.crycg.json",
@@ -116061,7 +116155,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogmatrix_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_GlossAlpha_EnvLight_PowerGlossAlpha_PS20.crycg.json",
@@ -116552,7 +116647,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprog_rainbowshading_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLights_HP_Atten.crycg.json",
@@ -117311,7 +117407,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_2layers_only_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTerrainLayerTempl.crycg.json",
@@ -117544,7 +117641,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrainlayertempl_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_MultipleLights_Proj_PS20.crycg.json",
@@ -117928,7 +118026,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproglowmedwater_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_SampleAvgLum_PS20.crycg.json",
@@ -118277,7 +118376,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_far_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Gloss_PowerGlossAlpha_PS20.crycg.json",
@@ -118675,7 +118775,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogscopeflare_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCAmbient_AlphaGlow_EnvCM.crycg.json",
@@ -119875,7 +119976,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogindoorwater_final_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_EnvCMSpec_PowerGlossAlpha_PS20.crycg.json",
@@ -120399,7 +120501,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_vf_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCIndoorWater.crycg.json",
@@ -120489,7 +120592,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogindoorwater_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCEye.crycg.json",
@@ -120591,7 +120695,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogeye_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTexDOT3LM_GlossAlpha_EnvCMSpec_PS20.crycg.json",
@@ -120866,7 +120971,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbump_diffpass_atten_plants_bump_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLights_Proj_Gloss_PowerGlossAlpha_PS20.crycg.json",
@@ -121320,7 +121426,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterraincaust_1layers_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_EnvLight_PowerGlossAlpha_PS20.crycg.json",
@@ -122382,7 +122489,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogcartoon_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_PartPoint_Depth2_1Samples.crycg.json",
@@ -122500,7 +122608,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partpoint_depth2_1samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCColorContrast.crycg.json",
@@ -122560,7 +122669,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogcolorcontrast_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff_ProjSingleLight_AlphaGlow_EnvCM.crycg.json",
@@ -125816,7 +125926,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprog_flashbang_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLights_HP_Atten_GlossAlpha.crycg.json",
@@ -126164,7 +126275,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbumpsunglow_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_AmbBaseCol_Fog_PS20.crycg.json",
@@ -126491,7 +126603,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogsubsurface_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Diff.crycg.json",
@@ -126583,7 +126696,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbump_diffspec_envlight_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCDetailObjects.crycg.json",
@@ -127994,7 +128108,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_2layers_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Atten_Gloss_PowerGlossAlpha_PS20.crycg.json",
@@ -128220,7 +128335,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_dettex_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Spec_Atten.crycg.json",
@@ -128398,7 +128514,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogambienttempl_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTerrain_Caust.crycg.json",
@@ -128664,7 +128781,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadowgen_depth_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_EnvCM.crycg.json",
@@ -129073,7 +129191,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvproginvulnerability_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCWaterTank.crycg.json",
@@ -129197,7 +129316,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwatertank_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCHeat_Alpha_MultipleLights_Proj.crycg.json",
@@ -129582,7 +129702,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partpoint_depth2_2samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_ShowRG_MRT_PS20.crycg.json",
@@ -130338,7 +130459,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogfire_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRC_HDR_MergeTextures_7_PS20.crycg.json",
@@ -130692,7 +130814,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogglasstex_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTerrain.crycg.json",
@@ -130769,7 +130892,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_PartPoint_Depth_3Samples.crycg.json",
@@ -130909,7 +131033,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partpoint_depth_3samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBluryScreen.crycg.json",
@@ -130988,7 +131113,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbluryscreen_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTerrain_4Layers_Only.crycg.json",
@@ -131110,7 +131236,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogterrain_4layers_only_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCLight_Diff_Atten_AlphaGlow.crycg.json",
@@ -131358,7 +131485,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partproj_depth_3samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Atten_EnvCMSpec_PS20.crycg.json",
@@ -133013,7 +133141,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogfur_normgen_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLights_ProjAtten_PS20.crycg.json",
@@ -133460,7 +133589,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogdecal_atten_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCOcean2.crycg.json",
@@ -133678,7 +133808,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogwaterripples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBumpSunGlow_PS20.crycg.json",
@@ -133775,7 +133906,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogbumpsunglow_vs20_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_PS20.crycg.json",
@@ -134134,7 +134266,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogscopelens_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCTexDOT3LM_AlphaGlow_EnvCM.crycg.json",
@@ -135396,7 +135529,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadowtempl_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadow_3Samples_EnvLight.crycg.json",
@@ -135519,7 +135653,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_3samples_envlight_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_Gloss_PowerGlossAlpha_PS20.crycg.json",
@@ -136713,7 +136848,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partpoint_depth2_3samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRefractCMap1_ColConst.crycg.json",
@@ -138282,7 +138418,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partpoint_depth_2samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_Spec_Proj_PS20.crycg.json",
@@ -138733,7 +138870,8 @@
       "depthTest": true,
       "depthCompare": "lessEqual",
       "cullMode": "back"
-    }
+    },
+    "vertexEntryPoint": "generated_cgvprogshadow_partproj_depth_2samples_vertex"
   },
   {
     "source": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_SingleLight_Proj_PowerGlossAlpha_PS20.crycg.json",

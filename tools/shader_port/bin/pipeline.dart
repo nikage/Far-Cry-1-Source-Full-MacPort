@@ -160,6 +160,11 @@ void _printUsage(ArgParser parser, [String? error]) {
 
 /// Returns the first path in [candidates] that exists on disk,
 /// or the last candidate as a fallback (so callers get a meaningful error).
+/// Returns the first path from [candidates] that exists on disk.
+/// Falls back to the last candidate when none exist (caller decides how to handle).
+// ignore: prefer_void_to_null — exposed for testing
+String firstExistingPath(List<String> candidates) => _firstExisting(candidates);
+
 String _firstExisting(List<String> candidates) {
   for (final String path in candidates) {
     if (File(path).existsSync() || Directory(path).existsSync()) {

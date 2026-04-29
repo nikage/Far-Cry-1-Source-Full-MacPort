@@ -93,8 +93,72 @@ void main(List<String> args) {
     });
     generated++;
   }
+  // Second pass: pair each fragment entry with its vertex entry.
+  // Mirrors the stem-extraction heuristic in MetalShaderLoader::BuildVertexLookupCandidates.
+  final Map<String, String> vertexByNormalized = {
+    for (final e in manifestEntries)
+      if (e['stage'] == 'vertex') e['normalized'] as String: e['entryPoint'] as String,
+  };
+
+  for (final e in manifestEntries) {
+    if (e['stage'] != 'fragment') continue;
+    final String norm = e['normalized'] as String;
+    final String? vep = _resolveVertexEntryPoint(norm, vertexByNormalized);
+    if (vep != null) e['vertexEntryPoint'] = vep;
+  }
+
   manifest.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifestEntries));
   stdout.writeln('Generated $generated Metal shader fragments');
+}
+
+/// Returns the vertex entryPoint for [fragmentNorm] by trying several
+/// stem candidates, or null when no match is found.
+///
+/// CryEngine fragment shaders start with `cgrc` or `cgps`; vertex shaders
+/// start with `cgvprog`. The pairing is declared at the technique/pass level
+/// in the source .crycg files, so name-based matching is best-effort. The
+/// MetalShaderLoader will fall back to its own runtime heuristic for entries
+/// where this field is absent.
+String? _resolveVertexEntryPoint(
+    String fragmentNorm, Map<String, String> vertexByNorm) {
+  // 1. Strip known fragment stage prefixes
+  String stem = fragmentNorm;
+  for (final prefix in ['cgrc_', 'cgrc', 'cgps']) {
+    if (stem.startsWith(prefix)) {
+      stem = stem.substring(prefix.length);
+      break;
+    }
+  }
+  // 2. Strip known fragment stage suffixes
+  for (final suffix in ['_ps20', '_ps30', '_ps14', '_ps11', '_ps']) {
+    if (stem.endsWith(suffix)) {
+      stem = stem.substring(0, stem.length - suffix.length);
+      break;
+    }
+  }
+
+  // 3. Exact-key candidates (prefer _vs20 which is the most common variant)
+  final List<String> candidates = [
+    'cgvprog${stem}_vs20',
+    'cgvprog${stem}_vs30',
+    'cgvprog${stem}',
+    'cgvprog_${stem}_vs20',
+    'cgvprog_${stem}',
+    fragmentNorm, // identity for shaders that share a normalised name
+  ];
+  for (final candidate in candidates) {
+    final String? entry = vertexByNorm[candidate];
+    if (entry != null) return entry;
+  }
+
+  // 4. Substring fallback: the first vertex key that contains the stem.
+  //    Requires stem length > 6 to avoid false positives on short names.
+  if (stem.length > 6) {
+    for (final MapEntry<String, String> kv in vertexByNorm.entries) {
+      if (kv.key.contains(stem)) return kv.value;
+    }
+  }
+  return null;
 }
 
 String buildMetal(ShaderIrData data) {
