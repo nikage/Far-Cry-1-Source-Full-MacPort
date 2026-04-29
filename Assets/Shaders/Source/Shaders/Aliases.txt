@@ -1,0 +1,9 @@
+TBumpSpec		TemplBumpSpec
+TBumpSpec_NOCM		TemplBumpSpec_NOCM
+TBumpDiffuse_NOCM	TemplBumpDiffuse_NOCM
+TBD			TemplBumpDiffuse
+tbs_HP			templbumpspec_HP
+tbd_NOCM		TemplBumpDiffuse_NOCM
+no_draw			nodraw
+tbs_GA_CM                  TemplBumpSpec_GlossAlpha_EnvCMAmb
+

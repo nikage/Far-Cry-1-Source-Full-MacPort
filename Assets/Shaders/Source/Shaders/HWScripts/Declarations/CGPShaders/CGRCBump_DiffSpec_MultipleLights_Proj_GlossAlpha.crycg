@@ -1,0 +1,51 @@
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE normCubeMapLV : texunit2,
+                  uniform samplerCUBE normCubeMapHA : texunit3,
+                  uniform samplerCUBE projMap : texunit4,
+                  uniform float4 Diffuse,
+                  uniform float4 Specular }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        // load the projector filter map
+        float4 projColor = texCUBE(projMap, IN.Tex4.xyz);
+
+        // Light vector from normalization cube-map
+        float4 lVec = 2*(texCUBE(normCubeMapLV, IN.Tex2.xyz)-0.5);
+        // Half angle vector from normalization cube-map
+        float4 hVec = 2*(texCUBE(normCubeMapHA, IN.Tex3.xyz)-0.5);
+        
+        float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+        float NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz));
+        float3 dif = (decalColor.xyz * NdotL * IN.Color.xyz * Diffuse.xyz * projColor.xyz) * 2;
+        float  specVal = saturate((NdotH - 0.75)*4);
+        specVal = specVal * specVal;
+        float3 spec = (specVal * decalColor.w * IN.Color.xyz * Specular.xyz * projColor.xyz) * 2;
+
+        // finally add them all together
+        OUT.Color.xyz = dif + spec;
+        OUT.Color.w = Diffuse.w;
+      }
+

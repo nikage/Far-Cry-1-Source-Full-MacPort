@@ -1,0 +1,236 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCShadowTempl.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: Shadow pass fragment template
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      AutoEnumTC
+
+#if %TEMP_DEPTH_MAP_PS20
+      PS20Only
+#endif
+
+      MainInput
+      {
+        uniform sampler2D shadMap0 : register(sn),
+#if %TEMP_SHAD_SAMPLEMASK1
+        uniform sampler2D shadMap1 : register(sn),
+#endif        
+#if %TEMP_SHAD_SAMPLEMASK2
+        uniform sampler2D shadMap2 : register(sn),
+#endif        
+        uniform sampler2D baseMap : register(sn),
+#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING
+        uniform sampler2D bumpMap : register(sn),
+#endif
+        uniform float4 Ambient,
+        uniform float4 Fading,
+#if %ENVCMAMB
+        uniform float4 Reflect,
+        uniform samplerCUBE envMap : register(sn),
+ #if %ENVCM_MASKED
+        uniform sampler2D glossMap : register(sn),
+ #endif  
+#endif
+#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING
+        uniform float4 BumpOffset,
+#endif
+      }
+      DeclarationsScript
+      {
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float4 shadTC0     : TEXCOORDN;
+#if %TEMP_SHAD_SAMPLEMASK1
+          float4 shadTC1     : TEXCOORDN;
+#endif
+#if %TEMP_SHAD_SAMPLEMASK2
+          float4 shadTC2     : TEXCOORDN;
+#endif
+          float4 baseTC      : TEXCOORDN;
+
+#if %PERPIXEL_SHADOWMAP
+          float4 viewVec     : TEXCOORDN;
+          float4 Tangent     : TEXCOORDN;
+          float4 Binormal    : TEXCOORDN;
+#elif %OFFSETBUMPMAPPING
+          float4 viewVec     : TEXCOORDN;
+#endif
+
+#if %TEMP_MIXED_MAP
+          float4 depthTC0    : TEXCOORDN;
+    #if %TEMP_SHAD_SAMPLEMASK2
+          float4 depthTC1    : TEXCOORDN;
+    #endif
+          float4 lightVec    : TEXCOORDN;
+#endif
+
+#ifdef D3D
+  #if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20
+          float4 WTC         : TEXCOORDN;
+  #endif
+#endif
+          float4 Color      : COLOR0;
+
+#if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+#endif
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        FLOAT3 shad = (float3)0;
+        FLOAT3 compare = (float3)0;
+   
+        float2 baseTC = IN.baseTC.xy;
+
+      	float4 shadTC0 = IN.shadTC0;
+#if %TEMP_SHAD_SAMPLEMASK1
+      	float4 shadTC1 = IN.shadTC1;
+#endif
+#if %TEMP_SHAD_SAMPLEMASK2
+      	float4 shadTC2 = IN.shadTC2;
+#endif
+        
+#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING
+        // load the bump normals
+        FLOAT height = tex2D(bumpMap, IN.baseTC.xy).a * 2 - 1;
+        height *= BumpOffset.x;
+        FLOAT3 viewVec = normalize(IN.viewVec.xyz);
+        FLOAT3 offs = height;
+      	float2 tcOffs;
+   #if %OFFSETBUMPMAPPING
+        baseTC += height * viewVec.xyz;
+   #endif
+   #if %PERPIXEL_SHADOWMAP
+      	tcOffs.x = dot(offs, IN.Binormal.xyz) * 0.5;
+      	tcOffs.y = dot(offs, IN.Tangent.xyz)  * 0.5;
+      	
+        shadTC0.xy += tcOffs.xy * shadTC0.zw; 
+     #if %TEMP_SHAD_SAMPLEMASK1
+        shadTC1.xy += tcOffs.xy * shadTC1.zw; 
+     #endif
+     #if %TEMP_SHAD_SAMPLEMASK2
+        shadTC2.xy += tcOffs.xy * shadTC2.zw; 
+     #endif
+   #endif
+#endif
+        // load the decal
+        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);
+
+        // load the shadow samples
+        FLOAT4 shadColor0 = tex2Dproj(shadMap0, shadTC0.xyzw);
+
+        FLOAT fFadePerPix = 1;
+               
+#if %TEMP_MIXED_MAP
+        shad.x = shadColor0.r/8 + shadColor0.g;
+        fFadePerPix = saturate(2 - 2*saturate(length(IN.lightVec.xyz) * Fading.w));
+#endif        
+        
+#if %TEMP_SHAD_SAMPLEMASK1
+        FLOAT4 shadColor1 = tex2Dproj(shadMap1, shadTC1.xyzw);
+        shad.y = shadColor1.r/8 + shadColor1.g;
+#endif        
+#if %TEMP_SHAD_SAMPLEMASK2
+        FLOAT4 shadColor2 = tex2Dproj(shadMap2, shadTC2.xyzw);
+        shad.z = shadColor2.r/8 + shadColor2.g;
+#endif        
+#if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20
+    // Using NVidia Depth textures
+  #ifdef D3D
+        compare.x = (IN.WTC.z>0.5)?1-shadColor0.b:0;
+    #if %TEMP_SHAD_SAMPLEMASK1
+        compare.y = (IN.WTC.y>0.5)?1-shadColor1.b:0;
+    #endif        
+    #if %TEMP_SHAD_SAMPLEMASK2
+        compare.z = (IN.WTC.x>0.5)?1-shadColor2.b:0;
+    #endif        
+  #endif
+  #ifdef OTHER
+        compare.x = 1-shadColor0.b;
+    #if %TEMP_SHAD_SAMPLEMASK1
+        compare.y = 1-shadColor1.b;
+    #endif        
+    #if %TEMP_SHAD_SAMPLEMASK2
+        compare.z = 1-shadColor2.b;
+    #endif        
+  #endif
+        compare.xyz = compare.xyz * Fading.xyz;
+#elif %TEMP_MIXED_MAP
+            
+  // Using PS2.0 Z-Comparing (mixed 2D/Depth technique)
+        FLOAT3 vZ = (float3)0;
+        vZ.x = IN.depthTC0.x / IN.depthTC0.y;
+    #if %TEMP_SHAD_SAMPLEMASK1
+        vZ.y = IN.depthTC0.z / IN.depthTC0.w;
+    #endif        
+    #if %TEMP_SHAD_SAMPLEMASK2
+        vZ.z = IN.depthTC1.x / IN.depthTC1.y;
+    #endif
+        shad = shad - vZ;
+        //compare = step(shad, float3(0.0, 0.0, 0.0));
+        compare = saturate(-shad*300);
+        compare.xyz = compare.xyz * Fading.xyz;
+        compare.x = compare.x * shadColor0.a;
+    #if %TEMP_SHAD_SAMPLEMASK1
+        compare.y = compare.y * shadColor1.a;
+    #endif
+    #if %TEMP_SHAD_SAMPLEMASK2
+        compare.z = compare.z * shadColor2.a;
+    #endif
+#else
+  // Using 2D shadow maps (simplest technique)
+        compare.x = shadColor0.a;
+    #if %TEMP_SHAD_SAMPLEMASK1
+        compare.y = shadColor1.a;
+    #endif
+    #if %TEMP_SHAD_SAMPLEMASK2
+        compare.z = shadColor2.a;
+    #endif
+        compare.xyz = compare.xyz * Fading.xyz * fFadePerPix;
+#endif
+
+        FLOAT fCompare = saturate(dot(compare, float3(1, 1, 1)));
+
+#if %TEMP_MIXED_MAP
+        fCompare *= fFadePerPix;
+#endif
+        
+#if %TEMP_ENVLIGHT
+        FLOAT3 amb = decalColor.xyz * IN.Color.xyz;
+#elif %ENVCMAMB
+        // load the environment map
+        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);
+        FLOAT fLerp = Reflect.a;
+  #if %ENVCM_MASKED
+        // load the gloss
+        fLerp *= tex2D(glossMap, IN.baseTC.zw).a;
+  #endif
+        FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);
+#else        
+        FLOAT3 amb = decalColor.xyz * Ambient.xyz;
+#endif        
+        amb = HDREncodeAmb(amb);
+        
+        OUT.Color.xyz = HDRFogBlend(amb.xyz, IN.Color.w, GlobalFogColor.xyz);
+        OUT.Color.a = fCompare;
+      }
+      

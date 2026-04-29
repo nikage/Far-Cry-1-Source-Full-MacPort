@@ -1,0 +1,80 @@
+// ===============================================================
+// Fragment Program: Heat Source Decoding
+// Description: Output heat 
+// Last Update: 06/01/2004
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{   
+#ifdef OPENGL  
+  uniform samplerRECT ScreenTexMask : texunit0,
+	uniform samplerRECT ScreenTex : texunit1,
+#endif
+#ifdef D3D  
+  uniform sampler2D ScreenTexMask : texunit0,
+	uniform sampler2D ScreenTex : texunit1,
+#endif	
+	uniform sampler2D HeatPaleteTex : texunit2,	
+	uniform float4 vHeatConstants
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	  OUT_T2
+	};
+
+	FOUT
+}
+
+CoreScript
+{
+	// fetch textures	
+#ifdef OPENGL
+  float4 vMaskColor = texRECT(ScreenTexMask, IN.Tex0.xy);
+	float4 vScreenColor = texRECT(ScreenTex, IN.Tex1.xy);
+#endif
+#ifdef D3D
+  float4 vMaskColor = tex2D(ScreenTexMask, IN.Tex0.xy);
+  float4 vScreenColor = tex2D(ScreenTex, IN.Tex1.xy);
+#endif
+	float4 vHeatColor = tex2D(HeatPaleteTex, vScreenColor.ar); 
+		
+  // heat decoding
+	const float4 vConstants=float4(0, 0, 0, 1);							
+					
+#ifdef OPENGL
+	// 1st test: strong blue is used for main mask color detection		
+	float fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) );
+
+	// 2nd test: check alpha mask
+	float fColorB=4*vMaskColor.w;
+
+  vMaskColor.w=dot(vMaskColor.xyz, float3(1, 0, 0));
+	float3 fFinalMask=(fColorA<0.49)? vMaskColor.xyz: vMaskColor.w;
+	fFinalMask=(fColorB<0.49)? fFinalMask: vMaskColor.xyz;	
+	
+#endif
+#ifdef D3D  			
+	// 1st test: strong blue is used for main mask color detection		
+	float fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) );
+
+	// 2nd test: check alpha mask
+	float fColorB=4*vMaskColor.w;
+   
+    vMaskColor.w=dot(vMaskColor.xyz, float3(1, 0, 0));
+    
+    // 0.49 previous
+	float3 fFinalMask=(fColorA<0.48)? vMaskColor.xyz: vMaskColor.w;
+	fFinalMask=(fColorB<0.48)? fFinalMask: vMaskColor.xyz;	
+#endif
+												
+	OUT.Color.xyz = fFinalMask;
+	OUT.Color.w = 1;
+}

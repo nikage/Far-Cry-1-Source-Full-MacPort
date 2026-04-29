@@ -1,0 +1,66 @@
+// ===============================================================
+// Fragment Program: water tank
+// Description: water in "tank" effect
+// Last Update: 24/06/2004
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+PS20Only
+
+MainInput 
+{ 
+    uniform sampler2D baseMap : register(s0),
+    uniform sampler2D refrMap : register(s1),
+    uniform sampler2D envMap : register(s2),
+    uniform float4 Matrix,
+    uniform float4 Ambient,
+    uniform float4 Diffuse
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+      OUT_T1
+      OUT_T2
+      OUT_T3
+      OUT_T4
+      OUT_C0
+    };
+
+    FOUT
+}
+
+CoreScript
+{   
+    float4 bumpColorA = tex2D(baseMap, IN.Tex0.xy);
+    float4 bumpColorB = tex2D(baseMap, IN.Tex0.zw);
+    float4 bumpColor = (bumpColorA*0.5+bumpColorB*0.5);
+
+    const float2 vScale=float2(0.01, 0.01);
+    float2 vNewUv= (IN.Tex1.xy/IN.Tex1.w) + vScale.xy*bumpColor.xy;
+    float4 refrColor = tex2D(refrMap, vNewUv);
+    
+    // compute illumination
+    float3 vAmbient=(Ambient.xyz+Ambient.xyz*saturate(dot(normalize(IN.Tex3.xyz), bumpColor.xyz)));    
+    float3 vDiffuse=saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz))*Diffuse.xyz*IN.Color.w;
+    float3 vIllum=saturate(vAmbient*0.25+vDiffuse*0.75);
+
+    float3 vView=normalize(IN.Tex3.xyz);
+    float3 vNormal=normalize(IN.Tex4.xyz);
+
+    // compute per-pixel reflection vector for enviromental bump mapping
+    float fReflDot= dot(vView.xyz, vNormal.xyz);  
+    float3 reflVector =(2.0*vNormal.xyz*fReflDot-vView.xyz);  
+    float2 vEnvUV= (reflVector.xy+1.0)*0.5+ Matrix.xw * bumpColor.xy;
+
+    float4 envColor = tex2D(envMap, vEnvUV.xy);
+    envColor*=envColor;
+//    envColor*=envColor;
+
+    OUT.Color.xyz =(envColor+refrColor)*Diffuse.xyz; //float3(0.0, 0.8, 0.5);//envColor.xyz*vDiffuse.xyz+refrColor.xyz*Ambient.xyz; //*0.8+vIllum*0.2;
+    OUT.Color.a = 1; 
+}

@@ -1,0 +1,51 @@
+// ===============================================================
+// Fragment Program: Motion Amount
+// Description: used for gl motion blur...
+// Last Update: 16/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+#ifdef OPENGL
+	uniform samplerRECT CurrScreen : texunit0,
+	uniform samplerRECT LastScreen : texunit1,	
+#endif	
+#ifdef D3D
+	uniform sampler2D CurrScreen : texunit0,
+	uniform sampler2D LastScreen : texunit1,	
+#endif	
+	uniform float4 vMotionParams
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	};
+
+	FOUT
+}
+
+CoreScript
+{
+	// load the decal
+#ifdef OPENGL
+	float4 fCurrColor = texRECT(CurrScreen , IN.Tex0.xy);
+	float4 fColor = texRECT(LastScreen, IN.Tex1.xy);
+#endif			
+#ifdef D3D
+	float4 fCurrColor = tex2D(CurrScreen , IN.Tex0.xy);
+	float4 fColor = tex2D(LastScreen, IN.Tex1.xy);
+#endif			
+	// interpolate between previous and current screen
+	float3 fFinal = lerp(fColor.xyz, fCurrColor.xyz, vMotionParams.w);	
+		
+	OUT.Color.xyz = fFinal;
+	OUT.Color.a = 1;	
+}
+

@@ -1,0 +1,85 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_DiffSpecPass_Proj_EnvLight.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, ATTEN, LIGHT_MATRIX, uniform float4x4 TexMatrix, uniform float4 EnvColors[6] }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+        OUT.Tex4 = mul(LightMatrix, vPos);
+
+        TANG_MATR
+
+        float3 lVec = LightPos.xyz - vPos.xyz;
+        float3 lightVec = mul(objToTangentSpace, lVec);          
+        OUT.Tex2.xyz = lightVec.xyz;          
+
+        // store normalized light vector
+        float fiSqDist = rsqrt(dot(lVec, lVec));        
+        OUT.Color.xyz = PROC_ATTENVERT;
+
+        // store normalized light vector
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+        float3 viewVec = mul(objToTangentSpace, vVec);
+
+        // compute half angle vector
+        float3 halfAngleVector = normalize(viewVec) + normalize(lightVec);
+
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex3.xyz = halfAngleVector;
+
+        // Calculate average radiosity color from 6 colors (Cube)
+        float3 tNormal;
+        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);
+        float3 Compare1 = step(tNormal, 0);
+        float3 Compare0 = 1 - Compare1;
+        float3 signN = sign(tNormal);
+        tNormal = tNormal * tNormal;
+        tNormal = tNormal * signN;
+        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;
+        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;
+        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;
+        OUT.Color1 = (ColorX + ColorY + ColorZ) * 2.0;
+      }
+    

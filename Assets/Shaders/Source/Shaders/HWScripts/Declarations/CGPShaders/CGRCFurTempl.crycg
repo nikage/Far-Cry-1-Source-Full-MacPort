@@ -1,0 +1,49 @@
+      #include "../CGVPMacro.csi"
+
+      NoFog
+      AutoEnumTC
+
+      MainInput { uniform sampler2D furNormalMap : register(sn),
+                  uniform sampler3D furLightMap  : register(sn),
+                  uniform sampler2D furMap       : register(sn),
+                  uniform float4 FurColor,
+                  uniform float4 LightColor }
+      DeclarationsScript
+      {
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float4 Tex0       : TEXCOORDN;
+          float4 Tex1       : TEXCOORDN;
+          float4 Tex2       : TEXCOORDN;
+          float4 Tex3       : TEXCOORDN;
+          float4 Tex4       : TEXCOORDN;
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the normal
+        float4 vNormal = tex2D(furNormalMap, IN.Tex0.xy)*2-1;
+        
+        float3 tcLight;
+        tcLight.x = dot(IN.Tex1.xyz, vNormal.xyz);
+        tcLight.y = dot(IN.Tex2.xyz, vNormal.xyz);
+        tcLight.z = IN.Tex1.z * 0.5 + 0.5;
+        
+        float fFurOffs = vNormal.x*vNormal.x + vNormal.y*vNormal.y + 1;
+        float2 tcFur = vNormal.xy * fFurOffs * IN.Tex4.xy + IN.Tex3.xy;
+        
+        float4 vLight = tex3D(furLightMap, tcLight.xyz);
+        float4 vFur = tex2D(furMap, tcFur.xy);
+        vFur.xyz = vFur.xyz * FurColor.xyz;
+
+        float3 dif = HDREncodeAmb(vFur.xyz * vLight.xyz);
+        float3 spec = HDREncodeAmb(vLight.a * vFur.xyz * LightColor.xyz);
+      
+        OUT.Color.xyz = dif + spec;
+        OUT.Color.w = vFur.a * FurColor.a;
+      }
+

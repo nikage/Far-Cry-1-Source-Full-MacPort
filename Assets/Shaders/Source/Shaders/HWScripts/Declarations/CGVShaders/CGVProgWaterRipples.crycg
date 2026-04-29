@@ -1,0 +1,82 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGProgWaterRipples.crycg
+//  Version:     v1.00
+//  Created:     19/03/2004 by Tiago Sousa.
+//  Compilers:   CG/HLSL
+//  Description: Water ripples effect
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR }
+
+Projected
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  uniform float4   CameraPos,  
+  uniform float4   ScreenSize
+}
+
+// vertex inputs/outputs
+DeclarationsScript
+{ 
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_C0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2
+    OUT_C0
+  };
+
+}
+
+// vertex position
+PositionScript = PosCommon
+
+CoreScript
+{
+  float4 vHPos = mul(ModelViewProj, vPos);                                    
+
+  // output texture coordinates       
+#ifdef OPENGL  
+	OUT.Tex2.xy = (vHPos.xy/vHPos.w  + 1)*0.5*ScreenSize.xy;    	    
+#endif
+
+#ifdef D3D 
+	#ifdef PROJECTEDENVBUMP
+		OUT.Tex2.xz = (vHPos.xz  + vHPos.w)*0.5;    
+		OUT.Tex2.y =  (-vHPos.y  + vHPos.w)*0.5;      
+		OUT.Tex2.w   = vHPos.w;  	
+	#endif
+	#ifdef OTHER
+		OUT.Tex2.x = (vHPos.x / vHPos.w + 1)*0.5;  
+		OUT.Tex2.y = (-vHPos.y / vHPos.w + 1)*0.5;
+    OUT.Tex2.zw = vPos.ww;
+	#endif
+#endif
+    
+  OUT.Tex0.xy =IN.TexCoord0.xy;
+  OUT.Tex1.xy =IN.TexCoord0.xy;  
+  OUT.Color.w = IN.Color.w;  
+  
+  return OUT;
+}

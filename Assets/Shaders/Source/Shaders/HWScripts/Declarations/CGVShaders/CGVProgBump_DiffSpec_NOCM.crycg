@@ -1,0 +1,64 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_DiffSpec_NOCM.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TANG_3X3 TEXCOORD0_2 }
+      
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_T2
+          OUT_T3_2
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex3.xy = IN.TexCoord0.xy;
+
+        TANG_MATR
+
+        // store normalized light vector
+        float3 lightVec = normalize(LightPos.xyz - vPos.xyz);
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz);
+
+        // compute view vector
+        float3 viewVec = normalize(CameraPos.xyz - vPos.xyz);
+
+        // compute half angle vector
+        float3 halfAngleVector = normalize(lightVec + viewVec);
+
+        // transform half angle vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex2.xyz = mul(objToTangentSpace, halfAngleVector);
+      }
+    

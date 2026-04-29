@@ -1,0 +1,59 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgFogVol.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      NoFog
+      UnifiedPosScript
+      
+      VertAttributes { POSITION_3 }
+      MainInput { VIEWPROJ_MATRIX, uniform float2x4 FogMatrix, uniform float2x4 FogEnterMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+	      // y
+	      float2 tex0;
+	      tex0.xy = mul(FogEnterMatrix, vPos);
+
+	      //x
+	      float2 temp = mul(FogMatrix, vPos);
+	      temp.x -= 0.5f;
+	      temp.x = abs(temp.x);
+	      temp.x = clamp(temp.x,0,.4921875f); //63.f/128.f = .4921875
+
+	      if(tex0.x > 0.5)
+		      temp.x += 0.5;
+	      tex0.x = temp.x;
+
+      	OUT.Tex0.xy = tex0;
+      }
+    

@@ -1,0 +1,81 @@
+// ===============================================================
+// Vertex Program: Fire
+// Description: used in fire volumes
+// Last Update: 17/11/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  uniform float4x4 ModelViewProj,
+  uniform float4   CameraPos,  
+  uniform float4   Constants,
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,
+  uniform float4   BumpMatrix,
+  uniform float4   DetailTexParams
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_C0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_C0
+    OUT_C1
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{ 
+  float2 vTranslation=DetailTexParams.zw*TexShiftRipple.zw;
+  // bump texture coordinates  
+  float3 vTex;
+  vTex.xy=(IN.TexCoord0.xy+vTranslation.xy)-0.5; 
+  vTex.z=1;
+  
+  float fCos=cos(TexShiftRipple.z*100);
+  float fSin=sin(TexShiftRipple.z*100);
+  
+  float3x3 mRot;
+  mRot[0]=float3(fCos, -fSin, 0);
+  mRot[1]=float3(fSin,  fCos, 0);
+  mRot[2]=float3(   0,     0, 1);
+      
+  // rotate coordinates
+  vTex=mul(mRot, vTex);  
+  OUT.Tex0.xy = (vTex.xy+0.5)*DetailTexParams.xy;
+    
+  // output environment map texture coordinates  
+  OUT.Tex1.xy = IN.TexCoord0.xy;  
+  // output particle transparency
+  OUT.Color.w = IN.Color.w;                 
+
+# ifdef _HDR
+  float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+  OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+
+  return OUT;
+}

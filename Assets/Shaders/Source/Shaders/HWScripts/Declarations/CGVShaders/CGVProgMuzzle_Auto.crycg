@@ -1,0 +1,46 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { uniform float4x4 ModelViewProj, uniform float4 CameraPos }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosBeam                 
+      CoreScript
+      {
+        float3 camVec = normalize(CameraPos.xyz - vPos.xyz);
+        
+        float d = dot(camVec.xyz, vNormal.xyz);
+        if (d < 0)
+          d = -d;
+        d = d * d;
+        
+        float4 color = IN.Color;
+          
+        color.w = color.w * d;
+          
+        OUT.Color = color;
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

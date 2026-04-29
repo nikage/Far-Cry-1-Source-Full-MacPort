@@ -1,0 +1,67 @@
+// ===============================================================
+// Fragment Program: refractive overlay
+// Description: used for general refractive geometry 
+// Last Update: 2/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D decalMap : texunit0,
+            uniform sampler2D bumpMap : texunit1,
+#ifdef OPENGL
+            uniform samplerRECT refMap : texunit2, 
+#endif
+#ifdef D3D
+            uniform sampler2D refMap : texunit2,
+#endif              
+            uniform float4 Matrix,
+            uniform float4 Amount,
+            uniform float4 RefrColor
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal  
+  float4 decalColor = tex2D(decalMap, IN.Tex0.xy); 
+  float4 bumpColor = tex2D(bumpMap, IN.Tex1.xy);
+                
+// must create 2 versions, since offsetRECT/samplerRECT must be used for gl version...
+#ifdef D3D
+  #ifdef PROFILE_PS_1_1 
+    float4 refrColor = offsettex2D(refMap, IN.Tex2.xy, bumpColor, Matrix);                 // get env bump map   
+  #endif
+  #ifdef OTHER
+        float2 newst = IN.Tex2.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+        float4 refrColor = tex2D(refMap, newst);
+  #endif                
+#endif
+
+#ifdef OPENGL
+  #ifdef PROFILE_PS_1_1 
+      float4 refrColor = offsettexRECT(refMap, IN.Tex2.xy, bumpColor, Matrix);                 // get env bump map   
+  #endif
+  #ifdef OTHER
+    float2 newst = IN.Tex2.xy / IN.Tex2.w;
+    newst = newst + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+    float4 refrColor = texRECT(refMap, newst);
+  #endif
+#endif           
+              
+  OUT.Color.xyz = RefrColor.xyz*lerp(decalColor.xyz, refrColor.xyz, RefrColor.w);  
+  OUT.Color.w= Amount.w;  
+}

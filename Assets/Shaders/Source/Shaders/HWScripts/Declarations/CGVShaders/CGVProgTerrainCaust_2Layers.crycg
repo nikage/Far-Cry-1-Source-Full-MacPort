@@ -1,0 +1,62 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgTerrainCaust_2Layers.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4 CaustTexGen0, uniform float4 CaustTexGen1, uniform float3 WaterLevel, uniform float4 Layer1TexGen0, uniform float4 Layer1TexGen1, uniform float4 Layer2TexGen0, uniform float4 Layer2TexGen1 }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_C1
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_T3_2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.x = dot(BaseTexGen0, vPos);
+        OUT.Tex0.y = dot(BaseTexGen1, vPos);
+        OUT.Tex1.x = dot(CaustTexGen0, vPos);
+        OUT.Tex1.y = dot(CaustTexGen1, vPos);
+        OUT.Tex2.x = dot(Layer1TexGen0, vPos);          
+        OUT.Tex2.y = dot(Layer1TexGen1, vPos);          
+        OUT.Tex3.x = dot(Layer2TexGen0, vPos);          
+        OUT.Tex3.y = dot(Layer2TexGen1, vPos);          
+        OUT.Color1.xyz = IN.Color1.xyz;
+        
+        float fDistBlendFactor = vPos.w - length(vPos.xyz - CameraPos.xyz) * CameraPos.w;
+        OUT.Color.w = fDistBlendFactor * (float)((WaterLevel.x - vPos.z) >= vPos.w);
+        OUT.Color.xyz = IN.Color.w;
+      }
+    

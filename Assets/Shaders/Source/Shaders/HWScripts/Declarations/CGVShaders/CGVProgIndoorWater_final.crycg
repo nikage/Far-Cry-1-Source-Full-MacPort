@@ -1,0 +1,92 @@
+// ===============================================================
+// Vertex Program: Indoor Water
+// Description: used in indoor refractive water
+// Last Update: 18/11/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  uniform float4x4 ModelViewProj,
+  uniform float4   CameraPos,      
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,     
+  uniform float4   ScreenSize
+}
+
+Projected
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{    
+  float4 vHPos = mul(ModelViewProj, vPos);     
+
+#ifdef D3D
+  #ifdef PROJECTEDENVBUMP
+  // optimized perspective correct projection
+  OUT.Tex1.xz = (vHPos.xz  + vHPos.w)*0.5;    
+  OUT.Tex1.y =  (-vHPos.y  + vHPos.w)*0.5;      
+  OUT.Tex1.w   = vHPos.w;  	
+  #endif
+  #ifdef OTHER
+  // have to use per-vertex projection..
+  vHPos.y = -vHPos.y;
+	OUT.Tex1.xy = ((vHPos.xy/vHPos.w) + 1)*0.5;    	  
+  #endif
+#endif
+
+#ifdef OPENGL		
+  #ifdef PROJECTEDENVBUMP
+  // optimized perspective correct projection
+  OUT.Tex1.xz = (vHPos.xz  + vHPos.w)*0.5*ScreenSize.x;    
+  OUT.Tex1.y =  (vHPos.y  + vHPos.w)*0.5*ScreenSize.y;      
+  OUT.Tex1.w   = vHPos.w;  	
+  #endif
+  #ifdef OTHER
+	// have to use per-vertex projection..
+	OUT.Tex1.xy = ((vHPos.xy/vHPos.w) + 1)*0.5*ScreenSize.xy;    	  
+	#endif
+#endif
+        
+  // output texture coordinates  
+  float2 vTex;
+  vTex.x = dot(vPos, TexGenRipple0);
+  vTex.y = dot(vPos, TexGenRipple1);
+  vTex.xy= (vTex.xy+(TexDetailScale.w*TexShiftRipple.zw))*TexDetailScale.xy;
+  OUT.Tex0.xy = vTex.xy;
+            
+  // output color and fresnel term hack  
+  //float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);  
+  //float3 fNormal=float3(0,0,1);
+  //float fDot= abs(dot(eyeVec, fNormal));      
+  OUT.Color.w =1; //fDot*2.0*(1-0.05*vHPos.w);
+   
+  return OUT;
+}

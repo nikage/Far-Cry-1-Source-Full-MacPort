@@ -1,0 +1,50 @@
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4x4 ObjMatrix, uniform float4x4 TexMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;  // diffuse and bump
+        OUT.Tex1.xy = IN.TexCoord0.xy * CameraPos.w;
+
+        TANG_MATR
+       
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+        float3 tangviewVec = mul(objToTangentSpace, vVec.xyz);
+        OUT.Color.xyz = normalize(tangviewVec.xyz);
+        OUT.Tex5.xyz = tangviewVec.xyz;
+
+        float3 worldTangentS = mul((const float3x3)ObjMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ObjMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ObjMatrix, objToTangentSpace[2]);
+
+	      OUT.Tex2.xyz = worldTangentS;
+	      OUT.Tex3.xyz = worldTangentT;
+	      OUT.Tex4.xyz = worldNormal;
+      }
+    

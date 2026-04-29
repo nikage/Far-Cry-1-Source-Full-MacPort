@@ -1,0 +1,58 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgSimple_TexLM_EnvCM.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TEXCOORD1_2 TNORMAL_3 }
+      
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4x4 TexMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_T1
+          IN_TN
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord1.xy;
+
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+        float3 tCamVec = normalize(vVec);
+        float3 tNormal = IN.TNormal.xyz;
+        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.Tex2 = mul(tRM, TexMatrix);
+      }
+    

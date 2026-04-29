@@ -1,0 +1,29 @@
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D palMap : texunit1,
+                  uniform sampler2D noiseMap : texunit2 }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 tcBase = tex2D(baseMap, IN.Tex0.xy);
+        float4 tcNoise = tex2D(noiseMap, IN.Tex2.xy);
+        
+        //float3 tc= 1-dot(tcBase.xyz, float3(0.30, 0.59, 0.11) );
+        float4 color = tex2D(palMap, tcBase.ar);                
+        
+        OUT.Color.xyz = color.xyz*tcNoise.xyz; 
+        OUT.Color.a = 1;
+      }
+

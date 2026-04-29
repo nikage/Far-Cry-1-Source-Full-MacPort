@@ -1,0 +1,65 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWater_Beach.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      // setup vertex components
+      MainInput
+      {
+        // common model view matrix
+        VIEWPROJ_MATRIX,
+        uniform float4   TexGenRipple0,
+        uniform float4   TexGenRipple1,
+        uniform float4   TexShiftRipple,
+        uniform float4   TexDetailScale,     
+        uniform float4   TexShift
+      }
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        float4 vTex = IN.TexCoord0;
+        vTex.y = (vTex.y * TexShift.y + TexShift.x * TexShift.y);
+        vTex.x = vTex.x * TexShift.w;
+        OUT.Tex1 = vTex;
+        OUT.Color = IN.Color;
+              
+        // output texture coordinates  
+        vTex.x = dot(vPos, TexGenRipple0);
+        vTex.y = dot(vPos, TexGenRipple1);
+        vTex.xy= (vTex.xy+(TexDetailScale.w*TexShiftRipple.zw))*TexDetailScale.xy;
+        OUT.Tex0.xy = vTex.xy;
+      }
+    

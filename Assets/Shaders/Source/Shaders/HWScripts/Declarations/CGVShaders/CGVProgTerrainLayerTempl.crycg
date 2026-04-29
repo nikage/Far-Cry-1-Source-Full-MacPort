@@ -1,0 +1,167 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgTerrainLayerTempl.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      AutoEnumTC
+      
+      VertAttributes
+      {
+       POSITION_3
+       PRIM_COLOR
+       NORMAL_3
+      }
+      MainInput
+      {
+        VIEWPROJ_MATRIX,
+#if %DIFFUSE || %SPECULAR || %ENVCMSPEC || %ENVCMAMB
+        LIGHT_POS,
+        uniform float3 Tangent, 
+#endif
+        uniform float4 LayerTexGen0,
+        uniform float4 LayerTexGen1,
+        
+        uniform float4 FadingDist,
+        CAMERA_POS,
+#if %ENVCMAMB
+        uniform float4x4 TexMatrix,
+#elif %ENVCMSPEC
+        uniform float4x4 ModelMatrix,
+#endif
+      }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          float4 Position  : POSITION;
+          float3 Normal    : NORMAL;
+          float4 Color     : COLOR0;
+        };
+        
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float2 baseTC     : TEXCOORDN;
+#if %BUMP_MAP
+          float2 bumpTC     : TEXCOORDN;
+#endif
+#if %SPECULAR && !%SPECULAR_PERPIXEL
+          float4 halfAngVec : TEXCOORDN;
+#endif   
+#if %GLOSS_MAP
+          float2 glossTC    : TEXCOORDN;
+#endif
+
+#if %DIFFUSE
+          float4 lightVec   : TEXCOORDN;
+#endif
+
+#if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+#elif %ENVCMSPEC
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+#endif          
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC || %SPECULAR_PERPIXEL
+          float4 viewVec    : TEXCOORDN;
+#endif          
+          float4 Color      : COLOR0;
+          float4 Color1     : COLOR1;
+        };
+      }
+      PositionScript = PosTerrainLayerOverlay
+      CoreScript
+      {      
+        float4 tcLayer;
+        tcLayer.x = dot(LayerTexGen0, vPos);
+        tcLayer.y = dot(LayerTexGen1, vPos);
+        tcLayer.z = 0;
+        tcLayer.w = vPos.w;
+        OUT.baseTC = tcLayer.xy;
+
+#if %DIFFUSE || %SPECULAR || %ENVCMSPEC || %ENVCMAMB
+        float3 tang = Tangent.xyz;
+        float3 binorm = normalize(cross(tang, normal));
+        tang   = cross(normal, binorm);
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = tang;
+        objToTangentSpace[1] = binorm;
+        objToTangentSpace[2] = normal;
+#endif
+
+#if %BUMP_MAP
+        OUT.bumpTC = tcLayer.xy;
+#endif
+#if %DIFFUSE || %SPECULAR
+        // store normalized light vector
+        float3 lightVec = normalize(mul(objToTangentSpace, LightPos.xyz));
+  #if %DIFFUSE
+        OUT.lightVec.xyz = lightVec;
+  #endif
+#endif
+
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+
+#if %OFFSETBUMPMAPPING || %ENVCMAMB || %ENVCMSPEC || %SPECULAR
+        float3 vVec = mul(objToTangentSpace, viewVec.xyz);
+  #if %OFFSETBUMPMAPPING || %ENVCMSPEC || %SPECULAR_PERPIXEL
+        OUT.viewVec.xyz = vVec;
+  #endif        
+  #if %SPECULAR && !%SPECULAR_PERPIXEL
+        OUT.halfAngVec.xyz = normalize(normalize(lightVec.xyz) + normalize(vVec.xyz));  
+  #endif        
+#endif          
+
+#if %ENVCMAMB
+        float3 tCamVec = normalize(viewVec);
+        float3 tRef = dot(normal.xyz, tCamVec.xyz) * normal.xyz * 2 - tCamVec.xyz;
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.envTC = mul(tRM, TexMatrix);
+#elif %ENVCMSPEC
+        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);
+
+	      OUT.tangVec.xyz = worldTangentS;
+	      OUT.binormVec.xyz = worldTangentT;
+	      OUT.normVec.xyz = worldNormal;
+#endif	      
+
+#if %GLOSS_MAP
+        OUT.glossTC = tcLayer.xy;
+#endif
+        OUT.Color.xyz = IN.Color.xyz;
+        float fDist = length(viewVec.xyz);
+        fDist = fDist / FadingDist.x;
+        fDist = min(fDist, 1);
+        fDist = fDist * fDist;
+        fDist = fDist * fDist;
+        OUT.Color.a = IN.Color.a * (1-fDist);
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

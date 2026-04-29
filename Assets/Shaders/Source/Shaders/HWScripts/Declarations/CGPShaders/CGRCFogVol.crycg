@@ -1,0 +1,24 @@
+      #include "../CGVPMacro.csi"
+
+      NoFog
+
+      MainInput { uniform sampler2D fogMap : texunit0,
+                  uniform float4 FogColor }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the fog
+        float4 fogColor = tex2D(fogMap, IN.Tex0.xy);
+
+        OUT.Color.xyz = HDREncodeAmb(FogColor.xyz);
+        OUT.Color.a = fogColor.a;
+      }
+

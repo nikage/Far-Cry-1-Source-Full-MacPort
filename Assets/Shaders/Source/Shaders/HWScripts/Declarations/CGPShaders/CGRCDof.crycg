@@ -1,0 +1,100 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCDof.crycg
+//  Version:     v1.00
+//  Created:     16/03/2004 by Tiago Sousa.
+//  Compilers:   CG/HLSL
+//  Description: Depth of field effect
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include "../CGVPMacro.csi"
+
+PS20Only
+NoFog
+
+MainInput 
+{
+#ifdef OPENGL
+    uniform samplerRECT ScreenMap : texunit0,
+    uniform samplerRECT FocalDistMap : texunit1,
+#endif    
+#ifdef D3D
+    uniform sampler2D ScreenMap : register(s0),
+    uniform sampler2D FocalDistMap : register(s1),
+#endif    
+    uniform float4 vFocalDistance,
+    uniform float4 vBlurAmount,
+    uniform float4 vPixelSize
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1 
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+    // fetch textures
+#ifdef OPENGL
+    float4 vTapCenterColor = texRECT(ScreenMap, IN.Tex0.xy);
+    float4 vTapBluredColor = texRECT(FocalDistMap, IN.Tex1.xy);
+#endif    
+#ifdef D3D
+    float4 vTapCenterColor = tex2D(ScreenMap, IN.Tex0.xy);
+    float4 vTapBluredColor = tex2D(FocalDistMap, IN.Tex1.xy);
+#endif	
+
+	float4 tapCenter=vTapCenterColor;
+	float4 tapBlured=vTapBluredColor;
+	
+	/*
+	const float2 vTaps[10]={
+        float2(0.0,0.0),
+        float2(0.527837, -0.085868),
+        float2(-0.040088, 0.536087),
+        float2(-0.670445, -0.179949),
+        float2(-0.419418, -0.616039),
+        float2(0.440453, -0.639399),
+        float2(-0.757088, 0.349334),
+        float2(0.574619, 0.685879),
+        float2(0.03851, -0.939059),
+        float2(-0.341977, 0.939091)
+    };	                        	                        	                        	                        	                        	                        	                  											
+    
+    float4 vFinalColor=0;    
+    for(int t=0;t<4;t++)
+    {        
+        float2 vLowUv=IN.Tex1.xy+vPixelSize.xy*(vTaps[t].xy);        
+        float4 tapLow= tex2D(FocalDistMap, vLowUv.xy);
+                
+        float2 vHighUv=IN.Tex0.xy+vPixelSize.zw*(vTaps[t].xy);                
+        float4 tapHigh= tex2D(ScreenMap, vHighUv.xy);
+                
+        float4 tap=(tapLow*tapHigh.w+tapHigh*(1.0-tapHigh.w));        
+        tap.w=(tapHigh.w-tapCenter.w>=0)? 1.0: tap.w;
+        
+        vFinalColor.xyz+=tap.xyz*tap.w;
+        vFinalColor.w+=tap.w;
+    }
+    // normalize color
+    vFinalColor/=vFinalColor.w;*/
+    
+    float tapLerp=tapCenter.w*0.5+tapBlured.w*0.5;        
+    float3 vFinalColor=tapBlured.xyz*tapCenter.w+tapCenter.xyz*(1-tapCenter.w);
+    
+    OUT.Color.xyz = vFinalColor.xyz*vBlurAmount.w+tapCenter.xyz*(1-vBlurAmount.w);
+    OUT.Color.a = 1;
+}

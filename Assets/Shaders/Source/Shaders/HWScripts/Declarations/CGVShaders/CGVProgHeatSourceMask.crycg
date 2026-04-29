@@ -1,0 +1,45 @@
+// ===============================================================
+// Vertex Program: Heat source mask rendering
+// Description: outputs heat source mask for heatvision pass
+// Last Update: 21/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+VertAttributes 
+{ 
+  POSITION_3 
+  TEXCOORD0_2 
+  TANG_3X3 
+}
+
+MainInput 
+{ 
+  VIEWPROJ_MATRIX  
+}
+
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_TANG
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_C0
+  };
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{
+  OUT.Color=0;
+}

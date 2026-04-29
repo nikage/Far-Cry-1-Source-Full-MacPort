@@ -1,0 +1,79 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBumpReflCM_PS.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, uniform float3x4 ObjToCubeSpace, uniform float3 CameraPos, uniform float BumpScale }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        // pass texture coordinates for fetching the normal map
+        OUT.Tex0 = IN.TexCoord0;
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        // first rows are the tangent and binormal scaled by the bump scale
+        objToTangentSpace[0] = BumpScale * IN.Tangent;
+        objToTangentSpace[1] = BumpScale * IN.Binormal;
+        objToTangentSpace[2] = IN.TNormal;
+
+        // compute the 3x3 transform from tangent space to cube space:
+        // TangentToCubeSpace = object2cube * tangent2object
+        //              = object2cube * transpose(objToTangentSpace) (since the inverse of a rotation is its transpose)
+        // so a row of TangentToCubeSpace is the transform by objToTangentSpace of the corresponding row of ObjToCubeSpace
+        OUT.Tex1.xyz = mul(objToTangentSpace, ObjToCubeSpace[0].xyz);
+        OUT.Tex2.xyz = mul(objToTangentSpace, ObjToCubeSpace[1].xyz);
+        OUT.Tex3.xyz = mul(objToTangentSpace, ObjToCubeSpace[2].xyz);
+
+        // compute the eye vector (going from shaded point to eye) in cube space
+        float3 eyeVector = CameraPos.xyz - vPos.xyz;
+        OUT.Tex1.w = dot(eyeVector, ObjToCubeSpace[0].xyz);
+        OUT.Tex2.w = dot(eyeVector, ObjToCubeSpace[1].xyz);
+        OUT.Tex3.w = dot(eyeVector, ObjToCubeSpace[2].xyz);
+        
+        OUT.Color = IN.Color;
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

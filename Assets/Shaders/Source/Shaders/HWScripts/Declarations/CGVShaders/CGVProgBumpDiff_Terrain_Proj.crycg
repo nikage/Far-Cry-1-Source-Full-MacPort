@@ -1,0 +1,78 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBumpDiff_Terrain_Proj.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, uniform float3 Tangent, uniform float3 ScaleBumpTex, uniform float4 TexGen0, uniform float4 TexGen1, uniform float3 AttenInfo, LIGHT_MATRIX }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosTerrainOverlay                 
+      CoreScript
+      {
+        float2 vTex;
+        vTex.x = dot(TexGen0, vPos);
+        vTex.y = dot(TexGen1, vPos);
+        OUT.Tex1.xy = vTex * ScaleBumpTex.xy;
+        OUT.Tex0.xy = vTex;
+
+        OUT.Tex3 = mul(LightMatrix, vPos);
+
+        float3 binorm = normalize(cross(Tangent, normal));
+        float3 tang   = cross(binorm, normal);
+        
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = tang;
+        objToTangentSpace[1] = binorm;
+        objToTangentSpace[2] = normal;
+
+        // store normalized light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        float fiSqDist = rsqrt(dot(lightVec, lightVec));
+        
+        OUT.Color1.xyz = PROC_ATTENVERT;
+        
+        OUT.Tex2.xyz = mul(objToTangentSpace, lightVec);
+        OUT.Color.xyz = IN.Color.w;
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

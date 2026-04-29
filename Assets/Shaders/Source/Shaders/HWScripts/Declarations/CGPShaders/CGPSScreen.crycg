@@ -1,0 +1,30 @@
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D bumpMap : texunit0,
+                  uniform sampler2D envMap : texunit1,
+                  uniform float4 Matrix }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);
+        float4 env;
+# ifdef _PS_1_1
+          env = offsettex2D(envMap, IN.Tex1.xy, bumpColor, Matrix);
+# else
+          float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+          env = tex2D(envMap, newst);
+# endif          
+        OUT.Color = env;
+      }
+      

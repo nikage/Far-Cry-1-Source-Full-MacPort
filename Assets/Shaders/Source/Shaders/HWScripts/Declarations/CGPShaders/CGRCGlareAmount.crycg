@@ -1,0 +1,66 @@
+// ===============================================================
+// Fragment Program: GlareAmount
+// Description: Screen glare amount
+// Last Update: 09/08/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+MainInput 
+{ 
+#ifdef OPENGL
+  uniform samplerRECT texScreen01 : texunit0,
+	uniform samplerRECT texScreen02 : texunit1,
+	uniform samplerRECT texScreen03 : texunit2,
+	uniform samplerRECT texScreen04 : texunit3,		
+#endif
+#ifdef D3D
+  uniform sampler2D texScreen01 : texunit0,
+	uniform sampler2D texScreen02 : texunit1,
+	uniform sampler2D texScreen03 : texunit2,
+	uniform sampler2D texScreen04 : texunit3,		
+#endif
+	
+	uniform float4 Glare 
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	  OUT_T2
+	  OUT_T3
+	};
+
+	FOUT
+}
+
+CoreScript
+{	
+#ifdef OPENGL
+	float4 vColor01 = texRECT(texScreen01 , IN.Tex0.xy);
+	float4 vColor02 = texRECT(texScreen02 , IN.Tex1.xy);
+	float4 vColor03 = texRECT(texScreen03 , IN.Tex2.xy);
+	float4 vColor04 = texRECT(texScreen04 , IN.Tex3.xy);
+#endif
+#ifdef D3D
+	float4 vColor01 = tex2D(texScreen01 , IN.Tex0.xy);
+	float4 vColor02 = tex2D(texScreen02 , IN.Tex1.xy);
+	float4 vColor03 = tex2D(texScreen03 , IN.Tex2.xy);
+	float4 vColor04 = tex2D(texScreen04 , IN.Tex3.xy);
+#endif
+	
+	float3 vAvgColor=saturate(saturate(vColor01.xyz*0.25+vColor02.xyz*0.25+vColor03.xyz*0.25+vColor04.xyz*0.25)); //*0.8+0.2);
+	vAvgColor=saturate(4*vAvgColor*vAvgColor);
+	float fAvgLum=dot(float3(0.3, 0.59, 0.11), vAvgColor.xyz);
+		
+	// only output luminosity
+	OUT.Color.xyz = fAvgLum; //saturate(2*fAvgLum*fAvgLum);
+	OUT.Color.w = Glare.w;
+}
+

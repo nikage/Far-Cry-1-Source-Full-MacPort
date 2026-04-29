@@ -1,0 +1,60 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_DiffSpec_MultipleLight_PS.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D bumpMap : texunit0,
+                  uniform sampler2D gradMap : texunit2,
+                  uniform sampler2D baseMap : texunit3,
+                  uniform float4 Diffuse,
+	                uniform float4 Specular }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex3.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);
+        // compute texCoord(NdotH, 0) and use it to look up NdotH^power in the power texture
+        // This should create a texm3x2tex instruction for ps_1_1 equivalent to the ps_1_1
+        // builtin tex2D_dp3x2 (which is not supported in any other profile):
+        //    float4 NdotL_NdotH = tex2D_dp3x2(specPowMap, IN.Tex2, bumpNormal);
+        float2 texCoord = float2(
+            dot(IN.Tex1.xyz, bumpNormal.xyz),
+            dot(IN.Tex2.xyz, bumpNormal.xyz));
+        float4 NdotL_NdotH = tex2D(gradMap, texCoord);
+
+        float3 dif = (Diffuse.rgb * NdotL_NdotH.xyz * decalColor.xyz) * 2;
+        // compute the specular color
+        float3 spec = (Specular.xyz * NdotL_NdotH.w) * 2;
+        
+        // finally add them all together
+        OUT.Color.xyz = dif + spec;
+        OUT.Color.w = Diffuse.w * decalColor.w;
+      }
+

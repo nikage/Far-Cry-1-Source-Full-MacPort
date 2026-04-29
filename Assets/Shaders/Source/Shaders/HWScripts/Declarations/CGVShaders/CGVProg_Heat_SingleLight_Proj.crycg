@@ -1,0 +1,45 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, uniform float3 LightPos, LIGHT_MATRIX, ATTEN }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+        OUT.Tex2 = mul(LightMatrix, vPos);
+
+        TANG_MATR
+
+        // store normalized light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        float fiSqDist = rsqrt(dot(lightVec, lightVec));
+        lightVec = lightVec * fiSqDist;
+        
+        OUT.Color.a = PROC_ATTENVERT;
+        OUT.Color1.xyz = 0.5 * mul(objToTangentSpace, lightVec.xyz) + 0.5.xxx;
+        OUT.Color.xyz = IN.Color.xyz * 0.1;
+      }
+    

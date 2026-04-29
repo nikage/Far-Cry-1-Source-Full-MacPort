@@ -1,0 +1,56 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, ATTEN, CAMERA_POS }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = IN.Tangent;
+        objToTangentSpace[1] = IN.Binormal;
+        objToTangentSpace[2] = IN.TNormal;
+
+        // store normalized light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        lightVec = mul(objToTangentSpace, lightVec);
+        
+        float3 vDist = PROC_ATTENPIX;
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex2.xyz = vDist;
+        OUT.Color.w = vDist.z;
+        
+        float fDirect = (AttenInfo.z - AttenInfo.y) * AttenInfo.w;
+        lightVec = lightVec * fDirect.x;
+        OUT.Color1.xyz = AttenInfo.y * normalize(lightVec) + AttenInfo.y;
+
+        // calc normalized eye vector
+        float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);
+        
+        OUT.Color.xyz = (dot(IN.TNormal, eyeVec)).xxx;
+      }
+    

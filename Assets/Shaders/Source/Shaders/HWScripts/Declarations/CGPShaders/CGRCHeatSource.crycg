@@ -1,0 +1,52 @@
+// ===============================================================
+// Fragment Program: Heat Source
+// Description: outputs heat source for heatvision pass
+// Last Update: 04/12/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform sampler2D bumpMap : texunit1,
+  uniform samplerCUBE normCubeMap : texunit2,  
+  uniform float4 Heat 
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // fetch texels  
+  float4 baseColor = tex2D(baseMap, IN.Tex0.xy);            
+  float4 vNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+  float4 vLight = 2*(texCUBE(normCubeMap, IN.Tex2.xyz)-0.5);
+    
+  float fDot=saturate(dot(vNormal.xyz, vLight.xyz));    
+  float fLum=saturate(dot(float3(0.33, 0.59, 0.11), baseColor)); //*IN.Color.w);  
+  
+  fLum=2*saturate(fLum);
+  
+  float fFinal=saturate(saturate(fDot*Heat.z)*fLum+0.1);
+   
+  float fFinal025=fFinal*0.25;  
+  //OUT.Color.xyz = float3(fFinal, IN.Color.w, IN.Color.w);
+  float3 fHeatMask= float3(0, 1, 1);//*IN.Color.w;
+  OUT.Color.xyz = saturate(fFinal+fHeatMask);
+  OUT.Color.a = fFinal025;
+}

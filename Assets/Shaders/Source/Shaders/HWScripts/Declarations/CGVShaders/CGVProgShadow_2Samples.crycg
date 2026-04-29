@@ -1,0 +1,57 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgShadow_2Samples.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 }
+
+      //NoFog      
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 TexGen0, uniform float4x4 TexGen1 }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2_2
+          OUT_T3
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float4 shadTC0 = mul(TexGen0, vPos);
+        OUT.Tex0 = shadTC0;
+        float4 shadTC1 = mul(TexGen1, vPos);
+        OUT.Tex1 = shadTC1;
+        OUT.Tex2.xy = IN.TexCoord0.xy;
+#ifdef D3D
+        float4 WTC = (float4)0;
+        WTC.w = 1;
+        WTC.z = shadTC0.w * 0.5 + 0.5;
+        WTC.y = shadTC1.w * 0.5 + 0.5;
+        OUT.Tex3 = WTC;
+#endif        
+      }
+    

@@ -1,0 +1,58 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCWater_Beach.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D bumpMap : texunit0,
+                  uniform sampler2D baseMap : texunit1,
+                  uniform float4 Matrix,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the bump
+        float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);
+        
+# ifdef _PS_1_1
+        float4 decalColor = offsettex2D(baseMap, IN.Tex1.xy, bumpColor, Matrix);                 // get env bump map       
+# else
+        float2 newst = IN.Tex1.xy;
+        newst.xy = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+        float4 decalColor = tex2D(baseMap, newst.xy);
+# endif        
+        
+        float3 amb = decalColor.xyz * Ambient.xyz * IN.Color.xyz;
+        
+# ifdef _HDR
+	      amb.xyz = amb.xyz * 4;
+# endif	
+
+        // finally add them all together
+        OUT.Color.xyz = amb.xyz;
+        OUT.Color.w = decalColor.w * Ambient.w *IN.Color.a;
+      }
+

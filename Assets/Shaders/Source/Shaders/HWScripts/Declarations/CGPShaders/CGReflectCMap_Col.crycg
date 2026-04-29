@@ -1,0 +1,55 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGReflectCMap_Col.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D bumpMap : register(s0),
+                  uniform samplerCUBE envMap : register(s3),
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 bumpNormal = tex2D(bumpMap, IN.Tex0.xy);
+# ifdef _PS_1_1
+        float4 env = texCUBE_reflect_dp3x3(envMap, IN.Tex3, IN.Tex1, IN.Tex2, bumpNormal);
+# else
+        float3 E = float3(IN.Tex1.w, IN.Tex2.w, IN.Tex3.w);
+        float3 N = float3(dot(IN.Tex1.xyz, bumpNormal.xyz),
+                          dot(IN.Tex2.xyz, bumpNormal.xyz),
+                          dot(IN.Tex3.xyz, bumpNormal.xyz));
+        float4 env = texCUBE(envMap, 2*(dot(N, E)/dot(N, N))*N - E);
+# endif        
+        float3 vColor = HDREncodeAmb(env.xyz * IN.Color.xyz);
+        OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.a = IN.Color.a * Ambient.a;
+      }
+

@@ -1,0 +1,55 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCShadowDepth_2Samples_EnvLight.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      NoFog
+
+      MainInput { uniform sampler2D shadowMap0 : texunit0,
+                  uniform sampler2D shadowMap1 : texunit1,
+                  uniform sampler2D baseMap : texunit2,
+                  uniform float4 Ambient,
+                  uniform float4 Fading }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 shadowColor0 = tex2Dproj(shadowMap0, IN.Tex0.xyzw);
+        float4 shadowColor1 = tex2Dproj(shadowMap1, IN.Tex1.xyzw);
+        float4 decalColor = tex2D(baseMap, IN.Tex2.xy);
+        float3 color = decalColor.xyz * IN.Color.xyz;
+        float3 vShadow = (float3)0;
+        vShadow.x = 1-shadowColor0.b;
+        vShadow.y = 1-shadowColor1.b;
+        vShadow.xyz = vShadow.xyz * Fading.xyz;
+        float shadow = dot(vShadow.xyz, float3(1, 1, 0));
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = shadow;
+      }
+      

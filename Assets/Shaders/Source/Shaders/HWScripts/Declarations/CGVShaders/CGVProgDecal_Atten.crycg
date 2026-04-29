@@ -1,0 +1,57 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgDecal_Atten.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TANG_3X3 }
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4 DecalAtten }
+      
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        TANG_MATR
+
+        float3 vVec = DecalAtten.xyz - vPos.xyz;
+        float3 vtVec = mul(objToTangentSpace, vVec);          
+        
+        float fDot = (dot(normalize(vVec), IN.TNormal.xyz) + 0.15)*6.6666;
+        
+        float fiRad = 1/DecalAtten.w;
+        float3 vDist = vtVec * (fiRad * 0.5) + 0.5;
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex0.xyz = vDist;
+        OUT.Color.xyz = max(min(fDot, 1), 0);
+        OUT.Color.w = vDist.z;
+      }
+    

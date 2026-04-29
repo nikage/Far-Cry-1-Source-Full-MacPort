@@ -1,0 +1,83 @@
+// ===============================================================
+// Vertex Program: Indoor water volume using reflection cube map
+// Description: used for indoor water volumes
+// Last Update: 19/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes 
+{ 
+  POSITION_3 
+  TEXCOORD0_2 
+  PRIM_COLOR 
+  TANG_3X3 
+}
+
+MainInput 
+{ 
+  VIEWPROJ_MATRIX, 
+  uniform float3x4 ObjToCubeSpace, 
+  uniform float3 CameraPos, 
+  uniform float BumpScale,
+  uniform float4 AnimProperties
+}
+
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_C0
+    IN_TANG
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1
+    OUT_T2
+    OUT_T3
+    OUT_C0
+  };
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{
+  float2 fShear= float2(cos(AnimProperties.x*AnimProperties.w), sin(AnimProperties.y*AnimProperties.w));
+  
+  // pass texture coordinates for fetching the normal map  
+  OUT.Tex0.xy = IN.TexCoord0.xy+fShear.xy*0.01;
+
+  // compute the 3x3 tranform from tangent space to object space
+  float3x3 objToTangentSpace;
+  // first rows are the tangent and binormal scaled by the bump scale
+  objToTangentSpace[0] = BumpScale * IN.Tangent;
+  objToTangentSpace[1] = BumpScale * IN.Binormal;
+  objToTangentSpace[2] = IN.TNormal;
+
+  // compute the 3x3 transform from tangent space to cube space:
+  // TangentToCubeSpace = object2cube * tangent2object
+  //              = object2cube * transpose(objToTangentSpace) (since the inverse of a rotation is its transpose)
+  // so a row of TangentToCubeSpace is the transform by objToTangentSpace of the corresponding row of ObjToCubeSpace
+  OUT.Tex1.xyz = mul(objToTangentSpace, ObjToCubeSpace[0].xyz);
+  OUT.Tex2.xyz = mul(objToTangentSpace, ObjToCubeSpace[1].xyz);
+  OUT.Tex3.xyz = mul(objToTangentSpace, ObjToCubeSpace[2].xyz);
+
+  // compute the eye vector (going from shaded point to eye) in cube space
+  float3 eyeVector = CameraPos.xyz - vPos.xyz;
+  OUT.Tex1.w = dot(eyeVector, ObjToCubeSpace[0].xyz);
+  OUT.Tex2.w = dot(eyeVector, ObjToCubeSpace[1].xyz);
+  OUT.Tex3.w = dot(eyeVector, ObjToCubeSpace[2].xyz);
+
+  // output color and fresnel term hack             
+  float4 vHPos = mul(ModelViewProj, vPos);      
+      
+  OUT.Color.xyz = IN.Color.xyz;
+  OUT.Color.w = IN.Color.w*(vHPos.w*0.15);
+}

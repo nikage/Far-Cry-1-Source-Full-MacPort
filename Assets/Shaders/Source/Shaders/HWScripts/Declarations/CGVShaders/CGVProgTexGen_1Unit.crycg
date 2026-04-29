@@ -1,0 +1,50 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgTexGen_1Unit.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      DefaultPos
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4x4 ObjMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float4 P = mul(ObjMatrix, vPos);
+        OUT.Tex0.x = dot(BaseTexGen0, P)*0.31;          
+        OUT.Tex0.y = dot(BaseTexGen1, P)*0.31;          
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif          
+      }
+    

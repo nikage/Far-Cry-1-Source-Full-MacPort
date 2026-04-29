@@ -1,0 +1,49 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCOcean2.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D bumpMap : texunit0,
+                  uniform samplerCUBE envMap : texunit3,
+                  uniform float4 WaterColor0,
+                  uniform float4 WaterColor1 }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);
+        float4 env = texCUBE_reflect_dp3x3(envMap, IN.Tex3, IN.Tex1, IN.Tex2, bumpColor);
+        
+        float4 color = WaterColor1 - WaterColor0;
+        color.xyz = (WaterColor1.xyz + color.xyz * IN.Color.xyz) * env.xyz;
+        color.a = (WaterColor1.a + color.a * IN.Color.b) * IN.Color.a;
+
+        OUT.Color = color;
+      }

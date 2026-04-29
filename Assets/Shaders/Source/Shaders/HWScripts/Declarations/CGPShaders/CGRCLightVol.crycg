@@ -1,0 +1,60 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCLightVol.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform float4 Diffuse }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // IN.Tex1.xyz = fPos;
+        // IN.Tex2.xyz = lPos;
+        // IN.Tex3.xyz = lightVec;
+        // IN.Tex4.xyz = normal;
+
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+
+        float v1 = dot(IN.Tex1.xyz, IN.Tex1.xyz);
+        float v2 = dot(IN.Tex1.xyz, IN.Tex2.xyz);
+        float3 p = saturate(v2 / v1) * IN.Tex1.xyz - IN.Tex2.xyz;
+        float fP = dot(p, p) * 0.02 + 1.2;
+        float fT = dot(IN.Tex3.xyz, IN.Tex3.xyz) * 0.004 + 1;
+        float fDiffuse = saturate(dot(IN.Tex3.xyz, IN.Tex4.xyz));
+        fT = fDiffuse / fT + 0.1;
+        float3 color = decalColor.xyz * fT + 1 / fP;
+
+        OUT.Color.xyz = color.xyz*Diffuse.xyz;
+        OUT.Color.w = decalColor.w * Diffuse.w;
+      }
+
+

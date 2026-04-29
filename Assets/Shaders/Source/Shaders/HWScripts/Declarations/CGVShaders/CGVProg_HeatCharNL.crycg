@@ -1,0 +1,46 @@
+
+#include "../CGVPMacro.csi"
+
+VertAttributes 
+{ 
+  POSITION_3 
+  TEXCOORD0_2 
+  TANG_3X3 
+}
+
+MainInput 
+{ 
+  VIEWPROJ_MATRIX, 
+  CAMERA_POS 
+}
+
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_TANG
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2
+  };
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{
+  OUT.Tex0.xy = IN.TexCoord0.xy;
+  OUT.Tex1.xy = IN.TexCoord0.xy;
+
+  TANG_MATR
+
+  float3 lightVec = CameraPos.xyz - vPos.xyz;
+  OUT.Tex2.xyz = mul(objToTangentSpace, lightVec.xyz);
+}

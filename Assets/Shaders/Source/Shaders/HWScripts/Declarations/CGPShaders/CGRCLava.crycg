@@ -1,0 +1,57 @@
+// ===============================================================
+// Fragment Program: Lava
+// Description: used in lava volumes
+// Last Update: 23/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D difMap : texunit0,
+            uniform sampler2D bumpMap : texunit1,
+            uniform sampler2D refMap : texunit2,            
+            uniform float4 Matrix,
+            uniform float4 Ambient,
+            uniform float4 LavaColor
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{  
+  // load the decal
+  float4 difColor  = tex2D(difMap,  IN.Tex0.xy);
+  float4 bumpColor = tex2D(bumpMap, IN.Tex1.xy);      
+
+# ifdef _PS_1_1
+  float4 refrColor = offsettex2D(refMap, IN.Tex2.xy, bumpColor, Matrix);          // get env bump map surface
+# else
+        float2 newst = IN.Tex2.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+        float4 refrColor = tex2D(refMap, newst);
+# endif                
+  
+  float fLum=2*(dot(refrColor.xyz, float3(0.0, 1.0, 0.0))-0.5);    
+  fLum=(fLum-0.75)*4;
+  float3 fNewColor=LavaColor.xyz*0.5;
+  float3 fFinal=saturate(fLum*LavaColor.xyz + fNewColor);                                       
+  fFinal = saturate(fFinal*fFinal + fNewColor); 
+  
+  float3 fColorOverlay=difColor*fFinal.xyz;  		
+  fColorOverlay=lerp(fFinal, fColorOverlay*fColorOverlay*4, LavaColor.w);
+  fColorOverlay = HDREncode(fColorOverlay.xyz);
+  OUT.Color.xyz = HDRFogBlend(fColorOverlay.xyz, IN.Color.w, GlobalFogColor.xyz);
+  OUT.Color.w = 1.0;
+}

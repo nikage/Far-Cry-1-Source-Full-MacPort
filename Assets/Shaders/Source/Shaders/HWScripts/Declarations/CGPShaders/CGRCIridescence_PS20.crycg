@@ -1,0 +1,78 @@
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : register(s0),
+                  uniform sampler2D bumpMap : register(s1),
+                  uniform sampler2D glossMap : register(s2),
+                  uniform sampler1D iridescenceMap : register(s3),
+                  uniform float4 Ambient : register(c0),
+                  uniform float4 IridescenceScaleBias : register(c1),
+                  uniform float4 TranslucencyCoeff : register(c2) }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 baseColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 vNormal = tex2D(bumpMap, IN.Tex1.xy)*2-1;
+        // load the gloss map
+        float4 glossColor = tex2D(glossMap, IN.Tex2.xy);
+
+        // normalize post-filtered bump normals
+        //vNormal.xyz = normalize(vNormal.xyz);
+        
+        Ambient.xyz = float3(0.5,0.5,0.5);
+        
+        //======================//
+        // Compute diffuse term //
+        //======================//
+
+        // Compute the color components based on the input base texture color, 
+        // the alpha value for the given pixel, ambient material color and orientation 
+        // toward the light source:
+        float3 Light = normalize(IN.Tex3.xyz);
+        float3 scatteredIllumination = saturate(dot(-vNormal.xyz, Light.xyz)) * baseColor.a * TranslucencyCoeff.x;
+        float3 diffuseContribution   = saturate(dot(vNormal.xyz, Light.xyz)) + Ambient.xyz;
+
+        baseColor.xyz *= scatteredIllumination.xyz + diffuseContribution.xyz;
+
+        float fOpacity = 1 - baseColor.a;
+
+        // Premultiply alpha blend to avoid clamping:
+        baseColor.xyz = baseColor.xyz * fOpacity;
+
+        //==================================//
+        // Compute Iridescence contribution //
+        //==================================//
+         
+        //.....................................................................................//
+        // Compute index into the iridescence gradient map, which consists of N*V coefficient  //
+        //.....................................................................................//
+        float3 View = IN.Tex4.xyz;
+        float fGradientIndex = dot( vNormal.xyz, View.xyz ) * IridescenceScaleBias.z + IridescenceScaleBias.w;
+         
+        // Load the iridescence value from the gradient map based on the indices we just computed above:
+        float4 iridescence = tex1D( iridescenceMap, fGradientIndex );
+
+        // Compute the final color using this equation: N*H * Gloss * Iridescence + Diffuse
+        float3 Half = IN.Tex5.xyz;
+        float3 vGloss = glossColor.xyz * (saturate( dot( vNormal.xyz, Half.xyz )) * IridescenceScaleBias.x + IridescenceScaleBias.y);
+
+        OUT.Color.xyz = baseColor.xyz + vGloss.xyz * iridescence.xyz;
+        OUT.Color.a = fOpacity;
+      }
+

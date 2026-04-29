@@ -1,0 +1,76 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgFur_DiffSpec.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      NoFog
+      AutoEnumTC
+      
+      VertAttributes { POSITION_3 TANG_3X3 TEXCOORD0_2 }
+      MainInput { VIEWPROJ_MATRIX, uniform float4 Modifiers, uniform float4 FurParams, LIGHT_POS, CAMERA_POS, uniform float4 ScaleBiasTC }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          float4 Position  : POSITION;
+          IN_TANGVECS
+          float4 TexCoord0 : TEXCOORD0;
+        };
+        
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float2 Tex0       : TEXCOORDN;
+          float4 Tex1       : TEXCOORDN;
+          float4 Tex2       : TEXCOORDN;
+          float2 Tex3       : TEXCOORDN;
+          float2 Tex4       : TEXCOORDN;
+        };
+      }
+      PositionScript = PosFur
+      CoreScript
+      {
+        // FurParams.x = FurScaleX
+        // FurParams.y = FurScaleY
+        
+        // Modifiers.x = FurLength
+        // Modifiers.w = FurOffsetScale
+        OUT.Tex0.xy = (IN.TexCoord0.xy+ScaleBiasTC.zw)*ScaleBiasTC.xy;
+        OUT.Tex3.xy = IN.TexCoord0.xy * FurParams.xy;
+
+        TANG_MATR
+
+        // store normalized light vector
+        float3 lightVec = normalize(LightPos.xyz - vPos.xyz);
+        OUT.Tex1.xyz  = mul(objToTangentSpace, lightVec);
+
+        // compute view vector
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+
+        // compute half angle vector
+        float3 halfAngleVector = lightVec.xyz + normalize(viewVec);
+        OUT.Tex2.xyz = normalize(mul(objToTangentSpace, halfAngleVector));
+        
+        float2 vRadius = float2(1, 1); //IN.TexCoord0.xy;
+        float2 vScale = float2(0.5, 0.5); //IN.TexCoord0.xy;
+        vRadius.xy = vRadius.xy / (vRadius.xy + Modifiers.xx);
+        OUT.Tex4.xy = vRadius.xy * vScale.xy * Modifiers.ww;
+      }
+    

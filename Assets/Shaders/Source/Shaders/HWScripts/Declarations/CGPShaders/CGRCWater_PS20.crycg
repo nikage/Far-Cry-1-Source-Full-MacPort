@@ -1,0 +1,81 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCWater_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+      
+      MainInput { uniform sampler3D noiseMap : register(s0),
+                  uniform sampler2D envMap   : register(s1),
+                  uniform sampler2D dirtyMap : register(s2),
+                  uniform float4 BumpScale,
+                  uniform float4 ReflectAmount,
+                  uniform float4 FadeParams,
+                  uniform float4 TimeParams }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {        
+        float3 pos = IN.Tex0.xyz + TimeParams.xyz * TimeParams.w;
+        float4 noisy = tex3D(noiseMap, pos.xyz);
+
+        // Signed noise 
+        float3 bump = 2*noisy.a-1;
+
+        // Make sure the normal always points upwards
+        //bump.z = 0.8 * abs(bump.z) + 0.2;
+
+        // fade bump normals on the distance (emulate mipmapping)
+        float fZ = (IN.Tex5.x / IN.Tex5.y);
+        fZ = pow(fZ, 16);
+        bump.xyz = lerp(bump.xyz, float3(0,0,1), fZ);
+
+        // environment
+        float2 newst = IN.Tex1.xy / IN.Tex1.w;
+        newst.xy = newst.xy + bump.xy*BumpScale.xy*16;
+        float4 refl = tex2D(envMap, newst.xy);
+
+        // result color
+        float4 baseColor = tex2D(dirtyMap, IN.Tex2.xy);
+
+        // Interpolate between the dirty color and reflection
+        float3 color = lerp(baseColor.xyz, refl.xyz, ReflectAmount.xyz);
+
+        // Fresnel term
+        float lrp = 1 - dot(-normalize(IN.Tex4.xyz), bump.xyz);
+        float fadeBias = FadeParams.x;
+        float fadeExp = FadeParams.y;
+        float fTransp = saturate(fadeBias + pow(lrp, fadeExp)); // + (baseColor.b-0.75);
+        
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = IN.Color.a * ReflectAmount.a * fTransp;
+      }
+      

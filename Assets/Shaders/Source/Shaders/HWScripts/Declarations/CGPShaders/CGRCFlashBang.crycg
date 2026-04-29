@@ -1,0 +1,52 @@
+// ===============================================================
+// Fragment Program: FlashBang
+// Description: Flashbang fx
+// Last Update: 24/04/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{
+#ifdef OPENGL
+    uniform samplerRECT baseMap : texunit0,
+    uniform samplerRECT flashMap : texunit1,
+#endif    
+#ifdef D3D
+    uniform sampler2D baseMap : texunit0,
+    uniform sampler2D flashMap : texunit1,
+#endif    
+    uniform float4 FlashBang 
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+      OUT_T1
+    };
+
+    FOUT
+}
+
+CoreScript
+{
+    // load the decal
+#ifdef OPENGL
+    float4 screenColor = texRECT(baseMap, IN.Tex0.xy);
+    float4 flashColor = texRECT(flashMap, IN.Tex1.xy);
+#endif    
+#ifdef D3D
+    float4 screenColor = tex2D(baseMap, IN.Tex0.xy);
+    float4 flashColor = tex2D(flashMap, IN.Tex1.xy);
+#endif    
+
+    float3 color = (flashColor.xyz * 4) + FlashBang.w;
+    
+    //OUT.Color.xyz = lerp(screenColor.xyz, color.xyz, FlashBang.w);
+    OUT.Color.xyz = screenColor.xyz*(1-FlashBang.w)+ color.xyz*FlashBang.w;
+    
+    OUT.Color.a = 1; //saturate(1-FlashBang.w)*0.75;
+}

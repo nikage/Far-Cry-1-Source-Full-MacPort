@@ -1,0 +1,66 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCShadow_Depth2_2Samples.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+      NoFog
+
+      MainInput { uniform sampler2D shadMap0 : register(s0),
+                  uniform sampler2D shadMap1 : register(s1),
+                  uniform sampler2D baseMap : register(s2),
+                  uniform float4 Ambient,
+                  uniform float4 Fading }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex2.xy);
+        // load the 2 shadow samples
+        float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);
+        float4 shadColor1 = tex2Dproj(shadMap1, IN.Tex1.xyzw);
+        float3 shad = (float3)0;
+        shad.x = shadColor0.r/8 + shadColor0.g;
+        shad.y = shadColor1.r/8 + shadColor1.g;
+        float3 vZ = (float3)0;
+        vZ.x = IN.Tex3.x / IN.Tex3.y;
+        vZ.y = IN.Tex3.z / IN.Tex3.w;
+        shad = shad - vZ;
+        //float3 compare = step(shad, float3(0.0, 0.0, 0.0));
+        float3 compare = saturate(-shad*10);
+        compare.xyz = compare.xyz * Fading.xyz;
+        compare.x = compare.x * shadColor0.a;
+        compare.y = compare.y * shadColor1.a;
+        float fCompare = dot(compare, float3(1.0, 1.0, 0.0));
+        
+        float3 color = decalColor.xyz * Ambient.xyz;
+        color = HDREncodeAmb(color);
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = fCompare;
+      }
+      

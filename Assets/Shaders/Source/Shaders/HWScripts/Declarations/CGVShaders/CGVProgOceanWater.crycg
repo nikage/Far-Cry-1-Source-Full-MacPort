@@ -1,0 +1,130 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgOceanWater.crycg
+//  Version:     v1.00
+//  Created:     01/07/2004 by Tiago Sousa.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      Noise
+      Projected
+
+      Param4f ( Name = NoisePos Comp 'time 0.8' Comp 'time 0.6' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+      Param4f ( Name = WaterLevel Comp 'WaterLevel' Comp = 0 Comp = 1)  // Water level
+      
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      MainInput 
+      { 
+        VIEWPROJ_MATRIX, 
+        uniform float4 NoisePos, 
+        CAMERA_POS, 
+        LIGHT_POS,
+        ATTEN,
+        uniform float4 TexShiftRipple, 
+        uniform float4 TexGenRipple0, 
+        uniform float4 TexGenRipple1, 
+        uniform float4 TexDetailScale, 
+        uniform float4 WaterLevel, 
+        uniform float4 BumpScale,
+        uniform float4x4 TexProjMatrix, 
+        uniform float4 pg[66] : register(c30)         
+      }
+      
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      
+      PositionScript = PosWaterDeform_PlusWaterLevel
+      
+      CoreScript
+      {
+        // compute eye vector
+        float3 ViewVec=CameraPos.xyz-IN.Position.xyz;
+        float3 LightVec=LightPos.xyz-IN.Position.xyz;
+        
+        float fiSqDist = rsqrt(dot(ViewVec, ViewVec));
+        float fAtten = PROC_ATTENVERT;        
+        
+        float2 vAttenuation=float2(saturate(1-fAtten)*0.2+0.1, saturate(1-fAtten)*2);
+                        
+        // set the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = float3(0, -1, 0);
+        objToTangentSpace[1] = float3(1, 0, 0);
+        objToTangentSpace[2] = float3(0, 0, 1);              
+      
+        float2 vTex;
+        
+        float3 vEye=abs(vPos.xyz-CameraPos.xyz);
+        float fDist=sqrt(dot(vEye, vEye));
+        
+        // virtual map center...
+        float2 vMapCenter=float2(1024.0, 2048.0);
+        
+        // set translation to bump layers
+                
+                
+        float2 vTranslation=TexShiftRipple.xy%1;        
+        
+        vTex.xy= (vMapCenter.xy-vPos.xy)*0.0125;                
+        OUT.Tex0.xy = vTex.xy + vTranslation.xy*2.0;
+        
+        vTex.xy= (vMapCenter.xy-vPos.xy)*0.0085;        
+        OUT.Tex0.wz = vTex.xy - vTranslation.xy;                
+                                      
+        OUT.Tex4.xyz=mul(objToTangentSpace, ViewVec.xyz);                
+        OUT.Tex4.w=vAttenuation.x*1.5;        
+        
+        OUT.Tex5.xyz=mul(objToTangentSpace, LightVec.xyz);
+        OUT.Tex5.w=vAttenuation.y;        
+                
+        OUT.Tex3.xy = (vTex.xy + TexShiftRipple.xy) * TexDetailScale.xy;
+        
+       
+        //float4 vProjTex = mul(TexProjMatrix, vPos);
+        //vProjTex.xy = vProjTex.xy + fNoise * CameraPos.w;
+  
+        // optimized perspective correct projection
+        float4 vHPos = mul(ModelViewProj, vPos);
+        OUT.Tex1.x = (vHPos.x  + vHPos.w)*0.5;
+        OUT.Tex1.y = (vHPos.y  + vHPos.w)*0.5; // for reflection
+        OUT.Tex1.z = (-vHPos.y  + vHPos.w)*0.5; // for refraction
+        OUT.Tex1.w   = vHPos.w;  
+        
+        float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);
+                
+        OUT.Tex3.z=(eyeVec.z<0)?vHPos.w*0.1:vHPos.w*0.05;                
+        OUT.Tex2.xyz = (eyeVec.z<0)?1:TexProjMatrix[2]; //*0.5+0.5;
+        
+        OUT.Color = IN.Color;
+      }
+    

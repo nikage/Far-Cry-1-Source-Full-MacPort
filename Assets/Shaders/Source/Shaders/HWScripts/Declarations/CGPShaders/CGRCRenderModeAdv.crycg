@@ -1,0 +1,106 @@
+// ===============================================================
+// Fragment Program: Advanced post processing
+// Description: image post processing
+// Last Update: 27/05/2004
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+PS20Only
+NoFog
+
+MainInput 
+{ 
+#ifdef OPENGL
+    uniform samplerRECT ScreenTex : texunit0,
+    uniform samplerRECT GlareTex : texunit1,
+    uniform samplerRECT ScreenBluredTex : texunit2,
+#endif
+#ifdef D3D
+    uniform sampler2D ScreenTex : register(s0),
+    uniform sampler2D GlareTex : register(s1),
+    uniform sampler2D ScreenBluredTex : register(s2),
+#endif
+    uniform float4    vParams01,
+    uniform float4    vParams02,
+    uniform float4    vCMYKParams
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+  };
+
+  FOUT
+}
+
+SubrScript
+{
+    // Convert from a RGB color space to CMYK color space
+    float4 RGBToCMKY(float3 vColor)
+    {
+        float4 vCMYK;
+        vCMYK.xyz=saturate(1-vColor.xyz);                         // Convert 1st to CMY= 1-RGB
+        vCMYK.w=min(vCMYK.x, min(vCMYK.y, vCMYK.z));    // Compute K = min(C, M, Y) 
+        vCMYK.xyz=saturate(vCMYK.xyz-vCMYK.www);                  // Compute final CMYK= CMY-K        
+        
+        return vCMYK;    
+    }
+
+    // Convert from a CMYK color space to RGB color space
+    float3 CMKYToRGB(float4 vColor)
+    {
+        return saturate(1-(vColor.xyz+vColor.www));
+    }
+}
+      
+CoreScript
+{         
+#ifdef OPENGL
+    // get screen
+    float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy);
+    // get glare map
+    float4 fGlareColor  = texRECT(GlareTex, IN.Tex1.xy);
+    // get blured screen
+    float4 fBluredScreenColor = texRECT(ScreenBluredTex, IN.Tex2.xy);
+#endif
+#ifdef D3D
+    // get screen
+    float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy);
+    // get glare map
+    float4 fGlareColor  = tex2D(GlareTex, IN.Tex1.xy);
+    // get blured screen
+    float4 fBluredScreenColor = tex2D(ScreenBluredTex, IN.Tex2.xy);
+#endif
+
+    //const float4 vParams01=float4(1.2, 1.2, 0.1, 1.0); // x= contrast, y= saturation, z= brightness, w= glare intensity
+    //const float4 vParams02=float4(0.0, 0.0, 1.5, 1.0); // xy= not used, z= sharpness amount, w= gamma adjust
+    //const float4 vCMYKParams=float4(0.0, 0.0, 0.0, 0.0); // x= cyan, y= magenta, z= yellow, w= luminance
+            
+    fGlareColor*=vParams01.w;   // Adjust glare intensity
+    fScreenColor.xyz=fScreenColor.xyz*vParams02.z+fBluredScreenColor.xyz*(1-vParams02.z); // Adjust image sharpeness
+    
+    // Add glare to scene
+    float3 vLum=dot(fScreenColor.xyz, float3(0.3, 0.59, 0.11));                
+    float3 vFinalComposing=saturate(fScreenColor.xyz + fGlareColor.xyz - fScreenColor.xyz*fGlareColor.xyz);
+    
+    // Convert color to CMYK model.
+    // Tests: Incresing RED, decreases red component, decreasing red, increases red component..
+    float4 vCMYK=RGBToCMKY(vFinalComposing.xyz);
+    vCMYK=saturate(vCMYK+vCMYKParams); // adjust Cyans/Magentas/Yellows/Luminance                    
+    vFinalComposing.xyz=CMKYToRGB(vCMYK);
+    
+    float3 vSaturationFinal=saturate(vFinalComposing.xyz*vParams01.y+vLum.xxx*(1-vParams01.y)); // Ajust image saturation
+    float3 vContrastFinal=saturate(vSaturationFinal.xyz*vParams01.x+0.5*(1-vParams01.x)); // Ajust image contrast
+    float3 vBrightnessFinal=saturate(vContrastFinal.xyz+vParams01.zzz); // Ajust image brightness
+    float3 vGammaFinal=saturate(pow(vBrightnessFinal.xyz, vParams02.w)); // Ajust image gamma                                    
+               
+    OUT.Color.xyz =vGammaFinal.xyz; //vGammaFinal.xyz;  
+    OUT.Color.w=1;
+}
+

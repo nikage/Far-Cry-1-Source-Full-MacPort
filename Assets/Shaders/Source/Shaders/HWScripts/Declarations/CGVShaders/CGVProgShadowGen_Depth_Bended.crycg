@@ -1,0 +1,44 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgShadowGen_Depth.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      NoFog
+
+      VertAttributes { POSITION_3 }
+      
+      Param4f (Name = Bend Comp 'ObjWaveX' Comp 'ObjWaveY' Comp 'Bending' Comp = 1)
+      MainInput { VIEWPROJ_MATRIX, BEND }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+        };
+
+      }
+      PositionScript = PosBending
+      CoreScript
+      {
+        OUT.Tex0.xy = vPos.w;
+      }
+    

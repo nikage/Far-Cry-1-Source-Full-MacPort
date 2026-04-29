@@ -1,0 +1,184 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgAmbientTempl.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: Ambient pass vertex shader template
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      DefaultPos
+      AutoEnumTC
+
+      VertAttributes
+      {
+        POSITION_3
+        TEXCOORD0_2
+#if %TEMP_DOT3LM || %TEMP_LM
+        TEXCOORD1_2
+#endif        
+#if %ENVCMAMB || %TEMP_ENVLIGHT
+        TNORMAL_3
+#endif
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC
+        TANG_3X3
+#endif
+#if %VERTCOLORS
+        PRIM_COLOR
+#endif
+      }
+      
+      MainInput
+      {
+        VIEWPROJ_MATRIX,
+#if %ENVCMAMB
+        uniform float4x4 TexMatrix,
+#elif %TEMP_ENVLIGHT
+        uniform float4 EnvColors[6],
+        uniform float4x4 TexMatrix,
+#elif %ENVCMSPEC
+        uniform float4x4 ModelMatrix,
+#endif
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC || %ENVCMAMB
+        CAMERA_POS,
+#endif
+      }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          float4 Position  : POSITION;
+          float4 baseTC    : TEXCOORD0;
+#if %TEMP_DOT3LM || %TEMP_LM || %BUMP_ZCORRECT
+          float4 lmTC      : TEXCOORD1;
+#endif
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC
+          IN_TANGVECS
+#elif %TEMP_ENVLIGHT || %ENVCMAMB
+          IN_TNORMVEC
+#endif
+#if %VERTCOLORS
+          IN_C0
+#endif
+        };
+        
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float4 baseTC     : TEXCOORDN;
+#if %BUMP_MAP
+  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING
+          float4 bumpTC     : TEXCOORDN;
+  #endif
+#endif  
+#if %TEMP_LM || %TEMP_DOT3LM || %BUMP_ZCORRECT
+          float4 lmTC_ZW    : TEXCOORDN;
+#endif          
+#if %TEMP_DOT3LM
+          float4 lmdirTC    : TEXCOORDN;
+#endif
+
+          float4 Color      : COLOR0;
+          
+#if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+#elif %ENVCMSPEC
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+#endif          
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC
+          float4 viewVec    : TEXCOORDN;
+#endif          
+        };
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.baseTC.xy = IN.baseTC.xy;
+        // Gloss-map texture coordinate
+    #if %ENVCMSPEC && %GLOSS_MAP
+        OUT.baseTC.zw = IN.baseTC.xy;
+    #elif %ENVCM_MASKED
+        OUT.baseTC.zw = IN.baseTC.xy;
+    #endif
+
+#if %BUMP_MAP
+  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING
+        OUT.bumpTC.xy  = IN.baseTC.xy;
+  #endif
+#endif
+
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC
+        TANG_MATR
+        
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+        OUT.viewVec.xyz = mul(objToTangentSpace, viewVec.xyz);
+#endif          
+      
+#if %TEMP_LM || %TEMP_DOT3LM || %BUMP_ZCORRECT
+        OUT.lmTC_ZW.xy = IN.lmTC.xy;
+#endif        
+#if %TEMP_DOT3LM
+        OUT.lmdirTC.xy = IN.lmTC.xy;
+#endif
+#if %BUMP_ZCORRECT
+        OUT.lmTC_ZW.z = dot(ModelViewProj[2], vPos);
+        OUT.lmTC_ZW.w = dot(ModelViewProj[3], vPos);
+#endif
+
+#if %ENVCMAMB
+  #if !%OFFSETBUMPMAPPING && !%ENVCMSPEC
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+  #endif        
+        float3 tCamVec = normalize(viewVec);
+        float3 tNormal = IN.TNormal.xyz;
+        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.envTC = mul(tRM, TexMatrix);
+#elif %TEMP_ENVLIGHT
+        // Calculate average radiosity color from 6 colors (Cube)
+        float3 tNormal;
+        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);        
+        float3 Compare1 = step(tNormal, 0);
+        float3 Compare0 = 1 - Compare1;
+        float3 signN = sign(tNormal);
+        tNormal = tNormal * tNormal;
+        tNormal = tNormal * signN;
+        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;
+        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;
+        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;
+        OUT.Color = (ColorX + ColorY + ColorZ) * 2.0;
+#elif %ENVCMSPEC
+        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);
+
+	      OUT.tangVec.xyz = worldTangentS;
+	      OUT.binormVec.xyz = worldTangentT;
+	      OUT.normVec.xyz = worldNormal;
+#endif	      
+
+#if %VERTCOLORS
+        OUT.Color = IN.Color;
+#endif
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif
+      }
+    

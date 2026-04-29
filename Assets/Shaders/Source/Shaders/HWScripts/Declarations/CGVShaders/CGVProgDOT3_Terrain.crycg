@@ -1,0 +1,72 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgDOT3_Terrain.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      
+      MainInput { VIEWPROJ_MATRIX, uniform float4 SunDirect, uniform float3 Tangent, uniform float3 ScaleBumpTex, uniform float4 TexGen0, uniform float4 TexGen1 }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float2 vTex;
+        vTex.x = dot(TexGen0, vPos);
+        vTex.y = dot(TexGen1, vPos);
+        OUT.Tex1.xy = vTex * ScaleBumpTex.xy;
+        OUT.Tex0.xy = vTex;
+        
+        float3 normal = IN.Normal.xyz;
+        //float3 normal;
+        //normal.x=0;
+        //normal.y=0;
+        //normal.z=1;
+        
+        float3 binorm = normalize(cross(Tangent, normal));
+        float3 tang   = cross(binorm, normal);
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = tang;
+        objToTangentSpace[1] = binorm;
+        objToTangentSpace[2] = normal;
+
+        // store normalized light vector
+        float3 lightVec = mul(objToTangentSpace, SunDirect.xyz);
+        
+        OUT.Tex2.xyz = lightVec;
+      }
+    

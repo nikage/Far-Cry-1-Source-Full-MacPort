@@ -1,0 +1,62 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBumpDiff_Terrain.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, uniform float3 Tangent, uniform float3 ScaleBumpTex, uniform float2x4 TexGen }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float2 vTex = mul(TexGen, vPos);
+        OUT.Tex0.xy = vTex * ScaleBumpTex.xy;
+        OUT.Tex1.xy = vTex;
+        
+        float3 Binormal = cross(Tangent, IN.Normal.xyz);
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = Tangent;
+        objToTangentSpace[1] = Binormal;
+        objToTangentSpace[2] = IN.Normal.xyz;
+
+        // store normalized light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex2.xyz = mul(objToTangentSpace, lightVec.xyz);
+      }
+    

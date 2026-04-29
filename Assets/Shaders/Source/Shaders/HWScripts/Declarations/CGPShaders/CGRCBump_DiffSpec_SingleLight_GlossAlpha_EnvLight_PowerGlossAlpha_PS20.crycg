@@ -1,0 +1,72 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_DiffSpec_SingleLight_GlossAlpha_EnvLight_PowerGlossAlpha_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform sampler2D glossMap : texunit2,
+                  uniform float4 Diffuse,
+                  uniform float4 Specular,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        half4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        // load the gloss
+        half4 glossColor = tex2D(glossMap, IN.Tex2.xy);
+
+        // normalize post-filtered bump normals
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+
+        // normalize light vector
+        float3 lightVec = normalize(IN.Tex3.xyz);
+        float fDif = saturate(dot(lightVec.xyz, bumpNormal.xyz));
+
+        // normalize view vector
+        float3 viewVec = normalize(IN.Tex4.xyz);
+        float3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;
+        float NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+        half fSpec = pow(NdotR, Specular.w*glossColor.w);
+
+        half3 dif = (decalColor.xyz * fDif * Diffuse.xyz) * 2;
+        half3 spec = (fSpec * Specular.xyz * decalColor.w) * 2;
+        half3 amb = IN.Color.xyz * decalColor.xyz;
+
+        // finally add them all together
+        OUT.Color.xyz = amb + dif + spec;
+        OUT.Color.w = Ambient.w;
+      }
+

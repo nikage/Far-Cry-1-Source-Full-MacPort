@@ -1,0 +1,118 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgOcean.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      Projected
+
+      //NoFog
+      VertAttributes { POSITION_3 NORMAL_3 }
+      MainInput
+      {
+        VIEWPROJ_MATRIX,
+        CAMERA_POS,
+        uniform float4 PosScale,
+        uniform float4 PosOffset,
+        uniform float3 ColorMinFresnel,
+        uniform float3 ColorMaxFresnel,
+        uniform float4 RippleTexGen0,
+        uniform float4 RippleTexGen1,
+        uniform float4x4 ReflectMatrix,
+        uniform float4 Constants,
+        uniform float4 WaterParams
+      }
+      DeclarationsScript
+      {
+        // define inputs from application
+        struct appin
+        {
+          float4 Position  : POSITION;
+          float3 Normal    : NORMAL;
+          float2 HeightMap : BLENDWEIGHT;
+        };
+
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float2 Tex0 : TEXCOORD0;
+          float4 Tex1 : TEXCOORD1;
+          float4 Color : COLOR0;
+          float3 Color1 : COLOR1;
+          //float FogC : FOG;
+        };
+      }
+      CoreScript
+      {
+        float4 vPos = IN.Position * PosScale + PosOffset;
+        
+        // Apply curvature
+        float4 vCam = vPos - CameraPos;
+        vCam.z = 0;
+        float fSqCamDist = dot(vCam, vCam);
+        vPos.z = vPos.z + Constants.x * -fSqCamDist;
+        
+        // Scale height of the wave and normal depending on the water deep
+        float fHeightDelta = WaterParams.x - IN.HeightMap.x;
+        OUT.Color.w = fHeightDelta * WaterParams.w;
+        float fHeightScale = clamp(fHeightDelta * WaterParams.z, 0, 1);
+        vPos.z = vPos.z * fHeightScale;
+        float3 normal = IN.Normal;
+        normal.xy = normal.xy * fHeightScale;
+        normal = normalize(normal);
+                  
+        // Calculate fog
+        float4 vPosReal = vPos;
+        vPosReal.z = vPosReal.z + WaterParams.x;
+        vCam = vPosReal - CameraPos;
+        float fiDist = rsqrt(dot(vCam, vCam));
+        float fDist = 1 / fiDist;
+        //OUT.FogC = fDist.x;
+        
+        // Don't deform near to camera 
+        //float fScale = step(8, fDist);
+        vPos.z = vPos.z + WaterParams.x;
+
+        // Normalize camera vector
+        vCam.xyz = vCam.xyz * fiDist;
+
+        // Two sided lighting
+        float fDotNorm = dot(vCam.xyz, normal);
+        fDotNorm = fDotNorm * sign(fDotNorm);
+
+        // calculate approximated fresnel term F
+        //                  1
+        // F = ---------------------------
+        //     ( 1 + E.N ) ^ Fresnel_Power_Factor
+        OUT.Color.xyz = fDotNorm.xxx;
+        float fFresnel = 1 / pow((fDotNorm + 1), Constants.y);
+        OUT.Color1.xyz = lerp(ColorMinFresnel, ColorMaxFresnel, fFresnel);
+        
+        OUT.HPosition = mul(ModelViewProj, vPos);
+        
+        OUT.Tex0.x = dot(vPos, RippleTexGen0);
+        OUT.Tex0.y = dot(vPos, RippleTexGen1);
+        
+        float4 vTexRefl = mul(ReflectMatrix, vPos);
+  #ifdef PROJECTEDENVBUMP
+        OUT.Tex1 = vTexRefl;
+  #endif        
+  #ifdef OTHER
+        OUT.Tex1.xy = vTexRefl.xy / vTexRefl.w;
+  #endif
+      }
+    

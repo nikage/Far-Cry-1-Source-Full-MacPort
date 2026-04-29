@@ -1,0 +1,53 @@
+// ==================================================================
+// Fragment Program: Cold render mode
+// Description: glare/contrast/saturation + unsharp filter adjustment
+// Last Update: 04/01/2004
+// Coder: Tiago Sousa
+// ==================================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+#ifdef OPENGL
+    uniform samplerRECT ScreenTex : texunit0,
+    uniform samplerRECT ScreenBluredTex : texunit1
+#endif
+#ifdef D3D
+    uniform sampler2D ScreenTex : texunit0,
+    uniform sampler2D ScreenBluredTex : texunit1
+#endif
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+      OUT_T1
+    };
+
+    FOUT
+}
+
+CoreScript
+{     
+#ifdef OPENGL
+    // get screen
+    float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy);
+    // get screen blured map
+    float4 fScreenColorBlured = texRECT(ScreenBluredTex, IN.Tex1.xy);
+#endif    
+#ifdef D3D
+    // get screen
+    float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy);
+    // get screen blured map
+    float4 fScreenColorBlured = tex2D(ScreenBluredTex, IN.Tex1.xy);
+#endif
+         
+    // ## unsharp and add contrast to image a bit ##
+    float3 vUnsharpMask=2*saturate(fScreenColor.xyz*0.75-fScreenColorBlured.xyz*0.3);     
+                                    
+    OUT.Color.xyz = vUnsharpMask.xyz;  
+    OUT.Color.a   = 1;
+}

@@ -1,0 +1,54 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTexShadow.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D basisMap0 : texunit0,
+                  uniform sampler2D horizonMap0 : texunit1,
+                  uniform sampler2D basisMap1 : texunit2,
+                  uniform sampler2D horizonMap1 : texunit3 }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+		//fetch basis maps
+        float4 basis0 = 2*(tex2D(basisMap0, IN.Tex0.xy)-0.5);
+        float4 basis1 = 2*(tex2D(basisMap1, IN.Tex2.xy)-0.5);
+
+		//fetch horizon maps
+        float4 horizon0 = 2*(tex2D(horizonMap0, IN.Tex1.xy)-0.5);
+        float4 horizon1 = 2*(tex2D(horizonMap1, IN.Tex3.xy)-0.5);
+        
+        float shad0 = saturate(dot(basis0.xyz, horizon0.xyz)) + saturate(basis0.w * horizon0.w);
+        float shad1 = saturate(dot(basis1.xyz, horizon1.xyz)) + saturate(basis1.w * horizon1.w);
+        
+        OUT.Color.xyz = 1;
+        OUT.Color.a = (shad0 + shad1 - (2*(IN.Color.b-0.5))) * 4;
+      }
+      
+    

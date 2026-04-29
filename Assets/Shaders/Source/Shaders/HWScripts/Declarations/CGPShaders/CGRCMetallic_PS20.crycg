@@ -1,0 +1,78 @@
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : register(s0),
+                  uniform sampler2D bumpMap : register(s1),
+                  uniform samplerCUBE envMap : register(s2),
+                  uniform float4 Diffuse,
+                  uniform float4 Specular,
+                  uniform float4 Params,
+                  uniform float4 SparkleDistort,
+                  uniform float4 SparkleColor,
+                  uniform float4 BaseColor }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float3 bumpNormal = EXPAND(tex2D(bumpMap, IN.Tex1.xy).xyz);
+        
+        // Increase the microflake perturbed normal a bit
+        //bumpNormal.xyz = lerp(float3(0,0,1), bumpNormal.xyz, Params.x);
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+        
+        float3x3 worldTangentSpace;
+        worldTangentSpace[0] = IN.Tex2.xyz;
+        worldTangentSpace[1] = IN.Tex3.xyz;
+        worldTangentSpace[2] = IN.Tex4.xyz;
+        
+        float3 viewVec = normalize(IN.Tex5.xyz);
+        float NdotE = dot(bumpNormal.xyz, viewVec);
+        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec.xyz);
+        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);
+        // load the env noise map
+        float4 envColorNoise = texCUBE(envMap, worldReflectVec.xyz);
+        envColorNoise.xyz = HDREncode(envColorNoise.xyz * envColorNoise.a) * 2;
+        
+        // load the env bumbed map
+        float3 bumpNormalEnv = float3(0,0,1);
+        float NdotEEnv = dot(bumpNormalEnv.xyz, viewVec);
+        float3 reflectVectEnv = (2.0*NdotEEnv*bumpNormalEnv.xyz)-(dot(bumpNormalEnv.xyz, bumpNormalEnv.xyz)*viewVec.xyz);
+        float3 worldReflectVecEnv = mul(reflectVectEnv, worldTangentSpace);
+        float4 envColor = texCUBE(envMap, worldReflectVecEnv.xyz);
+        envColor.xyz = HDREncode(envColor.xyz * envColor.a);
+                
+        // load the bump normal
+        float4 bumpNormal2 = tex2D(bumpMap, IN.Tex1.xy);
+        
+        // Compute (1-N.V)^2
+        float fAtten = ((1-viewVec.z) * (1-viewVec.z)) + 0.255;
+        // Simulate color scattering
+        float3 scatt = lerp(viewVec.z, NdotE, SparkleDistort.xyz);
+        // Combine resulting color with base color
+        float3 color = HDREncodeAmb(scatt * BaseColor.xyz);
+        // Combine sparkles with base color gradient
+        color.xyz = bumpNormal2.xyz * envColorNoise.xyz * envColor.xyz + color.xyz; 
+        // Add reflections from the environment map
+        color.xyz = lerp(color.xyz, envColor.xyz, fAtten);
+        
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = envColorNoise.a * SparkleColor.a * BaseColor.a;
+      }
+

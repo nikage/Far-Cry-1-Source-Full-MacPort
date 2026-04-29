@@ -1,0 +1,57 @@
+// ===============================================================
+// Vertex Program: Heat Source for low spec..
+// Description: outputs heat source for heatvision pass (low spec)
+// Last Update: 21/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes 
+{ 
+  POSITION_3 
+  TEXCOORD0_2     
+  TNORMAL_3   
+}
+
+MainInput 
+{ 
+  uniform float4x4 ModelViewProj, 
+  uniform float4 CameraPos,
+  uniform float4 Heat
+}
+
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_TN
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_C0
+  };
+
+}
+
+
+PositionScript = PosCommon
+
+CoreScript
+{  
+  float3 viewVec=normalize(CameraPos.xyz-vPos.xyz);
+  
+  float fDot=dot(viewVec, IN.TNormal.xyz);
+  fDot*=fDot;  
+  fDot=max(fDot*(Heat.z+0.4)*0.75, 0);  
+  
+  OUT.Tex0.xy=float2(0, fDot);   
+  OUT.Tex1.xy=IN.TexCoord0.xy;
+  
+  OUT.Color=1;
+}

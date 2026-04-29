@@ -1,0 +1,105 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgPredator.crycg
+//  Version:     v1.00
+//  Created:     24/06/2004 by Tiago Sousa
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+#include "../CGVPMacro.csi"
+
+
+VertAttributes 
+{ 
+    POSITION_3 
+    TEXCOORD0_2
+    TANG_3X3
+}
+
+MainInput 
+{ 
+    VIEWPROJ_MATRIX, 
+    LIGHT_POS,
+    CAMERA_POS,
+    ATTEN,
+    uniform float4 Constants
+}
+
+DeclarationsScript
+{
+    struct appin
+    {
+      IN_P
+      IN_T0
+      IN_TANG
+    };
+    
+    struct vertout
+    {
+      OUT_P
+      OUT_T0_2
+      OUT_T1
+      OUT_T2_2
+      OUT_T3
+      OUT_T4      
+      OUT_T5
+      OUT_C0
+    };
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{  
+    float4 vHPos = mul(ModelViewProj, vPos);
+    if(vHPos.w<0.5) vHPos.w=0.5;
+
+    OUT.Tex0.xy =IN.TexCoord0.xy;
+
+    // optimized perspective correct projection
+    OUT.Tex1.xz = (vHPos.xz  + vHPos.w)*0.5;
+    OUT.Tex1.y =  (-vHPos.y  + vHPos.w)*0.5;
+    OUT.Tex1.w   = vHPos.w;  
+
+    float3 ViewVec=CameraPos.xyz-IN.Position.xyz;
+    float3 LightVec=LightPos.xyz-IN.Position.xyz;
+    
+    float3 OSViewVec=normalize(ViewVec);
+    float3 OSLightVec=normalize(LightVec);
+    float fReflDot= dot(OSViewVec, IN.TNormal.xyz);  
+    float3 reflVector =(2*IN.TNormal.xyz*fReflDot-OSViewVec.xyz);  
+    OUT.Tex2.xy = (reflVector.xz+1.0)*0.5;
+    
+    TANG_MATR
+    OUT.Tex3.xyz = mul(objToTangentSpace, ViewVec.xyz);
+
+    if(Constants.x==0)
+    {
+        float fiSqDist = rsqrt(dot(LightVec, LightVec));
+        float fAtten = PROC_ATTENVERT;
+        OUT.Color.w=fAtten;
+        OUT.Tex4.xyz = mul(objToTangentSpace, LightVec.xyz);
+    }
+    else
+    {   
+        OUT.Color.w=1; 
+        OUT.Tex4.xyz = IN.TNormal.xyz;
+    }
+    
+    float2 vTranslation=Constants.yy%1;
+    OUT.Tex5.xy =IN.TexCoord0.xy+vTranslation.xy;
+    OUT.Tex5.zw =IN.TexCoord0.xy*0.1-vTranslation.xy;
+
+    return OUT;
+}

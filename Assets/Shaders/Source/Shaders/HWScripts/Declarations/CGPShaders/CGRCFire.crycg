@@ -1,0 +1,46 @@
+// ===============================================================
+// Fragment Program: Fire
+// Description: used in fire volumes
+// Last Update: 17/11/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D bumpMap : texunit0,
+            uniform sampler2D refMap : texunit1,                        
+            uniform float4 Matrix
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{  
+  // load the decal  
+  float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);      
+
+# ifdef _PS_1_1
+  float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);          // get env bump map surface
+# else
+        float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+        float4 refrColor = tex2D(refMap, newst);
+# endif                
+    
+  //float3 fColorSquare=refrColor.xyz*refrColor.xyz; 
+  //float fColorLum=dot(refrColor.xyz, float3(0.33, 0.59, 0.11)); 
+
+  OUT.Color.xyz =refrColor.xyz*refrColor.w*IN.Color.w;
+  OUT.Color.w = 1;
+}

@@ -1,0 +1,39 @@
+// ===============================================================
+// Vertex Program: 
+// Description: 
+// Last Update: 14/08/2003
+// Coder: Andrey Honich
+// ===============================================================
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        float3 vEyeDir = normalize(CameraPos.xyz - vPos.xyz);
+        float3 vHalf = normalize(vEyeDir.xyz + IN.Normal.xyz);
+        OUT.Tex0.x = dot(IN.Normal.xyz, vEyeDir);
+        OUT.Tex0.y = dot(IN.Normal.xyz, vHalf);
+
+        OUT.Tex1.x = vEyeDir.x;
+        OUT.Tex1.y = vHalf.y;
+      }
+    

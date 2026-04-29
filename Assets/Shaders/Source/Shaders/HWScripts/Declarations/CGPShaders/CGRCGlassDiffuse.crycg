@@ -1,0 +1,52 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCGlassDiffuse.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform samplerCUBE reflMap : texunit1,
+                  uniform samplerCUBE refrMap : texunit2,
+                  uniform float4 DiffAmount }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the reflection map
+        float4 reflColor = texCUBE(reflMap, IN.Tex1.xyz);
+        // load the refraction map
+        float4 refrColor = texCUBE(refrMap, IN.Tex2.xyz);
+        
+        float3 env = lerp(reflColor.xyz, refrColor.xyz, IN.Color.xyz);
+        float3 vColor = HDREncodeAmb(decalColor.xyz * DiffAmount.xyz + env.xyz);
+        // finally add them all together
+        OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.w = DiffAmount.a * IN.Color.a * decalColor.a;
+      }
+

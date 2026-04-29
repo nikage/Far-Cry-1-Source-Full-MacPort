@@ -1,0 +1,325 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgLightTempl.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: Lighting vertex program template
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      AutoEnumTC
+
+      VertAttributes
+      {
+        POSITION_3
+#if %VERTCOLORS
+        PRIM_COLOR
+#endif
+        TANG_3X3
+        TEXCOORD0_2
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+        TEXCOORD1_2
+#endif        
+      }
+      
+      MainInput
+      {
+        VIEWPROJ_MATRIX,
+        LIGHT_POS,
+#if %OFFSETBUMPMAPPING || %SPECULAR
+        CAMERA_POS,
+#elif %TEMP_AMBIENT
+  #if %ENVCMAMB || %ENVCMSPEC        
+        CAMERA_POS,
+  #endif
+#endif        
+#if %TEMP_PROJLIGHT
+        LIGHT_MATRIX,
+        ATTEN,
+#elif %TEMP_POINTLIGHT
+        ATTEN,
+#endif
+
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+        uniform float4x4 TexMatrix,
+  #elif %TEMP_ENVLIGHT
+        uniform float4 EnvColors[6],
+        uniform float4x4 TexMatrix,
+  #elif %ENVCMSPEC
+        uniform float4x4 ModelMatrix,
+  #endif
+#endif  
+      }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          float4 Position  : POSITION;
+          float4 baseTC    : TEXCOORD0;
+#if %TEMP_SPECULAR_OCCLUSIONMAP
+          float4 lmTC      : TEXCOORD1;
+#endif
+          IN_TANGVECS
+#if %VERTCOLORS
+          IN_C0
+#endif
+        };
+        
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float2 baseTC     : TEXCOORDN;
+#if %BUMP_MAP          
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+          float2 bumpTC     : TEXCOORDN;
+  #endif
+#endif
+  
+#if %DIFFUSE_NCM
+          float4 lightVec   : TEXCOORDN;
+#endif
+          
+#if %SPECULAR
+   #if %SPECULAR_NCM
+          float4 halfAngVec : TEXCOORDN;
+   #endif
+#endif   
+
+#if %TEMP_POINTLIGHT
+          float2 attenTC    : TEXCOORDN;
+#elif %TEMP_PROJLIGHT
+          float4 projTC     : TEXCOORDN;
+  #if %PROJLIGHT_PERPIXELATTEN
+          float2 attenTC    : TEXCOORDN;
+  #endif
+#endif
+
+#if %TEMP_POINTLIGHT || %TEMP_PROJLIGHT
+          float4 Color      : COLOR0;
+#elif %DIFFUSE && !%DIFFUSE_NCM
+          float4 Color      : COLOR0;
+#endif
+
+          float4 Color1     : COLOR1;
+
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+          float2 glossTC    : TEXCOORDN;
+#elif !%TEMP_AMBIENT || !%ENVCMSPEC
+  #if %SPECULAR
+    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+          float2 glossTC    : TEXCOORDN;
+    #endif
+  #endif
+#endif          
+
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+          float4 lmTC_ZW    : TEXCOORDN;
+#elif %BUMP_ZCORRECT
+          float4 lmTC_ZW    : TEXCOORDN;
+#endif
+
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+  #elif %ENVCMSPEC
+    #if !%SPECULAR || !%SPECULAR_PERPIXEL
+          float4 viewVec    : TEXCOORDN;
+    #endif
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+  #endif
+#endif
+
+#if !%DIFFUSE_NCM
+  #if %DIFFUSE_PERPIXEL
+          float4 lightVec : TEXCOORDN;
+  #elif %SPECULAR_PERPIXEL
+          float4 lightVec : TEXCOORDN;
+  #endif
+#endif
+          
+#if %SPECULAR_PERPIXEL
+          float4 viewVec : TEXCOORDN;
+#elif %TEMP_AMBIENT && %ENVCMSPEC
+#elif %OFFSETBUMPMAPPING
+          float4 viewVec    : TEXCOORDN;
+#endif
+        };
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.baseTC.xy = IN.baseTC.xy;
+#if %BUMP_MAP
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+        OUT.bumpTC.xy = IN.baseTC.xy;
+  #endif
+#endif
+  
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+        OUT.lmTC_ZW.xy = IN.lmTC.xy;
+#endif
+#if %BUMP_ZCORRECT
+        OUT.lmTC_ZW.z = dot(ModelViewProj[2], vPos);
+        OUT.lmTC_ZW.w = dot(ModelViewProj[3], vPos);
+#endif
+
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        OUT.glossTC.xy = IN.baseTC.xy;
+#elif !%TEMP_AMBIENT || !%ENVCMSPEC
+  #if %SPECULAR
+    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        OUT.glossTC.xy = IN.baseTC.xy;
+    #endif
+  #endif
+#endif          
+
+        TANG_MATR
+
+        float3 lVec = LightPos.xyz - vPos.xyz;
+        float3 lightVec = mul(objToTangentSpace, lVec);          
+
+#if %TEMP_POINTLIGHT
+        float3 vDist = PROC_ATTENPIX;
+        OUT.attenTC.xy = vDist.xy;
+        OUT.Color.a = vDist.z;
+#elif %TEMP_PROJLIGHT
+        OUT.projTC = mul(LightMatrix, vPos);
+   #if %PROJLIGHT_PERPIXELATTEN
+        float3 vDist = PROC_ATTENPIX;
+        OUT.attenTC.xy = vDist.xy;
+        OUT.Color.a = vDist.z;          
+   #else
+        float fiSqDist = rsqrt(dot(lVec,lVec));
+        OUT.Color.a = PROC_ATTENVERT;
+   #endif
+#endif
+
+#if %DIFFUSE
+  #if %DIFFUSE_NCM || %DIFFUSE_PERPIXEL
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        float3 lVecO = lightVec.xyz;
+    #ifdef RADEON
+    #endif
+    #ifdef OTHER
+      #if !%DIFFUSE_NCM
+        lVecO = lVecO * LightPos.w;
+      #endif
+    #endif
+        OUT.lightVec.xyz = lVecO;
+    
+  #else
+        OUT.Color.xyz = 0.5 * normalize(lightVec.xyz) + 0.5.xxx;
+  #endif
+#endif
+  
+#if %SPECULAR
+        // compute view vector
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+        float3 viewVec = mul(objToTangentSpace, vVec.xyz);
+#ifdef RADEON
+#endif
+#ifdef OTHER
+        viewVec.xyz = viewVec.xyz * CameraPos.w;
+#endif        
+
+  #if %SPECULAR_PERPIXEL
+        OUT.viewVec.xyz = viewVec.xyz;
+    #if !%DIFFUSE
+        float3 lVecO = lightVec.xyz;
+      #ifdef RADEON
+      #endif
+      #ifdef OTHER
+       #if !%DIFFUSE_NCM
+        lVecO = lVecO * LightPos.w;
+       #endif
+      #endif
+        OUT.lightVec.xyz = lVecO;
+    #endif        
+  #else
+        // compute half angle vector
+        float3 halfAngleVector = normalize(lightVec.xyz) + normalize(viewVec);  
+    #if %SPECULAR_NCM
+        // transform half angle vector from object space to tangent space and pass it as a tex coords
+        OUT.halfAngVec.xyz = halfAngleVector.xyz;
+    #else
+        OUT.Color1.xyz = 0.5 * normalize(halfAngleVector.xyz) + 0.5.xxx;
+    #endif
+  #endif
+#endif
+
+#if %SPECULAR && %SPECULAR_PERPIXEL
+#elif %TEMP_AMBIENT && %ENVCMSPEC
+#elif %OFFSETBUMPMAPPING && %BUMP_MAP
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+        float3 viewVec = mul(objToTangentSpace, vVec.xyz);
+        OUT.viewVec.xyz = viewVec.xyz;
+#endif
+
+#if %TEMP_AMBIENT
+  #if %TEMP_ENVLIGHT
+        // Calculate average radiosity color from 6 colors (Cube)
+        float3 tNormal;
+        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);
+        float3 Compare1 = step(tNormal, 0);
+        float3 Compare0 = 1 - Compare1;
+        float3 signN = sign(tNormal);
+        tNormal = tNormal * tNormal;
+        tNormal = tNormal * signN;
+        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;
+        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;
+        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;
+        OUT.Color1 = (ColorX + ColorY + ColorZ) * 2.0;
+  #elif %ENVCMAMB
+    #if !%SPECULAR
+        // compute view vector
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+    #endif
+        float3 tCamVec = normalize(vVec);
+        float3 tNormal = IN.TNormal.xyz;
+        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.envTC = mul(tRM, TexMatrix);
+  #elif %ENVCMSPEC
+    #if !%SPECULAR
+        // compute view vector
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+    #endif
+    #if !%SPECULAR || !%SPECULAR_PERPIXEL
+        // transform half angle vector from object space to tangent space and pass it as a tex coords
+        OUT.viewVec.xyz = mul(objToTangentSpace, vVec.xyz);
+    #endif
+    
+        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);
+
+	      OUT.tangVec.xyz = worldTangentS;
+	      OUT.binormVec.xyz = worldTangentT;
+	      OUT.normVec.xyz = worldNormal;
+  #endif
+#endif
+#if %VERTCOLORS
+        OUT.Color1 = IN.Color;
+#endif
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

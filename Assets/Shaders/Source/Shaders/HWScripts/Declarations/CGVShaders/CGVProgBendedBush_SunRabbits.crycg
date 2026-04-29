@@ -1,0 +1,44 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBendedBush_SunRabbits.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, BEND, uniform float2x4 TexGen }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosBending                 
+      CoreScript
+      {
+        OUT.Tex0.xy = mul(TexGen, vPos);
+        OUT.Color   = IN.Color;
+      }
+    

@@ -1,0 +1,36 @@
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D bumpMap : texunit0,
+                  uniform samplerCUBE envMap : texunit3,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);
+# ifdef _PS_1_1
+        float4 env = texCUBE_dp3x3(envMap, IN.Tex3.xyz, IN.Tex1, IN.Tex2, bumpColor);
+# else
+        float3 newst = float3(dot(IN.Tex1.xyz, bumpColor.xyz),
+                              dot(IN.Tex2.xyz, bumpColor.xyz),
+                              dot(IN.Tex3.xyz, bumpColor.xyz));
+        float4 env = texCUBE(envMap, newst);
+# endif                        
+        
+        OUT.Color.xyz = env.xyz * IN.Color.xyz * Ambient.xyz;
+        OUT.Color.a = IN.Color.a;
+      }
+

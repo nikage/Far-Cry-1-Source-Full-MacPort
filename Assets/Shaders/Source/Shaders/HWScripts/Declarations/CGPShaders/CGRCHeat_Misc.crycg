@@ -1,0 +1,28 @@
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+    uniform sampler2D baseMap : texunit0,
+    uniform float4 Heat
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+      OUT_C0
+    };
+
+    FOUT
+}
+
+CoreScript
+{
+    // load the decal
+    float4 baseColor = tex2D(baseMap , IN.Tex0.xy);
+    float fLum=dot(baseColor.xyz, float3(0.33, 0.59, 0.11));
+
+    OUT.Color.xyz = fLum*0.2; //Heat.xyz; //1.0;
+    OUT.Color.a = baseColor.a;
+}

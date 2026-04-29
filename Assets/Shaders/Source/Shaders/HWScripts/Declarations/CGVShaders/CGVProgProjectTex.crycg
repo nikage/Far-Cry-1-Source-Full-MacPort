@@ -1,0 +1,82 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgProjectTex.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+#include "../CGVPMacro.csi"
+
+
+VertAttributes 
+{ 
+	POSITION_3 
+	TEXCOORD0_2
+	NORMAL_3
+}
+
+MainInput 
+{ 
+	VIEWPROJ_MATRIX, 
+	uniform float4   TexShiftRipple,
+	uniform float4   CameraPos,
+	uniform float4   ScreenSize,
+	uniform float4   Constants
+}
+
+DeclarationsScript
+{
+	struct appin
+	{
+	  IN_P
+	  IN_T0
+	  IN_N
+	};
+	struct vertout
+	{
+	  OUT_P
+	  OUT_T0_2
+	  OUT_T1_2
+	  OUT_C0
+	};
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{
+	float4 vHPos = mul(ModelViewProj, vPos);
+	if(vHPos.w<0.5) vHPos.w=0.5;
+	//OUT.HPosition=vHPos;
+
+  OUT.Tex0.xy =IN.TexCoord0.xy;
+		
+#ifdef OPENGL
+	OUT.Tex1.xy = (vHPos.xy / vHPos.w + 1) *0.5*ScreenSize.xy;
+#endif
+
+#ifdef D3D
+	OUT.Tex1.x = (vHPos.x / vHPos.w + 1) * 0.5;
+	OUT.Tex1.y = (-vHPos.y / vHPos.w + 1) * 0.5;
+#endif
+
+
+  // output fresnel term hack
+  float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);    
+  float fDot= abs(dot(eyeVec, IN.Normal.xyz));    
+  
+  OUT.Color.w =fDot;
+}
+

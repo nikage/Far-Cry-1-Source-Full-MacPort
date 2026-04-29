@@ -1,0 +1,73 @@
+// ===============================================================
+// Vertex Program: Heat haze
+// Description: used in particles
+// Last Update: 02/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR }
+
+Projected
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  uniform float4   CameraPos,  
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,
+  uniform float4   TexMovSpeed,
+  uniform float4   ScreenSize
+}
+
+DeclarationsScript
+{
+
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_C0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{
+  float4 vHPos = mul(ModelViewProj, vPos);                                    
+
+  // output texture coordinates       
+#ifdef OPENGL  
+	OUT.Tex2.xy = (vHPos.xy/vHPos.w  + 1)*0.5*ScreenSize.xy;    	    
+#endif
+
+#ifdef D3D 
+	OUT.Tex2.x = (vHPos.x/vHPos.w  + 1)*0.5;    	    
+	OUT.Tex2.y = (-vHPos.y/vHPos.w  + 1)*0.5;    	  
+#endif
+    
+  OUT.Tex0.xy =IN.TexCoord0.xy;
+  OUT.Tex1.xy =(IN.TexCoord0.xy+TexShiftRipple.xy*TexMovSpeed.xy)*TexDetailScale.xy;
+
+  // output particle transparency
+  OUT.Color.w = IN.Color.w;  
+  
+  return OUT;
+}

@@ -1,0 +1,104 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_DiffSpec_SingleLight_Proj_EnvCMSpec_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE projMap : texunit2,
+                  uniform sampler2D attenMap : texunit3,
+                  uniform samplerCUBE envMap : texunit4,
+                  uniform float4 Ambient,
+                  uniform float4 Diffuse,
+                  uniform float4 Specular,
+                  uniform float4 EnvMapParams,
+                  uniform float4 FresnelParams }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_T6
+          OUT_T7
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        half4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);
+        // load the projector filter map
+        half4 projColor = texCUBE(projMap, IN.Tex1.xyz);
+        half atten = saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex2.xy).b));
+
+        // normalize post-filtered bump normals
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+
+        // normalize light vector
+        float3 lightVec = normalize(IN.Tex3.xyz);
+        float NdotL = dot(bumpNormal.xyz, lightVec);
+        float fDif = saturate(NdotL);
+
+        half fEnvmapAmount = EnvMapParams.x;
+
+        float fFresnelScale = FresnelParams.x;
+        float fFresnelBias = FresnelParams.y;
+        float fFresnelPow = FresnelParams.z;
+
+        // Calc Reflection Vector
+        float3x3 worldTangentSpace;
+        worldTangentSpace[0] = IN.Tex5.xyz;
+        worldTangentSpace[1] = IN.Tex6.xyz;
+        worldTangentSpace[2] = IN.Tex7.xyz;
+
+        float3 viewVec = normalize(IN.Tex4.xyz);
+        float NdotE = dot(bumpNormal.xyz, viewVec);
+        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);
+        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);
+
+        // Calc Fresnel factor
+        half fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);
+
+        // Calc environment
+        half3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;
+        env *= fresnel;
+
+        // Calc specular
+        float3 reflVec = (2*NdotL*bumpNormal.xyz)-lightVec.xyz;
+        float NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+        half fSpec = pow(NdotR, Specular.w);
+
+        half3 dif = (decalColor.xyz * fDif * atten * Diffuse.xyz * projColor.xyz) * 2;
+        half3 amb = Ambient.xyz * decalColor.xyz;
+        half3 spec = (fSpec * atten * Specular.xyz * projColor.xyz) * 2;
+
+        // finally add them all together
+        OUT.Color.xyz = amb + dif + spec + env;
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+

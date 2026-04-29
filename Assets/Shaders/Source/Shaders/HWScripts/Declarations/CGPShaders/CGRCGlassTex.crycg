@@ -1,0 +1,51 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCGlassTex.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D envMap : texunit1,
+                  uniform float4 ReflAmount }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+
+        // load the reflection map
+# ifdef _PS_1_1
+        float4 envColor = tex2D(envMap, IN.Tex1.xy);
+# else
+        float4 envColor = tex2Dproj(envMap, IN.Tex1.xyzw);
+# endif
+        
+        float3 env = envColor.xyz*ReflAmount.xyz + decalColor.xyz*(1-ReflAmount.xyz);
+        // finally add them all together
+        OUT.Color.xyz = env;
+        OUT.Color.w = ReflAmount.a * IN.Color.a * decalColor.a;
+      }
+

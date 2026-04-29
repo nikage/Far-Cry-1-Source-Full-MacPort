@@ -1,0 +1,78 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_DiffPass_Proj_EnvCMSpec_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_MATRIX, LIGHT_POS, ATTEN, CAMERA_POS, uniform float4x4 ModelMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_T6
+          OUT_T7
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1 = mul(LightMatrix, vPos);
+
+        TANG_MATR
+
+        float3 lVec = LightPos.xyz - vPos.xyz;
+        float3 lightVec = mul(objToTangentSpace, lVec);          
+        float3 vDist = PROC_ATTENPIX;
+        
+        OUT.Tex2.xyz = vDist;
+        OUT.Color.xyz = vDist;
+        
+        OUT.Tex3.xyz = lightVec;
+
+        // compute view vector
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+
+        // transform half angle vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex4.xyz = mul(objToTangentSpace, viewVec.xyz);
+    
+        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);
+
+	      OUT.Tex5.xyz = worldTangentS;
+	      OUT.Tex6.xyz = worldTangentT;
+	      OUT.Tex7.xyz = worldNormal;
+      }
+    

@@ -1,0 +1,45 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRC_HDR_Spr_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform float4 Ambient
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  float4 vSample = tex2D(baseMap, IN.Tex0.xy) * Ambient;
+  vSample.xyz = HDREncode(vSample.xyz);
+
+  OUT.Color = vSample;
+}
+

@@ -1,0 +1,50 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWater_Beach.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      Noise
+      Param4f ( Name = NoisePos Comp 'time 0.6' Comp 'time 0.6' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR }
+      MainInput { VIEWPROJ_MATRIX, uniform float4 NoisePos, CAMERA_POS, uniform float4 TexShift, uniform float4 pg[66] : register(c30) }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosWaterDeform
+      CoreScript
+      {
+        float4 vTex = IN.TexCoord0;
+        vTex.y = (vTex.y * TexShift.y + TexShift.x * TexShift.y) + (fNoise * TexShift.z);
+        vTex.x = vTex.x * TexShift.w;
+        OUT.Tex0 = vTex;
+        OUT.Color = IN.Color;
+      }
+    

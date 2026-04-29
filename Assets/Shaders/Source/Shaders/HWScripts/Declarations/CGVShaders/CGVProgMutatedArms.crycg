@@ -1,0 +1,48 @@
+// ===============================================================
+// Vertex Program: Mutated arms
+// Description: just copy texture coordinates
+// Last Update: 21/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes 
+{ 
+  POSITION_3 
+  TEXCOORD0_2       
+}
+
+MainInput 
+{ 
+  uniform float4x4 ModelViewProj
+}
+
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_C0
+  };
+
+}
+
+
+PositionScript = PosCommon
+
+CoreScript
+{  
+  OUT.Tex0.xy=IN.TexCoord0.xy;      
+
+# ifdef _HDR
+  float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+  OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+}

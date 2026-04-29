@@ -1,0 +1,69 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgSimple_Tex_Gloss_EnvCMSpec_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      DefaultPos
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+
+      VS20Only
+      
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4x4 ModelMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_T6
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+        OUT.Tex2.xy = IN.TexCoord0.xy;
+      
+        TANG_MATR
+
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+        OUT.Tex3.xyz = mul(objToTangentSpace, viewVec.xyz);
+
+        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);
+
+	      OUT.Tex4.xyz = worldTangentS;
+	      OUT.Tex5.xyz = worldTangentT;
+	      OUT.Tex6.xyz = worldNormal;
+      }
+    

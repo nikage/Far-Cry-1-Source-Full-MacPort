@@ -1,0 +1,33 @@
+// ===============================================================
+// Fragment Program: Scope Flare
+// Description: used for scope flare effect
+// Last Update: 16/12/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D lensMap : texunit0
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal
+  float4 lensColor = tex2D(lensMap, IN.Tex0.xy);
+
+  OUT.Color.xyz = lensColor*IN.Color.xyz;
+  OUT.Color.w= IN.Color.w;
+}

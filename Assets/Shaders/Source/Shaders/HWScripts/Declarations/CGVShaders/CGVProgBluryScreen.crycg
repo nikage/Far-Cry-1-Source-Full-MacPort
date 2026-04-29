@@ -1,0 +1,48 @@
+// ===============================================================
+// Vertex Program: Blury screen
+// Description: just output texture coords...
+// Last Update: 12/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  
+  uniform float4   vTexCoordScale // need uv scale, for rectangular textures in gl...    
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{
+  // output texture coordinates
+  OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy;
+  OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.zw;
+
+  return OUT;
+}

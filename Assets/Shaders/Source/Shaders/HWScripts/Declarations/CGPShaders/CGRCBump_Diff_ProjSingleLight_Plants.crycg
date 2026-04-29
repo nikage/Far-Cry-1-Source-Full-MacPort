@@ -1,0 +1,62 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_Diff_ProjSingleLight_Plants.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE normCubeMap : texunit2,
+                  uniform samplerCUBE projMap : texunit3,
+                  uniform float4 Diffuse,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = EXPAND(tex2D(bumpMap, IN.Tex1.xy));
+
+        float4 projColor = texCUBE(projMap, IN.Tex3.xyz);
+
+        // Light vector from normalization cube-map
+        float4 lVec = EXPAND(texCUBE(normCubeMap, IN.Tex2.xyz));
+        
+        float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+        float3 dif = (decalColor.xyz * NdotL * IN.Color.a * projColor.xyz * Diffuse.xyz);
+        dif = HDREncode(dif);
+        float3 amb = Ambient.xyz * decalColor.xyz * IN.Color.xyz;
+        amb.xyz = HDREncode(amb.xyz);
+
+        // finally add them all together
+        OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+

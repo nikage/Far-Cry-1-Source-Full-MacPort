@@ -1,0 +1,41 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCDofFocalDistNoUV.crycg
+//  Version:     v1.00
+//  Created:     16/03/2004 by Tiago Sousa.
+//  Compilers:   CG/HLSL
+//  Description: for depth of field, outputs focal distance
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+MainInput 
+{
+    uniform sampler2D ScreenMap : texunit0
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_P
+      OUT_C0
+    };
+
+    FOUT
+}
+
+CoreScript
+{	
+    OUT.Color.xyz = IN.Color.w;
+    OUT.Color.w = 1;
+}

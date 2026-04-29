@@ -1,0 +1,47 @@
+// ===============================================================
+// Fragment Program: Eye shader
+// Description: used in character eyes
+// Last Update: 15/20/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+  uniform sampler2D baseMap : texunit0,
+  uniform sampler2D opacityMap : texunit1,
+  uniform sampler2D reflMap : texunit2,
+  uniform float4 Ambient
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal
+  float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+  float4 opColor = tex2D(opacityMap, IN.Tex1.xy);
+  float4 reflColor = tex2D(reflMap, IN.Tex2.xy);
+  
+  float3 vFinalRefl=reflColor.xyz*opColor.xyz;
+//  vFinalRefl*=vFinalRefl;
+  float3 vFinalDecal=saturate(decalColor.xyz+vFinalRefl.xyz);//-decalColor.xyz*vFinalRefl.xyz);
+  //vFinalDecal*=vFinalDecal;
+    
+  float3 vFinal=2*vFinalDecal.xyz*IN.Color.xyz+vFinalDecal.xyz*Ambient.xyz;
+ 
+  OUT.Color.xyz = vFinal;
+  OUT.Color.w = 1.0;
+}

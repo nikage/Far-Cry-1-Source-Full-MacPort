@@ -1,0 +1,50 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTerrain_3Layers_Only.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D detMap0 : texunit0,
+                  uniform sampler2D detMap1 : texunit1,
+                  uniform sampler2D detMap2 : texunit2 }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the detail
+        float4 detColor0 = tex2D(detMap0, IN.Tex0.xy);
+        float4 detColor1 = tex2D(detMap1, IN.Tex1.xy);
+        float4 detColor2 = tex2D(detMap2, IN.Tex2.xy);
+        
+        detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);
+        detColor1.xyz = detColor1.xyz*IN.Color1.b + 0.5*(1-IN.Color1.b);
+        detColor2.xyz = detColor2.xyz*IN.Color.a + 0.5*(1-IN.Color.a);
+        float3 color = detColor0.xyz * detColor1.xyz * 2;
+        color.xyz = color.xyz * detColor2.xyz * 2;
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = 1;
+      }

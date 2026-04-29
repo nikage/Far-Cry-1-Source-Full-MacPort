@@ -1,0 +1,46 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_Diff_SingleLight_Plants.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform float4 Ambient,
+                  uniform float4 Diffuse }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        float3 dif = HDREncode(decalColor.xyz * Diffuse.xyz);
+        float3 amb = HDREncode(Ambient.xyz * decalColor.xyz * IN.Color.xyz);
+
+        // finally add them all together
+        OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+
+

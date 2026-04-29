@@ -1,0 +1,71 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_DiffSpec_EnvCM_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      VertAttributes { POSITION_3 TANG_3X3 TEXCOORD0_2 }
+      
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, uniform float4x4 TexMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+
+        TANG_MATR
+
+        // store normalized light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex3.xyz = mul(objToTangentSpace, lightVec.xyz);
+
+        // compute view vector
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+
+        // transform half angle vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex4.xyz = mul(objToTangentSpace, viewVec.xyz);
+
+        float3 tCamVec = normalize(viewVec);
+        float3 tNormal = IN.TNormal.xyz;
+        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.Tex2 = mul(tRM, TexMatrix);
+      }
+    

@@ -1,0 +1,72 @@
+// ===============================================================
+// Fragment Program: CryVision + Glare
+// Description: Cryvision + glare, optimized version
+// Last Update: 21/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+#ifdef OPENGL
+	uniform samplerRECT ScreenTex : texunit0,
+	uniform samplerRECT GlareTex : texunit1,	
+	uniform samplerRECT HeatTex : texunit2,	
+#endif	
+#ifdef D3D
+	uniform sampler2D ScreenTex : texunit0,
+	uniform sampler2D GlareTex : texunit1,	
+	uniform sampler2D HeatTex : texunit2,	
+#endif	
+	uniform sampler2D NoiseTex : texunit3,	
+	uniform float4 Glare,
+	uniform float4 NVColor
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	  OUT_T2
+	  OUT_T3
+	};
+
+	FOUT
+}
+
+CoreScript
+{
+  float3 fLuminosity=float3(0.33f, 0.59f, 0.11f);
+  float3 fNightColor= float3(-0.1, 0.25, 0.2);
+  //float3 fNightColor= float3(-0.1, 0.3, 0.6);
+
+	// load the decal
+#ifdef OPENGL
+	float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy);
+	float4 fGlareColor = texRECT(GlareTex, IN.Tex1.xy);
+	float4 fHeatColor = texRECT(HeatTex, IN.Tex2.xy);
+#endif	
+#ifdef D3D
+	float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy);
+	float4 fGlareColor = tex2D(GlareTex, IN.Tex1.xy);
+	float4 fHeatColor = tex2D(HeatTex, IN.Tex2.xy);
+#endif	
+	float4 fNoiseColor = tex2D(NoiseTex, IN.Tex3.xy);
+				
+				
+	// compute luminosity		
+	float fScreenLuminosity= dot( fLuminosity, fScreenColor.xyz );  		
+	float fGlareLuminosity= dot( fLuminosity, fGlareColor.xyz );
+		
+	float fColor = saturate( fGlareLuminosity );	
+	fColor = saturate(fColor*Glare.w + fScreenLuminosity);
+	
+	float3 fFinal= saturate( 2*(fColor*fNoiseColor + fNightColor*0.2)*fHeatColor)*fNoiseColor;
+							  			
+	OUT.Color.xyz = fFinal;
+	OUT.Color.w = 1;
+}
+

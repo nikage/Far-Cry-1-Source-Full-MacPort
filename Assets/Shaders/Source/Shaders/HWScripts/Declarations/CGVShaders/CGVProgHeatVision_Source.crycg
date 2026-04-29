@@ -1,0 +1,46 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, uniform float3 CameraPos, uniform float4 Constants, uniform float3 Source0, uniform float4 Dist }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+        };
+
+      }
+      PositionScript
+      {
+        float4 vNormal = normalize(IN.Normal);
+        float4 vPos;
+        float fFactor = length(IN.Position.xyz - Source0.xyz) * Dist.x;
+        fFactor = (1 / fFactor) / 8;
+        //fFactor = 1.5 - clamp(fFactor, 0, 1.5);
+        vPos.xyz = IN.Position.xyz + vNormal.xyz * Constants.x * clamp(fFactor, 0, 2);
+        vPos.w = IN.Position.w;
+        OUT.HPosition = mul(ModelViewProj, vPos);
+      }
+
+      CoreScript
+      {
+        float3 camVec = normalize(CameraPos.xyz - vPos.xyz);
+        float4 color = IN.Color;
+        float fDot = dot(camVec, vNormal.xyz) * fFactor;
+        color.w = fDot * Constants.y;
+        color.x = color.x * (fFactor * Constants.z);
+        OUT.Color = color;
+        OUT.Tex0.x = length(vPos.xyz - Source0.xyz) * Dist.x;
+        OUT.Tex0.y = 1.0f;
+      }
+    

@@ -1,0 +1,49 @@
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+      
+      MainInput { uniform sampler3D noiseMap : texunit0,
+                  uniform samplerCUBE envMap : texunit1,
+                  uniform float4 FadeParams,
+                  uniform float4 TimeParams,
+                  uniform float4 WaterColor }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {        
+        float3 pos = IN.Tex0.xyz + TimeParams.yzw * TimeParams.x;
+        float4 noisy = tex3D(noiseMap, pos);
+
+        // Signed noise 
+        float3 bump = 2 * noisy.a - 1;
+        bump.xy *= 0.15;
+        // Make sure the normal always points upwards
+        bump.z = 0.8 * abs(bump.z) + 0.2;
+        // Offset the surface normal with the bump
+        bump = normalize(IN.Tex1.xyz + bump);
+
+        // Find the reflection vector
+        float3 reflVec = reflect(IN.Tex2.xyz, bump.xyz);
+        float4 refl = texCUBE(envMap, reflVec.xyz);
+
+        float lrp = 1 - dot(-normalize(IN.Tex2.xyz), bump);
+
+        float fadeBias = FadeParams.x;
+        float fadeExp = FadeParams.y;
+
+        // Interpolate between the water color and reflection
+        OUT.Color.xyz = lerp(WaterColor.xyz, refl.xyz, saturate(fadeBias + pow(lrp, fadeExp)));
+        OUT.Color.a = IN.Color.a * WaterColor.a;
+      }
+      

@@ -1,0 +1,69 @@
+// ===============================================================
+// Vertex Program: refractive overlay
+// Description: used for general refractive geometry 
+// Last Update: 22/10/2003
+//
+// TODO: Make perspective correct projection version
+//
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 TEXCOORD0_2 }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,  
+  uniform float4   CameraPos,  
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,
+  uniform float4   TexMovSpeed,
+  uniform float4   ScreenSize
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{
+  float4 vHPos = mul(ModelViewProj, vPos);     
+              
+  // output texture coordinates       
+#ifdef OPENGL  
+  OUT.Tex2.xy = (vHPos.xy / vHPos.w + 1)*0.5*ScreenSize.xy;  
+#endif
+
+#ifdef D3D 
+  OUT.Tex2.x = (vHPos.x / vHPos.w + 1)*0.5;
+  OUT.Tex2.y = (-vHPos.y / vHPos.w + 1)*0.5;
+#endif
+
+  OUT.Tex1.x = ((vHPos.x / vHPos.w + 1)*0.5)*TexDetailScale.x+(TexMovSpeed.x*sin(1000*TexShiftRipple.x));
+  OUT.Tex1.y = ((-vHPos.y / vHPos.w + 1)*0.5)*TexDetailScale.y+(TexMovSpeed.y*cos(1000*TexShiftRipple.x));    
+  OUT.Tex0.xy = IN.TexCoord0.xy;
+
+  return OUT;
+}

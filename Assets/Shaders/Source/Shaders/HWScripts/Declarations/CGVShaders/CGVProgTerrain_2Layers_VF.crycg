@@ -1,0 +1,73 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgTerrain_2Layers_VF.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4 Layer1TexGen0, uniform float4 Layer1TexGen1, uniform float2x4 FogMatrix, uniform float2x4 FogEnterMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_C1
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_T3_2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.x = dot(BaseTexGen0, vPos);          
+        OUT.Tex0.y = dot(BaseTexGen1, vPos);          
+        OUT.Tex1.x = dot(Layer1TexGen0, vPos);          
+        OUT.Tex1.y = dot(Layer1TexGen1, vPos);          
+        OUT.Tex2.x = dot(Layer2TexGen0, vPos);          
+        OUT.Tex2.y = dot(Layer2TexGen1, vPos);          
+
+	      // y
+	      float2 tex0;
+	      tex0.xy = mul(FogEnterMatrix, vPos);
+
+	      //x
+	      float2 temp = mul(FogMatrix, vPos);
+	      temp.x -= 0.5f;
+	      temp.x = abs(temp.x);
+	      temp.x = clamp(temp.x,0,.4921875f); //63.f/128.f = .4921875
+
+	      if(tex0.x > 0.5)
+		      temp.x += 0.5;
+	      tex0.x = temp.x;
+
+      	OUT.Tex3.xy = tex0;
+
+        OUT.Color.a = IN.Color.a;
+        OUT.Color.b = IN.Color.r;
+        OUT.Color1.b = IN.Color.y;
+      }
+    

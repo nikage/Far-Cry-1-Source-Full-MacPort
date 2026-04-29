@@ -1,0 +1,64 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_Diff_ProjSingleLight_Atten_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+      
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE normCubeMap : texunit2,
+                  uniform samplerCUBE projMap : texunit3,
+                  uniform sampler2D attenMap : texunit4,
+                  uniform float4 Diffuse,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        half4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+
+        half4 projColor = texCUBE(projMap, IN.Tex3.xyz);
+        half atten = saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex4.xy).b));
+
+        // Light vector from input color
+        float4 lVec = 2*(texCUBE(normCubeMap, IN.Tex2.xyz)-0.5);
+        float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+        half3 dif = (decalColor.xyz * NdotL * projColor.xyz * Diffuse.xyz * atten) * 2;
+        half3 amb = Ambient.xyz * decalColor.xyz;
+
+        // finally add them all together
+        OUT.Color.xyz = amb + dif;
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+
+

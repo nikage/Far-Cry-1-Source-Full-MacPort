@@ -1,0 +1,52 @@
+// ===============================================================
+// Fragment Program: Cartoon
+// Description: used in cartoon render mode, washes out colors
+// Last Update: 01/05/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput
+{
+#ifdef OPENGL
+  uniform samplerRECT baseMap0 : texunit0
+#endif  
+#ifdef D3D
+  uniform sampler2D baseMap0 : texunit0
+#endif  
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal
+#ifdef OPENGL
+  float4 mColor0 = texRECT(baseMap0, IN.Tex0.xy);
+#endif  
+#ifdef D3D
+  float4 mColor0 = tex2D(baseMap0, IN.Tex0.xy);
+#endif  
+  
+    
+  float s0=saturate(dot(float3(0.30, 0.59, 0.11), mColor0.xyz))*0.9;        
+  float3 v0=mColor0.xyz*0.75+ s0.xxx*0.25;        
+  mColor0.xyz=saturate(v0+v0*float3(0.25, 0.24, 0.2));
+  
+                       
+  OUT.Color.xyz =  mColor0.xyz; //mColor0.xyz;
+  OUT.Color.w   = 1.0;
+}
+
+

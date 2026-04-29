@@ -1,0 +1,72 @@
+// ===============================================================
+// Vertex Program: Indoor Water
+// Description: used in indoor refractive water (w/ fake specular)
+// Last Update: 03/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  uniform float4   CameraPos,  
+  uniform float4   Constants,
+  uniform float4   NoisePos,
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale  
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{
+  float4 vHPos = mul(ModelViewProj, vPos);                
+  float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);  
+
+  float3 fNormal=float3(0,0,1);
+  float fDot= dot(eyeVec, fNormal);  
+  // output color and fresnel term hack           
+  OUT.Color.w =vHPos.w*0.15;     
+    
+  float2 vTex;
+  vTex.x = dot(vPos, TexGenRipple0);
+  vTex.y = dot(vPos, TexGenRipple1);
+  
+  float2 fShear= float2(cos(TexShiftRipple.z*TexDetailScale.w), sin(TexShiftRipple.w*TexDetailScale.w));    
+  vTex.xy= (vTex.xy+fShear.xy*0.1)*TexDetailScale.xy;
+
+  // output texture coordinates  
+  OUT.Tex0.xy = vTex.xy;
+    
+  float3 fReflVec=normalize(2*fDot*fNormal-eyeVec);     
+  //OUT.Tex1.xy = ((fReflVec.xy+1.0)*0.5-(TexShiftRipple.zw*TexShiftRipple.xy)*TexDetailScale.w); 
+
+  OUT.Tex1.xy = fReflVec.xy-fShear.xy*0.1;
+       
+  return OUT;
+}

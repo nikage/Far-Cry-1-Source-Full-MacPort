@@ -1,0 +1,67 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgMuzzleFlash_VF.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4 GeomConstants, uniform float4 StartColor, uniform float4 EndColor, uniform float3 LightForward, uniform float2x4 FogMatrix, uniform float2x4 FogEnterMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        float4 color = (1).xxxx;
+
+        float3 camVec = normalize(CameraPos.xyz - vPos.xyz);
+        
+        float d = dot(camVec.xyz, IN.Normal.xyz);
+        if (d < 0)
+          d = -d;
+        d = d*2;
+        d = d*d*d*d;
+        d = min(1, d);
+          
+        color.xyz = color.xyz * d.xxxx;
+          
+        OUT.Color = color;
+        OUT.Tex0.xy = IN.TexCoord0;
+        OUT.Tex1.xy  = mul(FogEnterMatrix, vPos);
+        OUT.Tex2.xy  = mul(FogMatrix, vPos);
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

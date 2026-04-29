@@ -1,0 +1,98 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCGlass_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+      
+      MainInput
+      {
+        uniform samplerCUBE Environment : register(s0),
+        uniform sampler1D Rainbow : register(s1),
+        uniform float4 Params,
+        uniform float4 Params1,
+        uniform float4 BaseColor
+      }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        float3 normal = normalize(IN.Tex0.xyz);
+        float3 viewVec = normalize(IN.Tex1.xyz);
+        
+        float refractionScale = Params.x;
+        float reflectionScale = Params.y;
+        float rainbowScale    = Params.z;
+        float rainbowSpread   = Params.w;
+        
+        float ambient         = Params1.x;
+        float indexOfRefractionRatio = Params1.y;
+
+        // Look up the reflection
+        float3 reflVec = reflect(-viewVec, normal);
+        float4 reflection = texCUBE(Environment, reflVec.xyz);
+
+        // We'll use Snell's refraction law:
+        // n  * sin(theta ) = n  * sin(theta )
+        //  i            i     r            r
+
+        // sin(theta )
+        //          i
+        float cosine = dot(viewVec, normal);
+        float sine = sqrt(1 - cosine * cosine);
+
+        // sin(theta )
+        //          r
+        float sine2 = saturate(indexOfRefractionRatio * sine);
+        float cosine2 = sqrt(1 - sine2 * sine2);
+
+        // Out of the sine and cosine of the angle between the
+        // refraction vector and the normal we can construct the
+        // refraction vector itself given two base vectors.
+        // These two base vectors are the negative normal and
+        // a tangent vector along the path of the incoming vector
+        // relative to the surface.
+        float3 x = -normal;
+        float3 y = normalize(cross(cross(viewVec, normal), normal));
+
+        // Refraction
+        float3 refrVec = x * cosine2 + y * sine2;
+        float4 refraction = texCUBE(Environment, refrVec.xyz);
+
+        // Colors refract differently and the difference is more
+        // visible the stronger the refraction. We'll fake this
+        // effect by adding some rainbowish colors accordingly.
+        float4 rainbow = tex1D(Rainbow, pow(cosine, rainbowSpread));
+
+        float4 rain = rainbowScale * rainbow * BaseColor;
+        float4 refl = reflectionScale * reflection;
+        float4 refr = refractionScale * refraction * BaseColor;
+
+        // There is more light reflected at sharp angles and less
+        // light refracted. There is more color separation of refracted
+        // light at sharper angles
+        OUT.Color = sine * refl + (1 - sine2) * refr + sine2 * rain + ambient;
+      }
+

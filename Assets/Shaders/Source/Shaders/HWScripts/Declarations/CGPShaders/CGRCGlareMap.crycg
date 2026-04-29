@@ -1,0 +1,59 @@
+// ==============================================================================
+// Fragment Program: Glare Map
+// Description: used in glare map generation, mask's out low luminosity fragments
+// Last Update: 09/08/2003
+// Coder: Tiago Sousa
+// ==============================================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+#ifdef OPENGL
+	uniform samplerRECT baseMap : texunit0,
+	uniform samplerRECT glareAmountMap : texunit1,
+#endif
+#ifdef D3D
+	uniform sampler2D baseMap : texunit0,
+	uniform sampler2D glareAmountMap : texunit1,
+#endif
+	uniform float4 vGlare,
+	uniform float4 vGlareAmount
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	};
+
+	FOUT
+}
+
+CoreScript
+{
+#ifdef OPENGL
+	// load the decal
+	float4 glareColor = texRECT(baseMap, IN.Tex0.xy);
+	float4 glareAmount= texRECT(glareAmountMap, IN.Tex1.xy);
+#endif
+#ifdef D3D
+	// load the decal
+	float4 glareColor = tex2D(baseMap, IN.Tex0.xy);
+	float4 glareAmount= tex2D(glareAmountMap, IN.Tex1.xy);
+#endif
+
+	     
+	// remove dark pixels, leave brightest ones (color-threshold)*MaxAmount
+	// BTW: i've add to negate vGlare.xyz values from CPP code, since CG generates really wrong instruction on this..
+  float3 fGlareMap=saturate(glareColor.xyz+vGlare.xyz)*vGlare.w;
+  fGlareMap*=2*fGlareMap;  
+    
+	
+	OUT.Color.xyz = fGlareMap*saturate((1-glareAmount.xyz)+vGlareAmount.xyz); 
+	OUT.Color.a = glareAmount.z;
+}
+
+

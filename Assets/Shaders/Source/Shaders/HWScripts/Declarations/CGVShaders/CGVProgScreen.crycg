@@ -1,0 +1,47 @@
+// ===============================================================
+// Vertex Program: Screen refraction
+// Description: outputs textures coordinates for screen refraction
+// Last Update: 20/04/2003
+// Coder: Andrey Konich / Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes
+{
+  POSITION_3
+  TEXCOORD0_2
+}
+
+MainInput 
+{
+  VIEWPROJ_MATRIX,
+  uniform float4 TexGen0,
+  uniform float4 TexGen1,
+  uniform float4 TexTilling
+}
+
+DeclarationsScript
+{
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+  };
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{
+  OUT.Tex0.xy = float2(dot(TexGen0, vPos), dot(TexGen1, vPos))*TexTilling.x;
+  OUT.Tex1.xy = IN.TexCoord0.xy;
+}
+

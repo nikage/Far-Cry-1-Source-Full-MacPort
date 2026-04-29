@@ -1,0 +1,53 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTerrainShadow_Depth.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : register(s0),
+                  uniform sampler2D shadMap : register(s1),
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        half4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the 1 shadow sample
+        half4 shadColor0 = tex2Dproj(shadMap, IN.Tex1.xyzw);
+        half shad = shadColor0.r/8 + shadColor0.g;
+        float fZ = IN.Tex2.x / IN.Tex2.y;
+        shad = shad - fZ;
+        half fCompare = step(shad, 0) * shadColor0.a;
+        
+        half3 color = (decalColor.xyz * IN.Color.xyz * Ambient.xyz);
+        color.xyz = HDREncode(color.xyz);
+        OUT.Color.xyz = color;
+        OUT.Color.a = fCompare;
+      }
+      

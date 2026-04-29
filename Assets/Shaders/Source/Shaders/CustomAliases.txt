@@ -1,0 +1,421 @@
+{
+  r_OffsetBump = 0
+  
+  TemplBumpSpec_Offset_PS20	TemplBumpSpec_PS20
+  TemplBumpSpec_Gloss_Offset_PS20	TemplBumpSpec_Gloss_PS20
+  TemplBumpSpec_GlossAlpha_Offset_PS20	TemplBumpSpec_GlossAlpha_PS20
+  TemplBumpSpec_EnvCMAmb_Offset_PS20	TemplBumpSpec_EnvCMAmb_PS20
+  TemplBumpSpec_EnvCMAmb_Offset_RT_PS20	TemplBumpSpec_EnvCMAmb_RT_PS20
+  TemplBumpSpec_Gloss_EnvCMAmb_Offset_PS20	TemplBumpSpec_Gloss_EnvCMAmb_PS20
+  TemplBumpSpec_Gloss_EnvCMAmb_Offset_RT_PS20	TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_Offset_PS20	TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_Offset_RT_PS20	TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20
+ 
+  TemplBumpSpec_EnvCMSpec_Offset_PS20	TemplBumpSpec_EnvCMSpec_PS20
+  TemplBumpSpec_EnvCMSpec_Offset_RT_PS20	TemplBumpSpec_EnvCMSpec_RT_PS20
+  TemplBumpSpec_Gloss_EnvCMSpec_Offset_PS20	TemplBumpSpec_Gloss_EnvCMSpec_PS20
+  TemplBumpSpec_Gloss_EnvCMSpec_Offset_RT_PS20	TemplBumpSpec_Gloss_EnvCMSpec_RT_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_Offset_PS20	TemplBumpSpec_GlossAlpha_EnvCMSpec_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_Offset_RT_PS20	TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_PS20
+
+  TemplBumpSpec_GlossAlpha_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_GlossAlpha_PowerGlossAlpha_PS20
+  TemplBumpSpec_Gloss_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_Gloss_PowerGlossAlpha_PS20
+  
+  TemplModelCommon_Offset_PS20 TemplModelCommon
+  TemplBumpDiffuse_Offset_PS20 TemplBumpDiffuse
+}
+
+{
+  GPU = NV1X
+  
+  PlayerMaskModulate PlayerMaskModulate_FP
+  
+  Decal_VP Decal_FP
+  Decal_2D_VP Decal_FP
+  TemplBumpDiffuse	TemplDiffuse_FP
+  TemplBumpDiffuse_AlphaGlow	TemplDiffuse_FP
+  TemplRefract	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassEnvCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassCM_PS20	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassDispersionCM	TemplReflCM ;TemplGlassCM
+  TemplGlassDispersionEnvCM TemplReflEnvCM
+  TemplBumpGlassCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplBumpGlassEnvCM	TemplGlassCM_FP ;TemplGlassEnvCM
+  TemplBumpGlassFresnelCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplBumpGlassFresnelEnvCM	TemplGlassCM_FP ;TemplGlassEnvCM
+  TemplBumpOffsetEnv	TemplDiffuse_FP
+  TemplBumpReflCM	TemplReflCM
+  TemplBumpReflCM_Deform	TemplReflCM ;;
+  TemplBumpReflCM_Light	TemplReflCM ;;
+  TemplBumpReflEnvCM	TemplReflEnvCM  ;; --
+  TemplBumpRefrCM	TemplRefrCM ;; --
+  TemplBumpRefrEnvCM	TemplRefrEnvCM ;;--
+
+  TemplReflCMDecal_ReflAmountOpacity  TemplReflCM
+  
+  TemplBumpSpec_EnvCMAmb	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMAmb_RT	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb_RT	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT	TemplDiffuse_FP
+
+  TemplDecalOpacityShift  TemplDecalOpacityShift_FP
+  TemplDecalOpacityShift1 TemplDecalOpacityShift1_FP
+  TemplDecalOpacityShift2 TemplDecalOpacityShift2_FP
+  TemplDecalOpacityShift3 TemplDecalOpacityShift3_FP
+  TemplDecalOpacityShift4 TemplDecalOpacityShift4_FP
+  
+  TemplReflCMDecal_ReflAmountOpacity  TemplReflCM
+  
+  TemplBumpSpec_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_PS20	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMAmb_PS20	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMAmb_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20	TemplDiffuse_FP
+
+  TemplBumpSpec_Offset_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_Offset_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_Offset_PS20	TemplDiffuse_FP
+  
+  TemplBumpSpec	TemplDiffuse_FP
+  TemplBumpSpec_Gloss	TemplDiffuse_FP     ;TemplDecalLight_SpecAdd
+  TemplBumpSpec_GlossAlpha	TemplDiffuse_FP
+  TemplBumpSpec_HP	TemplDiffuse_FP
+  TemplBumpSpec_HP_GlossAlpha	TemplDiffuse_FP
+  TemplBumpSpec_NOCM	TemplDiffuse_FP
+  TemplPlants	TemplDecalAlphaTest_VColors
+  TemplPlants1	TemplDecalAlphaTest_VColors
+  TemplPlantsBark	TemplDecal_VColors
+  TemplPlantsBark_SunRabbits	TemplDecal_VColors
+  TemplModelBumpSpec_hp TemplDiffuse_FP
+  TemplModelBumpSpec_hp_glossalpha	TemplDiffuse_FP
+  WhiteShadow	WhiteShadow_FP
+  TemplMuzzleFlash  TemplMuzzleFlash_FP
+  TemplAlphaBlend   TemplAlphaBlend_FP
+  TemplDecalAlphaBlend TemplDecalAlphaBlend_FP
+  TerrainShadowPass TerrainShadowPass_FP
+  Terrain	Terrain_FP
+  TerrainWithFog	Terrain_FP
+  TerrainLowLod	TerrainLowLod_FP  
+  TerrainWaterBeach	TerrainWaterBeach_FP
+  TerrainWaterBeachResearch	TerrainWaterBeach_FP
+  TerrainWaterBottom	TerrainWaterBottom_FP
+  TerrainWaterBottomSimple  TerrainWaterBottomSimple_FP  
+  TerrainWithDefaultDetailTexture  TerrainWithDefaultDetailTexture_FP  
+  templmodelcommon	TemplDiffuse_FP
+  ParticleLight	ParticleLight_FP  
+  TemplMuzzleFlash_Auto	TemplMuzzleFlash_Auto_FP
+  TemplFog	TemplFog_FP
+  TemplFogCaustics	TemplFogCaustics_FP_NV1X
+  TemplFogCaustics_FP	TemplFogCaustics_FP_NV1X
+  TemplGlassEnvCM	TemplDiffuse_FP
+  TemplLightDiffuse_AlphaGlow	TemplDiffuse_FP
+  TemplDecalModulate	TemplDecalModulate_FP
+  TemplDecalAlphaGlowSelfIllum	TemplDecalModulate_FP    
+  TerrainWater LowSpecWaterOutdoor_FP  
+  TerrainWater_TempleRiver LowSpecWaterOutdoor_FP
+  TerrainRiver  LowSpecWaterOutdoor_FP
+  TerrainLake LowSpecWaterOutdoor_FP
+  TerrainLake_NoFresnel LowSpecWaterOutdoor_FP
+  TerrainLake_Deformed  LowSpecWaterOutdoor_FP
+  TemplLake LowSpecWaterOutdoor_FP
+  TemplLakeRefr LowSpecWaterOutdoor_FP
+  TerrainWater_OnlySky  LowSpecWaterOutdoor_FP
+  TerrainDeepWater  LowSpecWaterOutdoor_FP
+  TerrainOcean2 LowSpecWaterOutdoor_FP
+  WaterVolume LowSpecWaterIndoor_FP
+  WaterVolumeBumpReflCM LowSpecWaterIndoor_FP
+  TemplBumpDiffuse_SpecHigh TemplDiffuse_FP
+  TemplBumpDiffuse_GlossSpecHigh TemplDiffuse_FP
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplDiffuse_FP
+  TemplBeamProc TemplBeamProc_FP
+  
+  MutantStealth MutantStealth_FP
+  MutantMorph MutantMorph_FP
+  LavaVolume LavaVolume_FP
+
+  TemplGlassEnvTex TemplGlassEnvTex_FP
+
+	TemplCryVision TemplCryVision_FP
+	TemplCryVisionPlayer TemplCryVision_FP
+	TemplCryVision_Mask TemplCryVision_Mask_FP
+	
+	CharacterInvulnerability_Metal CharacterInvulnerability_Metal_FP
+	TemplHologram TemplHologram_FP
+	TemplMutatedArms TemplMutatedArms_FP
+}
+
+
+{
+  r_Quality_BumpMapping = 0
+  
+  PlayerMaskModulate PlayerMaskModulate_FP
+  
+  Decal_VP Decal_FP
+  Decal_2D_VP Decal_FP
+  TemplBumpDiffuse	TemplDiffuse_FP
+  TemplBumpDiffuse_AlphaGlow	TemplDiffuse_FP
+  TemplRefract	TemplGlassCM_FP ;TemplGlassCM
+  TemplBumpGlassCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplBumpGlassEnvCM	TemplGlassCM_FP ;TemplGlassEnvCM
+  TemplBumpGlassFresnelCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplBumpGlassFresnelEnvCM	TemplGlassCM_FP ;TemplGlassEnvCM
+  TemplBumpOffsetEnv	TemplDiffuse_FP
+  TemplBumpReflCM	TemplReflCM
+  TemplBumpReflCM_Deform	TemplReflCM 
+  TemplBumpReflCM_Light	TemplReflCM
+  TemplBumpReflEnvCM	TemplReflEnvCM
+  TemplBumpRefrCM	TemplRefrCM
+  TemplBumpRefrEnvCM	TemplRefrEnvCM 
+
+  TemplDecalOpacityShift  TemplDecalOpacityShift_FP
+  TemplDecalOpacityShift1 TemplDecalOpacityShift1_FP
+  TemplDecalOpacityShift2 TemplDecalOpacityShift2_FP
+  TemplDecalOpacityShift3 TemplDecalOpacityShift3_FP
+  TemplDecalOpacityShift4 TemplDecalOpacityShift4_FP
+
+  TemplGlassCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassEnvCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassCM_PS20	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassDispersionCM	TemplGlassCM_FP ;TemplGlassCM
+  TemplGlassDispersionEnvCM TemplGlassCM_FP
+
+  TemplBumpSpec_EnvCMAmb	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMAmb_RT	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb_RT	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT	TemplDiffuse_FP
+  
+  TemplBumpSpec_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_PS20	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMAmb_PS20	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMAmb_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMSpec_PS20	TemplDiffuse_FP
+  TemplBumpSpec_EnvCMSpec_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMSpec_PS20	TemplDiffuse_FP
+  TemplBumpSpec_Gloss_EnvCMSpec_RT_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_PS20	TemplDiffuse_FP
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_PS20	TemplDiffuse_FP
+  TemplBumpDiffuse_EnvCMSpec_PS20	TemplDiffuse_FP
+  TemplBumpDiffuse_EnvCMSpec_RT_PS20	TemplDiffuse_FP
+
+  TemplBumpSpec	TemplDiffuse_FP
+  TemplBumpSpec_Gloss	TemplDiffuse_FP     ;TemplDecalLight_SpecAdd
+  TemplBumpSpec_GlossAlpha	TemplDiffuse_FP
+  TemplBumpSpec_HP	TemplDiffuse_FP
+  TemplBumpSpec_HP_GlossAlpha	TemplDiffuse_FP
+  TemplBumpSpec_NOCM	TemplDiffuse_FP
+  TemplPlants	TemplDecalAlphaTest_VColors
+  TemplPlants1	TemplDecalAlphaTest_VColors
+  TemplPlantsBark	TemplDecal_VColors
+  TemplPlantsBark_SunRabbits	TemplDecal_VColors
+  TemplModelBumpSpec_hp TemplDiffuse_FP
+  TemplModelBumpSpec_hp_glossalpha	TemplDiffuse_FP
+  ; Terrain	Terrain_FP  
+  ; TerrainLowLod	TerrainLowLod_FP  
+  ; TerrainWaterBeach	TerrainWaterBeach_FP
+  ; TerrainWaterBottom	TerrainWaterBottom_FP
+  ; TerrainWithDefaultDetailTexture  TerrainWithDefaultDetailTexture_FP    
+  templmodelcommon	TemplDiffuse_FP
+  ParticleLight	ParticleLight_FP  
+  TemplMuzzleFlash_Auto	TemplMuzzleFlash_Auto_FP
+  TemplGlassEnvCM	TemplDiffuse_FP
+  TemplLightDiffuse_AlphaGlow	TemplDiffuse_FP
+  TemplDecalModulate	TemplDecalModulate_FP
+  TemplDecalAlphaGlowSelfIllum	TemplDecalModulate_FP  
+  TerrainWaterBottomSimple TerrainWaterBottomSimple_FP
+  TemplBumpDiffuse_SpecHigh TemplDiffuse_FP
+  TemplBumpDiffuse_GlossSpecHigh TemplDiffuse_FP
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplDiffuse_FP
+  
+  MutantStealth MutantStealth_FP
+  MutantMorph MutantMorph_FP
+  
+	TemplCryVision TemplCryVision_FP
+	TemplCryVisionPlayer TemplCryVision_FP
+	TemplCryVision_Mask TemplCryVision_Mask_FP
+
+  TemplGlassEnvTex TemplGlassEnvTex_FP
+  CharacterInvulnerability_Metal CharacterInvulnerability_Metal_FP
+  TemplHologram TemplHologram_FP
+  TemplMutatedArms TemplMutatedArms_FP
+}
+
+{
+  r_Quality_BumpMapping = 1
+  
+  TemplBumpDiffuse_SpecHigh	TemplBumpDiffuse
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplBumpDiffuse
+  TemplBumpDiffuse_GlossSpecHigh TemplBumpDiffuse
+}
+
+{
+  r_Quality_BumpMapping = 2
+  
+  TemplBumpDiffuse_SpecHigh	TemplBumpSpec
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplBumpSpec_GlossAlpha
+  TemplBumpDiffuse_GlossSpecHigh TemplBumpSpec_Gloss
+}
+
+{
+  r_Quality_BumpMapping = 3
+
+  TemplBumpDiffuse_SpecHigh	TemplBumpSpec_PS20
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplBumpSpec_GlossAlpha_PS20
+  TemplBumpDiffuse_GlossSpecHigh TemplBumpSpec_Gloss_PS20
+  
+  TemplBumpSpec_EnvCMAmb	TemplBumpSpec_EnvCMAmb_PS20
+  TemplBumpSpec_EnvCMAmb_RT	TemplBumpSpec_EnvCMAmb_RT_PS20
+  TemplBumpSpec_Gloss_EnvCMAmb	TemplBumpSpec_Gloss_EnvCMAmb_PS20
+  TemplBumpSpec_Gloss_EnvCMAmb_RT	TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMAmb	TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT	TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20
+  
+  TemplBumpSpec	TemplBumpSpec_PS20
+  TemplBumpSpec_Gloss	TemplBumpSpec_Gloss_PS20
+  TemplBumpSpec_GlossAlpha	TemplBumpSpec_GlossAlpha_PS20
+  TemplBumpSpec_EnvCMAmb	TemplBumpSpec_EnvCMAmb_PS20
+  TemplBumpSpec_EnvCMAmb_RT	TemplBumpSpec_EnvCMAmb_RT_PS20
+  TemplBumpSpec_Gloss_EnvCMAmb	TemplBumpSpec_Gloss_EnvCMAmb_PS20
+  TemplBumpSpec_Gloss_EnvCMAmb_RT	TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMAmb	TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT	TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20
+
+  TemplBumpSpec_HP	TemplBumpSpec_PS20
+  TemplBumpSpec_HP_GlossAlpha	TemplBumpSpec_GlossAlpha_PS20
+  TemplBumpSpec_HP_EnvCMAmb	TemplBumpSpec_EnvCMAmb_PS20
+  TemplBumpSpec_HP_GlossAlpha_EnvCMAmb	TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20
+  TemplBumpSpec_NOCM	TemplBumpSpec_PS20
+  TemplModelBumpSpec_HP TemplBumpSpec_PS20
+  TemplModelBumpSpec_HP_GlossAlpha	TemplBumpSpec_GlossAlpha_PS20
+  TemplBumpDiffuse_SpecHigh TemplBumpSpec_PS20
+  TemplBumpDiffuse_GlossSpecHigh TemplBumpSpec_Gloss_PS20
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplBumpSpec_GlossAlpha_PS20
+}
+
+
+{
+  r_Quality_Reflection = 1
+
+  TerrainWater_OnlySky  TerrainWater
+}
+
+{
+  r_NoPS20 = 1
+
+  TemplBumpDiffuse_SpecHigh	TemplBumpSpec
+  TemplBumpDiffuse_GlossAlphaSpecHigh TemplBumpSpec_GlossAlpha
+  TemplBumpDiffuse_GlossSpecHigh TemplBumpSpec_Gloss
+  
+  TemplBumpSpec_PS20	TemplBumpSpec
+  TemplBumpSpec_Gloss_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_GlossAlpha_PS20	TemplBumpSpec_GlossAlpha
+
+  TemplBumpSpec_Offset_PS20	TemplBumpSpec
+  TemplBumpSpec_Gloss_Offset_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_GlossAlpha_Offset_PS20	TemplBumpSpec_GlossAlpha
+  
+  TemplBumpSpec_EnvCMAmb_PS20	TemplBumpSpec_EnvCMAmb
+  TemplBumpSpec_EnvCMAmb_RT_PS20	TemplBumpSpec_EnvCMAmb_RT
+  TemplBumpSpec_Gloss_EnvCMAmb_PS20	TemplBumpSpec_Gloss_EnvCMAmb
+  TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20	TemplBumpSpec_Gloss_EnvCMAmb_RT
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20	TemplBumpSpec_GlossAlpha_EnvCMAmb
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20	TemplBumpSpec_GlossAlpha_EnvCMAmb_RT
+
+  TemplBumpSpec_EnvCMAmb_Offset_PS20	TemplBumpSpec_EnvCMAmb
+  TemplBumpSpec_EnvCMAmb_RT_Offset_PS20	TemplBumpSpec_EnvCMAmb_RT
+  TemplBumpSpec_Gloss_EnvCMAmb_Offset_PS20	TemplBumpSpec_Gloss_EnvCMAmb
+  TemplBumpSpec_Gloss_EnvCMAmb_RT_Offset_PS20	TemplBumpSpec_Gloss_EnvCMAmb_RT
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_Offset_PS20	TemplBumpSpec_GlossAlpha_EnvCMAmb
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_Offset_PS20	TemplBumpSpec_GlossAlpha_EnvCMAmb_RT
+ 
+  TemplBumpSpec_EnvCMSpec_PS20	TemplBumpSpec
+  TemplBumpSpec_EnvCMSpec_RT_PS20	TemplBumpSpec
+  TemplBumpSpec_Gloss_EnvCMSpec_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_Gloss_EnvCMSpec_RT_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_PS20	TemplBumpSpec_GlossAlpha
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_PS20	TemplBumpSpec_GlossAlpha
+
+  TemplBumpSpec_EnvCMSpec_Offset_PS20	TemplBumpSpec
+  TemplBumpSpec_EnvCMSpec_RT_Offset_PS20	TemplBumpSpec
+  TemplBumpSpec_Gloss_EnvCMSpec_Offset_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_Gloss_EnvCMSpec_RT_Offset_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_Offset_PS20	TemplBumpSpec_GlossAlpha
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_Offset_PS20	TemplBumpSpec_GlossAlpha
+
+  TemplBumpSpec_EnvCMSpec_PowerGlossAlpha_PS20	TemplBumpSpec
+  TemplBumpSpec_EnvCMSpec_RT_PowerGlossAlpha_PS20	TemplBumpSpec
+  TemplBumpSpec_Gloss_EnvCMSpec_PowerGlossAlpha_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_Gloss_EnvCMSpec_RT_PowerGlossAlpha_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_PowerGlossAlpha_PS20	TemplBumpSpec_GlossAlpha
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_PowerGlossAlpha_PS20	TemplBumpSpec_GlossAlpha
+
+  TemplBumpSpec_EnvCMSpec_PowerGlossAlpha_Offset_PS20	TemplBumpSpec
+  TemplBumpSpec_EnvCMSpec_RT_PowerGlossAlpha_Offset_PS20	TemplBumpSpec
+  TemplBumpSpec_Gloss_EnvCMSpec_PowerGlossAlpha_Offset_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_Gloss_EnvCMSpec_RT_PowerGlossAlpha_Offset_PS20	TemplBumpSpec_Gloss
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_PowerGlossAlpha_Offset_PS20	TemplBumpSpec_GlossAlpha
+  TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_PowerGlossAlpha_Offset_PS20	TemplBumpSpec_GlossAlpha
+
+  TemplBumpSpec_PowerGlossAlpha_PS20 TemplBumpSpec
+  TemplBumpSpec_GlossAlpha_PowerGlossAlpha_PS20 TemplBumpSpec_GlossAlpha
+  TemplBumpSpec_Gloss_PowerGlossAlpha_PS20 TemplBumpSpec_Gloss
+  
+  TemplBumpSpec_PowerGlossAlpha_Offset_PS20 TemplBumpSpec
+  TemplBumpSpec_GlossAlpha_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_GlossAlpha
+  TemplBumpSpec_Gloss_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_Gloss
+  
+  TemplBumpSpec_EnvCMAmb_PowerGlossAlpha_PS20 TemplBumpSpec_EnvCMAmb
+  TemplBumpSpec_EnvCMAmb_RT_PowerGlossAlpha_PS20 TemplBumpSpec_EnvCMAmb_RT
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_PowerGlossAlpha_PS20 TemplBumpSpec_GlossAlpha_EnvCMAmb
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PowerGlossAlpha_PS20 TemplBumpSpec_GlossAlpha_EnvCMAmb_RT
+  TemplBumpSpec_Gloss_EnvCMAmb_PowerGlossAlpha_PS20 TemplBumpSpec_Gloss_EnvCMAmb
+  TemplBumpSpec_Gloss_EnvCMAmb_RT_PowerGlossAlpha_PS20 TemplBumpSpec_Gloss_EnvCMAmb_RT
+
+  TemplBumpSpec_EnvCMAmb_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_EnvCMAmb
+  TemplBumpSpec_EnvCMAmb_RT_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_EnvCMAmb_RT
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_GlossAlpha_EnvCMAmb
+  TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_GlossAlpha_EnvCMAmb_RT
+  TemplBumpSpec_Gloss_EnvCMAmb_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_Gloss_EnvCMAmb
+  TemplBumpSpec_Gloss_EnvCMAmb_RT_PowerGlossAlpha_Offset_PS20 TemplBumpSpec_Gloss_EnvCMAmb_RT
+
+  TemplBumpDiffuse_EnvCMSpec_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_EnvCMSpec_RT_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_GlossAlpha_EnvCMSpec_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_GlossAlpha_EnvCMSpec_RT_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_Gloss_EnvCMSpec_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_Gloss_EnvCMSpec_RT_PS20	TemplBumpDiffuse
+
+  TemplBumpDiffuse_EnvCMSpec_Offset_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_EnvCMSpec_RT_Offset_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_GlossAlpha_EnvCMSpec_Offset_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_GlossAlpha_EnvCMSpec_RT_Offset_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_Gloss_EnvCMSpec_Offset_PS20	TemplBumpDiffuse
+  TemplBumpDiffuse_Gloss_EnvCMSpec_RT_Offset_PS20	TemplBumpDiffuse
+
+  TemplBumpGlitter_PS20	TemplBumpSpec
+  TemplBubble_PS20	TemplBubble
+  TemplMetallic_PS20	TemplMetallic
+  TemplIridescence_PS20	TemplIridescence
+
+  TemplGlassCM_PS20	TemplGlassCM
+}
+
+{
+  r_Vegetation_PerpixelLight = 1
+
+  TemplPlantsBark	TemplPlantsBark_Bump
+  TemplPlantsBark_SunRabbits	TemplPlantsBark_SunRabbits_Bump
+}

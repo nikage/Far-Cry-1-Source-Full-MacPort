@@ -1,0 +1,69 @@
+// ===============================================================
+// Fragment Program: Cartoon silhouete
+// Description: used in cartoon render mode, to extract image silhouetes
+// Last Update: 01/05/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput
+{
+#ifdef OPENGL
+  uniform samplerRECT baseMap0 : texunit0,
+  uniform samplerRECT baseMap1 : texunit1,
+  uniform samplerRECT baseMap2 : texunit2,
+  uniform samplerRECT baseMap3 : texunit3            
+#endif  
+#ifdef D3D
+  uniform sampler2D baseMap0 : texunit0,
+  uniform sampler2D baseMap1 : texunit1,
+  uniform sampler2D baseMap2 : texunit2,
+  uniform sampler2D baseMap3 : texunit3            
+#endif  
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+    OUT_T3
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal
+#ifdef OPENGL
+  float4 mColor0 = texRECT(baseMap0, IN.Tex0.xy);
+  float4 mColor1 = texRECT(baseMap1, IN.Tex1.xy);
+  float4 mColor2 = texRECT(baseMap2, IN.Tex2.xy);
+  float4 mColor3 = texRECT(baseMap3, IN.Tex3.xy);
+#endif  
+#ifdef D3D
+  float4 mColor0 = tex2D(baseMap0, IN.Tex0.xy);
+  float4 mColor1 = tex2D(baseMap1, IN.Tex1.xy);
+  float4 mColor2 = tex2D(baseMap2, IN.Tex2.xy);
+  float4 mColor3 = tex2D(baseMap3, IN.Tex3.xy);
+#endif  
+    
+  // get edges
+  float3 vCol01=2*saturate(mColor0.xyz-mColor1.xyz);
+  float3 vCol02=2*saturate(mColor2.xyz-mColor3.xyz);
+  
+  float3 s0=saturate(2*dot(vCol01.xyz, vCol01.xyz)); //*0.75;
+  float3 s1=saturate(2*dot(vCol02.xyz, vCol02.xyz)); //*0.75;
+  float3 vFinal=saturate(1-s0-s1);  
+  
+  OUT.Color.xyz =vFinal.xyz;  
+  OUT.Color.w = 1.0;
+}
+
+

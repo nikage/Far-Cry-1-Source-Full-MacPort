@@ -1,0 +1,49 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWater_CM_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      Param4f ( Name = WaterLevel Comp 'WaterLevel' Comp = 0 Comp = 1)  // Water level
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4 Normal, uniform float4 Scale, uniform float4 WaterLevel }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon_PlusWaterLevel
+      CoreScript
+      {
+        OUT.Tex0.xyz = vPos.xyz * Scale.xyz;
+        OUT.Tex1.xyz = Normal.xyz;
+        OUT.Tex2.xyz = vPos.xyz - CameraPos.xyz;
+        OUT.Color = IN.Color;
+      }
+    

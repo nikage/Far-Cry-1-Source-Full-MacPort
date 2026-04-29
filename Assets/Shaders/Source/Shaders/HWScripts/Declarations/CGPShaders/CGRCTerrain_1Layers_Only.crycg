@@ -1,0 +1,39 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTerrain_1Layers_Only.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D detMap0 : texunit0 }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the detail
+        float4 detColor0 = tex2D(detMap0, IN.Tex0.xy);
+        
+        detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);
+        OUT.Color.xyz = detColor0.xyz;
+        OUT.Color.a = 1;
+      }

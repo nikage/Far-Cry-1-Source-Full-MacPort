@@ -1,0 +1,227 @@
+      #include "../CGVPMacro.csi"
+
+      AutoEnumTC
+
+      MainInput
+      {
+        uniform sampler2D baseMap : register(sn),
+#if %BUMP_MAP
+        uniform sampler2D bumpMap : register(sn),
+#endif
+#if %DIFFUSE
+        uniform float4 Diffuse,
+#endif
+#if %SPECULAR && !%SPECULAR_PERPIXEL
+        uniform samplerCUBE normCubeMapHA : register(sn),
+#endif
+#if %SPECULAR
+        uniform float4 Specular,
+#endif
+
+#if %GLOSS_MAP
+        uniform sampler2D glossMap : register(sn),
+#endif
+
+#if %ENVCMAMB || %ENVCMSPEC
+        uniform samplerCUBE envMap : register(sn),
+#endif
+        uniform float4 Ambient,
+#if %ENVCMAMB
+        uniform float4 Reflect,
+#elif %ENVCMSPEC
+        uniform float4 EnvMapParams,
+        uniform float4 FresnelParams,
+#endif
+#if %OFFSETBUMPMAPPING
+        uniform float4 BumpOffset,
+#endif
+      }  
+      DeclarationsScript
+      {
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float4 baseTC     : TEXCOORDN;
+#if %BUMP_MAP
+          float4 bumpTC     : TEXCOORDN;
+#endif          
+#if %SPECULAR && !%SPECULAR_PERPIXEL
+          float4 halfAngVec : TEXCOORDN;
+#endif   
+#if %GLOSS_MAP
+          float4 glossTC    : TEXCOORDN;
+#endif
+#if %DIFFUSE
+          float4 lightVec   : TEXCOORDN;
+#endif
+#if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+#elif %ENVCMSPEC
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+#endif          
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC || %SPECULAR_PERPIXEL
+          float4 viewVec    : TEXCOORDN;
+#endif          
+          float4 Color      : COLOR0;
+          float4 Color1     : COLOR1;
+        };
+
+# ifdef _HDR_MRT
+        FOUT_2
+# else
+        FOUT
+# endif
+
+      }
+      CoreScript
+      {
+        float2 baseTC = IN.baseTC.xy;
+
+#if %BUMP_MAP
+        float2 bumpTC = IN.bumpTC.xy;
+#endif
+
+#if %OFFSETBUMPMAPPING
+        FLOAT height = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a);
+        height *= BumpOffset.x;
+        FLOAT3 viewVec = normalize(IN.viewVec.xyz);
+        bumpTC.xy += viewVec.xy * height;
+        baseTC.xy += viewVec.xy * height;
+#endif
+        FLOAT3 bumpNormal = float3(0,0,1);
+      
+#if %BUMP_MAP
+        bumpNormal = EXPAND(tex2D(bumpMap, bumpTC.xy).xyz);
+    #if %BUMP_NORMALIZE
+        // normalize post-filtered bump normals
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+    #endif
+#endif
+        // load the decal
+#if %TEMP_NOBASE
+        FLOAT4 decalColor = float4(0,0,0,0);
+        FLOAT fAlpha = tex2D(baseMap, baseTC.xy).a;
+#else
+        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);
+        FLOAT fAlpha = decalColor.a;
+#endif
+        FLOAT3 color = decalColor.xyz;
+      
+#if %GLOSS_MAP
+        FLOAT4 glossColor = tex2D(glossMap, IN.glossTC.xy);
+#endif
+
+        FLOAT fWeight = IN.Color.a;
+
+#if %DIFFUSE && !%TEMP_NOBASE
+        // Calculate diffuse contribution
+        FLOAT3 lVec = IN.lightVec.xyz;
+        FLOAT NdotL = dot(lVec.xyz, bumpNormal.xyz)-lVec.z;
+        FLOAT3 dif = NdotL * Diffuse.xyz;
+        //FLOAT3 dif = HDREncode(dif);
+        color.xyz += dif;
+#endif
+
+        // Calculate specular contribution
+#if %SPECULAR && %TEMP_NOBASE
+        // Half angle vector from normalization cube-map
+  #if !%SPECULAR_PERPIXEL
+        FLOAT4 hVec = EXPAND(texCUBE(normCubeMapHA, IN.halfAngVec.xyz));
+        FLOAT NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz));
+        FLOAT  specVal = saturate((NdotH - 0.75)*4);
+        specVal = specVal * specVal;
+  #else
+    #if !%OFFSETBUMPMAPPING
+        FLOAT3 viewVec = normalize(IN.viewVec.xyz);
+    #endif
+        FLOAT3 lVec = normalize(IN.lightVec.xyz);
+        FLOAT3 reflVec = (2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz;
+        FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+        FLOAT fPow = Specular.w;
+    #if %SPECULARPOW_GLOSSALPHA
+        fPow *= glossColor.a;
+    #endif
+        FLOAT specVal = pow(NdotR, fPow);
+  #endif
+        FLOAT3 spec = specVal * Specular.xyz;
+  #if %GLOSS_MAP
+        spec *= glossColor.xyz;
+  #elif %GLOSS_DIFFUSEALPHA        
+        spec *= fAlpha;
+  #endif
+        spec = spec * 2; //HDREncode(spec);
+        color.xyz += spec;
+#endif
+
+#elif %ENVCMAMB
+        // load the environment map
+        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);
+        FLOAT fLerp = Reflect.a;
+  #if %ENVCM_MASKED
+        // load the gloss
+        fLerp *= glossColor.a;
+  #endif
+        color = lerp(color.xyz, envColor.xyz, fLerp);
+#elif %ENVCMSPEC && %TEMP_NOBASE
+        half fEnvmapAmount = EnvMapParams.x;
+
+        float fFresnelScale = FresnelParams.x;
+        float fFresnelBias = FresnelParams.y;
+        float fFresnelPow = FresnelParams.z;
+
+        // Calc Reflection Vector
+        float3x3 worldTangentSpace;
+        worldTangentSpace[0] = IN.tangVec.xyz;
+        worldTangentSpace[1] = IN.binormVec.xyz;
+        worldTangentSpace[2] = IN.normVec.xyz;
+
+      #if !%OFFSETBUMPMAPPING && !%SPECULAR_PERPIXEL
+        float3 viewVec = normalize(IN.viewVec.xyz);
+      #endif        
+        float NdotE = dot(bumpNormal.xyz, viewVec);
+        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);
+        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);
+
+        // Calc Fresnel factor
+        FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);
+
+        // Calc environment
+        FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;
+        env = env * fresnel;
+  #if %GLOSS_MAP
+        env *= glossColor.xyz;
+  #elif %GLOSS_DIFFUSEALPHA
+        env *= fAlpha;
+  #endif
+        color += HDREncodeAmb(env);
+#endif
+
+#if %ALPHAGLOW
+        color += fAlpha * decalColor.xyz;
+#endif
+
+#if !%ALPHA_BLEND || %TEMP_NOBASE
+  #if !%TEMP_NOBASE
+        color.xyz = color.xyz*fWeight + 0.5*(1-fWeight);
+  #else        
+        color.xyz = color.xyz*fWeight;
+  #endif
+#endif  
+        FLOAT fOutA = 1;
+
+#if !%ALPHA_BLEND || %TEMP_NOBASE
+  #if !%ALPHAGLOW && %DIFFUSEALPHA
+        fOutA = fAlpha;
+  #else
+        fOutA = 1;
+  #endif        
+#else
+        fOutA = fWeight;
+#endif
+        // finally add them all together
+        HDROutput(OUT, FLOAT4 (color.xyz, fOutA), 1, GlobalFogColor.xyz, IN.Color1.w);
+      }
+

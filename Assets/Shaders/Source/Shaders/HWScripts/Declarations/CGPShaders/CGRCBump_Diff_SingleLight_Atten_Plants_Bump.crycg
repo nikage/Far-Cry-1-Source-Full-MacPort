@@ -1,0 +1,67 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_Diff_SingleLight_Atten_Plants_Bump.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE normCubeMap : texunit2,
+                  uniform sampler2D attenMap : texunit3,
+                  uniform float4 Ambient,
+                  uniform float4 Diffuse,
+                  uniform float4 DiffuseSun }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        float atten = saturate(EXPAND(IN.Color1.b) * -(EXPAND(IN.Color1.b-0.5)) + (1-tex2D(attenMap, IN.Tex3.xy).b));
+
+        // Light vector from normalization cube-map
+        float4 lVec = EXPAND(texCUBE(normCubeMap, IN.Tex2.xyz));
+        float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+        float3 dif = NdotL * atten * Diffuse.xyz * decalColor.xyz;
+        dif = HDREncode(dif);
+
+        // light vector from static sun light
+        float3 lightVecSun = EXPAND(IN.Color1.xyz);
+        float fDifSun = saturate(dot(bumpNormal.xyz, lightVecSun));
+        float3 difSun = (fDifSun * DiffuseSun.xyz);
+        float3 amb = Ambient.xyz * (IN.Color.xyz + difSun.xyz) * decalColor.xyz;
+        amb.xyz = HDREncode(amb.xyz);
+
+        // finally add them all together
+        OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+
+

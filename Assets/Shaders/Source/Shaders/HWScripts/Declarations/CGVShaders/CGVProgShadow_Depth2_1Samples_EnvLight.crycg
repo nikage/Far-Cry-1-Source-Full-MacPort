@@ -1,0 +1,66 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgShadow_Depth2_1Samples_EnvLight.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TNORMAL_3 }
+
+      //NoFog      
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 TexGen0, uniform float2x4 ShadowModelMatr0, uniform float ShadowBias, uniform float4 EnvColors[6], uniform float4x4 TexMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TN
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1_2
+          OUT_T2_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+        OUT.Tex0 = mul(TexGen0, vPos);          
+
+        float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);
+        float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);
+        OUT.Tex2.x = fZ;
+        OUT.Tex2.y = fW;
+
+        // Calculate average radiosity color from 6 colors (Cube)
+        float3 tNormal;
+        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);        
+        float3 Compare1 = step(tNormal, 0);
+        float3 Compare0 = 1 - Compare1;
+        float3 signN = sign(tNormal);
+        tNormal = tNormal * tNormal;
+        tNormal = tNormal * signN;
+        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;
+        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;
+        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;
+        OUT.Color = (ColorX + ColorY + ColorZ) * 2.0;
+      }
+    

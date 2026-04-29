@@ -1,0 +1,91 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProg_BumpDiffSpec_PS.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+
+      MainInput { uniform float4x4 ModelViewProj, uniform float4 LightPos, uniform float4 CameraPos, uniform float4 AttenInfo }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+      }
+      SubrScript
+      {
+        // returns light distance
+        float ComputeLightVectors(
+            out float3 lightDir, 
+            out float3 viewDir, 
+            out float3 halfVec, 
+            float3 vertPos, float3 lightPos, float3 camPos) 
+        {
+	        // find the light distance and normalized light direction
+	        lightDir = lightPos-vertPos;
+	        float lightDist = length(lightDir);
+	        lightDir /= lightDist; // normalize
+
+	        // find the view distance and normalized view direction
+	        viewDir = normalize(camPos-vertPos);
+
+	        // find the half-angle vector
+	        halfVec = normalize(viewDir+lightDir);
+
+          return lightDist;
+        }
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        TANG_MATR
+
+        // compute lighting vectors
+        float3 LightDirection, ViewDirection, HalfVector;
+        float LightDistance = ComputeLightVectors(LightDirection, ViewDirection, HalfVector, vPos.xyz, LightPos.xyz, CameraPos.xyz);
+    
+        // transform the light direction to tangent space
+        OUT.Tex2.xyz = normalize(mul(objToTangentSpace, LightDirection)).xyzz;
+
+        // transform the half vector to tangent space
+        float3 halfVecTangent = normalize(mul(objToTangentSpace, HalfVector)).xyz;
+
+	      // compute light attenuation
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        float fiSqDist = rsqrt(dot(lightVec, lightVec));        
+        OUT.Color.w = (AttenInfo.x - 1/fiSqDist) * AttenInfo.y;
+
+	      // copy the texcoord over (duplicate for the bump map, also).
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+
+        // Set up texcoords for texm3x2tex to get specular
+        OUT.Tex3.xyz = halfVecTangent.xyzz;
+      }

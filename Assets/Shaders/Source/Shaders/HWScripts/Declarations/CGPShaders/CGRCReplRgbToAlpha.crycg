@@ -1,0 +1,40 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCReplRgbToAlpha.crycg
+//  Version:     v1.00
+//  Created:     16/03/2004 by Tiago Sousa.
+//  Compilers:   CG/HLSL
+//  Description: replicates r=g=b, into alpha channel
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{
+	uniform sampler2D ScreenMap : texunit0
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+    };
+
+    FOUT
+}
+
+CoreScript
+{
+	float4 vScrColor = tex2D(ScreenMap, IN.Tex0.xy);
+
+    OUT.Color.xyz = vScrColor.xyz;
+    OUT.Color.a = vScrColor.z;
+}

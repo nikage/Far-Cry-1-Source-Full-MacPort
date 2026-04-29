@@ -1,0 +1,90 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWaterBumpReflCM_PS.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+
+      Param4f ( Name = WaterLevel Comp 'WaterLevel' Comp = 0 Comp = 1)  // Water level
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      MainInput { VIEWPROJ_MATRIX, uniform float3x4 ObjToCubeSpace, uniform float4 WaterLevel, uniform float4 TexShiftRipple, uniform float4 TexGenRipple0, uniform float4 TexGenRipple1, uniform float3 Binormal, uniform float4 Normal, CAMERA_POS, uniform float4 BumpScale, uniform float4 Fresnel, uniform float4x4 ObjMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon_PlusWaterLevel
+      CoreScript
+      {
+        float2 vTex;
+        vTex.x = dot(vPos, TexGenRipple0);
+        vTex.y = dot(vPos, TexGenRipple1);
+        OUT.Tex0.xy = vTex.xy + TexShiftRipple.xy;
+      
+        float3 tang = cross(Binormal.xyz, Normal.xyz);
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = BumpScale.x * tang;
+        objToTangentSpace[1] = BumpScale.y * Binormal;
+        objToTangentSpace[2] = Normal;
+
+        // compute the 3x3 transform from tangent space to cube space:
+        // TangentToCubeSpace = object2cube * tangent2object
+        //              = object2cube * transpose(objToTangentSpace) (since the inverse of a rotation is its transpose)
+        // so a row of TangentToCubeSpace is the transform by objToTangentSpace of the corresponding row of ObjToCubeSpace
+        OUT.Tex1.xyz = mul(objToTangentSpace, ObjToCubeSpace[0].xyz);
+        OUT.Tex2.xyz = mul(objToTangentSpace, ObjToCubeSpace[1].xyz);
+        OUT.Tex3.xyz = mul(objToTangentSpace, ObjToCubeSpace[2].xyz);
+
+        // compute the eye vector (going from shaded point to eye) in cube space
+        float3 eyeVector = CameraPos.xyz - vPos.xyz;
+        OUT.Tex1.w = dot(eyeVector, ObjToCubeSpace[0].xyz);
+        OUT.Tex2.w = dot(eyeVector, ObjToCubeSpace[1].xyz);
+        OUT.Tex3.w = dot(eyeVector, ObjToCubeSpace[2].xyz);
+        
+        OUT.Color = IN.Color;
+
+        // transform normal
+        float3 normal;;
+        normal.x = dot(Normal.xyz, ObjMatrix._11_12_13);
+        normal.y = dot(Normal.xyz, ObjMatrix._21_22_23);
+        normal.z = dot(Normal.xyz, ObjMatrix._31_32_33);
+       
+        // calculate incident vector
+        float3 incidentVec = normalize(eyeVector.xyz);
+
+        // fresnel approximation
+        float bias = Fresnel.z;
+        float scale = Fresnel.y;
+        float power = Fresnel.x;
+        OUT.Color1.xyz = (bias + pow(vPos.w - dot(incidentVec, normal), power) * scale).xxx;
+      }
+    

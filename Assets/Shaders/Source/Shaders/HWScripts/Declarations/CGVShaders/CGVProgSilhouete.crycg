@@ -1,0 +1,41 @@
+// ===============================================================
+// Vertex Program: 
+// Description: 
+// Last Update: 14/08/2003
+// Coder: Andrey Honich
+// ===============================================================
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, uniform float3 CameraPos, uniform float4 Constants }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosSilhouete                 
+      CoreScript
+      {
+        float3 camVec = normalize(CameraPos.xyz - vPos.xyz);
+        float4 color = IN.Color;
+        float fDot = dot(camVec, vNormal.xyz);
+        fDot = fDot * sign(fDot);
+        OUT.Tex0.xy = (fDot).xx;
+        color.w = fDot * Constants.y;
+        //color.x = color.x * (fDot * Constants.z);
+        OUT.Color = color;
+      }
+    

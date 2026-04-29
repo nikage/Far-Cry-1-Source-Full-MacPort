@@ -1,0 +1,219 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgLightTempl_VS30.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: Lighting vertex program template for VS30 shader model (several light sources)
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS30Only
+      AutoEnumTC
+      SupportsMultiLights
+
+#if !%SPECULAR
+      NoSpecular
+#endif
+            
+      VertAttributes
+      {
+        POSITION_3
+        TANG_3X3
+        TEXCOORD0_2
+#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP
+        TEXCOORD1_2
+#endif        
+      }
+      
+      MainInput
+      {
+        VIEWPROJ_MATRIX,
+    # ifdef _LIGHT0_TYPE
+        uniform float4 LightsPos[ _NUM_LIGHTS ] : register(c4),
+        uniform float4x4 LightMatrix : register(c10),
+    # endif
+
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+        uniform float4x4 TexMatrix : register(c14),
+  #elif %TEMP_ENVLIGHT
+        uniform float4 EnvColors[6] : register(c14),
+        uniform float4x4 TexMatrix : register(c20),
+  #elif %ENVCMSPEC
+        uniform float4x4 ModelMatrix : register(c14),
+  #endif
+#endif  
+        uniform float4 CameraPos : register(c8),
+      }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          float4 Position  : POSITION;
+          float4 baseTC    : TEXCOORD0;
+#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP
+          float4 lmTC      : TEXCOORD1;
+#endif
+          IN_TANGVECS
+        };
+        
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float2 baseTC     : TEXCOORDN;
+#if %BUMP_MAP          
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+          float2 bumpTC     : TEXCOORDN;
+  #endif
+#endif
+            
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+          float2 glossTC    : TEXCOORDN;
+#elif !%TEMP_AMBIENT || !%ENVCMSPEC
+  #if %SPECULAR
+    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+          float2 glossTC    : TEXCOORDN;
+    #endif
+  #endif
+#endif          
+
+#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP || %BUMP_ZCORRECT
+          float4 lmTC_ZW    : TEXCOORDN;
+#endif
+          float4 viewVec    : COLOR0;
+
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+  #elif %ENVCMSPEC
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+  #endif
+#endif
+
+    # ifdef _LIGHT0_TYPE
+          float4 lightVec[ _NUM_LIGHTS ] : TEXCOORDN;          
+          float4 projTC      : COLOR1;          
+    # endif
+        };
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.baseTC.xy = IN.baseTC.xy;
+#if %BUMP_MAP
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+        OUT.bumpTC.xy = IN.baseTC.xy;
+  #endif
+#endif
+  
+#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP
+        OUT.lmTC_ZW.xy = IN.lmTC.xy;
+#endif
+#if %BUMP_ZCORRECT
+        OUT.lmTC_ZW.z = dot(ModelViewProj[2], vPos);
+        OUT.lmTC_ZW.w = dot(ModelViewProj[3], vPos);
+#endif
+
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        OUT.glossTC.xy = IN.baseTC.xy;
+#elif !%TEMP_AMBIENT || !%ENVCMSPEC
+  #if %SPECULAR
+    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        OUT.glossTC.xy = IN.baseTC.xy;
+    #endif
+  #endif
+#endif          
+
+        TANG_MATR
+        
+        // 0 type = directional light source (no attenuation)
+        // 1 type = omni light source
+        // 2 type = projected light source
+    # ifdef _LIGHT0_TYPE
+        int aLType[ _NUM_LIGHTS ];
+        aLType[0] = _LIGHT0_TYPE;
+      # ifdef _LIGHT1_TYPE
+        aLType[1] = _LIGHT1_TYPE;
+      # endif
+      # ifdef _LIGHT2_TYPE
+        aLType[2] = _LIGHT2_TYPE;
+      # endif
+      # ifdef _LIGHT3_TYPE
+        aLType[3] = _LIGHT3_TYPE;
+      # endif
+        for (int i=0; i<_NUM_LIGHTS; i++)
+        {
+          float3 lVec = LightsPos[i].xyz - vPos.xyz;
+          float3 lightVec = mul(objToTangentSpace, lVec);          
+          float3 lVecO = lightVec.xyz;
+#ifdef RADEON
+#endif
+#ifdef OTHER
+          if (!aLType[i])
+            lVecO = lVecO * LightsPos[i].w;
+#endif          
+          OUT.lightVec[i].xyz = lVecO;
+          if (aLType[i] == 2)
+            OUT.projTC = mul(LightMatrix, vPos);
+        }
+    # endif
+          
+        // compute view vector
+        float3 vVec = CameraPos.xyz - vPos.xyz;
+        float3 viewVec = mul(objToTangentSpace, vVec.xyz);
+#ifdef RADEON
+#endif
+#ifdef OTHER
+        viewVec.xyz = viewVec.xyz * CameraPos.w;
+#endif        
+        OUT.viewVec.xyz = viewVec.xyz;
+
+#if %TEMP_AMBIENT
+  #if %TEMP_ENVLIGHT
+        // Calculate average radiosity color from 6 colors (Cube)
+        float3 tNormal;
+        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);
+        float3 Compare1 = step(tNormal, 0);
+        float3 Compare0 = 1 - Compare1;
+        float3 signN = sign(tNormal);
+        tNormal = tNormal * tNormal;
+        tNormal = tNormal * signN;
+        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;
+        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;
+        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;
+        OUT.Color1 = (ColorX + ColorY + ColorZ) * 2.0;
+  #elif %ENVCMAMB
+        float3 tCamVec = normalize(vVec);
+        float3 tNormal = IN.TNormal.xyz;
+        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.envTC = mul(tRM, TexMatrix);
+  #elif %ENVCMSPEC    
+        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);
+        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);
+        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);
+
+	      OUT.tangVec.xyz = worldTangentS;
+	      OUT.binormVec.xyz = worldTangentT;
+	      OUT.normVec.xyz = worldNormal;
+  #endif
+#endif
+
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.viewVec.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+      }
+    

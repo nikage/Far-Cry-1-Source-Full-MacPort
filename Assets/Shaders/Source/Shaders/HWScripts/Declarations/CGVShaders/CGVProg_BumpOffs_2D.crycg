@@ -1,0 +1,40 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      ParamStateMatrix (Name = ModelView Type = View)
+      VertAttributes { POSITION_3 NORMAL_3 TEXCOORD0_2 }
+      
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 ModelView, uniform float4 Constants }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float2 vTex;
+        vTex.x = dot(IN.Normal.xyz, ModelView[0].xyz) + 1;
+        vTex.y = dot(IN.Normal.xyz, ModelView[1].xyz) - 0.5;
+        vTex.xy = vTex.xy * 0.5;
+        OUT.Tex3.xy = vTex.xy;
+        OUT.Tex0.xy = IN.TexCoord0;
+        OUT.Tex1.xy = IN.TexCoord0;
+        OUT.Color.xyz = (0.3).xxx;
+      }
+    

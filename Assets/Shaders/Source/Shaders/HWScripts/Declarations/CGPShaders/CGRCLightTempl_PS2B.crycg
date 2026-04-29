@@ -1,0 +1,463 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCLightTempl_PS2B.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: General lighting fragment template for PS2B shader model (several light sources)
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS2XOnly
+      AutoEnumTC
+      SupportsMultiLights
+
+#if !%SPECULAR
+      NoSpecular
+#endif
+
+      MainInput
+      {
+        uniform sampler2D baseMap : register(sn),
+#if %BUMP_MAP
+        uniform sampler2D bumpMap : register(sn),
+  #if %BUMP_DIFFUSE && %DIFFUSE
+        uniform sampler2D bumpMapDiffuse : register(sn),
+  #endif
+#endif
+
+#if %TEMP_LM || %TEMP_DOT3LM
+        uniform sampler2D lightMap : register(sn),
+#endif        
+#if %TEMP_DOT3LM
+        uniform sampler2D lightDirMap : register(sn),
+#endif
+#if %TEMP_SPECULAR_OCCLUSIONMAP
+        uniform sampler2D occlusionMap : register(sn),
+#endif
+
+#if %DIFFUSE
+    # ifdef _LIGHT0_TYPE
+        uniform half4 Diffuse[ _NUM_LIGHTS ] : register(c2),
+    # endif
+#endif
+
+#if %SPECULAR
+    # ifdef _LIGHT0_TYPE
+        uniform half4 Specular[ _NUM_LIGHTS ] : register(c6),
+        uniform half4 SpecularExp : register(c14),
+    # endif
+#endif        
+
+#if %TEMP_AMBIENT && %ENVCMSPEC && %GLOSS_MAP
+        uniform sampler2D glossMap : register(sn),
+#elif %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        uniform sampler2D glossMap : register(sn),
+#elif %SPECULAR
+  #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        uniform sampler2D glossMap : register(sn),
+  #endif
+#endif        
+
+#if %TEMP_AMBIENT
+        uniform half4 Ambient : register(c0),
+  #if %ENVCMAMB
+        uniform samplerCUBE envMap : register(sn),
+        uniform half4 Reflect,
+  #elif %ENVCMSPEC
+        uniform samplerCUBE envMap : register(sn),
+        uniform half4 EnvMapParams,
+        uniform half4 FresnelParams,
+  #endif
+#endif
+    # ifdef _LIGHT0_TYPE
+        uniform sampler2D attenMap : register(sn),
+        uniform samplerCUBE projMap : register(sn),
+    # endif
+
+#if %TEMP_SPECULAR_OCCLUSIONMAP
+    # ifdef _LIGHT0_TYPE
+        uniform half4 OcclusionMasks[ _NUM_LIGHTS ] : register(c10),
+    # endif
+#endif
+
+#if %OFFSETBUMPMAPPING
+        uniform half4 BumpOffset,
+#endif
+
+    # ifdef _HDRLM
+        uniform sampler2D lightMapHDR : register(sn),
+    # endif
+    # ifdef _3DC_A
+        uniform sampler2D bumpHeight : register(sn),
+    # endif
+    # ifdef _SPEC_ANTIALIAS
+        uniform sampler2D specularMap : register(sn),
+    # endif
+    
+        uniform half4 AttenInfo : register(c1),
+      }
+
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          half4 baseTC     : TEXCOORDN;
+#if %BUMP_MAP          
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+          half4 bumpTC     : TEXCOORDN;
+  #endif
+#endif
+
+#if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA            
+  #if !%ENVCMSPEC && !%ENVCMAMB
+          half4 glossTC    : TEXCOORDN;
+  #endif
+#endif
+
+#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP || %BUMP_ZCORRECT
+          half4 lmTC_ZW    : TEXCOORDN;
+#endif
+
+          half4 viewVec    : TEXCOORDN;
+
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+          half4 envTC      : TEXCOORDN;
+  #elif %ENVCMSPEC
+          half4 tangVec    : TEXCOORDN;
+          half4 binormVec  : TEXCOORDN;
+          half4 normVec    : TEXCOORDN;
+  #endif
+#endif
+
+    # ifdef _LIGHT0_TYPE
+          half4 projTC      : TEXCOORDN;          
+          half4 lightVec[ _NUM_LIGHTS ] : TEXCOORDN;
+    # endif
+        };
+
+# ifdef _HDR_MRT
+        FOUT_2
+# else
+  #if %BUMP_ZCORRECT
+        FOUT_DEPTH
+  #else
+        FOUT
+  #endif
+# endif        
+
+      }
+      CoreScript
+      {        
+        half2 baseTC = IN.baseTC.xy;
+        half2 bumpTC = baseTC;
+#if %BUMP_MAP
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+        bumpTC = IN.bumpTC.xy;
+  #endif
+#endif
+
+        half2 glossTC = baseTC;
+#if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA            
+  #if !%ENVCMSPEC && !%ENVCMAMB
+        glossTC = IN.glossTC.xy;
+  #endif
+#endif          
+
+        half3 viewVec = normalize(IN.viewVec.xyz);
+
+        half fHeight = 0;
+#if %OFFSETBUMPMAPPING
+  # ifdef _3DC_A
+        fHeight = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);
+  # else
+        fHeight = EXPAND(tex2D(bumpMap, bumpTC.xy).a);
+  # endif
+        fHeight *= BumpOffset.x;
+        baseTC = baseTC + viewVec.xy * fHeight;
+        bumpTC = bumpTC + viewVec.xy * fHeight;
+        glossTC = glossTC + viewVec.xy * fHeight;
+#endif
+
+        // load the diffuse texture
+        half4 decalColor = tex2D(baseMap, baseTC.xy);
+        half fAlpha = decalColor.a;
+
+#if %TEMP_SPECULAR_OCCLUSIONMAP
+        half4 occColor = tex2D(occlusionMap, IN.lmTC_ZW.xy);
+#endif
+
+#if %BUMP_MAP
+        // load the bump normal
+        half3 bumpNormal = GetNormalMap(bumpMap, bumpTC.xy);
+        half3 Na = bumpNormal;
+  #if %BUMP_DIFFUSE && %DIFFUSE
+        half3 bumpNormalDiffuse = GetNormalMap(bumpMapDiffuse, bumpTC.xy);
+  #endif
+
+  #if %BUMP_NORMALIZE && %SPECULAR
+    # if !defined (_3DC) && !defined (_V8U8) && !defined (_Cx_V8U8)
+        // normalize post-filtered bump normals
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+    # endif
+  #endif
+#else        
+        half3 bumpNormal = half3 (0,0,1);
+#endif
+
+#if %BUMP_ZCORRECT
+// Calculate depth bias.
+  # ifdef _3DC_A
+        half height = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);
+  # else
+        half height = EXPAND(tex2D(bumpMap, bumpTC.xy).a);
+  # endif
+        half fZ = DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw);
+#else
+        half fZ = 1;
+#endif
+
+        // load the gloss
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        half4 glossColor = tex2D(glossMap, glossTC.xy);
+#elif %SPECULAR
+  #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        half4 glossColor = tex2D(glossMap, glossTC.xy);
+  #endif
+#elif %TEMP_AMBIENT && %ENVCMSPEC && %GLOSS_MAP
+        half4 glossColor = tex2D(glossMap, glossTC.xy);
+#endif
+        half3 vFinalDif = half3 (0,0,0);
+        half3 vFinalSpec = half3 (0,0,0);
+
+        half NdotL;
+        
+        // 0 type = directional light source (no attenuation)
+        // 1 type = omni light source
+        // 2 type = projected light source
+    # ifdef _LIGHT0_TYPE
+        int aLType[ _NUM_LIGHTS ];
+        aLType[0] = _LIGHT0_TYPE;
+      # ifdef _LIGHT1_TYPE
+        aLType[1] = _LIGHT1_TYPE;
+      # endif
+      # ifdef _LIGHT2_TYPE
+        aLType[2] = _LIGHT2_TYPE;
+      # endif
+      # ifdef _LIGHT3_TYPE
+        aLType[3] = _LIGHT3_TYPE;
+      # endif
+        
+        // Only specular pass is used for light-map light sources
+        bool aBOnlySpec[ _NUM_LIGHTS ];
+      # ifdef _LIGHT0_ONLYSPEC
+        aBOnlySpec[0] = _LIGHT0_ONLYSPEC;
+      # endif
+      # ifdef _LIGHT1_ONLYSPEC
+        aBOnlySpec[1] = _LIGHT1_ONLYSPEC;
+      # endif
+      # ifdef _LIGHT2_ONLYSPEC
+        aBOnlySpec[2] = _LIGHT2_ONLYSPEC;
+      # endif
+      # ifdef _LIGHT3_ONLYSPEC
+        aBOnlySpec[3] = _LIGHT3_ONLYSPEC;
+      # endif
+
+        // Using specular occlusion maps for specific light source
+        bool aBSpecOcclusion[ _NUM_LIGHTS ];
+      # ifdef _LIGHT0_SPECOCCLUSION
+        aBSpecOcclusion[0] = _LIGHT0_SPECOCCLUSION;
+      # endif
+      # ifdef _LIGHT1_SPECOCCLUSION
+        aBSpecOcclusion[1] = _LIGHT1_SPECOCCLUSION;
+      # endif
+      # ifdef _LIGHT2_SPECOCCLUSION
+        aBSpecOcclusion[2] = _LIGHT2_SPECOCCLUSION;
+      # endif
+      # ifdef _LIGHT3_SPECOCCLUSION
+        aBSpecOcclusion[3] = _LIGHT3_SPECOCCLUSION;
+      # endif
+        half fAttenFunction = 4.f/16.f;
+        for (int i=0; i<_NUM_LIGHTS; i++)
+        {
+          // Calculate attenuation
+          half atten = 1;
+          if (aLType[i] != 0)
+          {
+            half dist = length(IN.lightVec[i].xyz) * AttenInfo[i];
+            atten = tex2D(attenMap, half2(dist, fAttenFunction)).a;
+          }
+          // Get projector filter color if needed
+          half3 filterColor = half3 (1,1,1);
+          if (aLType[i] == 2)
+            filterColor = texCUBE(projMap, IN.projTC.xyz);
+            
+          half3 lVec = normalize(IN.lightVec[i].xyz);
+          // Calculate diffuse contribution
+#if %DIFFUSE          
+          if (!aBOnlySpec[i])
+          {
+  #if %BUMP_DIFFUSE
+            NdotL = saturate(dot(lVec.xyz, bumpNormalDiffuse.xyz));
+  #else
+            NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+  #endif
+            half3 dif = decalColor.xyz * NdotL * ( half3 )Diffuse[i].xyz * atten * filterColor.xyz;
+            dif.xyz = HDREncode(dif.xyz);  
+            vFinalDif += dif.xyz;
+          }
+#endif
+
+          // Calculate specular contribution
+#if %SPECULAR
+    # ifdef _SPEC_ANTIALIAS
+          half3 Hn = normalize(viewVec.xyz + lVec.xyz);
+          half NaH = dot(Hn , Na);
+	        half NaNa = dot(Na , Na);
+    	    half specVal = tex2D(specularMap, half2(NaH, NaNa)).x;
+    # else
+          half3 reflVec = (2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz;
+          half NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+          half fPow = SpecularExp.x;
+  #if %SPECULARPOW_GLOSSALPHA
+          fPow *= glossColor.a;
+  #endif
+          half specVal = pow(NdotR, fPow);
+    # endif
+          half3 spec = specVal * ( half3 )Specular[i].xyz;
+  #if %TEMP_SPECULAR_OCCLUSIONMAP
+          if (aBSpecOcclusion[i])
+          {
+            half fOccl = dot(occColor, OcclusionMasks[i]);
+            spec.xyz *= fOccl;
+          }
+  #endif
+          spec = spec * atten * filterColor.xyz;
+  #if %GLOSS_MAP
+          spec.xyz *= glossColor.xyz;
+  #elif %GLOSS_DIFFUSEALPHA
+          spec.xyz *= fAlpha;
+  #endif
+          spec.xyz = HDREncode(spec.xyz);  
+          vFinalSpec += spec.xyz;
+#endif
+        }
+    # endif
+
+        // Calculate ambient, LM and environment contribution
+#if %TEMP_AMBIENT
+        half3 amb = decalColor.xyz * ( half3 )Ambient.xyz;
+        half3 difLM = half3(0,0,0);
+        half3 env = half3(0,0,0);
+  #if %TEMP_LM
+        // load the lm
+        half4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);
+        difLM = (decalColor.xyz * lmColor.xyz);
+        difLM = HDREncodeLM(difLM);
+  #elif %TEMP_DOT3LM
+        // load the lm
+        half4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);
+        // load the lm dir
+        half4 lmDir = tex2D(lightDirMap, IN.lmTC_ZW.xy);
+        half lmNdotL = saturate(dot( EXPAND(lmDir.xyz), bumpNormal.xyz));
+        half  lmIntens = lmNdotL * lmColor.a + (1-lmColor.a);
+    # ifdef _HDRLM
+        // Decode RGBE LM HDR color
+        half4 lmHDRColor = tex2D(lightMapHDR, IN.lmTC_ZW.xy);
+        half fExp = ( lmHDRColor.a * 256 - HDR_EXP_OFFSET );
+	      half fScale = pow( HDR_EXP_BASE, fExp );
+	      difLM = lmHDRColor.xyz * fScale * lmIntens;
+    # else
+        difLM = HDREncodeLM(lmColor.xyz * lmDir.a * lmIntens);
+    # endif        
+        difLM *= decalColor.xyz;
+  #endif        
+
+  #if %ENVCMAMB
+        // load the environment map
+        half4 envColor = texCUBE(envMap, IN.envTC.xyz);
+        half fLerp = Reflect.a;
+    #if %ENVCM_MASKED
+        // load the gloss
+        fLerp *= glossColor.a;
+    #endif
+        amb = lerp(amb.xyz, envColor.xyz, fLerp);
+  #elif %ENVCMSPEC        
+        half fEnvmapAmount = EnvMapParams.x;
+
+        half fFresnelScale = FresnelParams.x;
+        half fFresnelBias = FresnelParams.y;
+        half fFresnelPow = FresnelParams.z;
+
+        // Calc Reflection Vector
+        half3x3 worldTangentSpace;
+        worldTangentSpace[0] = IN.tangVec.xyz;
+        worldTangentSpace[1] = IN.binormVec.xyz;
+        worldTangentSpace[2] = IN.normVec.xyz;
+
+        half NdotE = dot(bumpNormal.xyz, viewVec);
+        half3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);
+        half3 worldReflectVec = mul(reflectVect, worldTangentSpace);
+
+        // Calc Fresnel factor
+        half fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);
+
+        // Calc environment
+        env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount * fresnel;
+     #if %GLOSS_MAP
+        env *= glossColor.xyz;
+     #elif %GLOSS_DIFFUSEALPHA
+        env *= fAlpha;
+     #endif
+  #endif
+  #if %ALPHAGLOW
+        amb += fAlpha * decalColor.xyz;
+  #endif
+        amb = HDREncodeAmb(amb);
+        env = HDREncodeAmb(env);
+#else
+        half3 amb = half3 (0,0,0);
+        half3 env  = half3 (0,0,0);
+        half3 difLM = half3 (0,0,0);
+#endif                
+
+        // Finally add them all together
+        half3 finalColor = amb + env + difLM + vFinalDif + vFinalSpec;
+        half fOutA = 1.0f;
+        
+#if %TEMP_AMBIENT
+  #if %ALPHAGLOW && %TEMP_DOT3LM
+  // Fake (for compatibility with old system)
+  // TODO: remove after patch 2
+        fOutA = fAlpha * Ambient.w;        
+  #elif !%ALPHAGLOW && %DIFFUSEALPHA && !%GLOSS_DIFFUSEALPHA
+        fOutA = fAlpha * Ambient.w;
+  #else        
+        fOutA = Ambient.w;
+  #endif        
+#else  
+        fOutA = fAlpha;
+#endif  
+      
+# ifdef _HDR
+        HDROutput(OUT, half4 (finalColor.xyz, fOutA), fZ);
+# else
+        OUT.Color.xyz = finalColor.xyz;
+        OUT.Color.a = fOutA;
+  #if %BUMP_ZCORRECT
+        OUT.Depth = fZ;
+  #endif
+# endif        
+
+      }
+

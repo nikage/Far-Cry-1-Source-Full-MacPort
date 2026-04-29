@@ -1,0 +1,54 @@
+// ===============================================================
+// Fragment Program: Blury screen
+// Description: lerp between blured texture and sharp texture
+// Last Update: 20/06/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+MainInput 
+{ 
+#ifdef OPENGL
+	uniform samplerRECT baseMap0 : texunit0,    
+  uniform samplerRECT baseMap1 : texunit1,
+#endif  
+#ifdef D3D
+	uniform sampler2D baseMap0 : texunit0,    
+  uniform sampler2D baseMap1 : texunit1,
+#endif  
+    uniform float4 fBluryParams
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	};
+
+	FOUT
+}
+CoreScript
+{
+	// load the decal
+#ifdef OPENGL
+	float4 fColor0 = texRECT(baseMap0, IN.Tex0.xy);
+	float4 fColor1 = texRECT(baseMap1, IN.Tex1.xy);
+#endif
+#ifdef D3D
+	float4 fColor0 = tex2D(baseMap0, IN.Tex0.xy);
+	float4 fColor1 = tex2D(baseMap1, IN.Tex1.xy);
+#endif
+
+	float fTemp = dot(float3(0.33, 0.59, 0.11), fColor0.xyz);
+	float3 fDesaturated= fTemp*fBluryParams.xyz; //lerp(fColor0.xyz, fTemp, 0.5)
+
+	// finally add them all together	
+	OUT.Color.xyz = lerp(fColor1.xyz, fDesaturated*fDesaturated*4, fBluryParams.w);                
+	OUT.Color.w = 1.0f;
+}
+

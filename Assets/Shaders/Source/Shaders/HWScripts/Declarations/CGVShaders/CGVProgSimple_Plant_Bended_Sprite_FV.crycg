@@ -1,0 +1,58 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgSimple_Plant_Bended_Sprite_FV.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      //NoFog
+      MainInput { VIEWPROJ_MATRIX, BEND, uniform float4 ObjPos, uniform float4 TexGen00, uniform float4 TexGen01, uniform float4 TexGen10, uniform float4 TexGen11 }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      
+      PositionScript = PosBending_Sprite                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.x  = dot(TexGen00, vPos);
+        OUT.Tex1.y  = dot(TexGen01, vPos);
+        OUT.Tex2.x  = dot(TexGen10, vPos);
+        OUT.Tex2.y  = dot(TexGen11, vPos);
+        OUT.Color   = IN.Color;
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

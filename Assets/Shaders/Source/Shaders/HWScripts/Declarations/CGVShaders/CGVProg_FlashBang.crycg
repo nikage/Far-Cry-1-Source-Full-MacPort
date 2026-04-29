@@ -1,0 +1,42 @@
+// ===============================================================
+// Vertex Program: FlashBang
+// Description: Flashbang fx
+// Last Update: 17/06/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+	VIEWPROJ_MATRIX,
+	
+	uniform float4   vTexCoordScale // need uv scale, for rectangular textures in gl...    
+}
+
+DeclarationsScript
+{
+	struct appin
+	{
+	  IN_P
+	  IN_T0
+	};
+	struct vertout
+	{
+	  OUT_P
+	  OUT_T0_2
+	  OUT_T1_2
+	};
+
+}
+
+PositionScript = PosCommon
+
+CoreScript
+{
+	OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy;
+	OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.zw;
+}
+   
+    
+    

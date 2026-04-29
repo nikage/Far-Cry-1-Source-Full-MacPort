@@ -1,0 +1,65 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWater_Refr.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      Noise
+      Projected
+
+      Param4f ( Name = NoisePos Comp 'time 0.8' Comp 'time 0.6' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+      Param4f ( Name = WaterLevel Comp 'WaterLevel' Comp = 0 Comp = 1)  // Water level
+
+      VertAttributes { POSITION_3 PRIM_COLOR }
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 TexProjMatrix, uniform float4 NoisePos, CAMERA_POS, uniform float4 TexShiftRipple, uniform float4 TexGenRipple0, uniform float4 TexGenRipple1, uniform float4 WaterLevel, uniform float4 pg[66] : register(c30) }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosWaterDeform_PlusWaterLevel
+      CoreScript
+      {
+        float2 vTex;
+        vTex.x = dot(vPos, TexGenRipple0);
+        vTex.y = dot(vPos, TexGenRipple1);
+        OUT.Tex0.xy = vTex.xy + TexShiftRipple.xy;
+        
+        float4 vProjTex;
+        vProjTex = mul(TexProjMatrix, vPos);
+  #ifdef PROJECTEDENVBUMP
+        OUT.Tex1 = vProjTex;
+  #endif        
+  #ifdef OTHER
+        vProjTex.xy = vProjTex.xy / vProjTex.w;
+        OUT.Tex1.xy = clamp(vProjTex.xy, (0).xx, vPos.ww);
+        OUT.Tex1.zw = vPos.ww;
+  #endif        
+
+        OUT.Color = IN.Color;
+      }
+    

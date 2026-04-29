@@ -1,0 +1,45 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCSun.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D modMap : texunit1 }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 sunColor = tex2D(baseMap, IN.Tex0.xy);
+        float4 modColor = tex2D(modMap, IN.Tex1.xy);
+        float3 color = sunColor.xyz * modColor.a * IN.Color.xyz;
+# ifdef _HDR        
+        color.xyz = color.xyz * 2;
+# endif        
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.w = sunColor.a * IN.Color.a;
+      }
+      

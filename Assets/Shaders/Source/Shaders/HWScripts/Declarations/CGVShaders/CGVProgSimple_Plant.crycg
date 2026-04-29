@@ -1,0 +1,101 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgSimple_Plant.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      DefaultPos
+      SupportsInstancing
+      
+      Inst_Param4f ( Name = Ambient Comp 'WorldObjColor[0]'  Comp 'WorldObjColor[1]' Comp 'WorldObjColor[2]' Comp 'Opacity' )
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 }
+      MainInput
+      {
+        VIEWPROJ_MATRIX,
+        uniform float4 Ambient
+      }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_T1
+          IN_T2
+# ifdef _INST_R
+          IN_T3
+          IN_T4
+          IN_T5
+# endif
+          IN_C0
+          IN_C1
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+# ifdef _HDR
+          OUT_C1
+# endif          
+        };
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+# ifdef _INST_NR
+        float4x4 _ObjMatrix, _CompMatrix;
+        _ObjMatrix[0] = float4(IN.TexCoord1.w, 0, 0, 0);
+        _ObjMatrix[1] = float4(0, IN.TexCoord1.w, 0, 0);
+        _ObjMatrix[2] = float4(0, 0, IN.TexCoord1.w, 0);
+        _ObjMatrix[3] = float4(IN.TexCoord1.x, IN.TexCoord1.y, IN.TexCoord1.z, 1);
+        for (int i=0; i<4; i++)
+        {
+          _CompMatrix[0][i] = dot(_ObjMatrix[i], ModelViewProj[0]);
+          _CompMatrix[1][i] = dot(_ObjMatrix[i], ModelViewProj[1]);
+          _CompMatrix[2][i] = dot(_ObjMatrix[i], ModelViewProj[2]);
+          _CompMatrix[3][i] = dot(_ObjMatrix[i], ModelViewProj[3]);
+        }
+        OUT.HPosition = mul(_CompMatrix, vPos);
+        OUT.Color.xyz = IN.Color.xyz * IN.TexCoord2.xyz;
+        OUT.Color.w = IN.TexCoord2.w;
+# elif defined(_INST_R)
+        float4x4 _CompMatrix;
+        _CompMatrix[0] = IN.TexCoord1;
+        _CompMatrix[1] = IN.TexCoord2;
+        _CompMatrix[2] = IN.TexCoord3;
+        _CompMatrix[3] = IN.TexCoord4;
+        OUT.HPosition = mul(_CompMatrix, vPos);
+        OUT.Color.xyz = IN.Color.xyz * IN.TexCoord5.xyz;
+        OUT.Color.w = IN.TexCoord5.w;
+# else
+        OUT.Color.xyz = IN.Color.xyz * Ambient.xyz;
+        OUT.Color.w = Ambient.w;
+# endif
+
+# ifdef _HDR
+  # if defined(_INST_R) || defined(_INST_NR)
+        float ffCameraSpacePosZ = dot(_CompMatrix[2], vPos);
+  # else
+        float ffCameraSpacePosZ = dot(ModelViewProj[2], vPos);
+  # endif
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif          
+      }
+    

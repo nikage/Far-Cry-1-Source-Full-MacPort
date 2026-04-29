@@ -1,0 +1,54 @@
+// ===============================================================
+// Vertex Program: Cartoon
+// Description: used for cartoon render mode
+// Last Update: 30/04/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  uniform float4x4 ModelViewProj,
+  
+  uniform float4   vTexCoordScale,
+  uniform float4   Offset0,
+  uniform float4   Offset1,
+  uniform float4   Offset2,
+  uniform float4   Offset3  
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0
+    OUT_T1
+    OUT_T2
+    OUT_T3
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{  
+  OUT.Tex0.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset0.xy;
+  OUT.Tex1.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset1.xy;
+  OUT.Tex2.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset2.xy;
+  OUT.Tex3.xy = IN.TexCoord0.xy*vTexCoordScale.xy+Offset3.xy;
+  
+  return OUT;
+}

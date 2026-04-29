@@ -1,0 +1,149 @@
+      #include "../CGVPMacro.csi"
+
+/*      // setup vertex components
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS }
+
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+      }
+      
+
+      PositionScript = PosCommon
+
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+
+        //  compute light vector
+        float3 lightVecOS = (LightPos.xyz - vPos.xyz);
+        
+        // fake subsurface scatering
+        float subSurfScateringCoef = dot( normalize(lightVecOS.xyz), IN.TNormal.xyz)*0.5 +0.5;
+        
+        OUT.Color.rgb= subSurfScateringCoef;
+
+        //  compute half vector
+        float3 viewVecOS = (CameraPos.xyz - vPos.xyz);
+
+        // get 3x3 tangent space tranformation matrix
+        float3x3 MatrixTS;
+        MatrixTS[0] = IN.Tangent;
+        MatrixTS[1] = IN.Binormal;
+        MatrixTS[2] = IN.TNormal;
+
+        // xform light vector to tangent space
+        float3 lightVecTS= (mul(MatrixTS, lightVecOS));
+
+
+
+        // xform view vector to tangent space
+        float3 viewVecTS= (mul(MatrixTS, viewVecOS));
+
+        // compute half vector
+        float3 halfVecTS= viewVecTS+lightVecTS;
+
+        // pass light vector into texture output register 2
+        OUT.Tex2.xyz=lightVecTS.xyz;
+        
+        // pass half vector into texture output register 3
+        OUT.Tex3.xyz=halfVecTS.xyz;
+        
+        return OUT;
+      }
+
+  // setup vertex components
+  MainInput { VIEWPROJ_MATRIX , LIGHT_POS, CAMERA_POS }
+
+  DeclarationsScript
+  {
+    IN_T0_N
+    OUT_T0_C0_C1
+  }     
+
+  PositionScript = PosCommon
+
+  CoreScript
+  {
+    OUT.Tex0.xy = IN.TexCoord0.xy;      
+    //  compute light vector
+    float3 vLightOS = normalize(LightPos.xyz - IN.Position.xyz);    
+
+    //  compute half vector
+    float3 vViewOS = normalize(CameraPos.xyz - IN.Position.xyz);
+    float3 vHalfOS = normalize(vLightOS.xyz + vViewOS.xyz);
+
+    float3 sDiffuse = max( dot( vLightOS.xyz, IN.Normal.xyz), 0);
+    float3 sSpecular= pow(max( dot( vHalfOS.xyz, IN.Normal.xyz), 0), 16);
+    
+    OUT.Color.rgb=sDiffuse;
+    OUT.Color1.rgb=sSpecular;        
+    return OUT;
+  }
+*/
+
+  // setup vertex components
+  VertAttributes
+  {
+    POSITION_3
+    TEXCOORD0_2
+    TANG_3X3
+  }
+
+  // setup vertex components
+  MainInput
+  {
+    VIEWPROJ_MATRIX,
+    LIGHT_POS,
+    CAMERA_POS
+  }
+
+  DeclarationsScript
+  {
+    IN_T0_TANG
+    OUT_T0_T1_C0
+  }
+
+  PositionScript = PosCommon
+
+  CoreScript
+  {
+
+    OUT.Tex0.xy = IN.TexCoord0.xy;
+    OUT.Tex1.xy = IN.TexCoord0.xy;
+
+    // get 3x3 tangent space tranformation matrix
+    float3x3 MatrixTS;
+    MatrixTS[0] = IN.Tangent;
+    MatrixTS[1] = IN.Binormal;
+    MatrixTS[2] = IN.TNormal;
+
+    //  compute light vector
+    float3 vLightOS = normalize(LightPos.xyz - IN.Position.xyz);
+
+    // xform to tangent space
+    vLightOS= mul(MatrixTS, vLightOS);
+    OUT.Color.xyz=normalize(vLightOS);
+
+    return OUT;
+  }
+
+

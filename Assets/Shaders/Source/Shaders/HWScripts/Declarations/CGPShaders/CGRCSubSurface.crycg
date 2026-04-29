@@ -1,0 +1,33 @@
+// ===============================================================
+// Fragment Program: Subsurface scatering
+// Description: used in subsurface scatering
+// Last Update: 10/04/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D decalMap : texunit0            
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load colors  
+  float4 decalColor = tex2D(decalMap, IN.Tex0.xy);                
+                          
+  OUT.Color.xyz = IN.Color.xyz*decalColor.xyz; 
+  OUT.Color.w= 1;  
+}

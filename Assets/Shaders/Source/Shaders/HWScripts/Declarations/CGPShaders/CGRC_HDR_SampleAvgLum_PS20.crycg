@@ -1,0 +1,41 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform FLOAT4 vSampleOffsets[9]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  FLOAT3 vSample = 0.0f;
+  FLOAT  fLogLumSum = 0.0f;
+  FLOAT3 LUMINANCE_VECTOR  = FLOAT3 (0.2125f, 0.7154f, 0.0721f);
+
+  for(int i=0; i<9; i++)
+  {
+    // Compute the sum of log(luminance) throughout the sample points
+    vSample = tex2D(baseMap, IN.Tex0.xy+vSampleOffsets[i].xy);
+    fLogLumSum += log(dot(vSample, LUMINANCE_VECTOR)+0.0001);
+  }
+  
+  // Divide the sum to complete the average
+  fLogLumSum /= 9;
+
+  OUT.Color = float4(fLogLumSum, fLogLumSum, fLogLumSum, 1.0f);
+}
+

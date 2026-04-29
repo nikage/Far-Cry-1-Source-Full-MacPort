@@ -1,0 +1,67 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWater_LakeNoMove.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      Noise
+      Projected
+
+      Param4f ( Name = NoisePos Comp 'time 0.8' Comp 'time 0.6' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 NoisePos, CAMERA_POS, uniform float4x4 TexProjMatrix, uniform float4 pg[66] : register(c30) }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_T2_2
+          OUT_T3_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosWaterDeform
+      CoreScript
+      {
+        float4 vTex = IN.TexCoord0;
+        OUT.Tex0.xy = vTex.xy;
+        OUT.Tex3.xy = vTex.xy;
+        
+        float4 vProjTex = mul(TexProjMatrix, vPos);
+        vProjTex.xy = vProjTex.xy + fNoise * NoisePos.w * CameraPos.w;
+  #ifdef PROJECTEDENVBUMP
+        OUT.Tex1 = vProjTex;
+  #endif        
+  #ifdef OTHER
+        OUT.Tex1.xy = vProjTex.xy / vProjTex.w;
+        OUT.Tex1.zw = vPos.ww;
+#endif        
+        
+        float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);
+        OUT.Tex2.xy = eyeVec.zz;
+
+        OUT.Color = IN.Color;
+      }
+    

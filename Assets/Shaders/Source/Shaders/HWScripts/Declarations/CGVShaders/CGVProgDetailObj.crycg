@@ -1,0 +1,32 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      Param4f ( Name = Time Comp 'time 3')
+      MainInput { uniform float4x4 ModelViewProj, uniform float4 GlowTexGen0, uniform float4 GlowTexGen1 }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.x  = dot(vPos, GlowTexGen0);
+        OUT.Tex1.y  = dot(vPos, GlowTexGen1);
+        OUT.Color   = IN.Color;
+      }
+    

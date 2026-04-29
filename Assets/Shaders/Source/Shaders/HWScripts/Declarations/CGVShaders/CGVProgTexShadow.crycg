@@ -1,0 +1,62 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgTexShadow.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      Param4f (Name = LightPos Comp 'OSLightPos[0]' Comp 'OSLightPos[1]' Comp 'OSLightPos[2]' Comp = 1)
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_T3_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex2.xy = IN.TexCoord0.xy;
+
+        TANG_MATR
+
+        // store normalized light vector
+        float3 lightVec = normalize(LightPos.xyz - vPos.xyz);
+        
+        // transform light vector from object space to tangent space and pass it as a color
+        float3 vLV = mul(objToTangentSpace, lightVec.xyz);
+        vLV = ((0.5).xxx * vLV) + (0.5).xxx;
+        
+        OUT.Tex1.xy = vLV.xy;
+        OUT.Tex3.xy = vLV.xy;
+        OUT.Color.xyz = vLV.zzz;
+      }
+    

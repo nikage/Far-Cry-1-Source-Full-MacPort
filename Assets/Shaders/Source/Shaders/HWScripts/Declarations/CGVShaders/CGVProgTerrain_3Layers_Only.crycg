@@ -1,0 +1,63 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgTerrain_3Layers_Only.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 Layer0TexGen0, uniform float4 Layer0TexGen1, uniform float4 Layer1TexGen0, uniform float4 Layer1TexGen1, uniform float4 Layer2TexGen0, uniform float4 Layer2TexGen1, CAMERA_POS, uniform float4 FadingDist  }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C1
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.x = dot(Layer0TexGen0, vPos);          
+        OUT.Tex0.y = dot(Layer0TexGen1, vPos);          
+        OUT.Tex1.x = dot(Layer1TexGen0, vPos);          
+        OUT.Tex1.y = dot(Layer1TexGen1, vPos);          
+        OUT.Tex2.x = dot(Layer2TexGen0, vPos);          
+        OUT.Tex2.y = dot(Layer2TexGen1, vPos);          
+
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+        float fDist = length(viewVec.xyz);
+        float fFade = max(0.001, FadingDist.x);
+        fDist = fDist / fFade;
+        fDist = min(fDist, 1);
+        fDist = fDist * fDist;
+        fDist = fDist * fDist;
+        
+        OUT.Color.b = IN.Color1.r * fDist;
+        OUT.Color1.b = IN.Color1.g * fDist;
+        OUT.Color.a = IN.Color1.b * fDist;
+      }
+    

@@ -1,0 +1,73 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgWater_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      Noise
+      Projected
+
+      Param4f ( Name = NoisePos Comp 'time 0.8' Comp 'time 0.6' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+      Param4f ( Name = WaterLevel Comp 'WaterLevel' Comp = 0 Comp = 1)  // Water level
+      
+      VertAttributes { POSITION_3 PRIM_COLOR }
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 NoisePos, CAMERA_POS, uniform float4 Normal, uniform float4 Scale, uniform float4 WaterLevel, uniform float4 TexShiftRipple, uniform float4 TexGenRipple0, uniform float4 TexGenRipple1, uniform float4 TexDetailScale, uniform float4x4 TexProjMatrix, uniform float4 pg[66] : register(c30) }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2_2
+          OUT_T3
+          OUT_T4
+          OUT_T5_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosWaterDeform_PlusWaterLevel
+      CoreScript
+      {
+        float fZ = dot(ModelViewProj._31_32_33_34, vPos);
+        float fW = dot(ModelViewProj._41_42_43_44, vPos);
+        OUT.Tex5.x = fZ;
+        OUT.Tex5.y = fW;
+
+        OUT.Tex0.xyz = vPos.xyz * Scale.xyz;
+        OUT.Tex3.xyz = Normal.xyz;
+        OUT.Tex4.xyz = normalize(vPos.xyz - CameraPos.xyz);
+
+        float2 vTex;
+        vTex.x = dot(vPos, TexGenRipple0);
+        vTex.y = dot(vPos, TexGenRipple1);
+        OUT.Tex2.xy = (vTex.xy + TexShiftRipple.xy) * TexDetailScale.xy;
+    
+        float4 vProjTex = mul(TexProjMatrix, vPos);
+        OUT.Tex1 = vProjTex;
+    
+        OUT.Color = IN.Color;
+      }
+    

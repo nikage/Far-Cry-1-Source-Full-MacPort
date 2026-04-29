@@ -1,0 +1,61 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgLight_DiffPass_Atten.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, ATTEN }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_T2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+
+        // store normalized light vector
+        float3 lVec = LightPos.xyz - vPos.xyz;
+
+        TANG_MATR
+
+        float3 lightVec = mul(objToTangentSpace, lVec);
+        OUT.Tex1.xyz = lightVec.xyz;
+        
+        float3 vDist = PROC_ATTENPIX;
+
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex2.xyz = vDist;
+        OUT.Color.xyz = vDist;
+      }
+    

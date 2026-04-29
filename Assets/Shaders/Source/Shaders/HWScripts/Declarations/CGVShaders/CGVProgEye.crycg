@@ -1,0 +1,74 @@
+// ===============================================================
+// Vertex Program: Eye shader
+// Description: used in character eyes
+// Last Update: 15/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 TEXCOORD0_2 NORMAL_3 }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  LIGHT_POS,
+  CAMERA_POS,
+  ATTEN,
+  uniform float4 Diffuse
+}
+
+DeclarationsScript
+{
+
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_N
+  };
+  
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{   
+  OUT.Tex0.xy =IN.TexCoord0.xy;
+  OUT.Tex1.xy =IN.TexCoord0.xy;      
+          
+  // Compute light vector
+  float3 LightVec=LightPos.xyz-IN.Position.xyz;
+  // Compute view vector
+  float3 ViewVec=CameraPos.xyz-IN.Position.xyz;  
+  
+  float3 OSLightVec=normalize(LightVec);
+  float3 OSViewVec=normalize(ViewVec);    
+  float3 NormalVec=IN.Normal.xyz;
+    
+  float fDot= dot(OSViewVec, NormalVec.xyz);  
+  float3 reflVector =(2*NormalVec.xyz*fDot-OSViewVec.xyz);  
+  OUT.Tex2.xy = (reflVector.xz+1.0)*0.5;
+
+  float fDiffuse = max(dot(OSLightVec, NormalVec), 0);
+  
+  float fiSqDist = rsqrt(dot(LightVec, LightVec));
+  float fAtten = PROC_ATTENVERT;
+  
+  OUT.Color.xyz=fDiffuse*fAtten*Diffuse.xyz;
+
+  return OUT;
+}

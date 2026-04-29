@@ -1,0 +1,43 @@
+// ===============================================================
+// Fragment Program: hologram
+// Description: used with holograms..
+// Last Update: 2/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D tableMap : texunit0,
+            uniform sampler2D decalMap : texunit1,
+            uniform sampler2D noiseMap : texunit2
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load colors
+  float4 tableColor = tex2D(tableMap, IN.Tex0.xy);                
+  float4 decalColor = tex2D(decalMap, IN.Tex1.xy);                
+  float4 noiseColor = tex2D(noiseMap, IN.Tex2.xy);                
+              
+  float fLum = 2*dot(float3(0.5, 0.5, 0.5), decalColor.xyz);
+  float fNoiseLum= 2*dot(float3(0.33, 0.59, 0.11), noiseColor.xyz);
+  fNoiseLum*=fNoiseLum;
+  fNoiseLum*=fNoiseLum*0.5;
+          
+  OUT.Color.xyz = HDREncode(tableColor*fLum*fNoiseLum); 
+  OUT.Color.w= 1;  
+}

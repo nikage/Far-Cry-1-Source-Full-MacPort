@@ -1,0 +1,59 @@
+// ===============================================================
+// Vertex Program: Motion
+// Description: used in motion blur fx
+// Last Update: 30/04/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  // texture size in xy
+  uniform float4   TexSize,
+  // textures scales for each stage, in components
+  uniform float4   TexScale
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+    OUT_T3_2
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{  
+
+//  OUT.Tex0.xy = IN.TexCoord0.xy;
+//  OUT.Tex1.xy = IN.TexCoord0.xy;
+//  OUT.Tex2.xy = IN.TexCoord0.xy;
+//  OUT.Tex3.xy = IN.TexCoord0.xy;
+
+  // output texture coordinates  
+  OUT.Tex0.xy = (IN.TexCoord0.xy*TexSize.xy - 0.5*TexSize.xy)*TexScale.x + 0.5*TexSize.xy;
+  OUT.Tex1.xy = (IN.TexCoord0.xy*TexSize.xy - 0.5*TexSize.xy)*TexScale.y + 0.5*TexSize.xy;
+  OUT.Tex2.xy = (IN.TexCoord0.xy*TexSize.xy - 0.5*TexSize.xy)*TexScale.z + 0.5*TexSize.xy;
+  OUT.Tex3.xy =(IN.TexCoord0.xy*TexSize.xy - 0.5*TexSize.xy)*TexScale.w + 0.5*TexSize.xy;
+
+  return OUT;
+}

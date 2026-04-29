@@ -1,0 +1,64 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgFur_OffsGen.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      NoFog
+      
+      VertAttributes { POSITION_3 TANG_3X3 TEXCOORD0_2 }
+      MainInput { VIEWPROJ_MATRIX, uniform float4 Force, uniform float4 Damping, uniform float4 Omega, uniform float4 ScaleBiasTC }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2
+        };
+
+      }
+      PositionScript = PosNULL
+      CoreScript
+      {
+        float2 tc;
+        tc.xy = (IN.TexCoord0.xy + ScaleBiasTC.zw)*ScaleBiasTC.xy;
+        OUT.HPosition.xy = tc * 2 - 1;
+        OUT.HPosition.zw = float2(0.5, 1);
+        OUT.Tex0.x = tc.x;
+        OUT.Tex0.y = 1-tc.y;
+        
+        float3 vForce = Force.xyz - cross(Omega.xyz, vPos.xyz);
+        
+        float fFS = dot(IN.Tangent.xyz, vForce.xyz);
+        float fFT = dot(IN.Binormal.xyz, vForce.xyz);
+        float fST = dot(IN.Binormal.xyz, IN.Tangent.xyz);
+        float fDet = 1 / (1 - fST*fST);
+        
+        OUT.Tex1.x = fDet * (fFS - fFT * fST);
+        OUT.Tex1.y = fDet * (fFT - fFS * fST);
+        OUT.Tex2.xyz = Damping.xyz;
+      }
+    

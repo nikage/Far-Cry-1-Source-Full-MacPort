@@ -1,0 +1,58 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCGlassDispersion.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform samplerCUBE refrMapR : texunit0,
+                  uniform samplerCUBE refrMapG : texunit1,
+                  uniform samplerCUBE refrMapB : texunit2,
+                  uniform samplerCUBE reflMap : texunit3,
+                  uniform float4 Opacity }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the reflection map
+        float4 reflColor = texCUBE(reflMap, IN.Tex3.xyz);
+        // load the refraction map
+        float3 cubeR = texCUBE(refrMapR, IN.Tex0.xyz).xyz;
+        float3 cubeG = texCUBE(refrMapG, IN.Tex1.xyz).xyz;
+        float3 cubeB = texCUBE(refrMapB, IN.Tex2.xyz).xyz;
+        float3 refrColor;
+        refrColor.r = cubeR.r;
+        refrColor.g = cubeG.g;
+        refrColor.b = cubeB.b;
+        float3 env = reflColor.xyz*IN.Color.xyz + refrColor.xyz*(1-IN.Color.xyz);
+        float3 vColor = HDREncodeAmb(env.xyz);
+        // finally add them all together
+        OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.w = Opacity.a * IN.Color.a;
+      }
+
+

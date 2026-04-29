@@ -1,0 +1,53 @@
+#ifdef D3D
+
+      Script
+      (
+        !!RC1.0
+        {
+          rgb
+          {
+            discard = col0 * const0;
+            discard = tex3;
+            spare0 = sum();
+          }
+        }
+        {
+          rgb
+          {
+            discard = spare0;
+            discard = const1;
+            spare0 = sum();
+          }
+        }
+        out.rgb = spare0;
+        out.a = unsigned_invert(zero);
+      )
+    
+#endif
+
+#ifdef OPENGL
+
+      CombinersStat
+      (
+        !!RC1.0
+        {
+          rgb
+          {
+            discard = col0 * const0;
+            discard = tex3;
+            spare0 = sum();
+          }
+        }
+        {
+          rgb
+          {
+            discard = spare0;
+            discard = const1;
+            spare0 = sum();
+          }
+        }
+        out.rgb = spare0;
+        out.a = unsigned_invert(zero);
+      )
+    
+#endif

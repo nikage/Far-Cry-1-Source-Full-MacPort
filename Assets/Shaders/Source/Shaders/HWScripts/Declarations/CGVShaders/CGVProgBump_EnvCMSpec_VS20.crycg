@@ -1,0 +1,69 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_EnvCMSpec_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { uniform float4x4 ModelViewProj, uniform float4 EyePos, uniform float4x4 ModelMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+
+        TANG_MATR
+
+      	float4 worldPos = mul(ModelMatrix, vPos);
+
+        // compute view vector
+        OUT.Tex2.xyz = EyePos.xyz - worldPos.xyz;
+
+        float3 worldTangentS = mul(objToTangentSpace[0], (const float3x3)ModelMatrix);
+        float3 worldTangentT = mul(objToTangentSpace[1], (const float3x3)ModelMatrix);
+        float3 worldNormal = mul(objToTangentSpace[2], (float3x3)ModelMatrix);
+
+	      OUT.Tex3.xyz = worldTangentS;
+	      OUT.Tex4.xyz = worldTangentT;
+	      OUT.Tex5.xyz = worldNormal;
+
+        // store light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        // transform light vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex2.xyz = mul(objToTangentSpace, lightVec.xyz);
+      }
+    

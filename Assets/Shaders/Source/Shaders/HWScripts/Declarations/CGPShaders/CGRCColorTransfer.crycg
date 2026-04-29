@@ -1,0 +1,45 @@
+// ===============================================================
+// Vertex Program: color transfer
+// Description: used in color transfer post-processing fx
+// Last Update: 02/06/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D baseMap0 : texunit0,
+            uniform float4 fTransfColor,
+            uniform float4 fTransfAmount
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal
+  float3 fTex0 = tex2D(baseMap0, IN.Tex0.xy).rgb;
+    
+  float3 fColor=float3(1.0, .86, 0.61);
+  float3 fLumSet=float3(0.30f, 0.59f, 0.11f);
+  float3 fLuminosity= dot( fLumSet, fTex0 )*2.0f;  
+  
+  //float3 fFinal=(1-fLuminosity)*fColor+fLuminosity;  
+  //OUT.Color.rgb = fFinal*fLuminosity;
+
+  float3 fFinal=fLuminosity*fColor+(1.0f-fColor)* (fLuminosity-1.0f);
+
+  OUT.Color.rgb= lerp(fTex0, fFinal, fTransfAmount.a);
+  OUT.Color.a = 1.0f;
+}
+
+

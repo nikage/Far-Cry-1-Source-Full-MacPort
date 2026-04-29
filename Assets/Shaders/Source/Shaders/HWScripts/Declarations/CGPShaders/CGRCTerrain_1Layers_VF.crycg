@@ -1,0 +1,58 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTerrain_1Layers_VF.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D detMap0 : texunit1,
+                  uniform sampler2D fogEnterMap : texunit2,
+                  uniform sampler2D fogMap : texunit3,
+                  uniform float4 Ambient,
+                  uniform float4 FogColor }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the detail
+        float4 detColor0 = tex2D(detMap0, IN.Tex1.xy);
+        // load the fog
+        float4 fogColor = tex2D(fogMap, IN.Tex3.xy);
+        float4 fogEnterColor = tex2D(fogEnterMap, IN.Tex2.xy);
+        float fog = fogColor.a * fogEnterColor.a;
+        
+        float3 color = (decalColor.xyz * IN.Color.a * Ambient.xyz) * 2;
+        detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);
+        color.xyz = color * detColor0.xyz * 2;
+        
+        OUT.Color.xyz = FogColor.xyz*fog + color.xyz*(1-fog);
+        OUT.Color.a = decalColor.a * Ambient.a;
+      }
+      
+      

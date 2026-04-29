@@ -1,0 +1,71 @@
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : register(s0),
+                  uniform sampler2D bumpMap : register(s1),
+                  uniform sampler3D noiseMap : register(s2),
+                  uniform float4 Diffuse,
+                  uniform float4 Specular,
+                  uniform float4 Ambient,
+                  uniform float4 GlitterParms }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+
+        float3 pos = IN.Tex4.xyz;
+        float noisy = tex3D(noiseMap, pos*0.4).a;
+
+        // Extract some random points to glitter.
+        // This is done by perturbing a grid pattern with some noise and
+        // with the view-vector to let the glittering change with view.
+        float3 fp = frac(GlitterParms.x * pos.xyz + 9 * noisy + GlitterParms.y * IN.Tex5.xyz);
+        fp *= (1 - fp);
+        float glitter = saturate(1 - GlitterParms.w * (fp.x + fp.y + fp.z));
+
+        // normalize post-filtered bump normals
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+
+        // normalize light vector
+        float3 lightVec = normalize(IN.Tex2.xyz);
+        float fDif = saturate(dot(lightVec.xyz, bumpNormal.xyz));
+
+        // normalize view vector
+        float3 viewVec = normalize(IN.Tex3.xyz);
+        float3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;
+        float NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+        float fSpec = pow(NdotR, Specular.w);
+
+        // Only glitter around the specular highlight. We use a lower
+        // exponent for the glitter to let it spread more.
+        float glittering = glitter * pow(NdotR, 2);
+
+        // Get a little more interesting base color
+        decalColor.xyz = (0.5 * noisy + 0.5) * decalColor.xyz;
+
+        float3 dif = (decalColor.xyz * fDif * Diffuse.xyz) * 2;
+        float3 spec = (fSpec * Specular.xyz) * 2;
+        float3 amb = Ambient.xyz * decalColor.xyz;
+
+        // finally add them all together
+        OUT.Color.xyz = amb + dif + spec + glittering*GlitterParms.z;
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+

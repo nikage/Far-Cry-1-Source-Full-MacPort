@@ -1,0 +1,75 @@
+// ===============================================================
+// Vertex Program: hologram
+// Description: used in holograms..
+// Last Update: 22/10/2003
+//
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 TEXCOORD0_2 TNORMAL_3 }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,  
+  uniform float4   CameraPos,  
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,
+  uniform float4   TexMovSpeed,
+  uniform float4   ScreenSize
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_TN
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{         
+  
+  float3 viewVec = normalize(CameraPos.xyz-vPos.xyz);
+  float  fDot =dot(viewVec, IN.TNormal.xyz);
+  fDot*=fDot;  
+  //fDot=max(fDot*0.5+0.5, 0);
+ 
+  // output texture coordinates           
+  OUT.Tex0.xy = float2(fDot, 1);
+  OUT.Tex1.xy = IN.TexCoord0.xy;
+
+  float4 vHPos = mul(ModelViewProj, vPos);     
+  float2 vTex=(vHPos.xy/vHPos.w  + 1)*0.5;  
+  
+  vTex.x*=15;  
+  vTex.y-=2*sin(TexShiftRipple.x*100);
+  OUT.Tex2.xy = vTex.xy;
+
+# ifdef _HDR
+  float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+  OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+
+  return OUT;
+}

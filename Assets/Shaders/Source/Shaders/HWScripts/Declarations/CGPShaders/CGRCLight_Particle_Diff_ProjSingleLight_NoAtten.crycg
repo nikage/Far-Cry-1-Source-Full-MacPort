@@ -1,0 +1,55 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCLight_Particle_Diff_ProjSingleLight_NoAtten.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform samplerCUBE projMap : texunit1,
+                  uniform float4 Ambient,
+                  uniform float4 Diffuse }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_C0
+          OUT_C1
+        };
+
+# ifdef _HDR_MRT
+        FOUT_2
+# else
+        FOUT
+# endif
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        float4 projColor = texCUBE(projMap, IN.Tex1.xyz);
+
+        float3 dif = (decalColor.xyz * projColor.xyz * Diffuse.xyz * IN.Color.xyz);
+        dif.xyz = HDREncode(dif.xyz);
+  
+        float3 amb = HDREncodeAmb(decalColor.xyz * Ambient.xyz);
+
+        // finally add them all together
+        float fOutA = decalColor.w * Ambient.w * IN.Color.a;
+        HDROutput(OUT, FLOAT4 (amb + dif, fOutA), 1, GlobalFogColor.xyz, IN.Color1.w);
+      }
+

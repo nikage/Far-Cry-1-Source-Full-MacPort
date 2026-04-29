@@ -1,0 +1,41 @@
+// ===============================================================
+// Fragment Program: Subsurface scatering
+// Description: used in subsurface scatering
+// Last Update: 10/04/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+PS20Only
+
+MainInput { uniform sampler2D decalMap : register(s0),
+            uniform sampler2D bumpMap : register(s1),
+            uniform samplerCUBE normCubeMap : register(s2)
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_T2    
+    OUT_T3
+    OUT_C0    
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load colors  
+  float4 vSubSurfaceColor = tex2D(decalMap, IN.Tex0.xy);                  
+  float3 vBumpColor = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5); //normalize(IN.Tex3.xyz);    
+  float4 vNCMColor = 2*(texCUBE(normCubeMap, IN.Tex2.xyz)-0.5);    
+                            
+  OUT.Color.xyz = saturate(dot(vNCMColor.xyz, vBumpColor.xyz)*0.5+0.5)*IN.Color.xyz*vSubSurfaceColor;
+  OUT.Color.w= 1;  
+}

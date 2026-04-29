@@ -1,0 +1,43 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+MRT
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform FLOAT4 vSampleOffsets[8],
+  uniform FLOAT4 vSampleWeights[8]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT_2
+}
+
+CoreScript
+{
+  FLOAT4 vSample = 0.0f;
+  FLOAT4 vColor = 0.0f;
+      
+  FLOAT2 vSamplePosition;
+  
+  // Sample from eight points along the star line
+  for(int i=0; i<8; i++)
+  {
+    vSamplePosition = IN.Tex0.xy + vSampleOffsets[i].xy;
+    vSample = tex2D(baseMap, vSamplePosition);
+    vColor += vSampleWeights[i] * vSample;
+  }
+    
+  OUT.Color0 = float4(vColor.rg, 0, 0);
+  OUT.Color1 = float4(vColor.b, 0, 0, 0);
+}
+

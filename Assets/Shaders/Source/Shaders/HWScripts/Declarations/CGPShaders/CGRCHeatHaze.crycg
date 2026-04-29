@@ -1,0 +1,67 @@
+// ===============================================================
+// Fragment Program: Heat Haze
+// Description: used in particles
+// Last Update: 02/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D bumpMask : texunit0, 
+            uniform sampler2D bumpMap : texunit1,
+#ifdef OPENGL
+            uniform samplerRECT refMap : texunit2, 
+#endif
+#ifdef D3D
+            uniform sampler2D refMap : texunit2,
+#endif
+            uniform float4 Matrix,
+            uniform float4 Amount,
+            uniform float4 RefrColor
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  // load the decal
+  float4 maskColor = tex2D(bumpMask, IN.Tex0.xy);
+  float4 bumpColor = tex2D(bumpMap, IN.Tex1.xy);
+
+// must create 2 versions, since offsetRECT/samplerRECT must be used for gl version...
+#ifdef D3D
+  # ifdef _PS_1_1
+    float4 refrColor = offsettex2D(refMap, IN.Tex2.xy, bumpColor, Matrix);                 // get env bump map   
+  # else
+    float2 newst = IN.Tex2.xy;
+    newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+    float4 refrColor = tex2D(refMap, newst);
+  # endif
+#endif
+
+#ifdef OPENGL
+  # ifdef _PS_1_1
+    float4 refrColor = offsettexRECT(refMap, IN.Tex2.xy, bumpColor, Matrix);               // get env bump map   
+  # else
+    float2 newst = IN.Tex2.xy;
+    newst = newst + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+    float4 refrColor = texRECT(refMap, newst);
+  # endif    
+#endif
+
+  OUT.Color.xyz = refrColor*RefrColor;
+  OUT.Color.w= maskColor.w*IN.Color.w;
+}

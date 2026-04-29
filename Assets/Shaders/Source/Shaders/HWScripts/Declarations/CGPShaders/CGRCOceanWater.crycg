@@ -1,0 +1,93 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCOceanWater.crycg
+//  Version:     v1.00
+//  Created:     01/07/2004by Tiago Sousa.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+      #include "../CGVPMacro.csi"
+
+PS20ONLY
+
+      MainInput { uniform sampler2D bumpMap : register(s0),
+                  uniform sampler2D envMap : register(s1),
+                  uniform float4 Matrix,
+                  uniform float4 ReflectAmount,
+                  uniform float4 WaterColor,
+                  uniform float4 SpecularSun }
+                  
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3 
+          OUT_T4
+          OUT_T5
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      
+      CoreScript
+      {                  
+        float2 vScale=saturate(Matrix.xw);//float2(IN.Tex4.w, IN.Tex4.w))*Matrix.xw;
+                        
+        // load the decal
+        float4 bumpColorA = tex2D(bumpMap, IN.Tex0.xy);
+        float4 bumpColorB = tex2D(bumpMap, IN.Tex0.zw);
+        float4 vNormal = 0.5*( (2*bumpColorA-1)+(2*bumpColorB-1) );
+                
+        float2 newst = (IN.Tex1.xy / IN.Tex1.w)+ vScale.xy * vNormal.xy;        
+        float4 reflColor = tex2D(envMap, newst.xy);                
+        
+        float3 vWaterColor=float3(0.0, 0.3, 0.5)*WaterColor.xyz;
+        reflColor.xyz=vWaterColor*(1.0-ReflectAmount.w)+reflColor.xyz*ReflectAmount.w;
+                                             
+        // load the decal
+        bumpColorA = tex2D(bumpMap, IN.Tex0.yx*2.0);
+        bumpColorB = tex2D(bumpMap, IN.Tex0.wz*2.0);
+        float4 vRefrNormal = 2*((bumpColorA*0.5+bumpColorB*0.5)-0.5);
+                                             
+        float3 vView=normalize(IN.Tex4.xyz);        
+        float3 vLight=normalize(IN.Tex5.xyz);
+                
+        float fDot=(dot(vNormal.xyz, vLight.xyz));
+        float3 vReflect=normalize(2.0*vNormal.xyz*fDot-vView.xyz);
+                                          
+        float fSunGlow=saturate(dot(vReflect.xyz, vLight.xyz));                
+                        
+        float fR0=0.5;
+        float fDist=saturate(IN.Tex3.z);
+        
+        float fFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)));                
+        float fAtten=saturate( saturate(IN.Color.w*(1.0-IN.Tex2.z))+IN.Color.w );
+        float fFresnel=saturate(fFoam*fAtten + fAtten);
+                                
+        float3 vFinal=saturate(reflColor*fFresnel);                                
+                                                        
+        float3 vSunCol=float3(1.0, 0.8, 0.5);
+        fSunGlow=2.0*pow(fSunGlow, 64)*fFresnel; //*IN.Tex5.w;                        
+        float3 vSunGlow=fSunGlow*vFinal.xyz*vSunCol.xyz; //*reflColor*fFresnel;
+
+        fR0=0.0;        
+        float3 vFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))*vFinal*WaterColor*0.5;                
+        vFoam*=vFoam*4.0;
+                                                                                                                                 
+        OUT.Color.xyz = vFoam+vFinal+vSunGlow-vFinal.xyz*vSunGlow;                
+        OUT.Color.a = saturate(IN.Color.w*fSunGlow+IN.Color.w);
+      }
+      

@@ -1,0 +1,72 @@
+// ===============================================================
+// Vertex Program: Low/Med spec water for NV1X class cards...
+// Description: used in for really low spec water volumes
+// Last Update: 29/11/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+VertAttributes { POSITION_3 PRIM_COLOR }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  uniform float4   CameraPos,    
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,
+  uniform float4   WaterColor
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_C0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosCommon
+
+CoreScript
+{
+  float4 vHPos = mul(ModelViewProj, vPos);                
+  float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);  
+
+  float3 fNormal=float3(0,0,1);
+  float fDot= dot(eyeVec, fNormal);  
+  
+  // output color and fresnel term hack           
+  OUT.Color.xyz=WaterColor.xyz;   
+  OUT.Color.w =max(0, IN.Color.w-(1/(vHPos.w*vHPos.w)));     
+          
+  float2 vTex;
+  vTex.x = dot(vPos, TexGenRipple0);
+  vTex.y = dot(vPos, TexGenRipple1);   
+  
+  float3 vNPos=normalize(vPos.xyz);
+  vTex.xy= (vTex.xy+TexShiftRipple.zw*TexShiftRipple.xy);
+
+  // output texture coordinates  
+  OUT.Tex0.xy = vTex.xy;      
+    
+  float3 fReflVec=normalize(2*fDot*fNormal-eyeVec);     
+  OUT.Tex1.xy = ((fReflVec.xy+1.0)*0.5-TexShiftRipple.zw*TexShiftRipple.xy*0.2)*0.4; 
+       
+  return OUT;
+}

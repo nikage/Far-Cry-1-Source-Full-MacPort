@@ -1,0 +1,73 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGPSBump_DiffSpec_MultipleLight_PS.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform sampler2D specPowMap : texunit3,
+                  uniform float4 Diffuse,
+	                uniform float4 Specular,
+	                uniform float4 AmbientEmissive,
+	                uniform float  SpecPower }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        // compute texCoord(NdotH, 0) and use it to look up NdotH^power in the power texture
+        // This should create a texm3x2tex instruction for ps_1_1 equivalent to the ps_1_1
+        // builtin tex2D_dp3x2 (which is not supported in any other profile):
+        //    float4 NdotL_NdotH = tex2D_dp3x2(specPowMap, IN.Tex2, bumpNormal);
+        float2 texCoord = float2(
+            dot(IN.Tex2.xyz, bumpNormal.xyz),
+            dot(IN.Tex3.xyz, bumpNormal.xyz));
+        float4 NdotL_NdotH = tex2D(specPowMap, texCoord);
+
+        // grab the attenuation factor out of the specular iterator
+        float3 attenuation = IN.Color.aaa;
+        //float selfShadow;
+        // modulate both NdotL and NdotH by the self-shadow and attenuation terms
+        NdotL_NdotH.xyz *= attenuation;
+        NdotL_NdotH.w *= attenuation.x;
+
+        // to match vertex pipeline, diffuse = (matDif * difIntensity + matAmbient) * decalColor
+        float4 dif;
+        dif.rgb = (Diffuse.rgb*NdotL_NdotH.xyz+AmbientEmissive.rgb) * decalColor.rgb;
+        dif.a = decalColor.a;
+
+        // compute the specular color
+        float4 spec = Specular * NdotL_NdotH.wwww * 2;
+        
+        // finally add them all together
+        OUT.Color = dif + spec;
+      }

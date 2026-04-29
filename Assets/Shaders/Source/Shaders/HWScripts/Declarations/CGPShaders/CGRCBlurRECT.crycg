@@ -1,0 +1,48 @@
+// ===============================================================
+// Fragment Program: Blur
+// Description: averages texture colors
+// Last Update: 12/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+MainInput 
+{
+	uniform samplerRECT baseMap0 : texunit0,
+	uniform samplerRECT baseMap1 : texunit1,
+	uniform samplerRECT baseMap2 : texunit2,
+	uniform samplerRECT baseMap3 : texunit3 
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	  OUT_T2
+	  OUT_T3
+	};
+
+	FOUT
+}
+
+CoreScript
+{
+	// load the decal
+	float4 color0 = texRECT(baseMap0, IN.Tex0.xy);
+	float4 color1 = texRECT(baseMap1, IN.Tex1.xy);
+	float4 color2 = texRECT(baseMap2, IN.Tex2.xy);
+	float4 color3 = texRECT(baseMap3, IN.Tex3.xy);
+
+	float4 avg= float4(0.5, 0.5, 0.5, 0.5);
+	float4 colorA = saturate(color0*avg+color1*avg)*0.5;
+	float4 colorB = saturate(color2*avg+color3*avg)*0.5;
+	
+	// finally add them all together
+	OUT.Color = saturate(colorA+colorB);
+}
+

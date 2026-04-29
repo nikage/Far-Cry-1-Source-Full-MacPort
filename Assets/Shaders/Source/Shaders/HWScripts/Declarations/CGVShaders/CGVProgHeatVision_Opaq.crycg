@@ -1,0 +1,33 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, uniform float2x4 TexGen, CAMERA_POS, uniform float4 Color }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float4 vNormal = normalize(IN.Normal);
+        OUT.Tex0.xy = mul(TexGen, vPos);
+
+        float4 camVec = normalize(CameraPos - vPos);
+        float4 color = Color;
+        color.y = Color.y - dot(camVec, vNormal) * color.w;
+        OUT.Color.xyz = color.xyz * IN.Color.xyz;
+      }
+    

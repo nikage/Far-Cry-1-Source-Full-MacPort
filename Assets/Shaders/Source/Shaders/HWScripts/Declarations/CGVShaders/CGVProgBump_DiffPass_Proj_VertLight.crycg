@@ -1,0 +1,61 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_DiffPass_Proj_VertLight.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TNORMAL_3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_MATRIX, LIGHT_POS, ATTEN }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TN
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1 = mul(LightMatrix, vPos);
+
+        // store normalized light vector
+        float3 lightVec = LightPos.xyz - vPos.xyz;
+        float fiSqDist = rsqrt(dot(lightVec, lightVec));
+        float3 lVec = lightVec * fiSqDist;
+        
+        OUT.Color.xyz = IN.Color.xyz;
+        float fAtten = PROC_ATTENVERT;
+        OUT.Color.w = fAtten * saturate(dot(lVec, IN.TNormal.xyz));
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

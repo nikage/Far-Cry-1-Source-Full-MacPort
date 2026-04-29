@@ -1,0 +1,260 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCAmbientTempl.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: Ambient pass fragment template
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      AutoEnumTC
+
+      MainInput
+      {
+        uniform sampler2D baseMap : register(sn),
+#if %BUMP_MAP
+  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING
+        uniform sampler2D bumpMap : register(sn),
+  #endif
+#endif  
+#if %TEMP_LM
+        uniform sampler2D lightMap : register(sn),
+#elif %TEMP_DOT3LM
+        uniform sampler2D lightMap : register(sn),
+        uniform sampler2D lightDirMap : register(sn),
+#endif        
+#if %ENVCMAMB
+        uniform samplerCUBE envMap : register(sn),
+  #if %ENVCM_MASKED
+        uniform sampler2D glossMap : register(sn),
+  #endif
+#elif %ENVCMSPEC
+        uniform samplerCUBE envMap : register(sn),
+  #if %GLOSS_MAP
+        uniform sampler2D glossMap : register(sn),
+  #endif        
+#endif
+
+# ifdef _HDRLM
+        uniform sampler2D lightMapHDR : register(sn),
+# endif
+# ifdef _3DC_A
+        uniform sampler2D bumpHeight : register(sn),
+# endif
+
+        uniform float4 Ambient,
+#if %ENVCMAMB
+        uniform float4 Reflect,
+#elif %ENVCMSPEC
+        uniform float4 EnvMapParams,
+        uniform float4 FresnelParams,
+#endif
+#if %OFFSETBUMPMAPPING
+        uniform float4 BumpOffset,
+#endif
+      }
+      
+      DeclarationsScript
+      {
+        // define outputs from vertex shader
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float4 baseTC     : TEXCOORDN;
+#if %BUMP_MAP
+  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING
+          float4 bumpTC     : TEXCOORDN;
+  #endif
+#endif  
+#if %TEMP_LM || %TEMP_DOT3LM || %BUMP_ZCORRECT
+          float4 lmTC_ZW    : TEXCOORDN;
+#endif
+#if %TEMP_DOT3LM
+          float4 lmdirTC    : TEXCOORDN;
+#endif
+
+          float4 Color      : COLOR0;
+
+#if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+#elif %ENVCMSPEC
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+#endif          
+#if %OFFSETBUMPMAPPING || %ENVCMSPEC
+          float4 viewVec    : TEXCOORDN;
+#endif          
+        };
+
+# ifdef _HDR_MRT
+        FOUT_2
+# else
+  #if %BUMP_ZCORRECT
+        FOUT_DEPTH
+  #else
+        FOUT
+  #endif
+# endif
+
+      }
+      CoreScript
+      {
+
+        float2 baseTC = IN.baseTC.xy;
+
+#if %BUMP_MAP
+  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING
+        float2 bumpTC = IN.bumpTC.xy;
+  #endif
+#endif
+
+#if %OFFSETBUMPMAPPING
+# ifdef _3DC_A
+        FLOAT fHeight = EXPAND(tex2D(bumpHeight, IN.bumpTC.xy).x);
+# else
+        FLOAT fHeight = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a);
+# endif        
+        fHeight *= BumpOffset.x;
+        FLOAT3 viewVec = normalize(IN.viewVec.xyz);
+        bumpTC = bumpTC + viewVec.xy * fHeight;
+        baseTC = baseTC + viewVec.xy * fHeight;
+#endif
+
+        FLOAT3 bumpNormal = float3(0,0,1);
+
+#if %BUMP_MAP
+  #if %TEMP_DOT3LM || %ENVCMSPEC || %OFFSETBUMPMAPPING
+        bumpNormal = GetNormalMap(bumpMap, bumpTC.xy);
+    #endif
+  #endif
+#endif
+
+#if %BUMP_ZCORRECT
+// Calculate depth bias.
+  # ifdef _3DC_A
+        FLOAT height = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);
+  # else
+        FLOAT height = EXPAND(tex2D(bumpMap, bumpTC.xy).a);
+  # endif
+        FLOAT fZ = DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw);
+#else
+        FLOAT fZ = 1;
+#endif
+
+        // load the decal
+        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);
+        FLOAT fAlpha = decalColor.a;
+
+        // Compute diffuse contribution
+#if %TEMP_LM
+        // load the lm
+        FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);
+        FLOAT3 dif = (decalColor.xyz * lmColor.xyz);
+        dif = HDREncodeLM(dif);
+#elif %TEMP_DOT3LM
+        // load the lm
+        FLOAT4 lmColor = tex2D(lightMap, IN.lmTC_ZW.xy);
+        // load the lm dir
+        FLOAT4 lmDir = tex2D(lightDirMap, IN.lmTC_ZW.xy);
+        FLOAT lmNdotL = saturate(dot( EXPAND(lmDir.xyz), bumpNormal.xyz));
+        FLOAT  lmIntens = lmNdotL * lmColor.a + (1-lmColor.a);
+    # ifdef _HDRLM
+        // Decode RGBE LM HDR color
+        FLOAT4 lmHDRColor = tex2D(lightMapHDR, IN.lmTC_ZW.xy);
+        FLOAT fExp = ( lmHDRColor.a * 256 - HDR_EXP_OFFSET );
+	      FLOAT fScale = pow( HDR_EXP_BASE, fExp );
+	      FLOAT3 dif = lmHDRColor.xyz * fScale * lmIntens;
+    # else
+        FLOAT3 dif = HDREncodeLM(lmColor.xyz * lmDir.a * lmIntens);
+    # endif        
+        dif *= decalColor.xyz;
+#else
+        FLOAT3 dif = float3(0,0,0);
+#endif        
+
+        // Compute ambient contribution
+#if %TEMP_ENVLIGHT
+        FLOAT3 amb = decalColor.xyz * IN.Color.xyz;
+#elif %ENVCMAMB
+        // load the environment map
+        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);
+        FLOAT fLerp = Reflect.a;
+  #if %ENVCM_MASKED
+        // load the gloss
+        fLerp *= tex2D(glossMap, IN.baseTC.zw).a;
+  #endif
+        FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);
+#elif %ENVCMSPEC
+        FLOAT fEnvmapAmount = EnvMapParams.x;
+
+        float fFresnelScale = FresnelParams.x;
+        float fFresnelBias = FresnelParams.y;
+        float fFresnelPow = FresnelParams.z;
+
+        // Calc Reflection Vector
+        float3x3 worldTangentSpace;
+        worldTangentSpace[0] = IN.tangVec.xyz;
+        worldTangentSpace[1] = IN.binormVec.xyz;
+        worldTangentSpace[2] = IN.normVec.xyz;
+
+      #if !%OFFSETBUMPMAPPING
+        float3 viewVec = normalize(IN.viewVec.xyz);
+      #endif        
+        float NdotE = dot(bumpNormal.xyz, viewVec);
+        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);
+        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);
+
+        // Calc Fresnel factor
+        FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);
+
+        // Calc environment
+        FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;
+        env *= fresnel;
+  #if GLOSS_MAP
+        // load the gloss
+        FLOAT4 glossColor = tex2D(glossMap, IN.baseTC.zw);
+        env *= glossColor.xyz;
+  #elif %GLOSS_DIFFUSEALPHA
+        env *= fAlpha;
+  #endif
+        FLOAT3 amb = decalColor.xyz * Ambient.xyz + env;
+#else
+        FLOAT3 amb = decalColor.xyz * Ambient.xyz;
+#endif
+
+#if %ALPHAGLOW
+        amb += fAlpha * decalColor.xyz;
+#endif
+        amb = HDREncodeAmb(amb);
+
+#if %VERTCOLORS
+        amb *= IN.Color.xyz;
+#endif
+
+        // Finally add them all together
+        FLOAT3 finalColor = amb + dif;
+        FLOAT fOutA = 1;
+                
+#if %ALPHAGLOW && %TEMP_DOT3LM
+// Fake (for compatibility with old system)
+// Should be removed        
+        fOutA = fAlpha * Ambient.w;        
+#elif !%ALPHAGLOW && %DIFFUSEALPHA
+        fOutA = fAlpha * Ambient.w;
+#else
+        fOutA = Ambient.w;
+#endif        
+        FLOAT _fFogFrac = IN.Color.w;
+        HDROutput(OUT, FLOAT4 (finalColor.xyz, fOutA), fZ, GlobalFogColor.xyz, _fFogFrac);
+      }

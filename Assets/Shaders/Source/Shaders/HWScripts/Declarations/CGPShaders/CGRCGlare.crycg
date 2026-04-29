@@ -1,0 +1,70 @@
+// ===============================================================
+// Fragment Program: Glare
+// Description: glare/contrast/saturation adjustment
+// Last Update: 09/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+NoFog
+
+MainInput 
+{ 
+#ifdef OPENGL
+    uniform samplerRECT ScreenTex : texunit0,
+    uniform samplerRECT GlareTex : texunit1,
+#endif
+#ifdef D3D
+    uniform sampler2D ScreenTex : texunit0,
+    uniform sampler2D GlareTex : texunit1,
+#endif
+    uniform float4    vSaturationAmount,
+    uniform float4    vConstrastAmount,
+    uniform float4    vConstrastAmount02
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+      OUT_T1
+    };
+
+    FOUT
+}
+
+CoreScript
+{         
+#ifdef OPENGL
+    // get screen
+    float4 fScreenColor = texRECT(ScreenTex, IN.Tex0.xy);
+    // get glare map
+    float4 fGlareColor  = texRECT(GlareTex, IN.Tex1.xy);
+#endif
+#ifdef D3D
+    // get screen
+    float4 fScreenColor = tex2D(ScreenTex, IN.Tex0.xy);
+    // get glare map
+    float4 fGlareColor  = tex2D(GlareTex, IN.Tex1.xy);
+#endif
+    
+    // ## Add glare to scene ##    
+    float3 vFinalGlareColor=saturate(fGlareColor.xyz+fScreenColor.xyz);
+    float3 vLum=dot(fScreenColor.xyz, float3(0.3, 0.59, 0.11));        
+    float3 vFinalComposing=saturate(fScreenColor.xyz*(1-vLum.z) + vFinalGlareColor.xyz*vLum.z );
+            
+    // ## adjust scene saturation ##
+    //float3 vSceneLuminosity = saturate(dot(float3(0.33, 0.59, 0.11), vFinalComposing.xyz));        
+    float3 vSaturationAdjust=saturate(vFinalComposing.xyz*(1-vSaturationAmount.w) + vLum.xyz*vSaturationAmount.w );
+                
+    // ## adjust scene contrast ##  Optimization: Not used anymore                    
+    //float  fContrastLerp=saturate(fGlareColor.w*vConstrastAmount.w+vConstrastAmount02.w);    
+    //float3 vConstrastAdjust=saturate(lerp( 2*(vSaturationAdjust.xyz-0.5), vSaturationAdjust.xyz, fContrastLerp));
+                                                
+    OUT.Color.xyz =vSaturationAdjust;
+    OUT.Color.w=1;
+}
+
+

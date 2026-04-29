@@ -1,0 +1,54 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProg_CartoonShading.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, uniform float4 Color }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        // 1. Calculate L dot N and pass result to ToonLookup texture
+        float3 vLightDir = normalize(LightPos.xyz - vPos.xyz);
+        float LdotN = dot(vLightDir.xyz, IN.Normal.xyz);
+        OUT.Tex0.x = LdotN;
+
+        // 2. Calculate E dot N and pass result to EdgeLookup texture
+        float3 vEyeDir = normalize(CameraPos.xyz - vPos.xyz);
+        float EdotN = dot(vEyeDir.xyz, IN.Normal.xyz);          
+        OUT.Tex1.x = EdotN;
+        
+        // Use custom color
+        OUT.Color = Color;
+      }
+    

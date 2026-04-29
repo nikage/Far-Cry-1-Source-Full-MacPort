@@ -1,0 +1,78 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCShadow_Neg_Depth2_4Samples.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+      NoFog
+
+      MainInput { uniform sampler2D shadMap0 : texunit0,
+                  uniform sampler2D shadMap1 : texunit1,
+                  uniform sampler2D shadMap2 : texunit2,
+                  uniform sampler2D shadMap4 : texunit3,
+                  uniform sampler2D baseMap : texunit4,
+                  uniform float4 Ambient,
+                  uniform float4 Fading }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_T6
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex4.xy);
+        // load the 3 shadow samples
+        float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);
+        float4 shadColor1 = tex2Dproj(shadMap1, IN.Tex1.xyzw);
+        float4 shadColor2 = tex2Dproj(shadMap2, IN.Tex2.xyzw);
+        float4 shadColor3 = tex2Dproj(shadMap2, IN.Tex3.xyzw);
+        float4 shad = (float4)0;
+        shad.x = shadColor0.r/8 + shadColor0.g;
+        shad.y = shadColor1.r/8 + shadColor1.g;
+        shad.z = shadColor2.r/8 + shadColor2.g;
+        shad.z = shadColor3.r/8 + shadColor3.g;
+        float4 vZ;
+        vZ.x = IN.Tex5.x / IN.Tex5.y;
+        vZ.y = IN.Tex5.z / IN.Tex5.w;
+        vZ.z = IN.Tex6.x / IN.Tex6.y;
+        vZ.w = IN.Tex6.z / IN.Tex6.w;
+        shad = shad - vZ;
+        //float4 compare = step(shad, float4(0, 0, 0, 0));
+        float4 compare = saturate(-shad*10);
+        compare = compare * Fading;
+        compare.x = compare.x * shadColor0.a;
+        compare.y = compare.y * shadColor1.a;
+        compare.z = compare.z * shadColor2.a;
+        compare.w = compare.w * shadColor3.a;
+        float fCompare = dot(compare, float4(1, 1, 1, 1));
+        
+        float3 color = decalColor.xyz * Ambient.xyz;
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = fCompare;
+      }
+      

@@ -1,0 +1,478 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCLightTempl.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: General lighting fragment template
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      AutoEnumTC
+      
+      MainInput
+      {
+        uniform sampler2D baseMap : register(sn),
+#if %BUMP_MAP
+        uniform sampler2D bumpMap : register(sn),
+  #if %BUMP_DIFFUSE && %DIFFUSE
+        uniform sampler2D bumpMapDiffuse : register(sn),
+  #endif
+#endif
+
+#if %DIFFUSE
+  #if %DIFFUSE_NCM && !%DIFFUSE_PERPIXEL
+        uniform samplerCUBE normCubeMapLV : register(sn),
+  #endif
+#else        
+  #if %DIFFUSE_NCM && %SPECULAR_PERPIXEL
+        uniform samplerCUBE normCubeMapLV : register(sn),
+  #endif
+#endif
+
+#if %SPECULAR
+  #if %SPECULAR_NCM || %VIEWVEC_NCM
+        uniform samplerCUBE normCubeMapHA : register(sn),
+  #endif
+#endif
+
+#if %TEMP_POINTLIGHT
+        uniform sampler2D attenMap : register(sn),
+#elif %TEMP_PROJLIGHT
+        uniform samplerCUBE projMap : register(sn),
+  #if %PROJLIGHT_PERPIXELATTEN        
+        uniform sampler2D attenMap : register(sn),
+  #endif        
+#endif        
+
+#if %TEMP_AMBIENT && %ENVCMSPEC && %GLOSS_MAP
+        uniform sampler2D glossMap : register(sn),
+#elif %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        uniform sampler2D glossMap : register(sn),
+#elif %SPECULAR
+  #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        uniform sampler2D glossMap : register(sn),
+  #endif
+#endif        
+
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+        uniform sampler2D occlusionMap : register(sn),
+#endif
+
+#if %TEMP_AMBIENT
+        uniform float4 Ambient,
+  #if %ENVCMAMB
+        uniform samplerCUBE envMap : register(sn),
+        uniform float4 Reflect,
+  #elif %ENVCMSPEC
+        uniform samplerCUBE envMap : register(sn),
+        uniform float4 EnvMapParams,
+        uniform float4 FresnelParams,
+  #endif
+#endif
+
+# ifdef _3DC_A
+        uniform sampler2D bumpHeight : register(sn),
+# endif
+# ifdef _SPEC_ANTIALIAS
+        uniform sampler2D specularMap : register(sn),
+# endif
+
+#if %DIFFUSE
+        uniform float4 Diffuse,
+#endif
+
+#if %SPECULAR
+        uniform float4 Specular,
+#endif
+
+#if %OFFSETBUMPMAPPING
+        uniform float4 BumpOffset,
+#endif
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+        uniform float4 OcclusionMask,
+#endif
+      }
+
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          float4 HPosition  : POSITION;
+          float4 baseTC     : TEXCOORDN;
+#if %BUMP_MAP          
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+          float4 bumpTC     : TEXCOORDN;
+  #endif
+#endif
+  
+#if %DIFFUSE_NCM
+          float4 lightVec   : TEXCOORDN;
+#endif
+          
+#if %SPECULAR
+   #if %SPECULAR_NCM
+          float4 halfAngVec : TEXCOORDN;
+   #endif
+#endif   
+
+#if %TEMP_POINTLIGHT
+          float4 attenTC    : TEXCOORDN;
+#elif %TEMP_PROJLIGHT
+          float4 projTC     : TEXCOORDN;
+  #if %PROJLIGHT_PERPIXELATTEN
+          float4 attenTC    : TEXCOORDN;
+  #endif
+#endif
+
+#if %TEMP_POINTLIGHT || %TEMP_PROJLIGHT
+          float4 Color      : COLOR0;
+#elif %DIFFUSE && !%DIFFUSE_NCM
+          float4 Color      : COLOR0;
+#endif
+
+          float4 Color1     : COLOR1;
+
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+          float4 glossTC    : TEXCOORDN;
+#elif !%TEMP_AMBIENT || !%ENVCMSPEC
+  #if %SPECULAR
+    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+          float4 glossTC    : TEXCOORDN;
+    #endif
+  #endif
+#endif          
+
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+          float4 lmTC_ZW    : TEXCOORDN;
+#elif %BUMP_ZCORRECT
+          float4 lmTC_ZW    : TEXCOORDN;
+#endif
+
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+          float4 envTC      : TEXCOORDN;
+  #elif %ENVCMSPEC
+    #if !%SPECULAR || !%SPECULAR_PERPIXEL
+          float4 viewVec    : TEXCOORDN;
+    #endif
+          float4 tangVec    : TEXCOORDN;
+          float4 binormVec  : TEXCOORDN;
+          float4 normVec    : TEXCOORDN;
+  #endif
+#endif
+
+#if !%DIFFUSE_NCM
+  #if %DIFFUSE_PERPIXEL
+          float4 lightVec : TEXCOORDN;
+  #elif %SPECULAR_PERPIXEL
+          float4 lightVec : TEXCOORDN;
+  #endif
+#endif
+          
+#if %SPECULAR && %SPECULAR_PERPIXEL
+          float4 viewVec : TEXCOORDN;
+#elif %TEMP_AMBIENT && %ENVCMSPEC
+#elif %OFFSETBUMPMAPPING && %BUMP_MAP
+          float4 viewVec    : TEXCOORDN;
+#endif
+        };
+
+# ifdef _HDR_MRT
+        FOUT_2
+# else
+  #if %BUMP_ZCORRECT
+        FOUT_DEPTH
+  #else
+        FOUT
+  #endif
+# endif
+
+      }
+      CoreScript
+      {        
+        float2 baseTC = IN.baseTC.xy;
+        float2 bumpTC = baseTC;
+#if %BUMP_MAP
+  #if !%TEMP_AMBIENT || !%ENVCMSPEC
+        bumpTC = IN.bumpTC.xy;
+  #endif
+#endif
+
+        float2 glossTC = baseTC;
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        glossTC = IN.glossTC.xy;
+#elif !%TEMP_AMBIENT || !%ENVCMSPEC
+  #if %SPECULAR
+    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        glossTC = IN.glossTC.xy;
+    #endif
+  #endif
+#endif
+
+        FLOAT fHeight = 0;
+#if %OFFSETBUMPMAPPING && %BUMP_MAP
+  # ifdef _3DC_A
+        fHeight = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);
+  # else
+        fHeight = EXPAND(tex2D(bumpMap, bumpTC.xy).a);
+  # endif
+        fHeight *= BumpOffset.x;
+        FLOAT3 viewVec = normalize(IN.viewVec.xyz);
+        baseTC = baseTC + viewVec.xy * fHeight;
+        bumpTC = bumpTC + viewVec.xy * fHeight;
+        glossTC = glossTC + viewVec.xy * fHeight;
+#endif
+
+        // load the diffuse texture
+        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);
+        FLOAT fAlpha = decalColor.a;
+
+#if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+        FLOAT4 occColor = tex2D(occlusionMap, IN.lmTC_ZW.xy);
+        FLOAT fOccl = dot(occColor, OcclusionMask);
+#endif
+
+#if %BUMP_MAP
+        // load the bump normal
+        FLOAT3 bumpNormal = GetNormalMap(bumpMap, bumpTC.xy);
+        FLOAT3 Na = bumpNormal;
+  #if %BUMP_DIFFUSE && %DIFFUSE
+        FLOAT3 bumpNormalDiffuse = GetNormalMap(bumpMapDiffuse, bumpTC.xy);
+  #endif
+
+  #if %BUMP_NORMALIZE
+    # if !defined (_3DC) && !defined (_V8U8) && !defined (_Cx_V8U8)
+        // normalize post-filtered bump normals
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+    # endif
+  #endif
+#else        
+        FLOAT3 bumpNormal = float3(0,0,1);
+        FLOAT3 bumpNormalDiffuse = float3(0,0,1);
+#endif
+
+#if %BUMP_ZCORRECT
+// Calculate depth bias.
+  # ifdef _3DC_A
+        FLOAT height = EXPAND(tex2D(bumpHeight, bumpTC.xy).x);
+  # else
+        FLOAT height = EXPAND(tex2D(bumpMap, bumpTC.xy).a);
+  # endif
+        FLOAT fZ = DepthBias(height, bumpNormal, viewVec, IN.lmTC_ZW.zw);
+#else
+        FLOAT fZ = 1;
+#endif
+
+        // load the gloss
+#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED
+        FLOAT4 glossColor = tex2D(glossMap, glossTC.xy);
+#elif %SPECULAR
+  #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA
+        FLOAT4 glossColor = tex2D(glossMap, glossTC.xy);
+  #endif
+#elif %TEMP_AMBIENT && %ENVCMSPEC && %GLOSS_MAP
+        FLOAT4 glossColor = tex2D(glossMap, glossTC.xy);
+#endif
+  
+        // Calculate attenuation
+        FLOAT atten = 1;
+#if %TEMP_POINTLIGHT
+        atten = saturate(EXPAND(IN.Color.a) * -EXPAND(IN.Color.a) + (1-tex2D(attenMap, IN.attenTC.xy).b));
+#elif %TEMP_PROJLIGHT
+        FLOAT4 projColor = texCUBE(projMap, IN.projTC.xyz);
+   #if %PROJLIGHT_PERPIXELATTEN
+        atten = saturate(EXPAND(IN.Color.a) * -EXPAND(IN.Color.a) + (1-tex2D(attenMap, IN.attenTC.xy).b));
+   #else
+        atten = saturate(IN.Color.a);
+   #endif
+#endif
+        // For some reason multiplying on very small 
+        // attenuation cause specular negative lighting on NV40 hardware
+# ifdef _HDR
+          atten = max(atten, 0.00001);
+# endif
+        
+        // Calculate diffuse contribution
+#if %DIFFUSE
+  #if %DIFFUSE_PERPIXEL
+        FLOAT3 lVec = normalize(IN.lightVec.xyz);
+  #elif %DIFFUSE_NCM
+        // Light vector from normalization cube-map
+        FLOAT3 lVec = EXPAND(texCUBE(normCubeMapLV, IN.lightVec.xyz).xyz);
+  #else
+        FLOAT3 lVec = EXPAND(IN.Color.xyz);
+  #endif        
+    #if %BUMP_DIFFUSE
+        FLOAT NdotL = saturate(dot(lVec.xyz, bumpNormalDiffuse.xyz));
+    #else
+        FLOAT NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+    #endif
+        FLOAT3 dif = decalColor.xyz * NdotL * Diffuse.xyz;
+  #if %TEMP_POINTLIGHT
+        dif = dif * atten;
+  #elif %TEMP_PROJLIGHT
+        dif = dif * atten * projColor.xyz;
+  #endif
+        dif.xyz = HDREncode(dif);  
+#else
+        FLOAT3 dif = float3(0,0,0);
+#endif
+
+#if %VERTCOLORS
+        dif *= IN.Color1.w;
+#endif
+        
+
+        // Calculate specular contribution
+#if %SPECULAR
+  #if %SPECULAR_PERPIXEL
+    #if !%OFFSETBUMPMAPPING
+      #if %VIEWVEC_NCM
+        FLOAT3 viewVec = EXPAND(texCUBE(normCubeMapHA, IN.viewVec.xyz).xyz);
+      #else
+        FLOAT3 viewVec = normalize(IN.viewVec.xyz);
+      #endif
+    #endif        
+  #elif %SPECULAR_NCM
+        // Half angle vector from normalization cube-map
+        FLOAT3 hVec = EXPAND(texCUBE(normCubeMapHA, IN.halfAngVec.xyz).xyz);
+  #else
+        FLOAT3 hVec = EXPAND(IN.Color1.xyz);
+  #endif        
+  #if %SPECULAR_PERPIXEL
+    #if !%DIFFUSE
+      #if %DIFFUSE_NCM
+        FLOAT3 lVec = EXPAND(texCUBE(normCubeMapLV, IN.lightVec.xyz).xyz);
+      #else
+        FLOAT3 lVec = normalize(IN.lightVec.xyz);
+      #endif
+    #endif
+    # ifdef _SPEC_ANTIALIAS
+        FLOAT3 Hn = normalize(viewVec.xyz + lVec.xyz);
+        FLOAT NaH = dot(Hn , Na);
+	      FLOAT NaNa = dot(Na , Na);
+    	  FLOAT specVal = tex2D(specularMap, float2(NaH,NaNa)).x;
+    # else
+        FLOAT3 reflVec = (2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz;
+        FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+        FLOAT fPow = Specular.w;
+      #if %SPECULARPOW_GLOSSALPHA
+        fPow *= glossColor.a;
+      #endif
+        FLOAT specVal = pow(NdotR, fPow);
+    # endif
+  #else        
+        FLOAT NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz));
+        FLOAT  specVal = saturate((NdotH - 0.75)*4);
+        specVal = specVal * specVal;
+  #endif        
+        FLOAT3 spec = specVal * Specular.xyz;
+  #if %TEMP_SPECULAR_OCCLUSIONMAP && !%DIFFUSE
+        spec *= fOccl;
+  #endif
+                
+  #if %TEMP_POINTLIGHT
+        spec = spec * atten;
+  #elif %TEMP_PROJLIGHT
+        spec = spec * atten * projColor.xyz;
+  #endif
+  #if %GLOSS_MAP
+        spec *= glossColor.xyz;
+  #elif %GLOSS_DIFFUSEALPHA
+        spec *= fAlpha;
+  #endif
+        spec = HDREncode(spec);
+#else
+        FLOAT3 spec = float3(0,0,0);
+#endif
+
+#if %VERTCOLORS
+        spec *= IN.Color1.w;
+#endif
+
+        // Calculate ambient and environment contribution
+#if %TEMP_AMBIENT
+  #if %ENVCMAMB
+        // load the environment map
+        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);
+        FLOAT fLerp = Reflect.a;
+    #if %ENVCM_MASKED
+        // load the gloss
+        fLerp *= glossColor.a;
+    #endif
+        FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);
+        FLOAT3 env = float3(0,0,0);
+  #elif %ENVCMSPEC        
+        FLOAT fEnvmapAmount = EnvMapParams.x;
+
+        float fFresnelScale = FresnelParams.x;
+        float fFresnelBias = FresnelParams.y;
+        float fFresnelPow = FresnelParams.z;
+
+        // Calc Reflection Vector
+        float3x3 worldTangentSpace;
+        worldTangentSpace[0] = IN.tangVec.xyz;
+        worldTangentSpace[1] = IN.binormVec.xyz;
+        worldTangentSpace[2] = IN.normVec.xyz;
+
+    #if !%SPECULAR || !%SPECULAR_PERPIXEL
+      #if !%OFFSETBUMPMAPPING
+        float3 viewVec = normalize(IN.viewVec.xyz);
+      #endif
+    #endif        
+        float NdotE = dot(bumpNormal.xyz, viewVec);
+        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);
+        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);
+
+        // Calc Fresnel factor
+        FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);
+
+        // Calc environment
+        FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;
+        env *= fresnel;
+     #if %GLOSS_MAP
+        env *= glossColor.xyz;
+     #elif %GLOSS_DIFFUSEALPHA
+        env *= fAlpha;
+     #endif
+        FLOAT3 amb = Ambient.xyz * decalColor.xyz;
+  #else
+        FLOAT3 amb = Ambient.xyz * decalColor.xyz;
+        FLOAT3 env  = float3(0,0,0);
+  #endif
+  #if %ALPHAGLOW
+        amb += fAlpha * decalColor.xyz;
+  #endif
+        amb = HDREncodeAmb(amb);
+#else
+        FLOAT3 amb = float3(0,0,0);
+        FLOAT3 env  = float3(0,0,0);
+#endif                
+
+        // Finally add them all together
+        FLOAT3 finalColor = amb + dif + spec + env;
+        FLOAT fOutA = 1.0f;
+#if %TEMP_AMBIENT
+  #if !%ALPHAGLOW && %DIFFUSEALPHA && !%GLOSS_DIFFUSEALPHA
+        fOutA = fAlpha * Ambient.w;
+  #else        
+        fOutA = Ambient.w;
+  #endif        
+#else  
+        fOutA = fAlpha;
+#endif
+
+        FLOAT _fFogFrac = IN.Color1.w;
+        HDROutput(OUT, FLOAT4 (finalColor, fOutA), fZ, GlobalFogColor.xyz, _fFogFrac);
+      }
+

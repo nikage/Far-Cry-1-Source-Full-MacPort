@@ -1,0 +1,79 @@
+// ===============================================
+// Vertex Program: Sub surface scatering
+// Description: compute fake subsurface coeficient
+// Last Update: 7/04/2003
+// Coder: Tiago Sousa
+//
+// Notes: could be better if scatering was dependent
+// also of surface distance to light source
+// ===============================================
+
+#include "../CGVPMacro.csi"
+
+Param4f (Name = LightPos Comp 'OSLightPos[0]' Comp 'OSLightPos[1]' Comp 'OSLightPos[2]' Comp = 1)
+Param4f (Name = CameraPos Comp 'OSCameraPos[0]' Comp 'OSCameraPos[1]' Comp 'OSCameraPos[2]' Comp=1)
+Param4f (Name = AttenInfo Comp 'LightIntens' Comp 'InvLightIntens' Comp=0.5)
+
+// setup vertex components
+VertAttributes
+{
+  POSITION_3
+  TEXCOORD0_2
+  TANG_3X3
+}
+
+// setup vertex components
+MainInput
+{
+  VIEWPROJ_MATRIX,
+  LIGHT_POS,
+  CAMERA_POS,
+  ATTEN
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+    IN_TANG
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0
+    OUT_T1
+    OUT_T2
+    OUT_T3
+    OUT_C0    
+  };
+
+}
+
+// output vertex position..
+PositionScript = PosCommon
+
+CoreScript
+{
+  TANG_MATR
+  
+  // output texture coordinates
+  OUT.Tex0.xy = IN.TexCoord0.xy;
+  OUT.Tex1.xy = IN.TexCoord0.xy;
+  
+  // store normalized light vector
+  float3 lVec = LightPos.xyz - vPos.xyz;
+  float3 lightVec = mul(objToTangentSpace, lVec.xyz);
+
+  OUT.Tex2.xyz = lightVec;
+  
+  float fiSqDist = rsqrt(dot(lVec, lVec));
+  float fAtten = PROC_ATTENVERT;                        
+  // output attenuation
+  OUT.Color.xyz=fAtten;
+  OUT.Tex3.xyz=mul(objToTangentSpace,IN.TNormal.xyz);
+  
+  return OUT;
+}

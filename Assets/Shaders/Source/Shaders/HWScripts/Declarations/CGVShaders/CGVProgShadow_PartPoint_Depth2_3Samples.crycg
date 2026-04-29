@@ -1,0 +1,74 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgShadow_Depth2_1Samples.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR }
+
+      NoFog      
+      VS20Only
+      
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 TexGen0, uniform float4x4 TexGen1, uniform float4x4 TexGen2, uniform float2x4 ShadowModelMatr0, uniform float2x4 ShadowModelMatr1, uniform float2x4 ShadowModelMatr2, uniform float ShadowBias, LIGHT_POS, ATTEN }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3_2
+          OUT_T4
+          OUT_T5_2
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex3.xy = IN.TexCoord0.xy;
+        OUT.Tex0 = mul(TexGen0, vPos);          
+        OUT.Tex1 = mul(TexGen1, vPos);          
+        OUT.Tex2 = mul(TexGen2, vPos);          
+
+        float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);
+        float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);
+        OUT.Tex4.x = fZ;
+        OUT.Tex4.y = fW;
+        
+        fZ = dot(ShadowModelMatr1._11_12_13_14, vPos);
+        fW = dot(ShadowModelMatr1._21_22_23_24, vPos);
+        OUT.Tex4.z = fZ;
+        OUT.Tex4.w = fW;
+
+        fZ = dot(ShadowModelMatr2._11_12_13_14, vPos);
+        fW = dot(ShadowModelMatr2._21_22_23_24, vPos);
+        OUT.Tex5.x = fZ;
+        OUT.Tex5.y = fW;
+        
+        OUT.Color1.xyz = AttenInfo.x-length(LightPos.xyz - vPos.xyz)*AttenInfo.y;
+        OUT.Color = IN.Color;
+      }
+    

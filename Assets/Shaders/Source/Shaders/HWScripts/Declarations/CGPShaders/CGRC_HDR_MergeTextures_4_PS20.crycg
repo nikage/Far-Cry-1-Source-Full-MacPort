@@ -1,0 +1,37 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap0 : texunit0,
+  uniform sampler2D baseMap1 : texunit1,
+  uniform sampler2D baseMap2 : texunit2,
+  uniform sampler2D baseMap3 : texunit3,
+  uniform FLOAT4 vSampleWeights[4]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  FLOAT4 vColor = 0.0f;
+  
+  vColor += vSampleWeights[0] * tex2D(baseMap0, IN.Tex0.xy);
+  vColor += vSampleWeights[1] * tex2D(baseMap1, IN.Tex0.xy);
+  vColor += vSampleWeights[2] * tex2D(baseMap2, IN.Tex0.xy);
+  vColor += vSampleWeights[3] * tex2D(baseMap3, IN.Tex0.xy);
+    
+  OUT.Color = vColor;
+}
+

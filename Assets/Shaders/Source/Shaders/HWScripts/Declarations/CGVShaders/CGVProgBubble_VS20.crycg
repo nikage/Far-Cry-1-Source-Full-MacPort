@@ -1,0 +1,52 @@
+
+      #include "../CGVPMacro.csi"
+
+      
+      Noise
+      Param4f ( Name = NoisePos Comp 'time 0.8' Comp 'time 0.6' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, uniform float4 NoisePos, CAMERA_POS, uniform float4x4 ObjMatrix, uniform float4 pg[66] : register(c30) }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_T2
+        };
+
+      }
+      PositionScript = PosWaterDeform_TNorm
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;  // diffuse
+
+        TANG_MATR
+        
+        float4 vNoise = fNoise * float4(0.5, 0.5, 0.25, 0.25);
+        float fX = dot(-vNoise, float4(0.0, 2.0, 0.0, 4.0));
+        float fY = dot(-vNoise, float4(2.0, 0.0, 4.0, 0.0));
+        float3 normal = IN.TNormal.xyz + (IN.Binormal.xyz*fX + IN.Tangent.xyz*fY)*0.04;
+
+        normal.x = dot(IN.TNormal.xyz, ObjMatrix._11_12_13);
+        normal.y = dot(IN.TNormal.xyz, ObjMatrix._21_22_23);
+        normal.z = dot(IN.TNormal.xyz, ObjMatrix._31_32_33);
+        normal = normalize(normal);
+
+        // calculate incident vector
+        float3 incidentVec = normalize(vPos.xyz - CameraPos.xyz);
+        OUT.Tex1.xyz = reflect(incidentVec, normal);
+        OUT.Tex1.w = vPos.w;
+
+        float VdotN = dot(incidentVec, IN.TNormal.xyz);
+        OUT.Tex2.xyz = VdotN;
+      }
+    

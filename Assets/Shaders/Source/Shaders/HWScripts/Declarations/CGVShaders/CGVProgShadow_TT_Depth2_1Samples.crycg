@@ -1,0 +1,51 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgShadow_TT_Depth2_1Samples.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 }
+
+      //NoFog      
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 TexGen0, TEX_MATRIX2x4, uniform float2x4 ShadowModelMatr0, uniform float ShadowBias }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1_2
+          OUT_T2_2
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0 = mul(TexGen0, vPos);          
+        OUT.Tex1.xy = mul(TexMatrix, IN.TexCoord0);
+
+        float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);
+        float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);
+        OUT.Tex2.x = fZ;
+        OUT.Tex2.y = fW;
+      }
+    

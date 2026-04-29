@@ -1,0 +1,39 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : register(s0),
+  uniform sampler2D baseMap_K : register(s1)
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  FLOAT4 vColor = tex2D(baseMap, IN.Tex0.xy);
+  FLOAT4 vColorK = tex2D(baseMap_K, IN.Tex0.xy);
+  
+# ifdef _HDR_MRT
+	float fLum = Luminance(vColor.rgb);
+	float fK = vColorK.x * HDRFAKE_MAXOVERBRIGHT;
+	if(fK > fLum*1.01)
+	{
+		vColor.rgb = vColor.rgb * (fK / fLum);
+	}
+# endif
+    
+  OUT.Color = vColor;
+}
+

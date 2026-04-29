@@ -1,0 +1,87 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBumpReflLightCM_PS.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 PRIM_COLOR TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, uniform float3x3 ObjToCubeSpace, uniform float3 LightPos, uniform float3 CameraPos, uniform float3 Up, uniform float BumpScale }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        // pass texture coordinates for fetching the normal map
+        OUT.Tex0 = IN.TexCoord0;
+
+        // compute the 3x3 tranform from tangent space to object space
+        float3x3 objToTangentSpace;
+        // first rows are the tangent and binormal scaled by the bump scale
+        objToTangentSpace[0] = BumpScale * IN.Tangent;
+        objToTangentSpace[1] = BumpScale * IN.Binormal;
+        objToTangentSpace[2] = IN.TNormal;
+        
+        float3x3 lightSpace;
+        lightSpace[2] = normalize(LightPos.xyz - vPos.xyz);
+        OUT.Color.xyz = dot(lightSpace[2], IN.TNormal);
+        lightSpace[1] = normalize(cross(lightSpace[2], Up));
+        lightSpace[0] = cross(lightSpace[1], lightSpace[2]);
+        
+        float3x3 vTemp;
+        vTemp[0] = mul(ObjToCubeSpace, lightSpace[0].xyz);
+        vTemp[1] = mul(ObjToCubeSpace, lightSpace[1].xyz);
+        vTemp[2] = mul(ObjToCubeSpace, lightSpace[2].xyz);
+
+        OUT.Tex1.xyz = mul(objToTangentSpace, vTemp[0].xyz);
+        OUT.Tex2.xyz = mul(objToTangentSpace, vTemp[1].xyz);
+        OUT.Tex3.xyz = mul(objToTangentSpace, vTemp[2].xyz);
+
+        // compute the eye vector (going from shaded point to eye) in cube space
+        //OUT.Tex1.w = -dot(lightSpace[0], vPos.xyz);
+        //OUT.Tex2.w = -dot(lightSpace[1], vPos.xyz);
+        //OUT.Tex3.w = -dot(lightSpace[2], vPos.xyz);
+        // compute the eye vector (going from shaded point to eye) in cube space
+        float3 eyeVector = CameraPos - mul(ObjToCubeSpace, vPos.xyz);
+        OUT.Tex1.w = eyeVector.x;
+        OUT.Tex2.w = eyeVector.y;
+        OUT.Tex3.w = eyeVector.z;
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

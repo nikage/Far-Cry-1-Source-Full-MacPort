@@ -1,0 +1,51 @@
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 NORMAL_3 PRIM_COLOR }
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 ObjMatrix, CAMERA_POS, uniform float4 Eta }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0 = IN.TexCoord0;
+        
+        // transform normal
+        float3 normal;;
+        normal.x = dot(IN.Normal.xyz, ObjMatrix._11_12_13);
+        normal.y = dot(IN.Normal.xyz, ObjMatrix._21_22_23);
+        normal.z = dot(IN.Normal.xyz, ObjMatrix._31_32_33);
+       
+        // calculate incident vector
+        float3 incidentVec = normalize(vPos.xyz - CameraPos.xyz);
+
+        // refraction function from Renderman spec
+        // I = incident direction, N = normal, eta = relative index of refraction
+        float IdotN = dot(incidentVec, normal);
+        float k = 1 - Eta.x*Eta.x*(1 - IdotN*IdotN);
+        float3 result = Eta.x*incidentVec - (Eta.x*IdotN + sqrt(k))*normal;
+        OUT.Tex1.xyz = result.xyz;
+        OUT.Tex1.w = vPos.w;
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

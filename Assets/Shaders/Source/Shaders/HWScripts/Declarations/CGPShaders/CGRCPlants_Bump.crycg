@@ -1,0 +1,66 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCPlants_Bump.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      SupportsInstancing
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  AMBIENT,
+                  DIFFUSE }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_C0
+          OUT_C1
+        };
+
+# ifdef _HDR_MRT
+        FOUT_2
+# else
+        FOUT
+# endif
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float3 bumpNormal = GetNormalMap(bumpMap, IN.Tex1.xy);
+
+        // light vector
+        float3 lightVec = EXPAND(IN.Color1.xyz);
+        float fDif = saturate(dot(bumpNormal.xyz, lightVec));
+        float3 dif = (fDif * Diffuse.xyz);
+
+        float4 vAmbient;
+# ifdef _INST
+        vAmbient = IN.Tex2;
+# else        
+        vAmbient = Ambient;
+# endif        
+        float3 color = vAmbient.xyz * (IN.Color.xyz + dif.xyz) * decalColor.xyz;
+        color.xyz = HDREncode(color.xyz);
+
+        HDROutput(OUT, FLOAT4 (color.xyz, decalColor.a * vAmbient.a), 1, GlobalFogColor.xyz, IN.Color1.w);
+      }
+      

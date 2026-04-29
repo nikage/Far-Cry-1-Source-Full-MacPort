@@ -1,0 +1,44 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCAmbient_AlphaGlow_EnvCM.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform samplerCUBE envMap : texunit1,
+                  uniform float4 Ambient,
+                  uniform float4 Reflect }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the environment map
+        float4 envColor = texCUBE(envMap, IN.Tex1.xyz);
+        float3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, Reflect.x);
+        OUT.Color.xyz = amb.xyz + decalColor.w * decalColor.xyz;
+        OUT.Color.w = Ambient.w;
+      }
+      

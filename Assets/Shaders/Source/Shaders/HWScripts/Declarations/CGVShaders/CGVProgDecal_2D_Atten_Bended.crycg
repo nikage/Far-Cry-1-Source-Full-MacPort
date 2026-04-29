@@ -1,0 +1,62 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgDecal_Atten_Bended.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      Param4f (Name = Bend Comp 'ObjWaveX' Comp 'ObjWaveY' Comp 'Bending' Comp = 1)
+      MainInput { VIEWPROJ_MATRIX, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4 DecalAtten, BEND }
+      
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosBending
+      CoreScript
+      {
+        OUT.Tex0.x = dot(BaseTexGen0, IN.Position);
+        OUT.Tex0.y = dot(BaseTexGen1, IN.Position);
+
+        float3 binorm = BaseTexGen0;
+        float3 tang = BaseTexGen1;
+        float3 norm = cross(binorm, tang);
+        binorm = cross(norm, tang);
+
+        float3x3 objToTangentSpace;
+        objToTangentSpace[0] = normalize(tang);
+        objToTangentSpace[1] = normalize(binorm);
+        objToTangentSpace[2] = normalize(norm);
+        
+        float3 vVec = DecalAtten.xyz - IN.Position.xyz;
+        float3 vtVec = mul(objToTangentSpace, vVec);          
+        float3 vDist = vtVec * ((1/DecalAtten.w) * 0.5) + 0.5;
+        OUT.Tex1.xyz = vDist;
+        OUT.Color.xyz = vDist;
+      }
+    

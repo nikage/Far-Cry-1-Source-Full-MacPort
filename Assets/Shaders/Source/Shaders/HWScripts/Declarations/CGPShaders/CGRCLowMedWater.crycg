@@ -1,0 +1,59 @@
+// ===============================================================
+// Fragment Program: Low/Med spec water 
+// Description: used in for low/med spec water volumes
+// Last Update: 10/10/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D bumpMap : texunit0,
+            uniform sampler2D refMap : texunit1,
+            uniform float4 Matrix,
+            uniform float4 Ambient,
+            uniform float4 WaterColor
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+    OUT_C0
+  };
+
+  FOUT
+}
+
+CoreScript
+{  
+  // load the decal
+  float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);
+  //float4 bumpColor2 = tex2D(refMap, IN.Tex1.xy);
+
+  // get env bump map surface
+# ifdef _PS_1_1
+  float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);          
+# else
+  float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+  float4 refrColor = tex2D(refMap, newst);
+# endif                
+  
+  float fLum=dot(refrColor.xyz, float3(0.33, 0.59, 0.11));
+  // get brightest color  
+  float fDiffuse=2*saturate(fLum-0.5);                          
+
+  // aprox~ spec^8      
+  float fFakeSpec=fDiffuse;
+  fFakeSpec=saturate(2*(fFakeSpec*fFakeSpec-0.6));                                            
+        
+  // compute water surface color  
+  float3 fWaterSurfColor=saturate(saturate(fLum*0.7+0.3)*WaterColor.xyz);            
+  
+  // set water to ambient color
+  OUT.Color.xyz = Ambient.xyz*(fWaterSurfColor+fWaterSurfColor*0.25);                                    
+  // output fresnel*transparency amount
+  OUT.Color.w = saturate(IN.Color.w*WaterColor.w+0.5); 
+}

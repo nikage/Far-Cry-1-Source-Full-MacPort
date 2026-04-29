@@ -1,0 +1,122 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgSimple_Plant_Bended.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      DefaultPos
+      SupportsInstancing
+
+      Inst_Param4f ( Name = Ambient Comp 'WorldObjColor[0]'  Comp 'WorldObjColor[1]' Comp 'WorldObjColor[2]' Comp 'Opacity' )
+      Inst_Param4f ( Name = Bend Comp 'ObjWaveX' Comp 'ObjWaveY' Comp 'Bending' Comp = 1)
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 }
+      Param4f (Name = Bend Comp 'ObjWaveX' Comp 'ObjWaveY' Comp 'Bending' Comp = 1)
+      MainInput { VIEWPROJ_MATRIX, uniform float4 Ambient, BEND }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_T1
+          IN_T2
+          IN_T3
+# ifdef _INST_R
+          IN_T4
+          IN_T5
+          IN_T6
+# endif          
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+# ifdef _HDR
+          OUT_C1
+# endif          
+        };
+      }
+      PositionScript = PosBending
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+# if defined(_INST_R) || defined(_INST_NR)
+        vPos = IN.Position;
+        
+  # if defined(_INST_NR)
+        float4 vBend = IN.TexCoord3;
+  # else        
+        float4 vBend = IN.TexCoord6;
+  # endif
+        // Bend factor
+        fBF = max(vPos.z, 0) * vBend.z + vBend.w;
+        fBF = fBF * fBF;
+        fBF = fBF * fBF - vBend.w;
+
+        vP;
+        vP.xy = vBend.xy * fBF;
+
+        fLength = length(vPos.xyz);
+
+        vPos.xy = vPos.xy + vP.xy;
+        vDirect = normalize(vPos.xyz);
+        vPos.xyz = vDirect * fLength;
+      
+  # ifdef _INST_NR
+        float4x4 _ObjMatrix, _CompMatrix;
+        _ObjMatrix[0] = float4(IN.TexCoord1.w, 0, 0, 0);
+        _ObjMatrix[1] = float4(0, IN.TexCoord1.w, 0, 0);
+        _ObjMatrix[2] = float4(0, 0, IN.TexCoord1.w, 0);
+        _ObjMatrix[3] = float4(IN.TexCoord1.x, IN.TexCoord1.y, IN.TexCoord1.z, 1);
+        for (int i=0; i<4; i++)
+        {
+          _CompMatrix[0][i] = dot(_ObjMatrix[i], ModelViewProj[0]);
+          _CompMatrix[1][i] = dot(_ObjMatrix[i], ModelViewProj[1]);
+          _CompMatrix[2][i] = dot(_ObjMatrix[i], ModelViewProj[2]);
+          _CompMatrix[3][i] = dot(_ObjMatrix[i], ModelViewProj[3]);
+        }
+        OUT.HPosition = mul(_CompMatrix, vPos);
+        OUT.Color.xyz   = IN.Color.xyz * IN.TexCoord2.xyz;
+        OUT.Color.w = IN.TexCoord2.w;
+  # else
+        float4x4 _CompMatrix;
+        _CompMatrix[0] = IN.TexCoord1;
+        _CompMatrix[1] = IN.TexCoord2;
+        _CompMatrix[2] = IN.TexCoord3;
+        _CompMatrix[3] = IN.TexCoord4;
+        OUT.HPosition = mul(_CompMatrix, vPos);
+        OUT.Color.xyz = IN.Color.xyz * IN.TexCoord5.xyz;
+        OUT.Color.w = IN.TexCoord5.w;
+  # endif
+# else
+        OUT.Color.xyz = IN.Color.xyz * Ambient.xyz;
+        OUT.Color.w = Ambient.w;
+# endif
+
+# ifdef _HDR
+  # if defined(_INST_R) || defined(_INST_NR)
+        float ffCameraSpacePosZ = dot(_CompMatrix[2], vPos);
+  # else
+        float ffCameraSpacePosZ = dot(ModelViewProj[2], vPos);
+  # endif
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif
+      }
+    

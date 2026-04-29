@@ -1,0 +1,36 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform float4 vSampleOffsets[16]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT_2
+}
+
+CoreScript
+{
+  FLOAT4 sample = 0.0f;
+
+  for(int i=0; i<16; i++)
+  {
+    sample += tex2D(baseMap, IN.Tex0.xy + vSampleOffsets[i].xy);
+  }
+    
+  FLOAT4 Col = sample / 16;
+  OUT.Color0 = float4 (Col.rg, 0, 0);
+  OUT.Color1 = float4 (Col.b, 1.0f, 0, 0);
+}
+

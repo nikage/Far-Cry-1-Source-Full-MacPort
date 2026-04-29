@@ -1,0 +1,70 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBump_SpecPass_Proj_Gloss_VS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      VS20Only
+
+      VertAttributes { POSITION_3 TEXCOORD0_2 TANG_3X3 }
+      MainInput { VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, LIGHT_MATRIX, ATTEN }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_T5
+          OUT_T6
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy = IN.TexCoord0.xy;
+        OUT.Tex4.xy = IN.TexCoord0.xy;
+        OUT.Tex2 = mul(LightMatrix, vPos);
+
+        TANG_MATR
+
+        float3 lVec = LightPos.xyz - vPos.xyz;
+        float3 lightVec = mul(objToTangentSpace, lVec);          
+        float3 vDist = PROC_ATTENPIX;
+        
+        OUT.Tex3.xyz = vDist;
+        OUT.Color.xyz = vDist;
+        
+        OUT.Tex5.xyz = lightVec;
+
+        // store view vector
+        float3 viewVec = CameraPos.xyz - vPos.xyz;
+        // transform view vector from object space to tangent space and pass it as a tex coords
+        OUT.Tex6.xyz = mul(objToTangentSpace, viewVec.xyz);
+      }
+    

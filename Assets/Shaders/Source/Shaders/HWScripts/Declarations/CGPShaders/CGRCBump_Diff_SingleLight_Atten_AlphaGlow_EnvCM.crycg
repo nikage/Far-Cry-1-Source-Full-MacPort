@@ -1,0 +1,66 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_Diff_SingleLight_Atten_AlphaGlow_EnvCM.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE normCubeMap : texunit2,
+                  uniform sampler2D attenMap : texunit3,
+                  uniform samplerCUBE envMap : texunit4,
+                  uniform float4 Ambient,
+                  uniform float4 Reflect,
+                  uniform float4 Diffuse }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        float atten = saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex3.xy).b));
+        // load the environment map
+        float4 envColor = texCUBE(envMap, IN.Tex4.xyz);
+
+        // Light vector from normalization cube-map
+        float4 lVec = 2*(texCUBE(normCubeMap, IN.Tex2.xyz)-0.5);
+        float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));
+        float3 dif = (decalColor.xyz * NdotL * atten * Diffuse.xyz) * 2;
+        float3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, Reflect.x);
+        amb = amb.xyz + decalColor.xyz * decalColor.w;
+
+        // finally add them all together
+        OUT.Color.xyz = amb + dif;
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+
+

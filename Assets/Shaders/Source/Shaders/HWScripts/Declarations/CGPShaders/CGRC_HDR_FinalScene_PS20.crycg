@@ -1,0 +1,42 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : register(s0),
+  uniform sampler2D bloomMap : register(s1),
+  uniform sampler2D starMap : register(s2),
+  uniform sampler2D adaptedLumMap : register(s3),
+  uniform float4 Params
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  float4 vSample = tex2D(baseMap, IN.Tex0.xy);
+  float4 vBloom = tex2D(bloomMap, IN.Tex0.xy);
+  float4 vStar = tex2D(starMap, IN.Tex0.xy);
+  float fAdaptedLum = tex2D(adaptedLumMap, float2(0.5f, 0.5f));
+    
+  float fStarScale = Params.x;
+  float fBloomScale = Params.y;
+  
+  // Add the star and bloom post processing effects
+  vSample += fStarScale * vStar;
+  vSample += fBloomScale * vBloom;
+
+  OUT.Color = vSample;
+}
+

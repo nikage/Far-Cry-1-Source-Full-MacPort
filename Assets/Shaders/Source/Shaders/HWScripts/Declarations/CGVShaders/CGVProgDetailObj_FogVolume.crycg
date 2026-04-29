@@ -1,0 +1,53 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgDetailObj_FogVolume.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      //NoFog
+
+      MainInput { VIEWPROJ_MATRIX, uniform float4 GlowTexGen0, uniform float4 GlowTexGen1, uniform float2x4 FogMatrix, uniform float2x4 FogEnterMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_C0
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_T1_2
+          OUT_T2_2
+          OUT_T3_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+        OUT.Tex1.xy  = mul(FogEnterMatrix, vPos);
+        OUT.Tex2.xy  = mul(FogMatrix, vPos);
+        OUT.Tex3.x  = dot(vPos, GlowTexGen0);
+        OUT.Tex3.y  = dot(vPos, GlowTexGen1);
+        OUT.Color   = IN.Color;
+      }
+    

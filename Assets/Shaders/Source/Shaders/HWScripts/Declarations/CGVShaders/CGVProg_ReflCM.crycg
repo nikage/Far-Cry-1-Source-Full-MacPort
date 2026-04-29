@@ -1,0 +1,49 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProg_ReflCM.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      VertAttributes { POSITION_3 TNORMAL_3 }
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4x4 TexMatrix }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_TANG
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        float3 tCamVec = normalize(CameraPos.xyz - vPos.xyz);
+        float3 tNormal = IN.TNormal.xyz;
+        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;
+        //float3 tRef = reflect(tCamVec, tNormal.xyz);
+        float4 tRM;
+        tRM.xyz = tRef.xyz;
+        tRM.w = vPos.w;
+        OUT.Tex0 = mul(tRM, TexMatrix);
+      }
+    

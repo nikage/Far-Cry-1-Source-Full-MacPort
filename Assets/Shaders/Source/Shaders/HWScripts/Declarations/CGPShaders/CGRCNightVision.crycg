@@ -1,0 +1,61 @@
+// ===============================================================
+// Fragment Program: Night Vision
+// Description: Night vision fx
+// Last Update: 23/06/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+MainInput 
+{ 
+#ifdef OPENGL
+	uniform samplerRECT baseMap0 : texunit0,
+#endif	
+#ifdef D3D
+	uniform sampler2D baseMap0 : texunit0,
+#endif	
+	uniform sampler2D baseMap1 : texunit1,
+	uniform float4 fBluryParams
+}
+
+DeclarationsScript
+{
+	struct vertout
+	{
+	  OUT_T0
+	  OUT_T1
+	};
+
+	FOUT
+}
+
+CoreScript
+{
+	// fetch textures
+#ifdef OPENGL
+	float4 fTex0 = texRECT(baseMap0, IN.Tex0.xy);
+#endif	
+#ifdef D3D
+	float4 fTex0 = tex2D(baseMap0, IN.Tex0.xy);
+#endif	
+	float4 fTex1 = tex2D(baseMap1, IN.Tex1.xy);
+		
+	// transfer color(0.6, .9, 0.81), -1.0+fAmbientGain(0.2)
+	float3 fColor=float3(0.6-0.85, .9-0.85, 0.81-0.85);	
+	
+	// double luminosity = (0.30f, 0.59f, 0.11f)*2
+	float3 fLumSet=float3(0.30f, 0.59f, 0.11f);//(0.6f, 1.0f, 0.22f);
+	
+	// compute luminosity		
+	float fLuminosity= dot( fLumSet, fTex0 );  	
+	
+	// tranfer color = fLuminosity+fColor;
+	float3 fFinal=fLuminosity+fColor;
+	
+	// apply noise to final color
+	OUT.Color.xyz = fFinal*(fTex1+0.5);
+	
+	OUT.Color.w = 1.0f;
+}
+

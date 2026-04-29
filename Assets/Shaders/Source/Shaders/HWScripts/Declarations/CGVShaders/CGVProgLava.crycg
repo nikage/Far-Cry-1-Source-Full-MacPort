@@ -1,0 +1,77 @@
+// ===============================================================
+// Vertex Program: Lava
+// Description: used in lava volumes
+// Last Update: 23/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+Noise
+Param4f ( Name = NoisePos Comp 'time 0.4' Comp 'time 0.3' Comp = 0 User 'WaveAmplitude') // xy = wavepos, z = 0, w = amplitude
+
+VertAttributes { POSITION_3 TEXCOORD0_2 }
+
+// setup vertex components
+MainInput
+{
+  // common model view matrix
+  VIEWPROJ_MATRIX,
+  uniform float4   CameraPos,  
+  uniform float4   Constants,
+  uniform float4   NoisePos,
+  uniform float4   TexGenRipple0,
+  uniform float4   TexGenRipple1,
+  uniform float4   TexShiftRipple,
+  uniform float4   TexDetailScale,
+  uniform float4   BumpMatrix,
+  uniform float4   DetailTexParams,
+  uniform float4 pg[66] : register(c30) 
+}
+
+DeclarationsScript
+{
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0
+  };
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+    OUT_T1_2
+    OUT_T2_2
+    OUT_C0
+  };
+
+}
+
+// output vertex position
+PositionScript = PosWaterDeform
+
+CoreScript
+{ 
+
+  float2 vTex;
+  vTex.x = dot(vPos, TexGenRipple0);
+  vTex.y = dot(vPos, TexGenRipple1);
+  vTex.xy= (vTex.xy+(TexShiftRipple.zw*TexShiftRipple.xy))*TexDetailScale.xy;
+
+  // output texture coordinates  
+  OUT.Tex1.xy = vTex.xy;
+  
+  vTex.x = dot(vPos, TexGenRipple0);
+  vTex.y = dot(vPos, TexGenRipple1);
+  vTex.xy= (vTex.xy-(TexShiftRipple.zw*TexShiftRipple.xy*5))*TexDetailScale.xy;
+  OUT.Tex2.xy = vTex.xy;
+  OUT.Tex0.xy = (IN.TexCoord0.xy+DetailTexParams.zw*TexShiftRipple.zw)*DetailTexParams.xy;
+
+# ifdef _HDR
+  float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+  OUT.Color.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif          
+     
+  return OUT;
+}

@@ -1,0 +1,52 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgCaust.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      NoFog
+      UnifiedPosScript
+      
+      VertAttributes { POSITION_3 }
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 ObjMatrix, uniform float4 CaustTexGen0, uniform float4 CaustTexGen1, uniform float3 WaterLevel, CAMERA_POS }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float4 P = mul(ObjMatrix, vPos);
+        OUT.Tex0.x = dot(CaustTexGen0, P);
+        OUT.Tex0.y = dot(CaustTexGen1, P);
+
+        float fDistBlendFactor = vPos.w - length(P.xyz - CameraPos.xyz) * CameraPos.w;
+        OUT.Color.w = fDistBlendFactor * (float)((WaterLevel.x - P.z) >= vPos.w) * 0.75;
+        OUT.Color.xyz = vPos.www;
+      }
+    

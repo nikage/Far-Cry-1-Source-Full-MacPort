@@ -1,0 +1,78 @@
+// ===============================================================
+// Fragment Program: predator
+// Description: predator refractive effect
+// Last Update: 24/06/2004
+// Coder: Tiago Sousa
+// ===============================================================
+
+#include "../CGVPMacro.csi"
+
+PS20Only
+
+MainInput 
+{ 
+    uniform sampler2D baseMap : register(s0),
+    uniform sampler2D diffuseMap : register(s1),
+    uniform sampler2D refrMap : register(s2),
+    uniform sampler2D envMap : register(s3),
+    uniform sampler2D plasmaMap : register(s4),
+    uniform float4 Matrix,
+    uniform float4 Ambient,
+    uniform float4 RealAmbient,
+    uniform float4 Diffuse
+}
+
+DeclarationsScript
+{
+    struct vertout
+    {
+      OUT_T0
+      OUT_T1
+      OUT_T2
+      OUT_T3
+      OUT_T4
+      OUT_T5
+      OUT_C0
+    };
+
+    FOUT
+}
+
+CoreScript
+{   
+    float4 bumpColor = 2*tex2D(baseMap, IN.Tex0.xy)-1;
+    float4 diffuseColor = tex2D(diffuseMap, IN.Tex0.xy);
+    
+    const float2 vScale=float2(0.025, 0.025);
+    float2 vNewUv= (IN.Tex1.xy/IN.Tex1.w) + vScale.xy*bumpColor.xy;
+    float4 refrColor = tex2D(refrMap, vNewUv);
+    
+    // compute illumination    
+    float3 vAmbient=(Ambient.xyz+Ambient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)));    
+    float3 vAmbientDiffuse=diffuseColor*(RealAmbient.xyz+RealAmbient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)));   
+    float3 vDiffuse=saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz))*Diffuse.xyz*IN.Color.w;
+
+    float2 vEnvUV=IN.Tex2.xy+ Matrix.xw * bumpColor.xy;
+    float4 envColor = tex2D(envMap, vEnvUV.xy);  
+    
+    // "electricity" effect
+    float2 vPlasmaUvA= IN.Tex5.xy + vScale.xy*bumpColor.xy;
+    float4 vPlasmaColorA=tex2D(plasmaMap, vPlasmaUvA);
+    float2 vPlasmaUvV= IN.Tex5.zw + vScale.xy*bumpColor.xy;
+    float4 vPlasmaColorB=tex2D(plasmaMap, vPlasmaUvV);    
+    // blend plasma layers
+    float4 vPlasmaColor=vPlasmaColorA*0.5+vPlasmaColorB*0.5;           
+    
+    // remove low-luminosity pixels, brighten up a bit 
+    vPlasmaColor.xyz=saturate((vPlasmaColor.xyz*vPlasmaColor.xyz-0.5)*4);            
+    vPlasmaColor.xyz*=float3(0.5, 0.7, 1.0)*2*Ambient.w;
+    
+    // compute final refraction        
+    float3 vFinalRefr=saturate(envColor.xyz*vDiffuse.xyz+refrColor.xyz*vAmbient.xyz);
+    // interpolate between refractive version and ambient bump mapped version
+    float3 vFinal=saturate(vFinalRefr.xyz*(1-RealAmbient.w)+vAmbientDiffuse*RealAmbient.w);    
+    
+    // add plasma effect on top
+    OUT.Color.xyz = vFinal+vPlasmaColor-vPlasmaColor*vFinal;
+    OUT.Color.a = 1;
+}

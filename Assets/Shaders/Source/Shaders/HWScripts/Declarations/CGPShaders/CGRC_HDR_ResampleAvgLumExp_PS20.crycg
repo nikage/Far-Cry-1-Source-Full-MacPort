@@ -1,0 +1,41 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform FLOAT4 vSampleOffsets[16]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  FLOAT fResampleSum = 0.0f;
+  
+  for(int i=0; i<16; i++)
+  {
+    // Compute the sum of luminance throughout the sample points
+    FLOAT4 vTex = tex2D(baseMap, IN.Tex0.xy+vSampleOffsets[i].xy);
+    fResampleSum += vTex;
+  }
+  
+  // Divide the sum to complete the average, and perform an exp() to complete
+  // the average luminance calculation
+  fResampleSum = exp(fResampleSum/16);
+    
+
+  OUT.Color = float4(fResampleSum, fResampleSum, fResampleSum, 1.0f);
+}
+

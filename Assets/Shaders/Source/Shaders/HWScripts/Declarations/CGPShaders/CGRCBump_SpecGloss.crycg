@@ -1,0 +1,54 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_SpecGloss.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D glossMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE normCubeMapHA : texunit2,
+                  uniform float4 Specular }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 glossColor = tex2D(glossMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+
+        // Half angle vector from normalization cube-map
+        float4 hVec = 2*(texCUBE(normCubeMapHA, IN.Tex2.xyz)-0.5);
+        
+        float NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz));
+        float  specVal = saturate((NdotH - 0.75)*4);
+        specVal = specVal * specVal;
+        float3 spec = (specVal * Specular.xyz * glossColor.xyz) * 2;
+
+        // finally add them all together
+        OUT.Color.xyz = spec;
+        OUT.Color.w = Specular.w * glossColor.w;
+      }
+

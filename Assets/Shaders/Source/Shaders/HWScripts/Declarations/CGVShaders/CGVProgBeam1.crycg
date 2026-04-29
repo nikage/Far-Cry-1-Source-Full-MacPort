@@ -1,0 +1,52 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgBeam1.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      MainInput { VIEWPROJ_MATRIX, CAMERA_POS, uniform float4 Constants, uniform float4 Color }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_T0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0_2
+          OUT_C0
+        };
+
+      }
+      PositionScript = PosCommon                 
+      CoreScript
+      {
+        float4 vNormal = normalize(IN.Normal);
+
+        OUT.Tex0.xy = IN.TexCoord0.xy;
+
+        float3 camVec = normalize(CameraPos - vPos);
+        float4 color = Color;
+        float fDot = dot(camVec.xyz, vNormal.xyz);
+        color.w = fDot * Constants.x + color.w;
+        OUT.Color = color;
+      }
+    

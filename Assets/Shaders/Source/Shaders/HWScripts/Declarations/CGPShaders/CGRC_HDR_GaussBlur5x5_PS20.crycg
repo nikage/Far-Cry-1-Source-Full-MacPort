@@ -1,0 +1,36 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform FLOAT4 vSampleOffsets[13],
+  uniform FLOAT4 vSampleWeights[13]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  FLOAT4 sample = 0.0f;
+
+  for(int i=0; i<13; i++)
+  {
+    FLOAT4 vTex = tex2D(baseMap, IN.Tex0.xy + vSampleOffsets[i].xy);
+    sample += vSampleWeights[i] * vTex;
+  }
+
+  OUT.Color = sample;
+}
+

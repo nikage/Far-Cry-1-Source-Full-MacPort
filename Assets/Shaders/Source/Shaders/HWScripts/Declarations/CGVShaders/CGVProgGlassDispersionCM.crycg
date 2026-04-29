@@ -1,0 +1,90 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgGlassDispersionCM.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+
+      VertAttributes { POSITION_3 NORMAL_3 PRIM_COLOR }
+      MainInput { VIEWPROJ_MATRIX, uniform float4x4 ObjMatrix, CAMERA_POS, uniform float4 Eta, uniform float4 Fresnel }
+      DeclarationsScript
+      {
+        struct appin
+        {
+          IN_P
+          IN_C0
+          IN_N
+        };
+        struct vertout
+        {
+          OUT_P
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+          OUT_C1
+        };
+
+      }
+      PositionScript = PosCommon
+      CoreScript
+      {
+        // transform normal
+        float3 normal;
+        normal.x = dot(IN.Normal.xyz, ObjMatrix._11_12_13);
+        normal.y = dot(IN.Normal.xyz, ObjMatrix._21_22_23);
+        normal.z = dot(IN.Normal.xyz, ObjMatrix._31_32_33);
+       
+        // calculate incident vector
+        float3 incidentVec = normalize(vPos.xyz - CameraPos.xyz);
+
+        // refraction function from Renderman spec
+        // I = incident direction, N = normal, eta = relative index of refraction
+        float IdotN = dot(incidentVec, normal);
+        float k = vPos.w - Eta.x*Eta.x*(vPos.w - IdotN*IdotN);
+        float3 result = Eta.x*incidentVec - (Eta.x*IdotN + sqrt(k))*normal;
+        OUT.Tex0.xyz = result.xyz;
+        OUT.Tex0.w = vPos.w;
+
+        k = vPos.w - Eta.y*Eta.y*(vPos.w - IdotN*IdotN);
+        result = Eta.y*incidentVec - (Eta.y*IdotN + sqrt(k))*normal;
+        OUT.Tex1.xyz = result.xyz;
+        OUT.Tex1.w = vPos.w;
+
+        k = vPos.w - Eta.z*Eta.z*(vPos.w - IdotN*IdotN);
+        result = Eta.z*incidentVec - (Eta.z*IdotN + sqrt(k))*normal;
+        OUT.Tex2.xyz = result.xyz;
+        OUT.Tex2.w = 0;
+
+        // calculate the fresnel reflection
+        OUT.Tex3.xyz = reflect(incidentVec, normal);
+        OUT.Tex3.w = vPos.w;
+
+        // fresnel approximation
+        float bias = Fresnel.z;
+        float scale = Fresnel.y;
+        float power = Fresnel.x;
+        OUT.Color.xyz = (bias + pow(vPos.w - dot(-incidentVec, normal), power) * scale).xxx;
+        OUT.Color.w = IN.Color.w;
+
+# ifdef _HDR
+        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);
+        OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);
+# endif        
+      }
+    

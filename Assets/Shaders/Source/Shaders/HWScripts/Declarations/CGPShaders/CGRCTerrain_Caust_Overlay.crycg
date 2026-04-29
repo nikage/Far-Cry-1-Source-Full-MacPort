@@ -1,0 +1,42 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTerrain_Caust_Overlay.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D caustMap : texunit0,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the detail
+        float4 caustColor = tex2D(caustMap, IN.Tex1.xy);
+        
+        float3 caust = caustColor.xyz * IN.Color.a * Ambient.xyz;
+        OUT.Color.xyz = caust.xyz * 2;
+        OUT.Color.a = caustColor.a * Ambient.a;
+      }
+      
+      

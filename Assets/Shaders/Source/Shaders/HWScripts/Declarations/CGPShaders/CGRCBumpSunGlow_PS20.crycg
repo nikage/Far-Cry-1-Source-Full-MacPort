@@ -1,0 +1,64 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBumpSunGlow_PS20.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D bumpMap : texunit0,
+	                uniform float4 Specular,
+	                uniform float4 BumpAmount }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the bump normal
+        FLOAT4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);
+
+        // normalize post-filtered bump normals
+        bumpNormal.xyz *= BumpAmount.xyz;
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+        
+        // normalize light vector
+        FLOAT3 lightVec = normalize(IN.Tex1.xyz);
+
+        // normalize view vector
+        FLOAT3 viewVec = normalize(IN.Tex2.xyz);
+        FLOAT3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;
+        FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));
+        FLOAT fSpec = pow(NdotR, Specular.w);
+
+        FLOAT fFade = IN.Color.w;
+        FLOAT3 spec = HDREncode(fSpec * Specular.xyz * fFade) * 2;
+        
+        // finally add them all together
+        OUT.Color.xyz = spec.xyz;
+        OUT.Color.w = 1;
+      }
+

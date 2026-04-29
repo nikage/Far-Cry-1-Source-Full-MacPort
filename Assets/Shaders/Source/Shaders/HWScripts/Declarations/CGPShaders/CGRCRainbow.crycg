@@ -1,0 +1,44 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCRainbow.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D rainbMap : texunit1,
+                  uniform float4 Constants }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the decal
+        float4 rainbColor = tex2D(rainbMap, IN.Tex1.xy);
+        float3 color = (decalColor.xyz * decalColor.a) * 2;
+        color = color - Constants.xyz + rainbColor.xyz;
+        OUT.Color.xyz = color.xyz;
+        OUT.Color.a = decalColor.a * Constants.a;
+      }
+      

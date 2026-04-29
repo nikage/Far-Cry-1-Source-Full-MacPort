@@ -1,0 +1,57 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTexDOT3LM_NoAmb.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform sampler2D lightMap : texunit2,
+                  uniform sampler2D lightDirMap : texunit3,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the bump normal
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        // load the lm
+        float4 lmColor = tex2D(lightMap, IN.Tex2.xy);
+        // load the lm dir
+        float4 lmDat = tex2D(lightDirMap, IN.Tex3.xy);
+        float3 lmDir = 2*(lmDat.xyz-0.5);
+
+        float NdotL = saturate(dot(lmDir.xyz, bumpNormal.xyz));
+        float  lmIntens = NdotL * lmColor.a + (1-lmColor.a);
+        float3 dif = (decalColor.xyz * lmColor.xyz * lmDat.a * lmIntens) * 4;
+
+        // finally add them all together
+        OUT.Color.xyz = dif;
+        OUT.Color.w = decalColor.w * Ambient.w;
+      }
+

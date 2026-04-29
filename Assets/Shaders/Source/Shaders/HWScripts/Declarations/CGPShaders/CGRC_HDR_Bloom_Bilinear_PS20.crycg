@@ -1,0 +1,41 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform FLOAT4 vSampleOffsets[8],
+  uniform FLOAT4 vSampleWeights[8]
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  FLOAT4 vSample = 0.0f;
+  FLOAT4 vColor = 0.0f;
+      
+  FLOAT2 vSamplePosition;
+  
+  // Perform a one-directional gaussian blur
+  for(int i=0; i<8; i++)
+  {
+    vSamplePosition = IN.Tex0.xy + vSampleOffsets[i].xy;
+    vColor = tex2D(baseMap, vSamplePosition);
+    vSample += vSampleWeights[i]*vColor;
+  }
+    
+  OUT.Color = vSample;
+}
+

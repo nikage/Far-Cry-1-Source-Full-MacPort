@@ -1,0 +1,57 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Vertex Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGVProgMatrix.crycg
+//  Version:     v1.00
+//  Created:     16/03/2004 by Marco Corbetta.
+//  Compilers:   CG/HLSL
+//  Description: Test shader
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+// This include is required for all vertex/fragment programs. Contains shared stuff.
+#include "../CGVPMacro.csi"
+
+// Vertex attributes, its like vertex program inputs, but only containing the vertex data. In this case, its Position and texture coordinates
+VertAttributes { POSITION_3 TEXCOORD0_2 }
+
+// Vertex program constants input. Usually viewprojection matrix, and other stuff.
+MainInput
+{
+  VIEWPROJ_MATRIX
+}
+
+// Vertex program inputs declaration. What data comes in and out. Vertex position, vertex texture coordinates, vertex colors, etc.
+DeclarationsScript
+{
+
+  // vertex input
+  struct appin
+  {
+    IN_P
+    IN_T0    
+  };
+  
+  struct vertout
+  {
+    OUT_P
+    OUT_T0_2
+  };
+
+}
+
+// Common vertex position output
+PositionScript = PosCommon
+
+// This is where main CG/HLSL vertex program code goes
+CoreScript
+{   
+  OUT.Tex0.xy =IN.TexCoord0.xy;
+    
+  return OUT;
+}

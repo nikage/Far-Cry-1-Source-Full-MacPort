@@ -1,0 +1,60 @@
+// ===============================================================
+// Fragment Program: Indoor Water
+// Description: used in indoor refractive water (w/ fake reflection)
+// Last Update: 03/09/2003
+// Coder: Tiago Sousa
+// ===============================================================
+
+
+#include "../CGVPMacro.csi"
+
+
+MainInput { uniform sampler2D bumpMap : texunit0,
+            uniform sampler2D refMap : texunit1,
+            uniform float4 Matrix,
+            uniform float4 Ambient,
+            uniform float4 WaterColor
+          }
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+    OUT_T1
+  };
+
+  FOUT
+}
+
+CoreScript
+{  
+  // load the decal
+  float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);
+
+// must create 2 versions, since offsetRECT/samplerRECT must be used for gl version...
+  float4 refrColor;
+#ifdef D3D
+  # ifdef _PS_1_1
+    refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);
+  # else
+    float2 newst = IN.Tex1.xy / IN.Tex1.w;
+    float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+    refrColor = tex2D(refMap, newst);
+  # endif
+#endif
+#ifdef OPENGL
+  # ifdef _PS_1_1
+    refrColor = offsettexRECT(refMap, IN.Tex1.xy, bumpColor, Matrix);
+  # else
+    float2 newst = IN.Tex1.xy / IN.Tex1.w;
+    float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;
+    refrColor = texRECT(refMap, newst);
+  # endif
+#endif  
+  
+  float fFakeSpec=dot(refrColor.xyz, float3(0.33, 0.59, 0.11));                                 // get brightest color
+  fFakeSpec=saturate(0.75*fFakeSpec + fFakeSpec);                                   // bright it a bit
+  float3 fFakeSpecColor=refrColor.xyz*fFakeSpec;                                         // compute specular color
+  OUT.Color.xyz = Ambient.xyz*( saturate(fFakeSpecColor*WaterColor.w + WaterColor.xyz) );      // compute final surface color  
+}

@@ -1,0 +1,50 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCTerrain_1Layers.crycg
+//  Version:     v1.00
+//  Created:     11/2/2004 by Andrey Honich.
+//  Compilers:   CG/HLSL
+//  Description: 
+// -------------------------------------------------------------------------
+//  History:
+//
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D detMap0 : texunit1,
+                  uniform float4 Ambient }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        // load the decal
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        // load the detail
+        float4 detColor0 = tex2D(detMap0, IN.Tex1.xy);        
+        float3 color = (decalColor.xyz * IN.Color.a * Ambient.xyz);
+        color.xyz = HDREncode(color.xyz);
+
+        detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);
+        color.xyz = color * detColor0.xyz * 2;
+        OUT.Color.xyz = HDRFogBlend(color.xyz, IN.Color1.w, GlobalFogColor.xyz);
+        OUT.Color.a = decalColor.a * Ambient.a;
+      }
+      
+      

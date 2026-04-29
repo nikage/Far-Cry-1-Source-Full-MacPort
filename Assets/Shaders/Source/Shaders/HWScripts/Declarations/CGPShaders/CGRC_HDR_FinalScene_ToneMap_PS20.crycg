@@ -1,0 +1,53 @@
+
+#include "../CGVPMacro.csi"
+
+NoFog
+PS20Only
+
+MainInput 
+{
+  uniform sampler2D baseMap : texunit0,
+  uniform sampler2D bloomMap : texunit1,
+  uniform sampler2D starMap : texunit2,
+  uniform sampler2D adaptedLumMap : texunit2,
+  uniform float4 Params
+}
+
+DeclarationsScript
+{
+  struct vertout
+  {
+    OUT_T0
+  };
+
+  FOUT
+}
+
+CoreScript
+{
+  float LUM_WHITE = 1.5f;
+
+  float4 vSample = tex2D(baseMap, IN.Tex0.xy);
+  float4 vBloom = tex2D(bloomMap, IN.Tex0.xy);
+  float4 vStar = tex2D(starMap, IN.Tex0.xy);
+  float fAdaptedLum = tex2D(adaptedLumMap, float2(0.5f, 0.5f));
+    
+  float fMiddleGray = Params.w;
+  
+  // Map the high range of color values into a range appropriate for
+  // display, taking into account the user's adaptation level, and selected
+  // values for for middle gray and white cutoff.
+  vSample.rgb *= 0.2/(fAdaptedLum + 0.001f);
+  vSample.rgb *= (1.0f + vSample.rgb/LUM_WHITE);
+  vSample.rgb /= (1.0f + vSample.rgb);
+    
+  float fStarScale = Params.x;
+  float fBloomScale = Params.y;
+  
+  // Add the star and bloom post processing effects
+  vSample += fStarScale * vStar;
+  vSample += fBloomScale * vBloom;
+
+  OUT.Color = vSample;
+}
+
