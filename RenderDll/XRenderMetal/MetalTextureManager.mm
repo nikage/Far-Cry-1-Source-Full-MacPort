@@ -3563,7 +3563,7 @@ MTLPixelFormat CMetalTextureManager::ConvertToMetalFormat(ETEX_Format format)
             return MTLPixelFormatR8Unorm;
         
         case eTF_DEPTH:
-            return MTLPixelFormatDepth32Float;
+            return MTLPixelFormatDepth32Float_Stencil8;
         
         case eTF_DSDT_MAG:
         case eTF_DSDT:

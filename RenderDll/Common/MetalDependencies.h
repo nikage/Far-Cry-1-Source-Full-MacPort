@@ -52,7 +52,15 @@ typedef void* HGLRC;
 
 // Missing assert function
 #include <cassert>
-#define assert(x) ((void)0)  // Disable asserts for now
+#ifdef NDEBUG
+  // In release builds use the standard no-op
+#else
+  // In debug builds: redefine assert to use __builtin_trap so that the
+  // debugger breaks on the exact failing line rather than aborting silently.
+  #undef assert
+  #define assert(x) \
+    do { if (!(x)) { __builtin_trap(); } } while (0)
+#endif
 
 // Vec3 is already defined in CryEngine, no need to redefine
 

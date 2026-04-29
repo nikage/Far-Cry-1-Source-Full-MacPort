@@ -255,7 +255,7 @@ public:
     virtual void ChangeViewport(unsigned int x, unsigned int y, unsigned int width, unsigned int height) override { assert(!"Not implemented"); }
 };
 
-// Export function for the renderer
+#ifndef XRENDERMETAL_EXPORTS
 extern "C" {
     IRenderer* PackageRenderConstructor(int argc, char* argv[], SCryRenderInterface* sp)
     {
@@ -263,3 +263,4 @@ extern "C" {
         return renderer;
     }
 }
+#endif

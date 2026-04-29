@@ -1773,8 +1773,8 @@ void CMetalShaderManager::SetShaderParameters(id<MTLRenderCommandEncoder> encode
         }
     }
 
-    [encoder setFragmentBytes:info.uniformStaging.data() length:info.uniformDataSize atIndex:2];
-    [encoder setVertexBytes:info.uniformStaging.data() length:info.uniformDataSize atIndex:2];
+    [encoder setFragmentBytes:info.uniformStaging.data() length:info.uniformDataSize atIndex:kMetalFragmentUniformSlot];
+    [encoder setVertexBytes:info.uniformStaging.data() length:info.uniformDataSize atIndex:kMetalVertexUniformSlot];
 }
 
 void CMetalShaderManager::BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader)

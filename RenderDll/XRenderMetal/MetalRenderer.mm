@@ -1578,9 +1578,13 @@ void CMetalRenderer::DestroyGameWindow() {
 
 // Export functions for the renderer
 extern "C" {
+// CreateRenderer is a convenience wrapper — NOT used by the engine at runtime.
+// The engine always calls PackageRenderConstructor() via dlsym.
+// This function is retained for manual/test usage only; dimensions should come
+// from the engine-supplied init parameters, not hardcoded here.
+#ifdef FARCRY_ENABLE_CREATE_RENDERER_STUB
 IRenderer *CreateRenderer(int argc, char *argv[], SCryRenderInterface *sp) {
   CMetalRenderer *renderer = new CMetalRenderer();
-  // Initialize the renderer
   if (renderer && renderer->Init(0, 0, 1024, 768, 32, 24, 8, false, nullptr, 0,
                                  0, 0, false)) {
     return renderer;
@@ -1588,6 +1592,7 @@ IRenderer *CreateRenderer(int argc, char *argv[], SCryRenderInterface *sp) {
   delete renderer;
   return nullptr;
 }
+#endif
 }
 
 void CMetalRenderer::DrawBuffer(CVertexBuffer *src, SVertexStream *indicies,
@@ -3374,7 +3379,12 @@ void CMetalRenderer::SetClipPlane(int id, float * params) {
 }
 
 char* CMetalRenderer::GetStatusText(ERendStats type) {
-    static char statusText[256] = "Metal Renderer Status";
+    static char statusText[256];
+    if (m_device) {
+        snprintf(statusText, sizeof(statusText), "Metal: %s", [[m_device name] UTF8String]);
+    } else {
+        strlcpy(statusText, "Metal Renderer (no device)", sizeof(statusText));
+    }
     return statusText;
 }
 

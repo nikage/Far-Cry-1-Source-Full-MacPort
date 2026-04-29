@@ -8,8 +8,11 @@
 #include <metal_stdlib>
 using namespace metal;
 
-#define METAL_VERTEX_UNIFORM_BUFFER_INDEX 2
-#define METAL_VERTEX_COLOR_BUFFER_INDEX 3
+#define METAL_VERTEX_UNIFORM_BUFFER_INDEX   2
+#define METAL_FRAGMENT_UNIFORM_BUFFER_INDEX 0
+#define METAL_MATERIAL_BUFFER_INDEX         1
+#define METAL_VERTEX_COLOR_BUFFER_INDEX     3
+#define METAL_WATER_NOISE_BUFFER_INDEX      4
 
 // Vertex shader input structure
 struct VertexIn {

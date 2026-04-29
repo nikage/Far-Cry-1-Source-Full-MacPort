@@ -52,10 +52,13 @@
 #define MAX_TMU 8
 
 // Shared Metal binding slots (keep in sync with UtilShaders.metal)
-static const NSUInteger kMetalVertexStream_General = 0;
+static const NSUInteger kMetalVertexStream_General  = 0;
 static const NSUInteger kMetalVertexStream_Tangents = 1;
-static const NSUInteger kMetalVertexUniformSlot = 2;
-static const NSUInteger kMetalFragmentUniformSlot = 0;
+static const NSUInteger kMetalVertexUniformSlot     = 2;   // vertex — global transforms / MVP / fog / time
+static const NSUInteger kMetalVertexColorSlot       = 3;   // vertex — flat float4 color (simple_vertex only)
+static const NSUInteger kMetalWaterNoiseSlot         = 4;   // vertex — WaterNoiseTable[66] (water shaders only)
+static const NSUInteger kMetalFragmentUniformSlot   = 0;   // fragment — global Uniforms struct
+static const NSUInteger kMetalMaterialSlot          = 1;   // fragment — per-draw MaterialUniforms
 
 // CryEngine utility headers
 #include <list2.h>
