@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - A Static Control
@@ -553,6 +553,12 @@ int CUIStatic::SetText(const wstring &szText)
 
 	IFFont *pFont = m_pUISystem->GetIFont(m_pFont);
 
+	if (!pFont)
+	{
+		assert(false && "CUIStatic::SetText - Font is NULL, cannot set text");
+		return 1;
+	}
+	
 	GetLineMetrics(&m_vLines[0], pFont);
 
 	return 1;
@@ -755,6 +761,12 @@ int CUIStatic::GetLineMetrics(UIStaticLine *pLine, IFFont *pFont)
 		// if line exceed allowed width, split it
 		if ((fCurrentLineWidth + fCurrentCharWidth >= fAllowedWidth) && (*pChar))
 		{
+			if (pLine->iWrapCount >= UI_DEFAULT_MAX_WRAP_INDICES)
+			{
+				// Avoid overflowing the fixed wrap array; finish without adding more wraps.
+				break;
+			}
+
 			if ((iLastSpace > 0) && ((iCurrentChar - iLastSpace) < UI_DEFAULT_WORDWRAP_TRESHOLD) && (iCurrentChar - iLastSpace > 0))
 			{
 				pLine->iWrapIndex[pLine->iWrapCount++] = iLastSpace + 1;
@@ -770,6 +782,11 @@ int CUIStatic::GetLineMetrics(UIStaticLine *pLine, IFFont *pFont)
 			}
 			else
 			{
+				if (pLine->iWrapCount >= UI_DEFAULT_MAX_WRAP_INDICES)
+				{
+					break;
+				}
+
 				pLine->iWrapIndex[pLine->iWrapCount++] = iCurrentChar;
 
 				if (fCurrentLineWidth > fBiggestLineWidth)

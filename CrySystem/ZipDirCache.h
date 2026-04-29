@@ -8,6 +8,10 @@
 #ifndef _ZIP_DIR_CACHE_HDR_
 #define _ZIP_DIR_CACHE_HDR_
 
+#include "smartptr.h"  // for RefCountedDataInstance
+
+// Forward declaration to ensure template is available
+template <class Header> class RefCountedDataInstance;
 
 /////////////////////////////////////////////////////////////
 // THe Zip Dir uses a special memory layout for keeping the structure of zip file.

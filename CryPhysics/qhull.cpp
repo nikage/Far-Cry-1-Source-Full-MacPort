@@ -31,7 +31,7 @@ struct qhtritem {
 };
 
 inline void relocate_ptritem(qhtritem *&ptr,intptr_t diff) {
-	ptr = (qhtritem*)((intptr_t)ptr+diff & ~-iszero((intptr_t)ptr));	// offset the pointer, but leave out 0s
+	ptr = (qhtritem*)((intptr_t)ptr+diff & ~-iszero((int)(intptr_t)ptr));	// offset the pointer, but leave out 0s
 }
 
 inline void relocate_tritem(qhtritem *ptr,int diff) {
@@ -90,7 +90,7 @@ static void qsort(int *v,void **p, int left,int right)
 {
 	if (left>=right) return;
 	int i,last; 
-	swap(v,p, left, left+right>>1);
+	swap(v,p, left, (left+right)>>1);
 	for(last=left,i=left+1; i<=right; i++)
 	if (v[i] < v[left])
 		swap(v,p, ++last, i);
@@ -103,7 +103,7 @@ static int bin_search(int *v,int n,int idx)
 {
 	int left=0,right=n,m;
 	do {
-		m = left+right>>1;
+		m = (left+right)>>1;
 		if (v[m]==idx) return m;
 		if (v[m]<idx) left=m;
 		else right=m;
@@ -357,7 +357,7 @@ int qhull(strided_pointer<vectorf> pts, int npts, index_t*& pTris)
 				if (tmparr_idx!=tmparr_idx_buf) delete tmparr_idx;
 				if (tmparr_ptr!=tmparr_ptr_buf) delete tmparr_ptr;
 				tmparr_idx = new int[n];
-				tmparr_ptr = new(qhtritem*[n]);
+				tmparr_ptr = new qhtritem*[n];
 			}
 			for(tr=trnew,i=0;tr<trend;tr++,i++) { tmparr_idx[i]=tr->idx[2]; tmparr_ptr[i]=tr; }
 			qsort(tmparr_idx,(void**)tmparr_ptr, 0,trend-trnew-1);

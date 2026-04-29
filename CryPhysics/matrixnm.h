@@ -252,7 +252,7 @@ typedef matrix_tpl<float> matrixf;
 	#define DECLARE_MTXNxM_POOL(ftype,sz) template<> ftype matrix_tpl<ftype>::mtx_pool[sz] = {}; template<> int matrix_tpl<ftype>::mtx_pool_pos=0; \
 		template<> int matrix_tpl<ftype>::mtx_pool_size=sz;
 #else
-	#define DECLARE_MTXNxM_POOL(ftype,sz) template<> ftype matrix_tpl<ftype>::mtx_pool[sz]; template<> int matrix_tpl<ftype>::mtx_pool_pos=0; \
+	#define DECLARE_MTXNxM_POOL(ftype,sz) template<> ftype matrix_tpl<ftype>::mtx_pool[sz] = {}; template<> int matrix_tpl<ftype>::mtx_pool_pos=0; \
 		template<> int matrix_tpl<ftype>::mtx_pool_size=sz;
 #endif //LINUX
 

@@ -40,37 +40,64 @@ CScriptBindings::CScriptBindings()
 
 bool CScriptBindings::Init(CSystem *pSystem)
 {
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Entry");
+	
 	IScriptSystem *pSS=pSystem->GetIScriptSystem();
 //SYSTEM
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectSystem");
 	CScriptObjectSystem::InitializeTemplate(pSS);
 	m_pScriptObjectSystem=new CScriptObjectSystem;
 	m_pScriptObjectSystem->Init(pSS,pSystem);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectSystem done");
+	
 //PARTICLE
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectParticle");
 	CScriptObjectParticle::InitializeTemplate(pSS);
 	m_pScriptObjectParticle=new CScriptObjectParticle;
 	m_pScriptObjectParticle->Init(pSS,pSystem);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectParticle done");
+	
 //ANIMATION
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectAnimation");
 	CScriptObjectAnimation::InitializeTemplate(pSS);
 	m_pScriptObjectAnimation=new CScriptObjectAnimation;
 	m_pScriptObjectAnimation->Init(pSS,pSystem);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectAnimation done");
+	
 //SOUND	
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectSound");
 	CScriptObjectSound::InitializeTemplate(pSS);
 	m_pScriptObjectSound=new CScriptObjectSound;
 	m_pScriptObjectSound->Init(pSS,pSystem);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectSound done");
+	
 //MOVIE
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectMovie");
 	CScriptObjectMovie::InitializeTemplate(pSS);
 	m_pScriptObjectMovie=new CScriptObjectMovie;
 	m_pScriptObjectMovie->Init(pSS,pSystem);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectMovie done");
+	
 //SCRIPT
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectScript");
 	CScriptObjectScript::InitializeTemplate(pSS);
 	m_pScriptObjectScript=new CScriptObjectScript;
 	m_pScriptObjectScript->Init(pSS);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectScript done");
+	
 //ENTITY
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing ScriptObjectEntity");
 	CScriptObjectEntity::InitializeTemplate(pSS);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - ScriptObjectEntity done");
+	
 //DOWNLOAD
 #if !defined(LINUX)
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Initializing HTTPDownloader");
 	CHTTPDownloader::InitializeTemplate(pSS);
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - HTTPDownloader done");
 #endif
+	
+	pSystem->GetILog()->LogToFile("CScriptBindings::Init - Completed successfully");
 	return true;
 }
 

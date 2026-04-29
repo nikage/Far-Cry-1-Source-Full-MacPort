@@ -38,12 +38,16 @@
 #include <assert.h>
 #endif
 
+#if !defined(__APPLE__) && !defined(__MACH__)
 #include <malloc.h>
+#endif
 #include <stdlib.h>
 #include <fcntl.h>
 
 #if defined( LINUX )
 #	include <sys/io.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#	include <unistd.h>  // macOS equivalent
 #else
 #	include <io.h>
 #endif
@@ -59,6 +63,9 @@
 #else
 #if defined(LINUX)
 #include <ext/hash_map>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include <unordered_map>
+// Don't define hash_map macro - let StlUtils.h handle it
 #else
 #include <hash_map>
 #endif

@@ -30,7 +30,7 @@ void CScriptObjectScript::Init(IScriptSystem *pScriptSystem)
 
 
 
-void CScriptObjectScript::Debug_Full_recursive( IScriptObject *pCurrent, string &sPath, std::set<const void *> &setVisited )
+void CScriptObjectScript::Debug_Full_recursive( IScriptObject *pCurrent, const string &sPath, std::set<const void *> &setVisited )
 {
 	assert(pCurrent);
 
@@ -38,7 +38,7 @@ void CScriptObjectScript::Debug_Full_recursive( IScriptObject *pCurrent, string 
 
 	while(pCurrent->MoveNext())
 	{
-		char *szKeyName;
+		const char *szKeyName;
 
 		if(!pCurrent->GetCurrentKey(szKeyName))
 			szKeyName="NO";
@@ -99,7 +99,7 @@ void CScriptObjectScript::Debug_Full_recursive( IScriptObject *pCurrent, string 
 }
 
 
-DWORD CScriptObjectScript::Debug_Buckets_recursive( IScriptObject *pCurrent, string &sPath, std::set<const void *> &setVisited, 
+DWORD CScriptObjectScript::Debug_Buckets_recursive( IScriptObject *pCurrent, const string &sPath, std::set<const void *> &setVisited,
 	const DWORD dwMinBucket )
 {
 	assert(pCurrent);
@@ -110,7 +110,7 @@ DWORD CScriptObjectScript::Debug_Buckets_recursive( IScriptObject *pCurrent, str
 
 	while(pCurrent->MoveNext())
 	{
-		char *szKeyName;
+		const char *szKeyName;
 
 		dwTableElementCount++;
 
@@ -184,7 +184,7 @@ void CScriptObjectScript::Debug_Elements( IScriptObject *pCurrent, string &sPath
 
 	while(pCurrent->MoveNext())
 	{
-		char *szKeyName;
+		const char *szKeyName;
 
 		if(!pCurrent->GetCurrentKey(szKeyName))
 			szKeyName="NO";

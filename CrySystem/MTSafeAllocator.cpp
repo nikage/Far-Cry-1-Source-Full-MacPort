@@ -1,8 +1,8 @@
 #include "stdafx.h"
 #include "MTSafeAllocator.h"
 
-#if defined(LINUX)
-	#define USE_CRT 1
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
+	#define USE_CRT 1  // Use standard C runtime on Linux and macOS
 #else
 //#ifdef _DEBUG
 //#define USE_CRT 1

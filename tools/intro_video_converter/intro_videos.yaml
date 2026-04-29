@@ -1,0 +1,47 @@
+videos:
+  - id: demo_loop
+    source: DemoLoops/CryTek.bik
+    output: demoloops/CryTek.mp4
+  - id: crytek_logo
+    source: English/Crytek.bik
+    output: english/Crytek.mp4
+  - id: ubi_logo
+    source: English/Ubi.bik
+    output: english/Ubi.mp4
+  - id: sandbox_logo
+    source: English/sandbox.bik
+    output: english/sandbox.mp4
+  - id: bunker
+    source: English/bunker.bik
+    output: english/bunker.mp4
+  - id: dam
+    source: English/dam.bik
+    output: english/dam.mp4
+  - id: factory
+    source: English/factory.bik
+    output: english/factory.mp4
+  - id: factory1
+    source: English/factory1.bik
+    output: english/factory1.mp4
+  - id: pier
+    source: English/pier.bik
+    output: english/pier.mp4
+  - id: regulator
+    source: English/regulator.bik
+    output: english/regulator.mp4
+  - id: river
+    source: English/River.bik
+    output: english/River.mp4
+  - id: training_begin
+    source: English/training_begin.bik
+    output: english/training_begin.mp4
+  - id: volcano01
+    source: English/volcano01.bik
+    output: english/volcano01.mp4
+  - id: volcano02
+    source: English/volcano02.bik
+    output: english/volcano02.mp4
+  - id: volcano_final
+    source: English/volcano_final.bik
+    output: english/volcano_final.mp4
+

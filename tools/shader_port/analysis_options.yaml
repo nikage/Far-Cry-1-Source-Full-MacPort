@@ -1,0 +1,7 @@
+include: package:lints/recommended.yaml
+
+linter:
+  rules:
+    # The tooling emits progress information to stdout/stderr.
+    avoid_print: false
+

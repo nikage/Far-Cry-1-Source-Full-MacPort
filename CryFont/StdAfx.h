@@ -70,7 +70,7 @@
 
 #endif
 
-#if !defined(LINUX)
+#if defined(WIN32)
 #include <Windows.h>
 #endif
 

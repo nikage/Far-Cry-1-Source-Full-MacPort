@@ -1,0 +1,71 @@
+<fontshader>
+	<font path="languages/fonts/arialnb.ttf" w="512" h="512"/>
+	<effect name="default">
+		<pass>
+		</pass>
+
+		<pass>
+			<color r="0" g="0" b="0" a="1"/>
+			<pos x="1" y="1"/>
+		</pass>
+	</effect>
+
+	<effect name="scoreboard">
+		<pass>
+		</pass>
+	</effect>
+
+	<effect name="console">
+		<pass>
+		</pass>
+	
+		<pass>
+			<color r="0" g="0" b="0" a="0.5"/>
+			<pos x="2" y="2"/>
+		</pass>
+	</effect>
+	
+	<effect name="tooltip">
+		<pass>
+			<color r="1" g="0" b="0" a="0.5"/>
+			<pos x="0" y="0"/>
+		</pass>
+	</effect>
+	
+	<effect name="IngameDlg">
+		<pass>
+			<color r="1" g="1" b="1" a="1.0"/>
+			<pos x="0" y="0"/>
+		</pass>
+	</effect>
+	
+	<effect name="CmdGui">
+		<pass>
+			<color r="1" g="1" b="1" a="1.0"/>
+			<pos x="0" y="0"/>
+		</pass>
+	</effect>
+	
+	<effect name="buttonnormal">
+		<pass>
+		</pass>
+	
+		<pass>
+			<color r="0" g="0" b="0" a="0.5"/>
+			<pos x="3" y="3"/>
+		</pass>
+	</effect>
+	
+	<effect name="buttonfocus">
+		<pass>
+			<color r="1" g="1" b="0" a="1"/>
+		</pass>
+	</effect>
+	
+	<effect name="buttonpushed">
+		<pass>
+			<color r="1" g="0" b="0" a="1"/>
+		</pass>
+	</effect>
+
+</fontshader>

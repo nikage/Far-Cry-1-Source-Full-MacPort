@@ -93,6 +93,7 @@ enum ActionType { ACTIONTYPE_MOVEMENT = 1, ACTIONTYPE_COMBAT, ACTIONTYPE_GAME, A
 struct BaseEvent
 {
 	int nRefCount;
+	virtual ~BaseEvent() = default;
 	virtual EventType GetType() = 0;
 	virtual void Write(CStream &stm,int iPhysicalTime, IBitStream *pBitStream ) = 0;
 	virtual void Read(CStream &stm,int &iPhysicalTime, IBitStream *pBitStream ) = 0;

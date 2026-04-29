@@ -26,6 +26,14 @@
 #include "StlUtils.h"
 #include "PakVars.h"
 
+#if (defined(__APPLE__) && defined(__MACH__)) && !defined(LINUX)
+#include <strings.h>
+inline int comparePathNames(const char* szPath1, const char* szPath2, size_t nLength)
+{
+	return strncasecmp(szPath1, szPath2, nLength);
+}
+#endif
+
 extern CMTSafeHeap* g_pSmallHeap;
 extern CMTSafeHeap* g_pBigHeap;
 
@@ -291,7 +299,13 @@ public:
 	enum {g_nPseudoFileIdxOffset = 1};
 
 	// this defines which slash will be kept internally
+#if defined(__APPLE__) || defined(LINUX)
+	// On Unix/macOS, forward slash is native
+	enum {g_cNativeSlash = '/', g_cNonNativeSlash = '\\'};
+#else
+	// On Windows, backslash is native
 	enum {g_cNativeSlash = '\\', g_cNonNativeSlash = '/'};
+#endif
 
   // makes the path lower-case and removes the duplicate and non native slashes
   // may make some other fool-proof stuff
@@ -422,7 +436,7 @@ public:
 
 	void OnMissingFile (const char* szPath);
 	// missing file -> count of missing files
-	typedef CMTSafeAllocator<std::pair<string, unsigned> > MissingFileMapAllocator;
+	typedef CMTSafeAllocator<std::pair<const string, unsigned> > MissingFileMapAllocator;
 	typedef std::map<string, unsigned, std::less<string>, MissingFileMapAllocator > MissingFileMap;
 	MissingFileMap m_mapMissingFiles;
 };
@@ -543,7 +557,7 @@ protected:
 			// you should access exactly the file under the directly in which the zip is situated
 			if (szFullPath[m_strBindRoot.length()] != '/' && szFullPath[m_strBindRoot.length()] != '\\')
 				return NULL;
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 			if (comparePathNames(szFullPath, m_strBindRoot.c_str(), m_strBindRoot.length()))
 #else
 			if (memicmp(szFullPath, m_strBindRoot.c_str(), m_strBindRoot.length()))

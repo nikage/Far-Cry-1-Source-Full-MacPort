@@ -23,7 +23,12 @@
 
 //DOC-IGNORE-BEGIN
 #include "Cry_Math.h"
+#include "Cry_Vector3.h"  // Explicit include for Plane class and GetPlane function
 #include "Cry_Geo.h"
+
+// GetPlane function forward declaration for ADL
+Plane GetPlane(const Vec3& v0, const Vec3& v1, const Vec3& v2);
+Plane GetPlane(const Vec3& normal, const Vec3& point);
 //DOC-IGNORE-END
 
 #ifdef WIN64
@@ -983,7 +988,9 @@ inline Matrix44	ViewMatrix(const Ang3 &angle)	{
 	Matrix33 ViewMatZ=Matrix33::CreateRotationZ(-angle.x);
 	Matrix33 ViewMatX=Matrix33::CreateRotationX(-angle.y);
 	Matrix33 ViewMatY=Matrix33::CreateRotationY(+angle.z);
-	return GetTransposed44( ViewMatX*ViewMatY*ViewMatZ);
+	// Temporary fix: convert Matrix33 to Matrix44 and transpose 
+	Matrix33 result = ViewMatX*ViewMatY*ViewMatZ;
+	return Matrix44(result);  // Constructor should handle conversion
 }
 
 //ZXY

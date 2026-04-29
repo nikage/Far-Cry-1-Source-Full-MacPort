@@ -46,7 +46,7 @@ class IPhysicalWorld;
 struct IMemoryManager;
 struct ISoundSystem;
 struct IMusicSystem;
-struct XDOM::IXMLDOMDocument;
+namespace XDOM { struct IXMLDOMDocument; }
 struct IFrameProfileSystem;
 struct FrameProfiler;
 struct IStreamEngine;
@@ -125,6 +125,8 @@ struct SSystemInitParams
 //	char szLocalIP[256];									// local IP address (needed if we have several servers on one machine)
 #if defined(LINUX)
 	void (*pCheckFunc)(void*);							// authentication function (must be set).
+#elif defined(__APPLE__) && defined(__MACH__)
+	void (*pCheckFunc)(void*);							// macOS also uses function pointer like Linux
 #else
 	void *pCheckFunc;											// authentication function (must be set).
 #endif

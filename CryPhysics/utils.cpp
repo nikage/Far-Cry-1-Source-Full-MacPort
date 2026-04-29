@@ -1091,7 +1091,7 @@ int CoverPolygonWithCircles(strided_pointer<vector2df> pt,int npt,bool bConsecut
 	for(i=0,r=0; i<npt; i++) {
 		pdata[i].pt = pt[i]-center; 
 		pdata[i].next = pdata+(i+1 & i+1-npt>>31);
-		pdata[i].prev = pdata+i-1+(npt & i-1>>31);
+		pdata[i].prev = pdata+i-1+(npt & (i-1)>>31);
 		r = max(r, pdata[i].pt.len2());
 	}
 	if (r < sqr(minCircleRadius)) {
@@ -1130,13 +1130,13 @@ int CoverPolygonWithCircles(strided_pointer<vector2df> pt,int npt,bool bConsecut
 		// find the farthest from the center vertex in +30 degrees vicinity of the global maximum
 		for(pvtx=(pvtx_left=pvtx_max)->next; 
 			pvtx!=pvtx_max && sqr(pvtx->pt^pvtx_max->pt) < 0.25f*pvtx->pt.len2()*len2 && pvtx->pt*pvtx_max->pt>0; pvtx=pvtx->next) 
-		{ imask = -((intptr_t)isneg(pvtx_left->pt.len2() - pvtx->pt.len2()) | iszero((intptr_t)pvtx_left-(intptr_t)pvtx_max));
+		{ imask = -((intptr_t)isneg(pvtx_left->pt.len2() - pvtx->pt.len2()) | iszero((int)(intptr_t)pvtx_left-(int)(intptr_t)pvtx_max));
 			pvtx_left = (ptitem2d*)((intptr_t)pvtx_left&~imask | (intptr_t)pvtx&imask);
 		}
 		// find the farthest from the center vertex in -30 degrees vicinity of the global maximum
 		for(pvtx=(pvtx_right=pvtx_max)->prev; 
 			pvtx!=pvtx_max && sqr(pvtx->pt^pvtx_max->pt) < 0.25f*pvtx->pt.len2()*len2 && pvtx->pt*pvtx_max->pt>0; pvtx=pvtx->prev) 
-		{ imask = -((intptr_t)isneg(pvtx_right->pt.len2() - pvtx->pt.len2()) | iszero((intptr_t)pvtx_right-(intptr_t)pvtx_max));
+		{ imask = -((intptr_t)isneg(pvtx_right->pt.len2() - pvtx->pt.len2()) | iszero((int)(intptr_t)pvtx_right-(int)(intptr_t)pvtx_max));
 			pvtx_right = (ptitem2d*)((intptr_t)pvtx_right&~imask | (intptr_t)pvtx&imask);
 		}
 
@@ -1238,7 +1238,7 @@ bool getCompressedQuat(const quaternionf &q, Vec3_tpl<short> &res)
 {
 	vectorf angles = Ang3::GetAnglesXYZ(matrix3x3f(q));
 	bool bGimbalLocked;
-	if (bGimbalLocked = fabs_tpl(angles.y)>pi*0.5f-0.03f)
+	if ((bGimbalLocked = fabs_tpl(angles.y)>pi*0.5f-0.03f))
 		angles = Ang3::GetAnglesXYZ(matrix3x3f(q*GetRotationAA((float)pi/6,vectorf(0,1,0))));
 	res.x = max(-32768,min(32767,float2int(angles.x*(32767/pi))));
 	res.y = max(-32768,min(32767,float2int(angles.y*(32767/(pi*0.5f)))));

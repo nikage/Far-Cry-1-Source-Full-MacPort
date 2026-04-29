@@ -25,6 +25,10 @@ inline mapped_type find_in_map(const Map& mapKeyToValue, key_type key, mapped_ty
 #if defined(LINUX)
 #include "platform.h"
 #include <ext/hash_map>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include "platform.h"
+#include <unordered_map>
+// For macOS, we'll use the stl::hash_map class defined below which wraps std::unordered_map
 #else
 #include <hash_map>
 #endif
@@ -309,6 +313,8 @@ namespace stl
 	class hash_map : 
 #ifdef _STLP_HASH_MAP // STL Port
 		std::hash_map<Key,Value,HashFunc,HashFunc>
+#elif defined(__APPLE__) && defined(__MACH__)
+		std::unordered_map<Key,Value,HashFunc>
 #else
 		std::hash_map<Key,Value,HashFunc>
 #endif // STL Port

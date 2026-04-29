@@ -1,0 +1,1 @@
+run git diff --stat and add asserts where necessary,  prefer constructors over methods where possible

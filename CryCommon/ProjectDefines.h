@@ -27,6 +27,13 @@
 	#define NOT_USE_BINK_SDK					// mainly needed for licencees to compile without the Bink integration
 	#define NOT_USE_DIVX_SDK					// mainly needed for licencees to compile without the DivX integration
 	#define EXCLUDE_UBICOM_CLIENT_SDK			// to compile a standalone server without the client integration
+#elif defined(__APPLE__) && defined(__MACH__)
+	// macOS: Disable DRM/copy protection like Linux
+	#define NOT_USE_PUNKBUSTER_SDK
+	#define NOT_USE_BINK_SDK
+	#define NOT_USE_DIVX_SDK
+	#define EXCLUDE_UBICOM_CLIENT_SDK
+	// Note: _DATAPROBE not defined - disables DRM system for macOS
 #else
 	
 	#define _DATAPROBE

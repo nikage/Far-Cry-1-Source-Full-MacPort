@@ -11,6 +11,9 @@ _ACCESS_POOL;
 #include <ILog.h>
 #include <IInput.h>
 #include "Input.h"
+#if defined(__APPLE__)
+#include "MacOSInput.h"
+#endif
 
 #ifdef _DEBUG
 static char THIS_FILE[] = __FILE__;
@@ -41,6 +44,14 @@ BOOL APIENTRY DllMain( HANDLE hModule,
 IInput *CreateInput( ISystem *pSystem,void* hinst, void* hwnd, bool usedinput)
 {
 	gISystem = pSystem;
+	
+#if defined(__APPLE__)
+	// Use macOS-specific input implementation
+	CMacOSInput *pInput = new CMacOSInput;
+	// macOS input doesn't need complex initialization for now
+	return pInput;
+#else
+	// Use Windows-specific input implementation
 	CInput *pInput=new CInput;
 	if (!pInput->Init(pSystem,(HINSTANCE)hinst,(HWND)hwnd,usedinput))
 	{
@@ -48,6 +59,7 @@ IInput *CreateInput( ISystem *pSystem,void* hinst, void* hwnd, bool usedinput)
 		return NULL;
 	}
 	return pInput;
+#endif
 }
 
 #include <CrtDebugStats.h>

@@ -47,14 +47,14 @@ CXConsoleVariable::CXConsoleVariable(CXConsole *pConsole,IScriptSystem *pSS,cons
 
 	
 	m_bLoadedFromScript=false;
-	if (CanGetValueFromScript() && m_pScriptSystem->GetGlobalValue(m_sName,sTempValue))
+	if (CanGetValueFromScript() && m_pScriptSystem && m_pScriptSystem && m_pScriptSystem->GetGlobalValue(m_sName,sTempValue))
 	{
 		m_bLoadedFromScript=true;
 		strcpy(m_sValue,sTempValue);
 		*m_fValue=(float)(atof(m_sValue));
 		*m_nValue=atoi(m_sValue);
 	}
-	m_hScriptTag=m_pScriptSystem->CreateTaggedValue(m_sName,m_sValue);
+	m_hScriptTag = m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(m_sName,m_sValue) : 0;
 }
 
 
@@ -81,34 +81,34 @@ CXConsoleVariable::CXConsoleVariable(CXConsole *pConsole,IScriptSystem *pSS,cons
 	case CVAR_STRING:
 		m_sValue = (char *)pVar;
 		
-		if(CanGetValueFromScript() && m_pScriptSystem->GetGlobalValue(sName,sTempValue))
+		if(CanGetValueFromScript() && m_pScriptSystem && m_pScriptSystem->GetGlobalValue(sName,sTempValue))
 		{
 			m_bLoadedFromScript=true;
 			strcpy(m_sValue,sTempValue);
 			*m_fValue=(float)(atof(sTempValue));
 			*m_nValue=atoi(sTempValue);
 		}
-		m_hScriptTag=m_pScriptSystem->CreateTaggedValue(sName,m_sValue);
+		m_hScriptTag=m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(sName,m_sValue) : 0;
 	break;
 	case CVAR_INT:
 		m_nValue=(int *)pVar;
 
-		if(CanGetValueFromScript() && m_pScriptSystem->GetGlobalValue(sName,sTempValue))
+		if(CanGetValueFromScript() && m_pScriptSystem && m_pScriptSystem->GetGlobalValue(sName,sTempValue))
 		{
 			m_bLoadedFromScript=true;
 			*m_nValue=atoi(sTempValue);
 		}
-		m_hScriptTag=m_pScriptSystem->CreateTaggedValue(sName,m_nValue);
+		m_hScriptTag=m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(sName,m_nValue) : 0;
 		memset(m_sValue,0,VAR_STRING_SIZE);
 	break;
 	case CVAR_FLOAT:
 		m_fValue=(float *)pVar;
-		if(CanGetValueFromScript() && m_pScriptSystem->GetGlobalValue(sName,sTempValue))
+		if(CanGetValueFromScript() && m_pScriptSystem && m_pScriptSystem->GetGlobalValue(sName,sTempValue))
 		{
 			m_bLoadedFromScript=true;
 			*m_fValue=(float)(atof(sTempValue));
 		}
-		m_hScriptTag=m_pScriptSystem->CreateTaggedValue(sName,m_fValue);
+		m_hScriptTag=m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(sName,m_fValue) : 0;
 		memset(m_sValue,0,VAR_STRING_SIZE);
 	break;
 	default:
@@ -125,24 +125,24 @@ void CXConsoleVariable::SetSrc (void* pSrc)
 	if (!pSrc)
 		return;
 
-	m_pScriptSystem->RemoveTaggedValue(m_hScriptTag);
+	if (m_pScriptSystem) m_pScriptSystem->RemoveTaggedValue(m_hScriptTag);
 
 	switch (m_nType)
 	{
 	case CVAR_STRING:
 		strcpy ((char*)pSrc, m_sValue );
 		m_sValue = (char*)pSrc;
-		m_hScriptTag=m_pScriptSystem->CreateTaggedValue(m_sName,m_sValue);
+		m_hScriptTag=m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(m_sName,m_sValue) : 0;
 		break;
 	case CVAR_INT:
 		*(int*)pSrc = *m_nValue;
 		m_nValue = (int*)pSrc;
-		m_hScriptTag=m_pScriptSystem->CreateTaggedValue(m_sName,m_nValue);
+		m_hScriptTag=m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(m_sName,m_nValue) : 0;
 		break;
 	case CVAR_FLOAT:
 		*(float*)pSrc = *m_fValue;
 		m_fValue = (float*)pSrc;
-		m_hScriptTag=m_pScriptSystem->CreateTaggedValue(m_sName,m_fValue);
+		m_hScriptTag=m_pScriptSystem ? m_pScriptSystem->CreateTaggedValue(m_sName,m_fValue) : 0;
 		break;
 	}
 
@@ -236,7 +236,24 @@ void CXConsoleVariable::Set(const char* s)
 		*m_fValue=(float)(atof(s));
 	if (m_sValue)
 	{
+#if defined(__APPLE__) && defined(__MACH__)
+		if (s == m_sValue)
+			return;
+		char temp[VAR_STRING_SIZE];
+		if (s)
+		{
+			std::strncpy(temp, s, sizeof(temp) - 1);
+			temp[sizeof(temp) - 1] = '\0';
+		}
+		else
+		{
+			temp[0] = '\0';
+		}
+		std::strncpy(m_sValue, temp, VAR_STRING_SIZE - 1);
+		m_sValue[VAR_STRING_SIZE - 1] = '\0';
+#else
 		strcpy(m_sValue,s);
+#endif
 	}
 }
 
@@ -327,7 +344,7 @@ const char* CXConsoleVariable::GetHelp()
 
 void CXConsoleVariable::Release()
 {
-	m_pScriptSystem->RemoveTaggedValue(m_hScriptTag);
+	if (m_pScriptSystem) m_pScriptSystem->RemoveTaggedValue(m_hScriptTag);
 	m_pConsole->UnregisterVariable(m_sName);
 	delete this;
 }

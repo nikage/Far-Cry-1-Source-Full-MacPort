@@ -774,7 +774,7 @@ void	CAIHandler::DoReadibilityPack( const char* text )
 		if( m_pAnimationPackTable->GetValue( text, pAnimationDirective )	)
 		{
 			IScriptObject *pMostLikelyTable = 0;
-			if(pMostLikelyTable = GetMostLikelyTable( pAnimationDirective ))
+			if((pMostLikelyTable = GetMostLikelyTable( pAnimationDirective )) != nullptr)
 			{
 			const char* aniName;
 			int		layer;
@@ -837,7 +837,7 @@ void	CAIHandler::DoReadibilityPack( const char* text )
 		if( m_pSoundPackTable->GetValue( text, pSoundDirective )	)
 		{
 			IScriptObject *pMostLikelyTable=0;
-			if(pMostLikelyTable = GetMostLikelyTable( pSoundDirective ))
+			if((pMostLikelyTable = GetMostLikelyTable( pSoundDirective )) != nullptr)
 			{
 			const char*	sndName;
 			int volume;

@@ -23,12 +23,18 @@ void CSectorInfo::SetTextures(bool bMakeUncompressedForEditing)
 {
 	FUNCTION_PROFILER( GetSystem(),PROFILE_3DENGINE );
 
+	assert(m_pTerrain && "SetTextures: m_pTerrain cannot be null!");
+	assert(m_pTerrain->m_pTexturePool && "SetTextures: texture pool cannot be null!");
+
 	if(m_bLockTexture) // always keep full texture detail during editing
 		m_cNewTextMML = 0;
 
   { // required actions
     if(!m_nLowLodTextureID)
+    {
       m_nLowLodTextureID = MakeSectorTextureDDS( GetSecIndex(), MAX_TEX_MML_LEVEL, bMakeUncompressedForEditing );
+      assert(m_nLowLodTextureID && "SetTextures: failed to create low LOD texture!");
+    }
 
     if(!m_nTextureID)
     {
@@ -87,6 +93,11 @@ int CSectorInfo::MakeSectorTextureDDS( int sec_id, int nMipMapLevelToLoad, bool 
 {
 	FUNCTION_PROFILER( GetSystem(),PROFILE_3DENGINE );
 
+	assert(m_pTerrain && "MakeSectorTextureDDS: m_pTerrain cannot be null!");
+	assert(m_pTerrain->m_pTexturePool && "MakeSectorTextureDDS: texture pool cannot be null!");
+	assert(sec_id >= 0 && "MakeSectorTextureDDS: sector ID cannot be negative!");
+	assert(nMipMapLevelToLoad >= 0 && "MakeSectorTextureDDS: mip level cannot be negative!");
+
 	nMipMapLevelToLoad+=GetCVars()->e_terrain_texture_mip_offset;
 
   // open file once
@@ -98,48 +109,70 @@ int CSectorInfo::MakeSectorTextureDDS( int sec_id, int nMipMapLevelToLoad, bool 
       return 0;
 
     GetSystem()->GetIPak()->FRead(&m_pTerrain->m_nSectorTextureReadedSize, 1, 4, m_pTerrain->m_fpTerrainTextureFile);
+    assert(m_pTerrain->m_nSectorTextureReadedSize > 0 && "MakeSectorTextureDDS: invalid texture size read from file!");
     GetLog()->Log("  TerrainSectorTextureSize %dx%d", m_pTerrain->m_nSectorTextureReadedSize, m_pTerrain->m_nSectorTextureReadedSize);
 
     GetSystem()->GetIPak()->FSeek( m_pTerrain->m_fpTerrainTextureFile, 0, SEEK_END);
     int nFileSize = GetSystem()->GetIPak()->FTell(m_pTerrain->m_fpTerrainTextureFile);
+    assert(nFileSize > 4 && "MakeSectorTextureDDS: terrain texture file is too small!");
 
-    m_pTerrain->m_nSectorTextureDataSizeBytes = (nFileSize-4)/(m_pTerrain->GetSectorsTableSize()*m_pTerrain->GetSectorsTableSize());
+    int nSectorsTableSize = m_pTerrain->GetSectorsTableSize();
+    assert(nSectorsTableSize > 0 && "MakeSectorTextureDDS: invalid sectors table size!");
+    m_pTerrain->m_nSectorTextureDataSizeBytes = (nFileSize-4)/(nSectorsTableSize*nSectorsTableSize);
+    assert(m_pTerrain->m_nSectorTextureDataSizeBytes > 0 && "MakeSectorTextureDDS: invalid sector texture data size!");
     GetLog()->Log("  SectorTextureDataSizeBytes = %d", m_pTerrain->m_nSectorTextureDataSizeBytes);
 
     m_pTerrain->m_ucpTmpTexBuffer = new uchar [m_pTerrain->m_nSectorTextureDataSizeBytes];
+    assert(m_pTerrain->m_ucpTmpTexBuffer && "MakeSectorTextureDDS: failed to allocate temp texture buffer!");
   }
 
   if(!m_pTerrain->m_fpTerrainTextureFile)
   { Warning(0,0,"MakeSectorTextureDDS: !m_pTerrain->m_fpTerrainTextureFile"); return 0; }
   
+  assert(m_pTerrain->m_ucpTmpTexBuffer && "MakeSectorTextureDDS: temp texture buffer is null!");
+  
   // count mm levels
   int nMipLevels=0;
   int w = m_pTerrain->m_nSectorTextureReadedSize;
+  assert(w > 0 && "MakeSectorTextureDDS: invalid texture size!");
   while(w>0)
   { w/=2; nMipLevels++; }
+  assert(nMipLevels > 0 && "MakeSectorTextureDDS: no mip levels calculated!");
 
   int nDataSize = m_pTerrain->m_nSectorTextureDataSizeBytes;
+  assert(nDataSize > 0 && "MakeSectorTextureDDS: invalid data size!");
+  
   int nTexSize  = m_pTerrain->m_nSectorTextureReadedSize;
+  assert(nTexSize > 0 && "MakeSectorTextureDDS: invalid texture size!");
 
   // calculate texture offset in file
   int file_offset = 4+sec_id*m_pTerrain->m_nSectorTextureDataSizeBytes;
+  assert(file_offset >= 4 && "MakeSectorTextureDDS: invalid file offset!");
 
   // if not zero mml specified
   for(int m=0; m<nMipMapLevelToLoad; m++)
   {
+    assert(nTexSize > 0 && "MakeSectorTextureDDS: texture size became zero or negative during mip calculation!");
     file_offset = file_offset + nTexSize*nTexSize/2;
     nDataSize -= nTexSize*nTexSize/2;
     nMipLevels--;
     nTexSize = nTexSize/2;
   }
+  
+  assert(nTexSize > 0 && "MakeSectorTextureDDS: final texture size is invalid!");
+  assert(nDataSize > 0 && "MakeSectorTextureDDS: final data size is invalid!");
+  assert(nMipLevels > 0 && "MakeSectorTextureDDS: no mip levels remaining!");
 
 	assert(m_pTerrain->m_nSectorTextureDataSizeBytes >= (GetCVars()->e_terrain_texture_mipmaps ? nDataSize : nTexSize*nTexSize/2));
 
   // read texture
   GetSystem()->GetIPak()->FSeek( m_pTerrain->m_fpTerrainTextureFile, file_offset, SEEK_SET );
+  int nBytesToRead = GetCVars()->e_terrain_texture_mipmaps ? nDataSize : nTexSize*nTexSize/2;
+  assert(nBytesToRead > 0 && "MakeSectorTextureDDS: invalid number of bytes to read!");
   INT_PTR readed = GetSystem()->GetIPak()->FRead(m_pTerrain->m_ucpTmpTexBuffer, 1,		//AMD Port
-    GetCVars()->e_terrain_texture_mipmaps ? nDataSize : nTexSize*nTexSize/2, 
+    nBytesToRead, 
     m_pTerrain->m_fpTerrainTextureFile);
+  assert(readed == nBytesToRead && "MakeSectorTextureDDS: failed to read complete texture data from file!");
 
   // no reason to use update texture instead create since size is always diferent
 /*  int nTexID = GetRenderer()->DownLoadToVideo Memory(m_pTerrain->m_ucpTmpTexBuffer,
@@ -148,6 +181,7 @@ int CSectorInfo::MakeSectorTextureDDS( int sec_id, int nMipMapLevelToLoad, bool 
     GetCVars()->e_terrain_texture_mipmaps ? FILTER_BILINEAR : FILTER_LINEAR);*/
 
   int nTexID = m_pTerrain->m_pTexturePool->MakeTexture(m_pTerrain->m_ucpTmpTexBuffer, nTexSize, this, bMakeUncompressedForEditing);
+  assert(nTexID != 0 && "MakeSectorTextureDDS: failed to create texture!");
 
   return (nTexID);
 }
@@ -176,20 +210,29 @@ void CSectorInfo::UpdateSectorTexture(unsigned char * pTexData, int nSizeOffTexD
 
 int CSectorInfo::LockSectorTexture(int & nTexDim)
 {
+	assert(m_pTerrain && "LockSectorTexture: m_pTerrain cannot be null!");
+	assert(m_pTerrain->m_nSectorTextureReadedSize > 0 && "LockSectorTexture: invalid sector texture size!");
+	
 	m_bLockTexture = true;
 	nTexDim = m_pTerrain->m_nSectorTextureReadedSize;
 	// force texture reloading as uncompressed
 	m_cNewTextMML = 0;
 	m_cTextureMML = 1;
 	SetTextures(true);
+	
+	assert(m_nTextureID != 0 && "LockSectorTexture: texture ID is zero after SetTextures!");
 	return m_nTextureID;
 }
 
 void CSectorInfo::RemoveSectorTextures(bool bRemoveLowLod)
 {
+  assert(m_pTerrain && "RemoveSectorTextures: m_pTerrain cannot be null!");
+  assert(m_pTerrain->m_pTexturePool && "RemoveSectorTextures: texture pool cannot be null!");
+  
   // remove high
   if(m_nTextureID)
   {
+    assert(m_nTextureID != 0 && "RemoveSectorTextures: attempting to remove invalid texture ID!");
     m_pTerrain->m_pTexturePool->RemoveTexture(m_nTextureID);
     assert(m_nLowLodTextureID);
     m_nTextureID = m_nLowLodTextureID;
@@ -199,6 +242,7 @@ void CSectorInfo::RemoveSectorTextures(bool bRemoveLowLod)
   // remove low
   if(bRemoveLowLod)
   {
+    assert(m_nLowLodTextureID != 0 && "RemoveSectorTextures: attempting to remove invalid low LOD texture ID!");
     m_pTerrain->m_pTexturePool->RemoveTexture(m_nLowLodTextureID);
     m_nTextureID = m_nLowLodTextureID = 0;
   }
@@ -206,13 +250,20 @@ void CSectorInfo::RemoveSectorTextures(bool bRemoveLowLod)
 
 void CSectorInfo::UnloadHeighFieldTexture(float fDistanse, float fMaxViewDist)
 {
+	assert(m_pTerrain && "UnloadHeighFieldTexture: m_pTerrain cannot be null!");
+	assert(m_pTerrain->m_pTexturePool && "UnloadHeighFieldTexture: texture pool cannot be null!");
+	assert(fDistanse >= 0.0f && "UnloadHeighFieldTexture: distance cannot be negative!");
+	assert(fMaxViewDist > 0.0f && "UnloadHeighFieldTexture: max view distance must be positive!");
+	
 	if(m_nTextureID && m_cTextureMML == 0 && m_nTextureID!=m_nLowLodTextureID)
 	{ // unload if to far or not in use int time
+		assert(m_nTextureID != m_nLowLodTextureID && "UnloadHeighFieldTexture: texture ID should not equal low LOD ID here!");
 		if(m_nTextureID == m_nLowLodTextureID)
 			GetLog()->Log("unload old secs error");
 
 		// set low lod tex
 		//glDeleteTextures(1, &(m_nTextureID) );
+		assert(m_nTextureID != 0 && "UnloadHeighFieldTexture: attempting to remove invalid texture ID!");
 		m_pTerrain->m_pTexturePool->RemoveTexture(m_nTextureID);
 		m_nTextureID = m_nLowLodTextureID;
 		m_cTextureMML = MAX_TEX_MML_LEVEL; 
@@ -221,9 +272,11 @@ void CSectorInfo::UnloadHeighFieldTexture(float fDistanse, float fMaxViewDist)
 			GetLog()->Log("lod0 tex unloaded");
 	}
 	else if(m_nTextureID && m_nTextureID == m_nLowLodTextureID)
-	{ // only low lod       
+	{ // only low lod
+		assert(m_nTextureID == m_nLowLodTextureID && "UnloadHeighFieldTexture: texture IDs should match here!");
 		if(fDistanse > (1.5f*fMaxViewDist))
 		{
+			assert(m_nTextureID != 0 && "UnloadHeighFieldTexture: attempting to remove invalid texture ID!");
 			m_pTerrain->m_pTexturePool->RemoveTexture(m_nTextureID);
 			m_nTextureID = m_nLowLodTextureID = 0;
 			m_cTextureMML = 0;

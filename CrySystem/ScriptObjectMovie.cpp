@@ -23,6 +23,9 @@ CScriptObjectMovie::~CScriptObjectMovie()
 //////////////////////////////////////////////////////////////////////////
 void CScriptObjectMovie::Init(IScriptSystem *pScriptSystem, ISystem *pSystem)
 {
+	assert(pScriptSystem != nullptr && "Script system must be valid for movie script object initialization");
+	assert(pSystem != nullptr && "System must be valid for movie script object initialization");
+	
 	m_pSystem=pSystem;
 	m_pMovieSystem=m_pSystem->GetIMovieSystem();	
 	InitGlobal(pScriptSystem, "Movie", this);
@@ -64,7 +67,9 @@ int CScriptObjectMovie::PlaySequence(IFunctionHandler *pH)
 	if (pH->GetParamCount()==2)
 		pH->GetParam(2, bResetFx);
 
-	m_pSystem->GetIMovieSystem()->PlaySequence(pszName,bResetFx);
+	IMovieSystem* pMovieSystem = m_pSystem->GetIMovieSystem();
+	if (pMovieSystem)
+		pMovieSystem->PlaySequence(pszName,bResetFx);
 
 	return pH->EndFunction();
 }
@@ -103,7 +108,8 @@ int CScriptObjectMovie::StopAllCutScenes(IFunctionHandler *pH)
 
 	//pGame->StopCurrentCutscene();
 	//m_pMovieSystem->StopAllCutScenes();
-	m_pSystem->GetIMovieSystem()->StopAllCutScenes();
+	IMovieSystem* pMovieSystem = m_pSystem->GetIMovieSystem();
+	pMovieSystem->StopAllCutScenes();
 
 	return pH->EndFunction();
 }

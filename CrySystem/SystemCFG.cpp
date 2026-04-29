@@ -171,7 +171,8 @@ void CSystemConfiguration::ParseSystemConfig()
 				string s( strLine, 0, posEq );
 				string strKey( RemoveWhiteSpaces(s) );
 #else
-				string strKey( RemoveWhiteSpaces( string( strLine, 0, posEq ) ) );
+				string s( strLine, 0, posEq );
+				string strKey( RemoveWhiteSpaces(s) );
 #endif
 				if (!strKey.empty())
 				{
@@ -199,7 +200,12 @@ void CSystemConfiguration::ParseSystemConfig()
 							{								
 								m_pSystem->GetILog()->Log("Lua cvar: (%s,%s)",strKey.c_str(),strValue.c_str());								
 								sprintf(szBuffer,"%s = \"%s\"",strKey.c_str(),strValue.c_str());
-								m_pSystem->GetIScriptSystem()->ExecuteBuffer(szBuffer,strlen(szBuffer));
+								// Check if script system is available before calling ExecuteBuffer
+								if (m_pSystem->GetIScriptSystem()) {
+									m_pSystem->GetIScriptSystem()->ExecuteBuffer(szBuffer,strlen(szBuffer));
+								} else {
+									m_pSystem->GetILog()->Log("Script system not available - skipping execution of: %s", szBuffer);
+								}
 							}
 						}
 					}

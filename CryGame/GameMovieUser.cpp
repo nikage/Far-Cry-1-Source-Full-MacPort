@@ -314,19 +314,20 @@ void CXGame::PlaySequence(const char *pszName,bool bResetFX)
 	//char szName[512];strcpy(szName,pszName);
 	//m_currCutScene=szName; // avoids assigning the Lua string pointer to STL string (unsafe)
 	
-	m_pSystem->GetIMovieSystem()->PlaySequence(pszName,bResetFX);
+	IMovieSystem* pMovieSystem = m_pSystem->GetIMovieSystem();
+	if (pMovieSystem)
+		pMovieSystem->PlaySequence(pszName,bResetFX);
 }
 
 //////////////////////////////////////////////////////////////////////////
-void CXGame::StopCurrentCutscene()
-{
-	// allow to skip only if it has been already played
-	/*
-	std::set<string>::iterator it;
-	it=m_lstPlayedCutScenes.find(m_currCutScene);
+void CXGame::StopCurrentCutscene() {
+  // allow to skip only if it has been already played
+  /*
+  std::set<string>::iterator it;
+  it=m_lstPlayedCutScenes.find(m_currCutScene);
 
-	if (it!=m_lstPlayedCutScenes.end())
-	{
-	*/	
-	m_pSystem->GetIMovieSystem()->StopAllCutScenes();  
+  if (it!=m_lstPlayedCutScenes.end())
+  {
+  */
+  m_pSystem->GetIMovieSystem()->StopAllCutScenes();
 }

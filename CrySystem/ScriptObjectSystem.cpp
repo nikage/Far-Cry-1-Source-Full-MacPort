@@ -21,7 +21,7 @@
 #include <ISound.h>
 #include <IGame.h>									// IGame
 #include <ICryPak.h>
-#if !defined(LINUX)
+#ifdef _WIN32
 	#include "ddraw.h"
 #endif
 #include "HTTPDownloader.h"
@@ -298,7 +298,7 @@ int CScriptObjectSystem::FrameProfiler(IFunctionHandler *pH)
 {
     bool on = false;
     bool display = true;
-    char *prefix = "";
+    const char *prefix = "";
 	if(pH->GetParamCount()>0)
 	{
 		pH->GetParam(1, on);
@@ -307,11 +307,11 @@ int CScriptObjectSystem::FrameProfiler(IFunctionHandler *pH)
 			pH->GetParam(2, display);
 			if(pH->GetParamCount()>2)
 			{
-				pH->GetParam(3, prefix);
+				pH->GetParam(3, (const char*&)prefix);
 			};
 		};
 	};
-    m_pSystem->SetFrameProfiler(on, display, prefix);
+    m_pSystem->SetFrameProfiler(on, display, (char*)prefix);
     return pH->EndFunction();
 };
 
@@ -334,7 +334,7 @@ int CScriptObjectSystem::CreateDownload(IFunctionHandler *pH)
 {
 	// this cast is a hack, because i don't want to change the ISystem interface at this point
 	CSystem *pSystem = static_cast<CSystem *>(m_pSystem);
-//#if !defined(LINUX)
+//#if !defined(LINUX) && !defined(__APPLE__)
 	if (pSystem)
 	{
 		CHTTPDownloader *pDL = pSystem->m_pDownloadManager->CreateDownload();
@@ -393,9 +393,9 @@ int CScriptObjectSystem::ExecuteCommand(IFunctionHandler *pH)
 {
 	CHECK_PARAMETERS(1);
 
-	char *szCmd;
+	const char *szCmd;
 
-	if (pH->GetParam(1, szCmd))
+	if (pH->GetParam(1, (const char*&)szCmd))
 	{
 		m_pConsole->ExecuteString(szCmd);
 	}
@@ -724,8 +724,8 @@ int CScriptObjectSystem::GetEntities(IFunctionHandler *pH)
 	@return [if succeded]the id of the class specified by sClassName [if failed]return nil
 */
 
-#if !defined(XBOX) && !defined(PS2) && (defined(WIN32) || defined(LINUX))
-	#if !defined(LINUX)
+#if !defined(XBOX) && !defined(PS2) && (defined(WIN32) || defined(LINUX) || defined(__APPLE__))
+	#if !defined(LINUX) && !defined(__APPLE__) && !defined(__APPLE__)
 		#include <io.h>
 	#endif
 	inline bool Filter(struct __finddata64_t& fd, int nScanMode)
@@ -796,6 +796,8 @@ int CScriptObjectSystem::ScanDirectory(IFunctionHandler *pH)
 #if defined(WIN32)
 		if ((hFile = _findfirst64( (string(pszFolderName) + "\\*.*").c_str(), &c_file )) == -1L)
 #elif defined(LINUX)
+		if ((hFile = _findfirst64( (string(pszFolderName) + "/*").c_str(), &c_file )) == -1)
+#elif defined(__APPLE__)
 		if ((hFile = _findfirst64( (string(pszFolderName) + "/*").c_str(), &c_file )) == -1)
 #endif
 		{
@@ -1184,13 +1186,18 @@ int CScriptObjectSystem::LoadImage(IFunctionHandler *pH)
 	//nTid=m_pRenderer->LoadTexture(sFileName);
 	ITexPic * pPic = m_pRenderer->EF_LoadTexture((char *)sFileName, (bRemovable ? 0 : FT_NOREMOVE) | FT_NORESIZE, 0, eTT_Base);
 
-  if (pPic && pPic->IsTextureLoaded())
+	if (pPic && pPic->IsTextureLoaded())
 	{
 		nTid=pPic->GetTextureID();
 		m_pRenderer->SetTexture(nTid);
 		m_pRenderer->SetTexClampMode(bClamp);
 		USER_DATA ud=m_pScriptSystem->CreateUserData((int)nTid,USER_DATA_TEXTURE);
 		return pH->EndFunction(ud);
+	}
+
+	if (m_pSystem && m_pSystem->GetILog())
+	{
+		m_pSystem->GetILog()->Log("System:LoadImage failed to load '%s'", sFileName ? sFileName : "<null>");
 	}
 
 	return pH->EndFunctionNull();
@@ -1517,7 +1524,7 @@ int CScriptObjectSystem::DrawImageColorCoords(IFunctionHandler *pH)
 /////////////////////////////////////////////////////////////////////////////////
 int CScriptObjectSystem::DrawTriStrip(IFunctionHandler *pH)
 {
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 #define _MAX_VTXS 10
 	USER_DATA nTid;
 	int nCookie=0;
@@ -1545,10 +1552,10 @@ int CScriptObjectSystem::DrawTriStrip(IFunctionHandler *pH)
 			if(vtxs->GetCurrent(vtx))
 			{
 				v[nvtxs].z=0;
-				v[nvtxs].c[0]=unsigned char(r*0xFF);
-				v[nvtxs].c[1]=unsigned char(g*0xFF);
-				v[nvtxs].c[2]=unsigned char(b*0xFF);
-				v[nvtxs].c[3]=unsigned char(a*0xFF);
+				v[nvtxs].c[0]=(unsigned char)(r*0xFF);
+				v[nvtxs].c[1]=(unsigned char)(g*0xFF);
+				v[nvtxs].c[2]=(unsigned char)(b*0xFF);
+				v[nvtxs].c[3]=(unsigned char)(a*0xFF);
 				vtx->GetValue("x",v[nvtxs].x);
 				vtx->GetValue("y",v[nvtxs].y);
 				vtx->GetValue("u",v[nvtxs].u);
@@ -2476,9 +2483,9 @@ int CScriptObjectSystem::Break(IFunctionHandler *pH)
 
 int CScriptObjectSystem::DumpCommandsVars(IFunctionHandler *pH)
 {
-	char *arg = "";
-	if(pH->GetParamCount()>0) pH->GetParam(1,arg);
-	m_pSystem->GetIConsole()->DumpCommandsVars(arg);
+	const char *arg = "";
+	if(pH->GetParamCount()>0) pH->GetParam(1,(const char*&)arg);
+	m_pSystem->GetIConsole()->DumpCommandsVars((char*)arg);
 	return pH->EndFunction();
 }
 
@@ -2626,8 +2633,8 @@ int CScriptObjectSystem::BrowseURL(IFunctionHandler *pH)
 {
 	CHECK_PARAMETERS(1);
 
-	char *szURL;
-	pH->GetParam(1, szURL);
+	const char *szURL;
+	pH->GetParam(1, (const char*&)szURL);
 
 	// for security reasons, check if it really a url
 	if (strlen(szURL) >= 10)
@@ -2695,7 +2702,7 @@ int CScriptObjectSystem::GetGPUQuality( IFunctionHandler* pH )
 {
 	CHECK_PARAMETERS( 0 );
 	static int s_iGPUQuality( -1 );
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 	if( -1 == s_iGPUQuality )
 	{
 		HMODULE hDDraw( LoadLibrary( "ddraw.dll" ) );
@@ -2911,7 +2918,7 @@ int CScriptObjectSystem::GetVideoMem( IFunctionHandler* pH )
 {
 	CHECK_PARAMETERS( 0 );
 	static DWORD s_dwTotalVideoMemory( 0xFFFFFFFF );
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 	if( 0xFFFFFFFF == s_dwTotalVideoMemory )
 	{
 		s_dwTotalVideoMemory = 0;

@@ -393,8 +393,8 @@ void CXGame::InitConsoleCommands()
 // Defines Console Variables used by Game.
 void CXGame::InitConsoleVars()
 {
-	m_pScriptSystem->SetGlobalValue("__tz0", "3423");
-	m_pScriptSystem->SetGlobalValue("__tz1", "31337");
+		m_pScriptSystem->SetGlobalValue("__tz0", "3423");
+		m_pScriptSystem->SetGlobalValue("__tz1", "31337");
 
 	IConsole *pConsole = m_pSystem->GetIConsole();
 
@@ -428,6 +428,7 @@ void CXGame::InitConsoleVars()
 		"Control the complexity of weapon firing effects.\n"
 		"Usage: cl_weapon_fx [0..2], 0=low,1=medium,2=high"
 		"Default value is 2, but its autodetected the first time based on pc spec.");
+	m_pLog->Log("InitConsoleVars - checkpoint 1 (after cl_weapon_fx)");
 
 	cl_projectile_light = GetISystem()->GetIConsole()->CreateVariable("cl_projectile_light","0",VF_DUMPTODISK,
 		"Controls if projectiles are allowed to use dynamic lights.\n"
@@ -455,6 +456,7 @@ void CXGame::InitConsoleVars()
 		"Sets the maximum frame rate.\n"
 		"Usage: g_maxfps 500"
 		"Default value is 500.");
+	m_pLog->Log("InitConsoleVars - checkpoint 2 (after g_maxfps)");
 	ai_num_of_bots = pConsole->CreateVariable("ai_num_of_bots","0",0);
 
 	p_always_run= pConsole->CreateVariable("p_always_run","1",0,
@@ -559,12 +561,14 @@ void CXGame::InitConsoleVars()
 		"Usage: sv_min_scheduling_delay 200"
 		"Default value is 200.");
 
+	m_pLog->Log("InitConsoleVars - checkpoint 3 (before sv_name)");
 	string szServerName;
 	if (m_pSystem->IsDedicated())
 		szServerName = string(m_pSystem->GetUserName()) + string("'s FarCry Server");
 	pConsole->CreateVariable("sv_name", szServerName.c_str(),0,
 		"Specifies the server name in a multiplayer game.\n"
 		"Usage: sv_name name\n");
+	m_pLog->Log("InitConsoleVars - checkpoint 4 (after sv_name)");
 	g_GameType= pConsole->CreateVariable("g_GameType","Default",VF_REQUIRE_NET_SYNC,
 		"Sets the game type.\n"
 		"Usage: g_GameType [Default/FFA/TDM/ASSAULT]\n"
@@ -683,7 +687,7 @@ void CXGame::InitConsoleVars()
 		"");
 
 	//////////////////////////////////////////////////////////////////////////
-	
+
 	ICryPak	*pPak=m_pSystem->GetIPak();
 	if (pPak)
 	{
@@ -730,7 +734,7 @@ void CXGame::InitConsoleVars()
 
 	//////////////////////////////////////////////////////////////////////////
 
-
+	CryLogAlways("InitConsoleVars - Before InitVehicleCvars");
 	//everything related to vehicle will be in another file 
 	//should be the same for other cvars, code and includes,
 	InitVehicleCvars();
@@ -990,6 +994,7 @@ void CXGame::InitConsoleVars()
 		"this represent the downward impulse power applied when the player reach the max height of the jump, 0 means no impulse.\n"
 		"Usage: JumpNegativeImpulse 0-100 is a good range to test.\n"
 		"Default value is 0, disabled.\n");
+	m_pLog->Log("InitConsoleVars - COMPLETED ALL VARIABLES!");
 }
 
 void CXGame::ResetInputMap()

@@ -1,0 +1,1 @@
+make commit message of staged changes in a commit message format, make sure it is a copiable text 

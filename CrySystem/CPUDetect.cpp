@@ -10,6 +10,15 @@
 #include "stdafx.h"
 #include "System.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#include <pthread.h>
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#include <mach/host_info.h>
+#endif
+
 /* features */
 #define FPU_FLAG  0x0001
 #define SERIAL_FLAG 0x40000
@@ -108,6 +117,182 @@ static double measure_clock_speed(double& SecondsPerCycle )
   return 1.0e-6/SecondsPerCycle;
 }
 
+#if defined(__APPLE__) && defined(__MACH__)
+
+// Cache for CPU frequency detection (same for all cores on same CPU)
+// This avoids redundant sysctlbyname calls and expensive clock measurement
+static double g_CachedSecondsPerCycle = 0.0;
+static bool g_CachedFrequencyValid = false;
+
+// Helper function to detect CPU frequency with fallback chain
+// Returns seconds per cycle, or default value if all methods fail
+// Results are cached to avoid redundant system calls
+static double DetectCPUFrequencyMacOS()
+{
+  // Return cached value if available (frequency is same for all cores)
+  if (g_CachedFrequencyValid)
+  {
+    return g_CachedSecondsPerCycle;
+  }
+  
+  uint64_t freq = 0;
+  size_t size = sizeof(freq);
+  
+  // Try hw.cpufrequency_max first (most accurate for Apple Silicon)
+  if (sysctlbyname("hw.cpufrequency_max", &freq, &size, NULL, 0) == 0 && freq > 0)
+  {
+    double freqMHz = (double)freq / 1.0e6;
+    g_CachedSecondsPerCycle = 1.0e-6 / freqMHz;
+    g_CachedFrequencyValid = true;
+    return g_CachedSecondsPerCycle;
+  }
+  
+  // Fallback to hw.cpufrequency
+  size = sizeof(freq);
+  if (sysctlbyname("hw.cpufrequency", &freq, &size, NULL, 0) == 0 && freq > 0)
+  {
+    double freqMHz = (double)freq / 1.0e6;
+    g_CachedSecondsPerCycle = 1.0e-6 / freqMHz;
+    g_CachedFrequencyValid = true;
+    return g_CachedSecondsPerCycle;
+  }
+  
+  // Final fallback: measure clock speed (expensive, so cache result)
+  double dummy = 0.0;
+  double freqMHz = measure_clock_speed(dummy);
+  if (freqMHz > 0.0 && freqMHz < 10000.0)
+  {
+    g_CachedSecondsPerCycle = 1.0e-6 / freqMHz;
+    g_CachedFrequencyValid = true;
+    return g_CachedSecondsPerCycle;
+  }
+  
+  // Default fallback value
+  g_CachedSecondsPerCycle = 1.0e-9;
+  g_CachedFrequencyValid = true;
+  return g_CachedSecondsPerCycle;
+}
+
+// Detect Apple Silicon (ARM64) CPU characteristics
+static void DetectProcessorARM64(SCpu* p)
+{
+  memset(p, 0, sizeof(SCpu));
+  
+  // Batch CPU identification queries
+  char brand[256] = {0};
+  size_t size = sizeof(brand);
+  
+  // Try brand string first, fallback to hw.model
+  if (sysctlbyname("machdep.cpu.brand_string", brand, &size, NULL, 0) != 0)
+  {
+    size = sizeof(brand);
+    sysctlbyname("hw.model", brand, &size, NULL, 0);
+  }
+  
+  // Set vendor and CPU type
+  strncpy(p->mVendor, "Apple", sizeof(p->mVendor) - 1);
+  if (brand[0] != '\0')
+  {
+    strncpy(p->mCpuType, brand, sizeof(p->mCpuType) - 1);
+  }
+  else
+  {
+    strncpy(p->mCpuType, "Apple Silicon", sizeof(p->mCpuType) - 1);
+  }
+  
+  // Get CPU family
+  int family = 0;
+  size = sizeof(family);
+  sysctlbyname("hw.cpufamily", &family, &size, NULL, 0);
+  p->mFamily = family;
+  p->mModel = 0;
+  p->mStepping = 0;
+  
+  // Set standard ARM64 features
+  p->mFeatures |= CFI_FPUEMULATION;
+  strcpy(p->mFpuType, "on-chip");
+  
+  // Detect frequency using helper function
+  p->m_SecondsPerCycle = DetectCPUFrequencyMacOS();
+  
+  p->mbSerialPresent = false;
+}
+
+// Detect Intel x86_64 CPU characteristics
+static void DetectProcessorIntel(SCpu* p)
+{
+  memset(p, 0, sizeof(SCpu));
+  
+  // Batch all CPU identification queries
+  char brand[256] = {0};
+  char vendor[64] = {0};
+  int family = 0, model = 0, stepping = 0;
+  uint64_t features = 0;
+  uint64_t features_ext = 0;
+  size_t size;
+  
+  // Query all CPU identification attributes
+  size = sizeof(brand);
+  sysctlbyname("machdep.cpu.brand_string", brand, &size, NULL, 0);
+  
+  size = sizeof(vendor);
+  sysctlbyname("machdep.cpu.vendor", vendor, &size, NULL, 0);
+  
+  size = sizeof(family);
+  sysctlbyname("machdep.cpu.family", &family, &size, NULL, 0);
+  
+  size = sizeof(model);
+  sysctlbyname("machdep.cpu.model", &model, &size, NULL, 0);
+  
+  size = sizeof(stepping);
+  sysctlbyname("machdep.cpu.stepping", &stepping, &size, NULL, 0);
+  
+  // Query CPU features in batch
+  size = sizeof(features);
+  sysctlbyname("machdep.cpu.features", &features, &size, NULL, 0);
+  
+  size = sizeof(features_ext);
+  sysctlbyname("machdep.cpu.extfeatures", &features_ext, &size, NULL, 0);
+  
+  // Set CPU identification
+  strncpy(p->mVendor, vendor, sizeof(p->mVendor) - 1);
+  strncpy(p->mCpuType, brand, sizeof(p->mCpuType) - 1);
+  p->mFamily = family;
+  p->mModel = model;
+  p->mStepping = stepping;
+  
+  // Process feature flags
+  if (features & 0x00800000)
+    p->mFeatures |= CFI_MMX;
+  if (features & 0x02000000)
+    p->mFeatures |= CFI_SSE;
+  if (features_ext & 0x00000001)
+    p->mFeatures |= CFI_SSE2;
+  
+  p->mFeatures |= CFI_FPUEMULATION;
+  strcpy(p->mFpuType, "on-chip");
+  
+  // Detect frequency using helper function
+  p->m_SecondsPerCycle = DetectCPUFrequencyMacOS();
+  
+  p->mbSerialPresent = false;
+}
+
+// Main macOS CPU detection entry point
+static void* DetectProcessorMacOS(void* arg)
+{
+  SCpu* p = (SCpu*)arg;
+  
+#if defined(__aarch64__) || defined(__arm64__)
+  DetectProcessorARM64(p);
+#else
+  DetectProcessorIntel(p);
+#endif
+  
+  return NULL;
+}
+#endif
+
 /* TODO: Alpha AXP */
 static unsigned long __stdcall DetectProcessor( void *arg )
 {
@@ -146,7 +331,7 @@ static unsigned long __stdcall DetectProcessor( void *arg )
   SCpu  *p = (SCpu *) arg;
   float     test_val[4] = { 1.f, 1.f, 1.f, 1.f };
 
-#if (!defined(WIN64) && !defined(LINUX))
+#if (!defined(WIN64) && !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__)))
   __asm
   {
     /*
@@ -168,7 +353,7 @@ static unsigned long __stdcall DetectProcessor( void *arg )
     jne check_80286     /* go check for 80286 */
     push sp         /* double check with push sp */
     pop dx          /* if value pushed was different */
-    cmp dx, sp        /* means it’s really an 8086 */
+    cmp dx, sp        /* means itï¿½s really an 8086 */
     jne end_cpu_type    /* jump if processor is 8086/8088 */
     mov cpu_type, 010h    /* indicate unknown processor */
     jmp end_cpu_type
@@ -207,7 +392,7 @@ check_80286:
     popfd         /* replace current EFLAGS value */
     pushfd          /* get new EFLAGS */
     pop eax         /* store new EFLAGS in EAX */
-    cmp eax, ebx      /* can’t toggle AC bit, processor=80386 */
+    cmp eax, ebx      /* canï¿½t toggle AC bit, processor=80386 */
     jz end_cpu_type     /* jump if 80386 processor */
     push ebx
     popfd         /* restore AC bit in EFLAGS */
@@ -400,7 +585,7 @@ end_fpu_type:
 
   if( features_edx & SERIAL_FLAG )
   {
-#if (defined(WIN64) || defined (LINUX))
+#if (defined(WIN64) || defined (LINUX) || (defined(__APPLE__) && defined(__MACH__)))
 		serial_number[0] = serial_number[1] = serial_number[2] = 0;
 #else
     /* read serial number */
@@ -952,10 +1137,35 @@ void CCpuFeatures::Detect(void)
 {
 #if !defined(PS2) && !defined (GC) && !defined (LINUX)
 
-#if !defined(_XBOX) && !defined(LINUX)
+#if defined(__APPLE__) && defined(__MACH__)
+  size_t size = 0;
+  int numCPUs = 0;
+  
+  size = sizeof(numCPUs);
+  sysctlbyname("hw.ncpu", &numCPUs, &size, NULL, 0);
+  m_NumSystemProcessors = numCPUs;
+  m_NumAvailProcessors = numCPUs;
+  
+  if (m_NumAvailProcessors > MAX_CPU)
+    m_NumAvailProcessors = MAX_CPU;
+  
+  OSSupport = OSExceptions = 0;
+  
+  for (int i = 0; i < m_NumAvailProcessors; i++)
+  {
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, DetectProcessorMacOS, &m_Cpu[i]) == 0)
+    {
+      pthread_join(thread, NULL);
+    }
+  }
+  
+  m_bOS_ISSE = (m_Cpu[0].mFeatures & CFI_SSE) != 0;
+  m_bOS_ISSE_EXCEPTIONS = m_bOS_ISSE;
+
+#elif !defined(_XBOX) && !defined(LINUX)
   SYSTEM_INFO   sys_info;
   DWORD_PTR system_affinity_mask;
-#endif
   HANDLE      thread;
   unsigned long thread_id;
   int current_processor;
@@ -964,18 +1174,10 @@ void CCpuFeatures::Detect(void)
   uint  thread_processor_mask;
   unsigned char c;
 
-  /* get the system info to derive the number of processors within the system. */
-#if !defined(_XBOX) && !defined(LINUX)
   GetSystemInfo( &sys_info );
   m_NumSystemProcessors = sys_info.dwNumberOfProcessors;
   m_NumAvailProcessors = 0;
   GetProcessAffinityMask( GetCurrentProcess(), &process_affinity_mask, &system_affinity_mask );
-#else
-  m_NumSystemProcessors = 1;
-  m_NumAvailProcessors = 0;
-  process_affinity_mask = 1;
-#endif
-
 
   for( c = 0; c < m_NumSystemProcessors; c++ )
   {
@@ -993,37 +1195,18 @@ void CCpuFeatures::Detect(void)
   {
     thread_processor_mask = 1 << current_processor;
 
-    /* Is the processor we are about to set for the detect thread part of the
-     * process affinity mask. If it is not then it cannot be set.
-     */
     if( (process_affinity_mask & thread_processor_mask) )
     {
-      /* create a thread that is suspended */
       thread = CreateThread( NULL, 0, DetectProcessor, &m_Cpu[current_processor_element], CREATE_SUSPENDED, &thread_id );
 
       if( thread )
       {
-        /*
-         * set the affinity of the thread so to force it to run
-         * on the required processor
-         */
-#if !defined(_XBOX) && !defined(LINUX)
         if( SetThreadAffinityMask( thread, thread_processor_mask ) )
-#endif
         {
-          /*
-           * Now we have set the processor resume the thread and it
-           * will run only on the specified processor.
-           */
           ResumeThread( thread );
-
-          /* wait for the current detection thread to finish */
           WaitForSingleObject( thread, INFINITE );
-
-          /* close the handle to the now finished thread */
           CloseHandle( thread );
 
-          /* use the next element of the array */
           current_processor_element++;
 
           if( current_processor_element == MAX_CPU )
@@ -1037,6 +1220,16 @@ void CCpuFeatures::Detect(void)
 
   m_bOS_ISSE = OSSupport != 0;
   m_bOS_ISSE_EXCEPTIONS = OSExceptions != 0;
+#else
+  m_NumSystemProcessors = 1;
+  m_NumAvailProcessors = 1;
+  memset(&m_Cpu[0], 0, sizeof(SCpu));
+  strcpy(m_Cpu[0].mVendor, "Unknown");
+  strcpy(m_Cpu[0].mCpuType, "Unknown");
+  m_Cpu[0].m_SecondsPerCycle = 1.0e-9;
+  m_bOS_ISSE = false;
+  m_bOS_ISSE_EXCEPTIONS = false;
+#endif
 
   CryLogAlways("\n--- CPU detection ---\n" );
   CryLogAlways("Number of system processors: %d\n", m_NumSystemProcessors );

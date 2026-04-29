@@ -120,11 +120,11 @@ template<class ftype> int sgnnz_safe(const quotient_tpl<ftype> &op) { return sgn
 template<class ftype> int isneg_safe(const quotient_tpl<ftype> &op) { return isneg(op.x)^isneg(op.y); }
 template<class ftype> int isnonneg_safe(const quotient_tpl<ftype> &op) { return isnonneg(op.x)*isnonneg(op.y); }
 template<class ftype> quotient_tpl<ftype> fabs_tpl(const quotient_tpl<ftype> op) { return quotient_tpl<ftype>(fabs_tpl(op.x),fabs_tpl(op.y)); }
-template<class ftype> quotient_tpl<ftype> max(const quotient_tpl<ftype> &op1,const quotient_tpl<ftype> &op2) { 
+template<class ftype> quotient_tpl<ftype> max_quotient(const quotient_tpl<ftype> &op1,const quotient_tpl<ftype> &op2) { 
 	int mask1=isneg(op2.x*op1.y-op1.x*op2.y), mask2=mask1^1;
 	return quotient_tpl<ftype>(op1.x*mask1+op2.x*mask2, op1.y*mask1+op2.y*mask2); 
 }
-template<class ftype> quotient_tpl<ftype> min(const quotient_tpl<ftype> &op1,const quotient_tpl<ftype> &op2) { 
+template<class ftype> quotient_tpl<ftype> min_quotient(const quotient_tpl<ftype> &op1,const quotient_tpl<ftype> &op2) { 
 	int mask1=isneg(op1.x*op2.y-op2.x*op1.y), mask2=mask1^1;
 	return quotient_tpl<ftype>(op1.x*mask1+op2.x*mask2, op1.y*mask1+op2.y*mask2); 
 }

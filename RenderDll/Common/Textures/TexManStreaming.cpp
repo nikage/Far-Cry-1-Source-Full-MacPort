@@ -13,6 +13,44 @@
 #include "Image/DDSImage.h"
 #include "Image/dds.h"
 
+#if defined(__APPLE__)
+// macOS: POSIX equivalents for Windows file APIs
+#define FILE_FLAG_SEQUENTIAL_SCAN 0
+#include <sys/stat.h>
+#include <sys/time.h>
+
+// POSIX equivalent for GetFileTime
+static inline BOOL GetFileTime(HANDLE hFile, FILETIME* lpCreationTime, FILETIME* lpLastAccessTime, FILETIME* lpLastWriteTime)
+{
+    assert(hFile != nullptr && "GetFileTime: file handle cannot be null");
+    assert(lpLastWriteTime != nullptr && "GetFileTime: lpLastWriteTime cannot be null");
+    
+    if (!lpLastWriteTime) return FALSE;
+    struct stat st;
+    if (fstat(fileno((FILE*)hFile), &st) != 0) return FALSE;
+    
+    // Convert Unix timestamp to Windows FILETIME (100-nanosecond intervals since 1601)
+    uint64_t unixTime = (uint64_t)st.st_mtime;
+    uint64_t windowsTime = (unixTime + 11644473600ULL) * 10000000ULL;
+    lpLastWriteTime->dwLowDateTime = (DWORD)windowsTime;
+    lpLastWriteTime->dwHighDateTime = (DWORD)(windowsTime >> 32);
+    return TRUE;
+}
+
+// POSIX equivalent for CompareFileTime
+static inline int CompareFileTime(const FILETIME* lpFileTime1, const FILETIME* lpFileTime2)
+{
+    assert(lpFileTime1 != nullptr && "CompareFileTime: lpFileTime1 cannot be null");
+    assert(lpFileTime2 != nullptr && "CompareFileTime: lpFileTime2 cannot be null");
+    
+    uint64_t time1 = ((uint64_t)lpFileTime1->dwHighDateTime << 32) | lpFileTime1->dwLowDateTime;
+    uint64_t time2 = ((uint64_t)lpFileTime2->dwHighDateTime << 32) | lpFileTime2->dwLowDateTime;
+    if (time1 < time2) return -1;
+    if (time1 > time2) return 1;
+    return 0;
+}
+#endif
+
 // DXT compressed block for black image (DXT1, DXT3, DXT5)
 static byte sDXTData[3][16] = 
 {

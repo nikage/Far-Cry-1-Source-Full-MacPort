@@ -220,7 +220,8 @@ int tri_box_intersection(const triangle *ptri, const box *pbox, prim_inters *pin
 	pinters->iFeature[1][0] = 0xA0 | dec_mod3[i];
 
 	haveinters:
-	iStart = idxmax3((const real*)&n.abs());
+	Vec3_tpl<double> nAbs = n.abs();
+	iStart = idxmax3((const real*)&nAbs);
 	// if triangle's area is comparable with the most parallel box face, check box edges vs triangle also
 	if ((pt[1]-pt[0]^pt[2]-pt[0]).len2() > sqr(pbox->size[inc_mod3[iStart]]*pbox->size[dec_mod3[iStart]])) { 
 		int nborderpt0 = pinters->nborderpt;
@@ -287,7 +288,7 @@ int tri_cylinder_intersection(const triangle *ptri, const cylinder *pcyl, prim_i
 		dp = ptri->pt[dec_mod3[i]]-ptri->pt[i]; pc = ptri->pt[i]-pcyl->center;
 		t[i][0].x = t[i][1].x = -pc*pcyl->axis;
 		t[i][0].y = t[i][1].y = dp*pcyl->axis; sg = sgnnz(t[i][0].y); 
-		t[i][sg+1>>1].x += pcyl->hh; t[i][sg+1>>1^1].x -= pcyl->hh;
+		t[i][(sg+1)>>1].x += pcyl->hh; t[i][(sg+1)>>1^1].x -= pcyl->hh;
 		t[i][0].x*=sg; t[i][0].y*=sg; t[i][1].x*=sg; t[i][1].y*=sg;
 
 		vec1 = dp^pcyl->axis; vec0 = pc^pcyl->axis;
@@ -530,7 +531,7 @@ int ray_tri_intersection(const ray *pray, const triangle *ptri, prim_inters *pin
 		t.fixsign();
 		vectorr pt = pray->origin*t.y + pray->dir*t.x, edge;
 		real nlen2 = ptri->n.len2()*t.y;
-		int bOutside = isneg(t.y-fabsf(t.x*2-t.y));
+		int bOutside = isneg(t.y-std::abs(t.x*2-t.y));
 		edge = ptri->pt[1]-ptri->pt[0]; bOutside |= isneg(sqr_signed(ptri->n*(edge ^ pt-ptri->pt[0]*t.y))+pinters->minPtDist2*edge.len2()*nlen2);
 		edge = ptri->pt[2]-ptri->pt[1]; bOutside |= isneg(sqr_signed(ptri->n*(edge ^ pt-ptri->pt[1]*t.y))+pinters->minPtDist2*edge.len2()*nlen2);
 		edge = ptri->pt[0]-ptri->pt[2]; bOutside |= isneg(sqr_signed(ptri->n*(edge ^ pt-ptri->pt[2]*t.y))+pinters->minPtDist2*edge.len2()*nlen2);
@@ -574,11 +575,11 @@ int tri_plane_intersection(const triangle *ptri, const plane *pplane, prim_inter
 	ptloc=ptri->pt[1]*nlen2-pt0; pt2d[1].set(axes[1]*ptloc,axes[2]*ptloc); sgnx[1]=sgnnz(pt2d[1].x);	
 	ptloc=ptri->pt[2]*nlen2-pt0; pt2d[2].set(axes[1]*ptloc,axes[2]*ptloc); sgnx[2]=sgnnz(pt2d[2].x);
 
-	bCross = sgnx[0]*sgnx[1]-1>>1;
+	bCross = (sgnx[0]*sgnx[1]-1)>>1;
 	nCross = -bCross;	iNotCross = 0;
-	bCross = sgnx[1]*sgnx[2]-1>>1;
+	bCross = (sgnx[1]*sgnx[2]-1)>>1;
 	nCross -= bCross;	iNotCross |= 1&~bCross;
-	bCross = sgnx[2]*sgnx[0]-1>>1;
+	bCross = (sgnx[2]*sgnx[0]-1)>>1;
 	nCross -= bCross;	(iNotCross&=bCross) |= 2&~bCross;
 	if (nCross!=2) 
 		return 0;
@@ -945,10 +946,10 @@ int cylinder_cylinder_intersection(const cylinder *pcyl1, const cylinder *pcyl2,
 					vector2df pt2d,kpt2d,n2d,kn2d;
 					kpt2d.set(r0*sg2d.x, r0*sg2d.y*fabs_tpl(cosa));
 					kn2d.set(sg2d.x*fabs_tpl(cosa), sg2d.y);
-					j = 1-sg2d.x*sg2d.y>>1;
+					j = (1-sg2d.x*sg2d.y)>>1;
 					int iangle,idx[2] = {0,SINCOSTABSZ};
 					do {
-						iangle = idx[0]+idx[1]>>1;
+						iangle = (idx[0]+idx[1])>>1;
 						pt2d.set(g_costab[iangle]*kpt2d.x, g_sintab[iangle]*kpt2d.y);
 						n2d.set(g_costab[iangle]*kn2d.x, g_sintab[iangle]*kn2d.y);
 						idx[isneg(n2d^c2d-pt2d)^j] = iangle;
@@ -962,7 +963,7 @@ int cylinder_cylinder_intersection(const cylinder *pcyl1, const cylinder *pcyl2,
 						for(ipass=-1; ipass<=1; ipass+=2) {
 							idx[0] = icenter; idx1=idx[1] = idx[0]+ipass*SINCOSTABSZ;
 							do {
-								imiddle = idx[0]+idx[1]>>1;
+								imiddle = (idx[0]+idx[1])>>1;
 								iquad = imiddle>>SINCOSTABSZ_LOG2 & 3;
 								iangle = (SINCOSTABSZ-1 & -(iquad&1)) + (imiddle & SINCOSTABSZ-1)*(1-(iquad&1)*2);
 								pt2d.set(g_costab[iangle]*(1-((iquad^iquad<<1)&2))*kpt2d.x, g_sintab[iangle]*(1-(iquad&2))*kpt2d.y); 
@@ -1076,7 +1077,7 @@ int cylinder_ray_intersection(const cylinder *pcyl, const ray *pray, prim_inters
 	} else {
 		sg = sgnnz((pinters->pt[0]-pcyl->center)*pcyl->axis);
 		pinters->n = pcyl->axis*sg;
-		pinters->iFeature[0][0]=pinters->iFeature[1][0] = 0x41+(sg+1>>1);
+		pinters->iFeature[0][0]=pinters->iFeature[1][0] = 0x41+((sg+1)>>1);
 	}
 	pinters->iFeature[0][1]=pinters->iFeature[1][1] = 0x20;
 	return 1;

@@ -22,6 +22,12 @@
 #include "File.h"
 #endif
 
+// Include required headers for type definitions
+#include "IRenderer.h"
+#include "IShader.h"
+#include "Cry_Math.h"
+#include "Shaders/Shader.h"
+
 typedef void (PROCRENDEF)(SShaderPass *l, int nPrimType);
 
 #define USE_HDR 1

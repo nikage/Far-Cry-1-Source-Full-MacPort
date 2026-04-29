@@ -59,6 +59,33 @@ void AuthCheckFunction( void *data )
 
 #define NOT_USE_CRY_MEMORY_MANAGER
 
+// On macOS, include Cocoa headers BEFORE platform.h and CryEngine headers to avoid conflicts
+#if defined(__APPLE__) && defined(__MACH__)
+#import <Cocoa/Cocoa.h>
+
+@interface CryApplicationDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation CryApplicationDelegate
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag
+{
+    NSLog(@"CryApplicationDelegate: applicationShouldHandleReopen (hasVisible=%d)", flag);
+    [sender activateIgnoringOtherApps:YES];
+    return NO;
+}
+
+- (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames
+{
+    NSLog(@"CryApplicationDelegate: openFiles %@", filenames);
+    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+
+@end
+
+static CryApplicationDelegate* g_appDelegate = nil;
+#endif
+
 #include <platform.h>
 #include <vector>
 #include <list>
@@ -71,6 +98,7 @@ void AuthCheckFunction( void *data )
 // CRY Stuff ////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 #include "Cry_Math.h"
+#include "Cry_Vector3.h"  // Explicit include to ensure Plane class and GetPlane function are available
 #include <Cry_Camera.h>
 
 
@@ -97,6 +125,10 @@ static char szMasterCDFolder[_MAX_PATH];
 static HMODULE g_hSystemHandle=NULL;
 #define DLL_SYSTEM "CrySystem.dll"
 #define DLL_GAME	 "CryGame.dll"
+#elif defined(__APPLE__) && defined(__MACH__)
+void* g_hSystemHandle = nullptr;
+// DLL_SYSTEM and DLL_GAME defined in MacOSspecific.h
+// __fmode defined in CryPak.cpp
 #endif
 
 #ifndef PS2
@@ -591,7 +623,9 @@ string FormatWinError(DWORD dwError)
 }
 
 #define MAX_CMDLINE_LEN 256
+#ifdef _WIN32
 #include <crtdbg.h>
+#endif
 ///////////////////////////////////////////////
 // Load the game DLL and run it
 
@@ -854,7 +888,7 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 			::DestroyWindow((HWND)hWnd);
 			hWnd = NULL;
 		}
-#endif;
+#endif
 
 	} while(false);
 
@@ -893,8 +927,103 @@ bool RunGame(HINSTANCE hInstance,const char *sCmdLine)
 		// Now terminate this process as fast as possible.
 		ExitProcess( 0 );
 
-#endif WIN32
+#endif // WIN32
 	}
 
 	return true;
 }
+
+#if defined(__APPLE__) && defined(__MACH__)
+// macOS entry point - use statically linked libraries
+int main(int argc, char* argv[]) {
+        @autoreleasepool {
+            // Initialize NSApplication for GUI support
+            [NSApplication sharedApplication];
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+            [NSApp finishLaunching];
+            [NSApp activateIgnoringOtherApps:YES];
+            if (!g_appDelegate)
+            {
+                g_appDelegate = [[CryApplicationDelegate alloc] init];
+                [NSApp setDelegate:g_appDelegate];
+            }
+        
+        printf("NSApplication initialized\n");
+        
+        // Convert command line arguments to single string like Windows
+        char cmdLine[1024] = "";
+        for (int i = 1; i < argc; i++) {
+            if (i > 1) strcat(cmdLine, " ");
+            strcat(cmdLine, argv[i]);
+        }
+        
+        // Initialize system parameters
+        SSystemInitParams sip;
+        sip.sLogFileName = "log.txt";
+        if (cmdLine[0]) {
+            strncpy(sip.szSystemCmdLine, cmdLine, sizeof(sip.szSystemCmdLine) - 1);
+            sip.szSystemCmdLine[sizeof(sip.szSystemCmdLine) - 1] = '\0';
+        }
+        
+        // Initialize with macOS-specific parameters
+        sip.hInstance = (HINSTANCE)1;
+        sip.hWnd = NULL;
+        sip.pSystem = NULL;
+        sip.pCheckFunc = AuthCheckFunction;
+        
+        // Create system interface directly (statically linked)
+        g_pISystem = CreateSystemInterface(sip);
+        if (!g_pISystem) {
+            printf("CreateSystemInterface Failed\n");
+            return -1;
+        }
+        
+        // Enable Log verbosity
+        g_pISystem->GetILog()->EnableVerbosity(true);
+        
+        // Initialize console
+        g_pISystem->GetIConsole()->ShowConsole(false);
+        g_pISystem->GetIConsole()->SetScrollMax(600/2);
+        
+        // Create game (statically linked)
+        printf("main(): About to call CreateGame\n");
+        fflush(stdout);
+        SGameInitParams gip;
+        if (!g_pISystem->CreateGame(gip)) {
+            printf("CreateGame Failed\n");
+            g_pISystem->Release();
+            return -1;
+        }
+        printf("main(): CreateGame completed successfully\n");
+        fflush(stdout);
+        
+        // Get game interface and run
+        printf("main(): About to call GetIGame\n");
+        fflush(stdout);
+        IGame *pGame = g_pISystem->GetIGame();
+        printf("main(): GetIGame returned: %p\n", pGame);
+        fflush(stdout);
+        
+        if (pGame) {
+            printf("main(): Starting game\n");
+            fflush(stdout);
+            
+            // On macOS, we need to process events but let the game control the loop
+            // The game's Run() method will handle the main loop
+            bool bRelaunch = false;
+            pGame->Run(bRelaunch);
+            
+            printf("main(): Game Run() completed\n");
+            fflush(stdout);
+        }
+        
+        // Cleanup
+        if (g_pISystem) {
+            g_pISystem->Release();
+            g_pISystem = NULL;
+        }
+        
+        return 0;
+    }
+}
+#endif

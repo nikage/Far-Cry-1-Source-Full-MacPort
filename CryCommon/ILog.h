@@ -166,6 +166,8 @@ inline FILE * fxopen(const char *file, const char *mode)
 #else
 #if defined(LINUX)
 	return fopen_nocase(file, mode);
+#elif defined(__APPLE__) && defined(__MACH__)
+	return fopen_nocase(file, mode);  // macOS also uses case-sensitive filesystem
 #else
   return fopen(file, mode);
 #endif //LINUX

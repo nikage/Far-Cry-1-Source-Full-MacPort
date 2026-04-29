@@ -1720,7 +1720,7 @@ bool CEntity::RegisterInAISystem(unsigned short type, const AIObjectParameters &
 		if (type == 0)
 			return true;
 
-		if (m_pAIObject = pSystem->CreateAIObject(type, this))
+                if ((m_pAIObject = pSystem->CreateAIObject(type, this)))
 		{
 			m_bUpdateAI = true;
 			m_pAIObject->ParseParameters(params);

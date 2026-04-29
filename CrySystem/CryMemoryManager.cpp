@@ -5,7 +5,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#if defined(__APPLE__) && defined(__MACH__)
+#include <new>      // macOS uses <new> not <new.h>
+#else
 #include <new.h>
+#endif
 
 #include <ISystem.h>
 

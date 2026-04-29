@@ -175,7 +175,7 @@ const char *CXServerRules::GetGameType()
   {
       m_pScriptSystem->BeginCall(fun);
 	    m_pScriptSystem->PushFuncParam(m_pGameRulesObj);
-	    m_pScriptSystem->EndCall(md);
+	    m_pScriptSystem->EndCall();
 			m_pScriptSystem->ReleaseFunc(fun);
 	};
 	
@@ -292,7 +292,7 @@ void CXServerRules::OnClientMsgText(EntityId sender, TextMessage &tm)
 {
 	const char *szMessageType=0;
 
-	// Modified by Márcio
+	// Modified by Mï¿½rcio
 	//------------------------------------------------------------------------------------------------- 
 	// TODO:
 	// 

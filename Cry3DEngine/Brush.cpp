@@ -150,7 +150,7 @@ bool CBrush::DrawEntity(const struct SRendParams & _EntDrawParams)
 //  if(!strstr(m_pStatObj->GetFileName(),"SWR_MP_PumpB.cgf"))
   //  return false;
 
-  int nRecursionLevel = (int)GetRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
+  int nRecursionLevel = (int)(intptr_t)GetRenderer()->EF_Query(EFQ_RecurseLevel) - 1;
 
   // some parameters will be modified
 	SRendParams rParms = _EntDrawParams;
@@ -1500,7 +1500,7 @@ void CBrush::PreloadInstanceResources(Vec3d vPrevPortalPos, float fPrevPortalDis
 
 	for(int nLod=0; nLod<MAX_BRUSH_LODS_NUM; nLod++)
 #if !defined(LINUX64)
-	if(m_arrLMData[nLod].m_pLMData != NULL && m_arrLMData[nLod].m_pLMData->GetColorLerpTex() && m_arrLMData[nLod].m_pLMData->GetDomDirectionTex())
+	if(m_arrLMData[nLod].m_pLMData && m_arrLMData[nLod].m_pLMData->GetColorLerpTex() && m_arrLMData[nLod].m_pLMData->GetDomDirectionTex())
 #else
 	if(m_arrLMData[nLod].m_pLMData != 0 && m_arrLMData[nLod].m_pLMData->GetColorLerpTex() && m_arrLMData[nLod].m_pLMData->GetDomDirectionTex())
 #endif

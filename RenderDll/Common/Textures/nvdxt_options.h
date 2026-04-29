@@ -15,8 +15,8 @@
 *****************************************************************************************/
 #pragma once
 
-#if defined(LINUX)
-	#include "WinBase.h"
+#if defined(LINUX) || defined(__APPLE__)
+	#include <platform.h>
 #else
 	#include <windows.h>
 #endif

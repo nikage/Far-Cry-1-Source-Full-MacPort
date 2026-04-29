@@ -132,7 +132,7 @@ _inline void __cdecl __CRYTEKDLL_TRACE(const char *sFormat, ... )
 #	if defined(LINUX)
 #		define NET_TRACE //
 #	else
-#		define NET_TRACE __noop
+#		define NET_TRACE(...) ((void)0)
 #	endif
 #endif
 

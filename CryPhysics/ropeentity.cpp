@@ -263,7 +263,7 @@ int CRopeEntity::GetStatus(pe_status *_status)
 int CRopeEntity::Action(pe_action *_action)
 {
 	int res,i,j;
-	if (res = CPhysicalEntity::Action(_action))
+	if ((res = CPhysicalEntity::Action(_action)))
 		return res;
 
 	if (_action->type==pe_action_impulse::type_id) {
@@ -359,7 +359,8 @@ __ropeframe++;
 			m_segs[i].dir = dir;
 			m_segs[i].pt = ptend[0] + m_segs[i].dir*(newseglen*i);
 		}
-		m_bAwake = m_pTiedTo[0]->GetStatus(&pe_status_awake()) | m_pTiedTo[1]->GetStatus(&pe_status_awake());
+		pe_status_awake status0, status1;
+		m_bAwake = m_pTiedTo[0]->GetStatus(&status0) | m_pTiedTo[1]->GetStatus(&status1);
 		m_BBox[0].x = min(m_segs[0].pt.x,m_segs[m_nSegs].pt.x); m_BBox[1].x = max(m_segs[0].pt.x,m_segs[m_nSegs].pt.x); 
 		m_BBox[0].y = min(m_segs[0].pt.y,m_segs[m_nSegs].pt.y); m_BBox[1].y = max(m_segs[0].pt.y,m_segs[m_nSegs].pt.y); 
 		m_BBox[0].z = min(m_segs[0].pt.z,m_segs[m_nSegs].pt.z); m_BBox[1].z = max(m_segs[0].pt.z,m_segs[m_nSegs].pt.z); 
@@ -394,7 +395,7 @@ __ropeframe++;
 
 		if (m_pTiedTo[0]) m_segs[0].pt = ptend[0];
 		if (m_pTiedTo[1]) m_segs[m_nSegs].pt = ptend[1];
-	} while(m_pTiedTo[iDir+1>>1] && bStretched && iter>0);
+	} while(m_pTiedTo[(iDir+1)>>1] && bStretched && iter>0);
 
 	m_BBox[0] = m_BBox[1] = m_segs[0].pt;
 	for(i=0;i<=m_nSegs;i++) {
@@ -467,13 +468,13 @@ __ropeframe++;
 		if (m_pTiedTo[0] && m_pTiedTo[1])
 			iDir = isneg(m_pTiedTo[1]->GetRigidBody(m_iTiedPart[1])->Minv-m_pTiedTo[0]->GetRigidBody(m_iTiedPart[0])->Minv);
 		else 
-			iDir = iszero((intptr_t)m_pTiedTo[0]);
+			iDir = iszero((int)(intptr_t)m_pTiedTo[0]);
 		iDir = 1-iDir*2;
 		iStart = m_nSegs & iDir>>31;
 		iEnd = m_nSegs & -iDir>>31;
 		for(i=iStart;i!=iEnd;i+=iDir)	{
 			iseg = i+(iDir>>31);
-			if (pent=m_segs[iseg].pContactEnt) {
+			if ((pent=m_segs[iseg].pContactEnt)) {
 				//(pent->m_qrot*pent->m_parts[m_segs[iseg].iContactPart].q).getmatrix(gwd.R);	//Q2M_IVO 
 				gwd.R = matrix3x3f(pent->m_qrot*pent->m_parts[m_segs[iseg].iContactPart].q);
 				gwd.offset = pent->m_pos + pent->m_qrot*pent->m_parts[m_segs[iseg].iContactPart].pos;
@@ -670,7 +671,7 @@ __ropeframe++;
 	i = -isneg(E-m_Emin*(m_nSegs+1));
 	m_nSlowFrames = (m_nSlowFrames&i)-i;
 	if (!(m_bAwake = isneg(m_nSlowFrames-4)))
-		for(i=iszero((intptr_t)m_pTiedTo[0])^1; i<m_nSegs+iszero((intptr_t)m_pTiedTo[1]); i++)
+		for(i=iszero((int)(intptr_t)m_pTiedTo[0])^1; i<m_nSegs+iszero((int)(intptr_t)m_pTiedTo[1]); i++)
 			m_segs[i].vel.zero();
 
 	m_pos = m_segs[0].pt;

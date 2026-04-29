@@ -129,10 +129,10 @@ public:
 
 	void deallocate_destroy(pointer _Ptr, size_type _Count)
 	{
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		delete [] _Ptr;
 #else
-		delete[_Count]_Ptr;
+		delete [] _Ptr;  // Fixed: should be delete[] not delete[_Count]
 #endif
 	}
 

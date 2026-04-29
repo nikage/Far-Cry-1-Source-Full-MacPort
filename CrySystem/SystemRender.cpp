@@ -13,6 +13,7 @@
 
 #include "stdafx.h"
 #include "System.h"
+#include "CryLibrary.h"
 
 #ifndef _XBOX
 #ifdef WIN32
@@ -37,14 +38,24 @@
 #include "luadebugger/LuaDbg.h"
 #endif
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__) && !defined(__APPLE__)
 #include <ddraw.h>
 extern HRESULT GetDXVersion( DWORD* pdwDirectXVersion, TCHAR* strDirectXVersion, int cchDirectXVersion );
+#elif defined(__APPLE__)
+// macOS stub for DirectX version detection
+HRESULT GetDXVersion( DWORD* pdwDirectXVersion, TCHAR* strDirectXVersion, int cchDirectXVersion ) {
+    if (pdwDirectXVersion) *pdwDirectXVersion = 0;
+    if (strDirectXVersion && cchDirectXVersion > 0) {
+        strncpy(strDirectXVersion, "macOS Graphics", cchDirectXVersion - 1);
+        strDirectXVersion[cchDirectXVersion - 1] = '\0';
+    }
+    return S_OK;
+}
 #endif
 
 extern int g_nPrecaution;
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 /////////////////////////////////////////////////////////////////////////////////
 int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
 {
@@ -783,6 +794,20 @@ int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
 }
 #endif
 
+#if defined(__APPLE__)
+/////////////////////////////////////////////////////////////////////////////////
+int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
+{
+  // macOS implementation - use OpenGL renderer by default
+  strcpy(Vendor, "Apple");
+  strcpy(Device, "Metal/OpenGL");
+  
+  GetILog()->LogToFile("System: INFO: Using OpenGL renderer on macOS\n");
+  
+  return R_GL_RENDERER;
+}
+#endif
+
 /////////////////////////////////////////////////////////////////////////////////
 void CSystem::CreateRendererVars()
 {
@@ -800,9 +825,15 @@ void CSystem::CreateRendererVars()
 		"Usage: r_ColorBits [32/24/16/8]");
 	m_rDepthBits = GetIConsole()->CreateVariable("r_DepthBits", "32", VF_DUMPTODISK);
 	m_rStencilBits = GetIConsole()->CreateVariable("r_StencilBits", "8", VF_DUMPTODISK);	
+#ifdef __APPLE__
+	m_rDriver= GetIConsole()->CreateVariable("r_Driver", "Metal", VF_DUMPTODISK,
+		"Sets the renderer driver. Default is 'Metal' on macOS.\n"
+		"Usage: r_Driver Metal");
+#else
 	m_rDriver= GetIConsole()->CreateVariable("r_Driver", "Direct3D9", VF_DUMPTODISK,
 		"Sets the renderer driver. Default is 'Direct3D9'.\n"
 		"Usage: r_Driver Direct3D9");
+#endif
 #ifdef _DEBUG
 	m_rFullscreen = GetIConsole()->CreateVariable("r_Fullscreen", "0", VF_DUMPTODISK,
 		"Toggles fullscreen mode. Default is 1 (fullscreen).\n"
@@ -841,13 +872,17 @@ void CSystem::RenderBegin()
 {
 	FUNCTION_PROFILER( this,PROFILE_SYSTEM );
 
-	if (m_bIgnoreUpdates)
+	if (m_bIgnoreUpdates) {
 		return;
+	}
 
 	//////////////////////////////////////////////////////////////////////
 	//start the rendering pipeline
-	if (m_pRenderer) 
+	if (m_pRenderer) {
 		m_pRenderer->BeginFrame();
+	} else {
+		assert(false && "No renderer found");
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -883,7 +918,7 @@ void CSystem::UpdateLoadingScreen()
 {
 	if (!m_bEditor)
 	{
-		if (GetIRenderer()->EF_Query(EFQ_RecurseLevel) <= 0)
+		if ((intptr_t)GetIRenderer()->EF_Query(EFQ_RecurseLevel) <= 0)
 		{
 			RenderBegin();
 			GetIConsole()->Draw();
@@ -1042,7 +1077,7 @@ void CSystem::Render()
     GetWindowText( (HWND)hRendWnd,sBuff,128);
     if(hActiveWnd != hRendWnd && strncmp(sBuff,"- Far Cry -",11)==0)
     {
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
       Sleep(50);
 #endif      
 //      if(!bSleep)

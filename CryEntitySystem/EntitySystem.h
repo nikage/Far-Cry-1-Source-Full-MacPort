@@ -43,13 +43,20 @@ class CEntityClonesMgr;
 #include <ext/hash_map>
 #include "ientityrenderstate.h"
 #else
+#if defined(__APPLE__)
+#include <unordered_map>
+#else
 #include <hash_map>
+#endif
 #endif
 #endif
 
 #if defined(LINUX)
 	typedef __gnu_cxx::hash_map<EntityId,CEntity*> EntityMap;
 	typedef __gnu_cxx::hash_map<EntityId,CEntity*>::iterator EntityMapItor;
+#elif defined(__APPLE__)
+	typedef std::unordered_map<EntityId,CEntity*> EntityMap;
+	typedef EntityMap::iterator EntityMapItor;
 #else
 	typedef std::hash_map<EntityId,CEntity*> EntityMap;
 	typedef EntityMap::iterator EntityMapItor;

@@ -1040,7 +1040,7 @@ int CScriptObjectEntity::AttachObjectToBone(IFunctionHandler *pH)
 {
 	//CHECK_PARAMETERS(2); can be 2 or 3 or 4 params.
 
-	char *boneName;
+	const char *boneName;
 	int slot;
 	bool bMultipleAttachments = false;
 	bool bUseZOffset = false;
@@ -1074,7 +1074,7 @@ int CScriptObjectEntity::DetachObjectToBone(IFunctionHandler *pH)
 {
 	//CHECK_PARAMETERS(1); Can be 1 or 2 params.
 
-	char *boneName;
+	const char *boneName;
 	pH->GetParam(1,boneName);
 
 	int BAD_HANDLER = -1;
@@ -1101,7 +1101,7 @@ int CScriptObjectEntity::AttachToBone(IFunctionHandler *pH)
 {
 	CHECK_PARAMETERS(2);
 
-	char *boneName;
+	const char *boneName;
 	int nID;
 	_SmartScriptObject pObj(m_pScriptSystem,true);
 	pH->GetParam(1,*pObj);
@@ -4636,7 +4636,7 @@ int CScriptObjectEntity::GetEntitiesInContact(IFunctionHandler *pH)
 	IPhysicalEntity **ppColliders;
 	int cnt = 0,valid=0;
 
-	if (cnt = pWorld->GetEntitiesInBox(minbox, maxbox, ppColliders,ent_living|ent_rigid|ent_sleeping_rigid|ent_static))
+	if ((cnt = pWorld->GetEntitiesInBox(minbox, maxbox, ppColliders,ent_living|ent_rigid|ent_sleeping_rigid|ent_static)))
 	{
 		// execute on collide for all of the entities
 		_SmartScriptObject pObj(m_pScriptSystem);
@@ -5088,7 +5088,8 @@ int CScriptObjectEntity::CheckCollisions(IFunctionHandler *pH)
 
 		pEnt->GetParams(&pbb);
 		pEnt->GetParams(&pfd);
-		nParts = pEnt->GetStatus(&pe_status_nparts());
+		pe_status_nparts status_nparts;
+		nParts = pEnt->GetStatus(&status_nparts);
 		pEnt->GetStatus(sp+0);
 		ip.bNoAreaContacts = true;
 		ip.vrel_min = 1E10f;
@@ -5102,7 +5103,9 @@ int CScriptObjectEntity::CheckCollisions(IFunctionHandler *pH)
 				psoEnt = (pIEnt = (IEntity*)ppEnts[i]->GetForeignData()) ? pIEnt->GetScriptObject() : 0;
 				nEntCont = 0;
 
-				for(pp[1].ipart=ppEnts[i]->GetStatus(&pe_status_nparts())-1; pp[1].ipart>=0; pp[1].ipart--)
+				pe_status_nparts status_nparts_i;
+				int nParts_i = ppEnts[i]->GetStatus(&status_nparts_i);
+				for(pp[1].ipart=nParts_i-1; pp[1].ipart>=0; pp[1].ipart--)
 				{
 					MARK_UNUSED(pp[1].partid); ppEnts[i]->GetParams(pp+1);
 					gwd[1].offset = sp[1].pos + sp[1].q*pp[1].pos;

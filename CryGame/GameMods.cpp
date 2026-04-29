@@ -20,6 +20,8 @@
 
 #if defined(LINUX)
 	#include <sys/io.h>
+#elif defined(__APPLE__)
+	#include <unistd.h>
 #else
 #	include <io.h>
 #endif

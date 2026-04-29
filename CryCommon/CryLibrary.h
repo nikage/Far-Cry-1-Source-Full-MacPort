@@ -43,6 +43,7 @@
 	#define CrySharedLibraySupported true
 	#define CrySharedLibrayExtension ".dll"
 	#define CryLoadLibrary(libName) ::LoadLibrary(libName)
+	#define CryLoadLibraryDefExt(libName) CryLoadLibrary(libName CrySharedLibrayExtension)
 	#define CryGetProcAddress(libHandle, procName) ::GetProcAddress((HMODULE)libHandle, procName)
 	#define CryFreeLibrary(libHandle) ::FreeLibrary(libHandle)
 #elif defined(LINUX)
@@ -55,13 +56,15 @@
 	#define CrySharedLibrayExtension ".so"
 	#define CryGetProcAddress(libHandle, procName) ::dlsym(libHandle, procName)
 	#define CryFreeLibrary(libHandle) ::dlclose(libHandle)
+	#define CryLoadLibraryDefExt(libName) CryLoadLibrary(libName CrySharedLibrayExtension)
 
 	#define HMODULE void*
 	static const char* gEnvName("MODULE_PATH");
 
 	static const char* GetModulePath()
 	{
-		return getenv(gEnvName);
+		const char* path = getenv(gEnvName);
+		return path ? path : "";
 	}
 
 	static void SetModulePath(const char* pModulePath)
@@ -85,6 +88,76 @@
 		return ::dlopen(newLibName.c_str(), cLoadLazy?(RTLD_LAZY | RTLD_GLOBAL):(RTLD_NOW | RTLD_GLOBAL));
 	}
 
+#elif defined(__APPLE__) && defined(__MACH__)
+	#include <dlfcn.h>
+	#include <stdlib.h>
+	#include <unistd.h>
+	#include <mach-o/dyld.h>
+	#include "platform.h"
+
+	// macOS dylib support
+	#define CrySharedLibraySupported true
+	#define CrySharedLibrayExtension ".dylib"
+	#define CryGetProcAddress(libHandle, procName) ::dlsym(libHandle, procName)
+	#define CryFreeLibrary(libHandle) ::dlclose(libHandle)
+	#define CryLoadLibraryDefExt(libName) CryLoadLibrary(libName CrySharedLibrayExtension)
+
+	#define HMODULE void*
+	static const char* gEnvName("MODULE_PATH");
+
+	static const char* GetModulePath()
+	{
+		// Use a more robust approach to avoid getenv hangs on macOS
+		static char modulePath[1024] = {0};
+		if (modulePath[0] == 0) {
+			// Try to get the executable directory (app bundle)
+			char exePath[1024];
+			uint32_t size = sizeof(exePath);
+			if (_NSGetExecutablePath(exePath, &size) == 0) {
+				// Find the last slash and truncate to get the directory
+				char* lastSlash = strrchr(exePath, '/');
+				if (lastSlash) {
+					*lastSlash = '\0';
+					strcpy(modulePath, exePath);
+					strcat(modulePath, "/");
+				}
+			}
+			// Fallback to current working directory
+			if (modulePath[0] == 0 && getcwd(modulePath, sizeof(modulePath) - 1) != NULL) {
+				strcat(modulePath, "/");
+			}
+		}
+		return modulePath;
+	}
+
+	static void SetModulePath(const char* pModulePath)
+	{
+		setenv(gEnvName, pModulePath?pModulePath:"",true);
+	}
+
+	static HMODULE CryLoadLibrary(const char* libName, const bool cAppend = true, const bool cLoadLazy = false)
+	{
+		if (!libName) {
+			printf("CryLoadLibrary: libName is null\n");
+			return NULL;
+		}
+		string newLibName(GetModulePath());
+		if (!newLibName.empty() && newLibName.back() != '/') {
+			newLibName += '/';
+		}
+#if !defined(NDEBUG)
+		// Temporarily disable debug suffix for macOS
+		newLibName += libName;
+		printf("loading library  %s...\n",newLibName.c_str());
+#else
+		newLibName += libName;
+#endif
+		void* result = ::dlopen(newLibName.c_str(), cLoadLazy?(RTLD_LAZY | RTLD_GLOBAL):(RTLD_NOW | RTLD_GLOBAL));
+		if (!result) {
+			printf("dlopen failed: %s\n", dlerror());
+		}
+		return result;
+	}
 
 #else
 #define CrySharedLibraySupported false

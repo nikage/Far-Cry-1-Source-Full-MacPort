@@ -3,6 +3,9 @@ Copyright (c) 1998, 1999 Thai Open Source Software Center Ltd
 See the file COPYING for copying permission.
 */
 
+#ifndef XmlTok_impl_INCLUDED
+#define XmlTok_impl_INCLUDED 1
+
 enum {
   BT_NONXML,
   BT_MALFORM,
@@ -44,3 +47,5 @@ enum {
 };
 
 #include <stddef.h>
+
+#endif /* not XmlTok_impl_INCLUDED */

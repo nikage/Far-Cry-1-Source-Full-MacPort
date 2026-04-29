@@ -84,7 +84,7 @@ void portable_makepath (
 
         /* copy fname */
 
-        if (p = fname) {
+        if ((p = fname)) {
                 while (*p) {
                         *path++ = *p++;
                 }
@@ -94,11 +94,11 @@ void portable_makepath (
          * to be inserted.
          */
 
-        if (p = ext) {
+        if ((p = ext)) {
                 if (*p && *p != ('.')) {
                         *path++ = ('.');
                 }
-                while (*path++ = *p++)
+                while ((*path++ = *p++))
                         ;
         }
         else {

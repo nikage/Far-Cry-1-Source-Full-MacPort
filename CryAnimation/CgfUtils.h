@@ -77,7 +77,7 @@ public:
 	// operator that sorts the materials for rendering
 	bool operator < (const CMatEntityNameTokenizer& right)const;
 protected:
-	char* m_szMtlName;
+	std::vector<char> m_mtlNameBuffer;
 };
 
 // this is sorting predicate that helps form a mapping of old-new mat ids

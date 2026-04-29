@@ -98,21 +98,13 @@ bool CXGame::AddEquipPack(XDOM::IXMLDOMNode *pPack)
 		{
 			XDOM::IXMLDOMNodePtr pCurItemList;
 			pItemList->reset();
-#if !defined(LINUX64)
-			while ((pCurItemList = pItemList->nextNode()) != NULL)
-#else
-			while ((pCurItemList = pItemList->nextNode()) != 0)
-#endif
+			while ((pCurItemList = pItemList->nextNode()))
 			{
 				XDOM::IXMLDOMNodeListPtr pItems = pCurItemList->getChildNodes();
 				XDOM::IXMLDOMNodePtr pCurItem;
 				pItems->reset();
 				UINT iCurItem = 1;
-#if !defined(LINUX64)
-				while ((pCurItem = pItems->nextNode()) != NULL)
-#else
-				while ((pCurItem = pItems->nextNode()) != 0)
-#endif
+				while ((pCurItem = pItems->nextNode()))
 				{
 					XDOM::IXMLDOMNodePtr pIType = pCurItem->getAttribute("type");
 					// if (strcmp(pIType->getText(), "Weapon") == 0)
@@ -120,11 +112,7 @@ bool CXGame::AddEquipPack(XDOM::IXMLDOMNode *pPack)
 						_SmartScriptObject cEntry(GetScriptSystem(), false);
 						cEntry->SetValue("Type", pIType->getText());
 						cEntry->SetValue("Name", pCurItem->getName());
-#if !defined(LINUX64)
-						if(pPrimaryWeapon!=NULL)
-#else
-						if(pPrimaryWeapon!=0)
-#endif
+						if(pPrimaryWeapon)
 						{
 							if(strcmp(pPrimaryWeapon->getText(),pCurItem->getName())==0)
 							{

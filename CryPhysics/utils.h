@@ -35,9 +35,18 @@ union floatint {
 	int ival;
 };
 
-#if defined(WIN64) || defined(LINUX64)
+#if defined(WIN64) || defined(LINUX64) || defined(__APPLE__)
 const int	imag	= (23+127)<<23 | 1<<22; 
 int float2int(float x);
+
+// Add definition for macOS
+#if defined(__APPLE__)
+inline int float2int(float x) {
+	floatint u;
+	u.fval = x+fmag;
+	return u.ival-imag;
+}
+#endif
 
 #elif defined(LINUX32)
 const int	imag	= (23+127)<<23 | 1<<22; 
@@ -227,11 +236,11 @@ int ascii2bin(const unsigned char *pin,int sz, unsigned char *pout);
 
 template<class T> inline T *_align16(T *ptr) { return (T*)(((INT_PTR)ptr-1&~15)+16); }
 #if !defined(LINUX)
-	template<class dtype> bool is_valid(const dtype &op) { return is_valid(op|op); }
-
 	inline bool is_valid(float op) { return op*op>=0 && op*op<1E30f; }
 	inline bool is_valid(int op) { return true; }
 	inline bool is_valid(unsigned int op) { return true; }
+	
+	template<class dtype> bool is_valid(const dtype &op) { return true; } // Default implementation
 #endif
 
 void WritePacked(CStream &stm, int num);

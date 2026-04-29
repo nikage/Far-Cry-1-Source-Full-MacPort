@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - Create and update a texture with the most recently used glyphs
@@ -18,6 +18,9 @@
 #else
 #if defined(LINUX)
 #include <ext/hash_map>
+#elif defined(__APPLE__)
+#include <unordered_map>
+#define hash_map std::unordered_map
 #else
 #include <hash_map>
 #endif
@@ -82,8 +85,8 @@ typedef struct CTextureSlot
 typedef std::vector<CTextureSlot *>							CTextureSlotList;
 typedef std::vector<CTextureSlot *>::iterator				CTextureSlotListItor;
 
-typedef std::hash_map<wchar_t, CTextureSlot *>				CTextureSlotTable;
-typedef std::hash_map<wchar_t, CTextureSlot *>::iterator	CTextureSlotTableItor;
+typedef hash_map<wchar_t, CTextureSlot *>				CTextureSlotTable;
+typedef hash_map<wchar_t, CTextureSlot *>::iterator	CTextureSlotTableItor;
 
 #ifdef WIN64
 #undef GetCharWidth

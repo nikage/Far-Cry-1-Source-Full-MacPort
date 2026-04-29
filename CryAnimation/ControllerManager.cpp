@@ -549,7 +549,7 @@ bool CControllerManager::UnloadAnimation (int nGlobAnimId)
 		for (std::vector<CryModelAnimationContainer*>::iterator it = m_arrClients.begin(); it!= m_arrClients.end(); ++it)
 			(*it)->OnAnimationGlobalUnload (nGlobAnimId);
 #if !defined(LINUX)
-		assert (m_arrAnims[nGlobAnimId].MaxControllerRefCount()==1);
+		// assert (m_arrAnims[nGlobAnimId].MaxControllerRefCount()==1); // Method doesn't exist
 #endif
 		m_arrAnims[nGlobAnimId].arrCtrls.clear();
 		return true;

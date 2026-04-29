@@ -219,7 +219,6 @@ static void ltrim (const char*& szString)
 
 
 CMatEntityNameTokenizer::CMatEntityNameTokenizer ():
-	m_szMtlName (NULL),
 	szName (""),
 	szTemplate (""),
 	szPhysMtl (""),
@@ -231,17 +230,13 @@ CMatEntityNameTokenizer::CMatEntityNameTokenizer ():
 
 void CMatEntityNameTokenizer::tokenize (const char* szMtlFullName)
 {
-	if (m_szMtlName)
-	{
-		free (m_szMtlName);
-		m_szMtlName = NULL;
-	}	
+	m_mtlNameBuffer.clear();
 	if (!szMtlFullName)
 		return;
 
 	int nLen = (int)strlen(szMtlFullName);
-	m_szMtlName = (char*)malloc (nLen+1);
-	memcpy (m_szMtlName, szMtlFullName, nLen + 1);
+	m_mtlNameBuffer.resize(nLen + 1);
+	memcpy (&m_mtlNameBuffer[0], szMtlFullName, nLen + 1);
 
 	szName = NULL;
 	szTemplate = NULL;
@@ -260,9 +255,13 @@ void CMatEntityNameTokenizer::tokenize (const char* szMtlFullName)
 	};
 
 	StateEnum nState = kName;  // by default, the string begins with name
-	this->szName = m_szMtlName;
+	char* pBuffer = m_mtlNameBuffer.empty() ? NULL : &m_mtlNameBuffer[0];
+	if (!pBuffer)
+		return;
 
-	for (char* p = m_szMtlName; *p; ++p)
+	this->szName = pBuffer;
+
+	for (char* p = pBuffer; *p; ++p)
 	{
 		switch (*p)
 		{
@@ -384,8 +383,6 @@ void CMatEntityNameTokenizer::tokenize (const char* szMtlFullName)
 
 CMatEntityNameTokenizer::~CMatEntityNameTokenizer ()
 {
-	if (m_szMtlName)
-		free (m_szMtlName);
 }
 
 // operator that sorts the materials for rendering

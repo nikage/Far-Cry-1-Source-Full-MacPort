@@ -14,6 +14,8 @@
 #include "FFont.h"
 #include "FBitmap.h"
 #include "CryFont.h"
+#include <cassert>
+#include <iostream>
 //#include <Image.h>
 #ifdef PS2
 #include "PS2Font.h"
@@ -27,6 +29,17 @@
 ///////////////////////////////////////////////
 CFFont::CFFont(struct ISystem *pISystem, class CCryFont *pCryFont, const char *pszName)
 {
+	// Assert system pointer is valid
+	assert(pISystem != nullptr && "CFFont: System pointer cannot be null");
+	
+	// Assert CryFont pointer is valid
+	assert(pCryFont != nullptr && "CFFont: CryFont pointer cannot be null");
+	
+	// Assert font name is valid
+	assert(pszName != nullptr && "CFFont: Font name cannot be null");
+	assert(strlen(pszName) > 0 && "CFFont: Font name cannot be empty");
+	assert(strlen(pszName) < 256 && "CFFont: Font name too long");
+	
 	m_bRealPixels=false;
 	m_fWidthScale = 1.0f;
 	m_bSameSize = false;
@@ -115,6 +128,20 @@ return RenderInit();
 // Load a font from a TTF file
 bool CFFont::Load(const char *szFile, unsigned long nWidth, unsigned long nHeight, unsigned long nTTFFlags)
 {
+	// Assert file name is valid
+	assert(szFile != nullptr && "CFFont::Load: File name cannot be null");
+	assert(strlen(szFile) > 0 && "CFFont::Load: File name cannot be empty");
+	assert(strlen(szFile) < 512 && "CFFont::Load: File name too long");
+	
+	// Assert dimensions are valid
+	assert(nWidth > 0 && "CFFont::Load: Width must be positive");
+	assert(nHeight > 0 && "CFFont::Load: Height must be positive");
+	assert(nWidth < 4096 && "CFFont::Load: Width too large");
+	assert(nHeight < 4096 && "CFFont::Load: Height too large");
+	
+	// Assert system is available
+	assert(m_pISystem != nullptr && "CFFont::Load: System must be available");
+	
 	Free();
 
 	int i = 0;

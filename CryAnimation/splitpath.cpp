@@ -10,7 +10,7 @@
 #include "stdafx.h"
 #include <stdlib.h>
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 #	include <tchar.h>
 #endif
 
@@ -40,7 +40,7 @@
 *
 *******************************************************************************/
 #ifndef WIN32
-extern "C" void portable_splitpath (
+void portable_splitpath (
         const char *path,
         char *drive,
         char *dir,

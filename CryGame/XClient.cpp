@@ -99,6 +99,8 @@ CXClient::CXClient()
 
 bool CXClient::Init(CXGame *pGame,bool bLocal) 
 {
+	assert(pGame != nullptr && "CXGame must be valid for client initialization");
+	
 	m_fLastClientStringTime=0;
 	m_bDisplayHud=true;
 	m_bMapConnecting=false;
@@ -111,7 +113,9 @@ bool CXClient::Init(CXGame *pGame,bool bLocal)
 	m_bLinkListenerToCamera =true;
 	m_pGame = pGame;
 	m_pScriptSystem = m_pGame->GetScriptSystem();
+	assert(m_pScriptSystem != nullptr && "Script system must be initialized");
 	m_pEntitySystem = m_pGame->GetSystem()->GetIEntitySystem();
+	assert(m_pEntitySystem != nullptr && "Entity system must be initialized");
 	m_pLog=m_pGame->m_pLog;
 
 	m_sopMsgNormal.Create( m_pScriptSystem );
@@ -137,10 +141,13 @@ bool CXClient::Init(CXGame *pGame,bool bLocal)
 	m_nGameLastTime = 0;	
 	m_fGameLastTimeReceived = 0;
 	m_pScriptObjectClient=new CScriptObjectClient;
+	assert(m_pScriptObjectClient != nullptr && "CScriptObjectClient allocation must succeed");
 	m_pScriptObjectClient->Create(pGame->GetScriptSystem(),pGame,this);
 
 	m_CameraParams = new SCameraParams;
+	assert(m_CameraParams != nullptr && "SCameraParams allocation must succeed");
 	m_pClientStuff=m_pScriptSystem->CreateEmptyObject();
+	assert(m_pClientStuff != nullptr && "Client stuff script object must be created");
 	m_iPhysicalWorldTime = 0;
 	m_bIgnoreSnapshot = false;
 

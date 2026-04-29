@@ -16,9 +16,20 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <stdio.h>
+#include <strings.h>
+#include <algorithm>
+#include <cctype>
 #include "CryPak.h"
 #include <ilog.h>
 #include <StringUtils.h>
+
+// Windows compatibility
+extern "C" {
+    int _fmode = 0;
+    int __fmode = 0;
+    int ___fmode = 0;
+}
 
 /////////////////////////////////////////////////////
 
@@ -34,6 +45,11 @@
 #ifdef LINUX
 #include <sys/dir.h>
 #include <sys/io.h>
+#elif defined(__APPLE__) && defined(__MACH__)
+#include <dirent.h>    // macOS directory functions
+#include <unistd.h>    // macOS I/O functions
+#include <mach-o/dyld.h>
+#include <sys/stat.h>
 #else
 #	include <direct.h>
 #	include <io.h>
@@ -57,16 +73,66 @@ m_pPakVars (pPakVars?pPakVars:&g_PakVars),
 m_mapMissingFiles ( std::less<string>(), MissingFileMapAllocator(g_pBigHeap) )
 {
 	char szCurrentDir[0x800];
+#if defined(__APPLE__) && defined(__MACH__)
+	// On macOS, try to use bundle Resources directory first
+	// Get executable path and construct Resources path
+	char exePath[1024];
+	uint32_t size = sizeof(exePath);
+	if (_NSGetExecutablePath(exePath, &size) == 0)
+	{
+		// Check if we're in a bundle (path contains .app/Contents/MacOS/)
+		char* appBundle = strstr(exePath, ".app/Contents/MacOS/");
+		if (appBundle)
+		{
+			// Replace MacOS with Resources
+			*appBundle = '\0';
+			strcat(exePath, ".app/Contents/Resources");
+			
+			// Check if Resources directory exists
+			struct stat st;
+			if (stat(exePath, &st) == 0 && S_ISDIR(st.st_mode))
+			{
+				strncpy(szCurrentDir, exePath, sizeof(szCurrentDir) - 1);
+				szCurrentDir[sizeof(szCurrentDir) - 1] = '\0';
+				m_pLog->Log("CCryPak::CCryPak - Using bundle Resources directory: %s\n", szCurrentDir);
+				goto normalize_path;
+			}
+		}
+	}
+	
+	// Fallback to current directory
 	if (GetCurrentDirectory(sizeof(szCurrentDir), szCurrentDir))
+	{
+		m_pLog->Log("CCryPak::CCryPak - Using current directory: %s\n", szCurrentDir);
+	}
+	else
+	{
+		strcpy(szCurrentDir, ".");
+		m_pLog->Log("CCryPak::CCryPak - Using default directory: %s\n", szCurrentDir);
+	}
+#else
+	if (GetCurrentDirectory(sizeof(szCurrentDir), szCurrentDir))
+	{
+		m_pLog->Log("CCryPak::CCryPak - Current directory: %s\n", szCurrentDir);
+	}
+	else
+	{
+		strcpy(szCurrentDir, ".");
+	}
+#endif
+normalize_path:
+	if (szCurrentDir[0] != '\0')
 	{
 		// normalize it (lower-char with forward slashes and trailing slash)
 		char* p;
-		for (p = szCurrentDir; *p; ++p)
+		for (p = szCurrentDir; *p;  ++p)
 		{
 			if (*p == g_cNonNativeSlash)
 				*p = g_cNativeSlash;
+#if !defined(__APPLE__) && !defined(LINUX)
 			else
 				*p = tolower(*p);
+#endif
 		}
 		// add the trailing slash if needed
 #if defined(LINUX)
@@ -78,7 +144,32 @@ m_mapMissingFiles ( std::less<string>(), MissingFileMapAllocator(g_pBigHeap) )
 			*p=g_cNativeSlash;
 			*++p = '\0';
 		}
+#if defined(__APPLE__) && defined(__MACH__)
+		char basePath[sizeof(szCurrentDir)];
+		strncpy(basePath, szCurrentDir, sizeof(basePath) - 1);
+		basePath[sizeof(basePath) - 1] = '\0';
+		size_t baseLen = strlen(basePath);
+		if (baseLen && (basePath[baseLen - 1] == '/' || basePath[baseLen - 1] == '\\'))
+		{
+			basePath[baseLen - 1] = '\0';
+			baseLen--;
+		}
+		char fcDataPath[sizeof(szCurrentDir)];
+		if (snprintf(fcDataPath, sizeof(fcDataPath), "%s/FCData/", basePath) < (int)sizeof(fcDataPath))
+		{
+			struct stat stFCData;
+			if (stat(fcDataPath, &stFCData) == 0 && S_ISDIR(stFCData.st_mode))
+			{
+				strncpy(szCurrentDir, fcDataPath, sizeof(szCurrentDir) - 1);
+				szCurrentDir[sizeof(szCurrentDir) - 1] = '\0';
+			}
+		}
+#endif
 		m_strMasterCDRoot = szCurrentDir;
+#if defined(__APPLE__) && defined(__MACH__)
+		if (m_pLog)
+			m_pLog->Log("CCryPak::CCryPak - Master root resolved to %s", m_strMasterCDRoot.c_str());
+#endif
 	}
 }
 
@@ -92,7 +183,11 @@ void CCryPak::AddMod(const char* szMod)
 		if (*it==g_cNonNativeSlash)
 			*it = g_cNativeSlash;
 		else
+		{
+#if !(defined(__APPLE__) && defined(__MACH__))
 			*it = tolower(*it);
+#endif
+		}
 	}
 #if defined(LINUX)
 	if (!strPrepend.empty() && (strPrepend[strPrepend.length()-1] != g_cNativeSlash && strPrepend[strPrepend.length()-1] != g_cNonNativeSlash))
@@ -192,62 +287,270 @@ char* CCryPak::BeautifyPath(char* dst)
 			while(*p == g_cNonNativeSlash || *p == g_cNativeSlash)
 				++p; // skip the extra slashes
 		}
+#if defined(__APPLE__) && defined(__MACH__)
 		else
 		{
-			*q = tolower (*p);
+			*q = *p;
 			++q,++p;
 		}
+#else
+		else
+		{
+#if defined(__APPLE__) && defined(__MACH__)
+			*q = *p;
+#else
+			*q = tolower (*p);
+#endif
+			++q,++p;
+		}
+#endif
 	}
 	*q = '\0';
 	return q;
 }
 
 //////////////////////////////////////////////////////////////////////////
-// given the source relative path, constructs the full path to the file according to the flags
-const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,bool *bFoundInPak)
-{
-	// in many cases, the path will not be long, so there's no need to allocate so much..
-	// I'd use _alloca, but I don't like non-portable solutions. besides, it tends to confuse new developers. So I'm just using a big enough array
-	char szNewSrc[g_nMaxPath];
-	strcpy(szNewSrc, src);
-	BeautifyPath(szNewSrc);
-	if (!_fullpath (dst, szNewSrc, g_nMaxPath))
-	{
-		src = szNewSrc;
-		m_pLog->LogError("\002Cannot transform file name %s to absolute path, resorting to desparate measures!", src);
-		if (src[0] == '.' && (src[1] == g_cNativeSlash || src[1] == g_cNonNativeSlash))
-			src+=2;
-#ifdef _XBOX
-		if (src[0] && src[1] != ':')
-			strcpy (dst, "d:\\");
-		dst += 3;
-#endif
-		strcpy(dst, src);
-		size_t len = strlen(dst);
-		for (size_t n=0; dst[n]; n++)
-		{
-			if ( dst[n] == '\\' )
-				dst[n] = '/';
+// Utility functions for path manipulation
+//////////////////////////////////////////////////////////////////////////
 
-			if (n > 8 && n+3 < len && dst[n] == '/' && dst[n+1] == '.' && dst[n+2] == '.')
+// Check if a path is absolute (starts with / or \ on Unix/macOS, or drive letter on Windows)
+static bool IsAbsolutePath(const char* path)
+{
+	if (!path || !path[0])
+		return false;
+	
+#if defined(__APPLE__) || defined(LINUX)
+	return (path[0] == '/' || path[0] == '\\');
+#else
+	// Windows: check for drive letter (C:\) or UNC path (\\)
+	return ((path[0] >= 'A' && path[0] <= 'Z' || path[0] >= 'a' && path[0] <= 'z') && path[1] == ':') ||
+	       (path[0] == '\\' && path[1] == '\\');
+#endif
+}
+
+// Safely copy string with bounds checking
+static size_t SafeStringCopy(char* dst, size_t dstSize, const char* src)
+{
+	if (!dst || dstSize == 0)
+		return 0;
+	
+	if (!src)
+	{
+		dst[0] = '\0';
+		return 0;
+	}
+	
+	size_t srcLen = strlen(src);
+	size_t copyLen = (srcLen < dstSize - 1) ? srcLen : dstSize - 1;
+	strncpy(dst, src, copyLen);
+	dst[copyLen] = '\0';
+	return copyLen;
+}
+
+// Safely concatenate strings with bounds checking
+static size_t SafeStringCat(char* dst, size_t dstSize, const char* src)
+{
+	if (!dst || dstSize == 0 || !src)
+		return 0;
+	
+	size_t dstLen = strlen(dst);
+	size_t remaining = dstSize - dstLen - 1;
+	if (remaining == 0)
+		return dstLen;
+	
+	size_t srcLen = strlen(src);
+	size_t copyLen = (srcLen < remaining) ? srcLen : remaining;
+	strncat(dst, src, copyLen);
+	dst[dstLen + copyLen] = '\0';
+	return dstLen + copyLen;
+}
+
+// Resolve relative path by prepending master CD root
+// Returns true on success, false if buffer would overflow
+static bool ResolveRelativePath(const char* relativePath, const std::string& masterRoot, char* fullPath, size_t fullPathSize)
+{
+	if (!relativePath || !fullPath || fullPathSize == 0)
+		return false;
+	
+	// Copy master root
+	size_t rootLen = SafeStringCopy(fullPath, fullPathSize, masterRoot.c_str());
+	if (rootLen == 0 && masterRoot.length() > 0)
+		return false; // Buffer too small
+	
+	// Ensure trailing slash
+	if (rootLen > 0 && fullPath[rootLen - 1] != '/' && fullPath[rootLen - 1] != '\\')
+	{
+		if (rootLen >= fullPathSize - 1)
+			return false; // No room for slash
+		fullPath[rootLen] = '/';
+		fullPath[rootLen + 1] = '\0';
+		rootLen++;
+	}
+	
+	const char* relPtr = relativePath ? relativePath : "";
+#if defined(__APPLE__) && defined(__MACH__)
+	const char fcPrefix[] = "FCData/";
+	const size_t fcLen = sizeof(fcPrefix) - 1;
+	if (!masterRoot.empty())
+	{
+		size_t rootLen = masterRoot.length();
+		if (rootLen >= fcLen && strncasecmp(masterRoot.c_str() + rootLen - fcLen, fcPrefix, fcLen) == 0)
+		{
+			if (strncasecmp(relPtr, fcPrefix, fcLen) == 0)
+				relPtr += fcLen;
+		}
+	}
+#endif
+
+	// Append relative path
+	size_t totalLen = SafeStringCat(fullPath, fullPathSize, relPtr);
+	return (totalLen < fullPathSize - 1); // Success if we didn't truncate
+}
+
+// Normalize path separators (convert backslashes to forward slashes)
+static void NormalizePathSeparators(char* path)
+{
+	if (!path)
+		return;
+	
+	for (char* p = path; *p; ++p)
+	{
+		if (*p == '\\')
+			*p = '/';
+	}
+}
+
+// Resolve .. components in path (simplified - handles basic cases)
+static void ResolveDotDotPaths(char* path)
+{
+	if (!path)
+		return;
+	
+	size_t len = strlen(path);
+	if (len < 3)
+		return; // Too short to contain ..
+	
+	// Simple .. resolution: find /.. and remove preceding component
+	for (size_t n = 0; n < len - 2; ++n)
+	{
+		if (path[n] == '/' && path[n + 1] == '.' && path[n + 2] == '.')
+		{
+			// Found /.. - find previous component
+			size_t m = n + 3;
+			if (n > 0)
 			{
-				size_t m = n+3;
-				n--;
-				while (dst[n] != '/')
+				// Find start of previous component
+				size_t prevStart = n;
+				while (prevStart > 0 && path[prevStart - 1] != '/')
+					prevStart--;
+				
+				// Remove previous component and /..
+				if (prevStart < n)
 				{
-					n--;
-					if (!n)
-						break;
+					size_t removeLen = m - prevStart;
+					memmove(&path[prevStart], &path[m], len - m + 1);
+					len -= removeLen;
+					n = (prevStart > 0) ? prevStart - 1 : 0;
 				}
-				if (n)
+				else
 				{
-					memmove(&dst[n], &dst[m], len-m+1);
-					len -= m-n;
-					n--;
+					// Can't resolve, skip
+					n = m;
 				}
+			}
+			else
+			{
+				// At start, can't resolve
+				n = m;
 			}
 		}
 	}
+}
+
+// Remove leading ./ from path
+static const char* SkipLeadingDotSlash(const char* path)
+{
+	if (!path)
+		return path;
+	
+	if (path[0] == '.' && (path[1] == '/' || path[1] == '\\'))
+		return path + 2;
+	
+	return path;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// given the source relative path, constructs the full path to the file according to the flags
+const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,bool *bFoundInPak)
+{
+	if (!src || !dst)
+		return dst;
+	
+	// Normalize input path
+	char szNewSrc[g_nMaxPath];
+	SafeStringCopy(szNewSrc, sizeof(szNewSrc), src);
+	BeautifyPath(szNewSrc);
+	
+	// Handle platform-specific path resolution
+#if defined(__APPLE__) || defined(LINUX)
+	char fullPath[g_nMaxPath];
+	bool pathResolved = false;
+	
+	// Resolve relative paths by prepending master CD root
+	if (!IsAbsolutePath(szNewSrc))
+	{
+		pathResolved = ResolveRelativePath(szNewSrc, m_strMasterCDRoot, fullPath, sizeof(fullPath));
+	}
+	else
+	{
+		SafeStringCopy(fullPath, sizeof(fullPath), szNewSrc);
+		pathResolved = true;
+	}
+	
+	// Try to resolve absolute path using realpath
+	if (pathResolved)
+	{
+		char* result = realpath(fullPath, dst);
+		if (result)
+		{
+			// realpath succeeded - path is resolved
+		}
+		else
+		{
+			// realpath failed - use constructed path and normalize manually
+			const char* processedSrc = SkipLeadingDotSlash(fullPath);
+			SafeStringCopy(dst, g_nMaxPath, processedSrc);
+			NormalizePathSeparators(dst);
+			ResolveDotDotPaths(dst);
+		}
+	}
+	else
+	{
+		// Path resolution failed - use input as-is (with bounds checking)
+		SafeStringCopy(dst, g_nMaxPath, szNewSrc);
+	}
+#else
+	// Windows/Xbox path handling
+	const char* processedSrc = SkipLeadingDotSlash(src);
+	
+#ifdef _XBOX
+	// Xbox-specific path prefix handling
+	if (processedSrc[0] && processedSrc[1] != ':')
+	{
+		SafeStringCopy(dst, g_nMaxPath, "d:\\");
+		size_t prefixLen = strlen(dst);
+		SafeStringCat(dst, g_nMaxPath - prefixLen, processedSrc);
+	}
+	else
+#endif
+	{
+		SafeStringCopy(dst, g_nMaxPath, processedSrc);
+	}
+	
+	// Normalize path separators and resolve .. components
+	NormalizePathSeparators(dst);
+	ResolveDotDotPaths(dst);
+#endif
 
 	char* pEnd = BeautifyPath(dst);
 
@@ -276,7 +579,7 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 	unsigned nLength = pEnd - dst;
 
 	if (bFoundInPak)
-		bFoundInPak=false;
+		*bFoundInPak=false;
 
 	if (nFlags & FLAGS_PATH_REAL)
 		return dst;
@@ -287,7 +590,7 @@ const char* CCryPak::AdjustFileName(const char *src, char *dst, unsigned nFlags,
 	// now replace the root directory name (C:\Mastercd\)
 	// with the filesystem prefix ("" by default).
 	// try to search through the MOD directories, if it makes sense
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 	if (!(nFlags&FLAGS_IGNORE_MOD_DIRS) && nLength > m_strMasterCDRoot.length() && !comparePathNames(dst, m_strMasterCDRoot.c_str(), m_strMasterCDRoot.length()))
 #else
 	if (!(nFlags&FLAGS_IGNORE_MOD_DIRS) && nLength > m_strMasterCDRoot.length() && !memcmp(dst, m_strMasterCDRoot.c_str(), m_strMasterCDRoot.length()))
@@ -475,6 +778,11 @@ FILE *CCryPak::FOpen(const char *pName, const char *szMode,unsigned nFlags2)
 	}
 
 	const char *szFullPath = AdjustFileName(pName, szFullPathBuf, 0);
+	
+	if (strstr(pName, "mousecursor") || strstr(pName, "MouseCursor"))
+	{
+		m_pLog->Log("CCryPak::FOpen - DEBUG: Requested path='%s', Adjusted path='%s'\n", pName, szFullPath);
+	}
 
 	if (!nVarPakPriority) // if the file system files have priority now..
 	{
@@ -572,6 +880,10 @@ FILE *CCryPak::FOpen(const char *pName, const char *szMode,unsigned nFlags2)
 	CCachedFileData_AutoPtr pFileData = GetFileData (szFullPath);
 	if (!pFileData)
 	{
+		if (strstr(pName, "mousecursor") || strstr(pName, "MouseCursor"))
+		{
+			m_pLog->Log("CCryPak::FOpen - DEBUG: GetFileData failed for path='%s' (adjusted='%s')\n", pName, szFullPath);
+		}
 		if (nVarPakPriority) // if the pak files had more priority, we didn't attempt fopen before- try it now
 		{
 			fp = fopen (szFullPath, szMode);
@@ -598,7 +910,7 @@ FILE *CCryPak::FOpen(const char *pName, const char *szMode,unsigned nFlags2)
 		m_arrOpenFiles.resize (nFile+1);
 	}
 
-#if defined(LINUX64)
+#if defined(LINUX64) || (defined(__APPLE__) && defined(__MACH__))
 	if (pFileData != 0 && (nFlags2 & FOPEN_HINT_DIRECT_OPERATION))
 #else
 	if (pFileData != NULL && (nFlags2 & FOPEN_HINT_DIRECT_OPERATION))
@@ -627,16 +939,31 @@ CCachedFileDataPtr CCryPak::GetFileData(const char* szName)
 	for (ZipArray::reverse_iterator itZip = m_arrZips.rbegin(); itZip != m_arrZips.rend(); ++itZip)
 	{
 		size_t nBindRootLen = itZip->strBindRoot.length();
-#if defined(LINUX)
-		if (nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szName, nBindRootLen))
+		if (
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
+			nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szName, nBindRootLen)
 #else
-		if (nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szName, nBindRootLen))
+			nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szName, nBindRootLen)
 #endif
+			)
 		{
-			//const char	*szDebug1=itZip->strBindRoot.c_str();
-			//const char	*szDebug2=itZip->pZip->GetFilePath();
+			if (strstr(szName, "mousecursor") || strstr(szName, "MouseCursor"))
+			{
+				m_pLog->Log("CCryPak::GetFileData - DEBUG: Found matching bind root. szName='%s', bindRoot='%s' (len=%zu), looking for '%s'\n", 
+					szName, itZip->strBindRoot.c_str(), nBindRootLen, szName+nBindRootLen);
+			}
 
-			ZipDir::FileEntry* pFileEntry = itZip->pZip->FindFile (szName+nBindRootLen);
+			const char* szRelativePath = szName+nBindRootLen;
+			ZipDir::FileEntry* pFileEntry = itZip->pZip->FindFile (szRelativePath);
+			if (pFileEntry && (strstr(szName, "mousecursor") || strstr(szName, "MouseCursor")))
+			{
+				m_pLog->Log("CCryPak::GetFileData - DEBUG: Found file entry for '%s'\n", szName+nBindRootLen);
+			}
+			else if ((strstr(szName, "mousecursor") || strstr(szName, "MouseCursor")))
+			{
+				m_pLog->Log("CCryPak::GetFileData - DEBUG: FindFile returned NULL for '%s' in PAK '%s'\n", 
+					szName+nBindRootLen, itZip->pZip->GetFilePath());
+			}
 			if (pFileEntry)
 			{
 				CCachedFileData Result(NULL, itZip->pZip, pFileEntry);
@@ -653,7 +980,7 @@ CCachedFileDataPtr CCryPak::GetFileData(const char* szName)
 			}
 		}
 	}
-	return NULL;
+	return 0;  // Return 0 for smart pointer instead of NULL
 }
 
 
@@ -670,7 +997,7 @@ bool CCryPak::HasFileEntry (const char* szPath)
 		size_t nBindRootLen = itZip->strBindRoot.length();
 		//const char	*szDebug1=itZip->strBindRoot.c_str();
 		//const char	*szDebug2=itZip->pZip->GetFilePath();
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (nNameLen > nBindRootLen	&&!comparePathNames(itZip->strBindRoot.c_str(), szPath, nBindRootLen))
 #else
 		if (nNameLen > nBindRootLen	&&!memcmp(itZip->strBindRoot.c_str(), szPath, nBindRootLen))
@@ -1061,6 +1388,10 @@ bool CCryPak::OpenPacks(const char* szBindRoot, const char *pWildcardIn, unsigne
 bool CCryPak::OpenPacksCommon(const char* szDir, char *cWork, unsigned nFlags)
 {
 	__finddata64_t fd;
+#if defined(__APPLE__) && defined(__MACH__)
+	if (m_pLog)
+		m_pLog->Log("OpenPacksCommon: szDir='%s' pattern='%s'", szDir, cWork);
+#endif
 	intptr_t h = _findfirst64 (cWork, &fd);
 
 	// where to copy the filenames to form the path in cWork
@@ -1078,13 +1409,20 @@ bool CCryPak::OpenPacksCommon(const char* szDir, char *cWork, unsigned nFlags)
 		std::vector<string> files;
 		do {
 			strcpy (pDestName, fd.name);
-			std::string sfile = strlwr(cWork);
-			files.push_back(strlwr(cWork));
+			std::string sfile = cWork;
+#if !(defined(__APPLE__) && defined(__MACH__))
+			std::transform(sfile.begin(), sfile.end(), sfile.begin(), ::tolower);
+#endif
+			files.push_back(sfile);
 		}
 		while(0 == _findnext64 (h, &fd));
 
 		// Open files in alphabet order.
 		std::sort( files.begin(),files.end() );
+#if defined(__APPLE__) && defined(__MACH__)
+		if (m_pLog)
+			m_pLog->Log("OpenPacksCommon: %zu entries matched for %s", files.size(), szDir);
+#endif
 		for (int i = 0; i < files.size(); i++)
 		{
 			OpenPackCommon(szDir, files[i].c_str(), nFlags);
@@ -1431,7 +1769,7 @@ void CCryPakFindData::ScanZips (CCryPak* pPak, const char* szDir)
 	{
 		size_t nBindRootLen = it->strBindRoot.length();
 
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 		if (nLen > nBindRootLen && !comparePathNames(szDir, it->strBindRoot.c_str(), nBindRootLen))
 #else
 		if (nLen > nBindRootLen && !memcmp(szDir, it->strBindRoot.c_str(), nBindRootLen))
@@ -1812,7 +2150,8 @@ void CCryPak::RecordFile( const char *szFilename )
 
 void CCryPak::OnMissingFile (const char* szPath)
 {
-	AUTO_LOCK(m_csMain);
+	// NOTE: m_csMain is already locked by the caller (FOpen), so don't lock it again
+	// AUTO_LOCK(m_csMain); // REMOVED - causes deadlock since FOpen already holds this lock
 	if (m_pPakVars->nLogMissingFiles)
 	{
 		std::pair<MissingFileMap::iterator, bool> insertion = m_mapMissingFiles.insert (MissingFileMap::value_type(szPath,1));

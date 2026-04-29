@@ -15,7 +15,7 @@ CRefReadStream::CRefReadStream (const string& strFileName, CRefStreamEngine* pEn
 	m_nSectorSize(0),
 	m_hFile (INVALID_HANDLE_VALUE),
 	m_bOverlapped ( false),
-	m_pZipEntry (NULL)
+	m_pZipEntry (nullptr)
 {
 	pEngine->Register(this);
 }
@@ -30,7 +30,7 @@ bool CRefReadStream::Activate()
 
 	m_bOverlapped = m_pEngine->isOverlappedIoEnabled();
 #if !defined(LINUX64)
-	if (m_pZipEntry == NULL && m_hFile == INVALID_HANDLE_VALUE)
+	if (!m_pZipEntry && m_hFile == INVALID_HANDLE_VALUE)
 #else
 	if (m_pZipEntry == 0 && m_hFile == INVALID_HANDLE_VALUE)
 #endif
@@ -38,7 +38,7 @@ bool CRefReadStream::Activate()
 			m_bOverlapped?FILE_FLAG_OVERLAPPED:0,
 			NULL);
 #if !defined(LINUX64)
-	if (m_pZipEntry == NULL && m_hFile == INVALID_HANDLE_VALUE)
+	if (!m_pZipEntry && m_hFile == INVALID_HANDLE_VALUE)
 #else
 	if (m_pZipEntry == 0 && m_hFile == INVALID_HANDLE_VALUE)
 #endif
@@ -164,3 +164,35 @@ size_t CRefReadStream::GetSize()
 		nSize += sizeof(ProxySet::value_type) + (*it)->GetSize();
 	return nSize;
 }
+
+#ifndef _WIN32
+struct Event {
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	bool signaled;
+
+	Event() : signaled(false) {
+		pthread_mutex_init(&mutex, nullptr);
+		pthread_cond_init(&cond, nullptr);
+	}
+
+	void Set() {
+		pthread_mutex_lock(&mutex);
+		signaled = true;
+		pthread_cond_signal(&cond);
+		pthread_mutex_unlock(&mutex);
+	}
+
+	void Reset() {
+		pthread_mutex_lock(&mutex);
+		signaled = false;
+		pthread_mutex_unlock(&mutex);
+	}
+
+	void Wait() {
+		pthread_mutex_lock(&mutex);
+		while(!signaled) pthread_cond_wait(&cond, &mutex);
+		pthread_mutex_unlock(&mutex);
+	}
+};
+#endif

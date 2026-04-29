@@ -17,8 +17,11 @@
 # pragma once
 #endif
 
+// GetPlane function forward declaration for ADL
+class Plane;
+Plane GetPlane(const Vec3& normal, const Vec3& point);
 
-#include <Cry_Geo.h>
+// Note: This file is included by Cry_Geo.h, don't include it back
 
 
 

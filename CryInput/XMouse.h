@@ -41,6 +41,8 @@ public:
 	
 #ifdef WIN32
 	bool	Init(ISystem *pSystem,LPDIRECTINPUT8 &g_pdi,HINSTANCE hinst,HWND hwnd,bool dinput);
+#elif defined(__APPLE__)
+	bool	Init(ISystem *pSystem, void* g_pdi, void* hinst, void* hwnd, bool dinput);
 #else
 	
 	////////////////////////////////////////////////////

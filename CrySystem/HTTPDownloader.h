@@ -1,7 +1,7 @@
 #pragma once
 
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 	#include <wininet.h>
 	#include <dbghelp.h>
 #endif
@@ -60,7 +60,7 @@ private:
 
 	static
 	DWORD DownloadProc(CHTTPDownloader *_this);
-	void	CreateThread();
+	void	CreateDownloadThread();
 	DWORD DoDownload();
 	void	PrepareBuffer();
 
@@ -79,5 +79,13 @@ private:
 	ISystem						*m_pSystem;
 	CDownloadManager	*m_pParent;
 };
+
+#ifdef __APPLE__
+// macOS stub implementation for InitializeTemplate
+inline void CHTTPDownloader::InitializeTemplate(IScriptSystem *pSS)
+{
+	// Stub implementation - no-op on macOS
+}
+#endif
 
 //#endif //LINUX

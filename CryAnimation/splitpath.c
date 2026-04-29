@@ -10,8 +10,39 @@
 *******************************************************************************/
 
 #include <stdlib.h>
-#include <tchar.h>
+#include <string.h>
+// #include <tchar.h> // Not available on macOS
 #include "splitpath.h"
+
+// Windows path constants for macOS
+#ifndef _MAX_PATH
+#define _MAX_PATH 260
+#endif
+
+#ifndef _MAX_DRIVE
+#define _MAX_DRIVE 3
+#endif
+
+#ifndef _MAX_DIR
+#define _MAX_DIR 256
+#endif
+
+#ifndef _MAX_FNAME
+#define _MAX_FNAME 256
+#endif
+
+#ifndef _MAX_EXT
+#define _MAX_EXT 256
+#endif
+
+// Windows min/max functions for macOS
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
+#ifndef max
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#endif
 
 /***
 *_splitpath() - split a path name into its individual components

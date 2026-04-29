@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - Create and update a texture with the most recently used glyphs
@@ -10,6 +10,33 @@
 //-------------------------------------------------------------------------------------------------
 #include "StdAfx.h"
 #include "FontTexture.h"
+
+// Windows bitmap structures for cross-platform compatibility
+#ifndef BITMAPFILEHEADER
+typedef struct tagBITMAPFILEHEADER {
+    unsigned short bfType;
+    unsigned int   bfSize;
+    unsigned short bfReserved1;
+    unsigned short bfReserved2;
+    unsigned int   bfOffBits;
+} BITMAPFILEHEADER;
+#endif
+
+#ifndef BITMAPINFOHEADER
+typedef struct tagBITMAPINFOHEADER {
+    unsigned int biSize;
+    int          biWidth;
+    int          biHeight;
+    unsigned short biPlanes;
+    unsigned short biBitCount;
+    unsigned int biCompression;
+    unsigned int biSizeImage;
+    int          biXPelsPerMeter;
+    int          biYPelsPerMeter;
+    unsigned int biClrUsed;
+    unsigned int biClrImportant;
+} BITMAPINFOHEADER;
+#endif
 
 
 //-------------------------------------------------------------------------------------------------

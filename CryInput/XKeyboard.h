@@ -43,8 +43,12 @@ public IKeyboard
 {
 public:
 #ifndef PS2
+#if defined(__APPLE__)
+	bool Init(CInput *,ISystem *pSystem, void* &g_pdi, void* hinst, void* hwnd3);
+#else
 	//bool Init(CInput *,ILog *pLog, LPDIRECTINPUT8 &g_pdi,HINSTANCE hinst,HWND hwnd3);
 	bool Init(CInput *,ISystem *pSystem, LPDIRECTINPUT8 &g_pdi,HINSTANCE hinst,HWND hwnd3);
+#endif
 #else
 	bool Init(ILog *pLog);
 #endif	

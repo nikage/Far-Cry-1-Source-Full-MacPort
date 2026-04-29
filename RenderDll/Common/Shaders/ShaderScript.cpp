@@ -11,6 +11,13 @@
 #include "I3DEngine.h"
 #include "CryHeaders.h"
 #include "../RendElements/CREScreenCommon.h"
+#include <unordered_map>
+#include <unordered_set>
+#include <mutex>
+#include <fstream>
+#include <algorithm>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #if defined(WIN32) || defined(WIN64)
 #include <direct.h>
@@ -25,6 +32,105 @@
 extern char *gShObjectNotFound;
 
 //=================================================================================================
+
+namespace
+{
+std::mutex gShaderUsageMutex;
+std::unordered_map<std::string, uint32> gShaderUsageCounts;
+
+void EnsureDirectory(const std::string& path)
+{
+  if (path.empty())
+    return;
+  size_t index = 0;
+  while (index < path.size())
+  {
+    size_t delimiter = path.find_first_of("/\\", index);
+    if (delimiter == std::string::npos)
+      break;
+    if (delimiter > 0)
+    {
+      std::string sub = path.substr(0, delimiter);
+      mkdir(sub.c_str(), 0777);
+    }
+    while (delimiter < path.size() && (path[delimiter] == '/' || path[delimiter] == '\\'))
+      delimiter++;
+    index = delimiter;
+  }
+  mkdir(path.c_str(), 0777);
+}
+
+std::string EscapeJson(const std::string& value)
+{
+  std::string result;
+  result.reserve(value.size());
+  for (char c : value)
+  {
+    if (c == '\"')
+      result += "\\\"";
+    else if (c == '\\')
+      result += "\\\\";
+    else if (c == '\n')
+      result += "\\n";
+    else if (c == '\r')
+      result += "\\r";
+    else if (c == '\t')
+      result += "\\t";
+    else
+      result += c;
+  }
+  return result;
+}
+
+void WriteUsageManifest()
+{
+  const std::string manifestPath = "tools/shader_port/output/shader_usage.json";
+  std::vector<std::pair<std::string, uint32>> entries;
+  entries.reserve(gShaderUsageCounts.size());
+  for (const auto& item : gShaderUsageCounts)
+    entries.push_back(item);
+  std::sort(entries.begin(), entries.end(), [](const std::pair<std::string, uint32>& a, const std::pair<std::string, uint32>& b)
+  {
+    return a.first < b.first;
+  });
+  size_t slash = manifestPath.find_last_of("/\\");
+  if (slash != std::string::npos)
+    EnsureDirectory(manifestPath.substr(0, slash));
+  std::ofstream file(manifestPath.c_str(), std::ios::out | std::ios::trunc);
+  if (!file.is_open())
+    return;
+  file << "{\n  \"shaders\": [\n";
+  for (size_t i = 0; i < entries.size(); ++i)
+  {
+    file << "    {\"name\": \"" << EscapeJson(entries[i].first) << "\", \"count\": " << entries[i].second << "}";
+    if (i + 1 < entries.size())
+      file << ",";
+    file << "\n";
+  }
+  file << "  ]\n}\n";
+}
+
+void RecordShaderUsage(const char* name)
+{
+  if (!name || !name[0])
+    return;
+  char buffer[512];
+  size_t length = strlen(name);
+  if (length >= sizeof(buffer))
+    length = sizeof(buffer) - 1;
+  for (size_t i = 0; i < length; ++i)
+  {
+    unsigned char c = static_cast<unsigned char>(name[i]);
+    buffer[i] = static_cast<char>(tolower(c));
+  }
+  buffer[length] = 0;
+  std::lock_guard<std::mutex> lock(gShaderUsageMutex);
+  uint32& counter = gShaderUsageCounts[buffer];
+  counter++;
+  if (counter == 1 || (counter & 15) == 0)
+    WriteUsageManifest();
+}
+}
 
 void CShader::mfRefreshLayer(SShaderPass *sl, SShader *sh)
 {
@@ -276,6 +382,7 @@ bool CShader::mfReloadShaderScript(const char *szShaderName, int nFlags, SShader
   CRenderer *rd = gRenDev;
   SRefEfsLoaded *fe;
   char name[256];
+  RecordShaderUsage(szShaderName);
   strcpy(name, szShaderName);
   strlwr(name);
   LoadedShadersMapItor it = m_RefEfsLoaded.find(name);

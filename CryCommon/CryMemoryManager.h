@@ -1,9 +1,13 @@
 #ifndef _CRY_MEMORY_MANAGER_H_
 #define _CRY_MEMORY_MANAGER_H_
 
-#include <malloc.h>
 #include <platform.h>
 #include <stdlib.h>
+#if defined(__APPLE__) && defined(__MACH__)
+    #include <malloc/malloc.h>
+#elif !defined(LINUX)
+    #include <malloc.h>
+#endif
 
 #ifdef WIN32
 	#ifdef CRYSYSTEM_EXPORTS
@@ -12,9 +16,9 @@
 		#define CRYMEMORYMANAGER_API __declspec(dllimport)
 	#endif
 #endif //WIN32 
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 	#define CRYMEMORYMANAGER_API
-#endif //LINUX 
+#endif //LINUX || macOS 
 
 #if defined(LINUX)
 	#define HMODULE void*
@@ -177,6 +181,7 @@ struct _CryMemoryManagerPoolHelper
 			}
 		}
 #endif
+#if defined(LINUX) || defined(WIN32)
 		if(hSystem)
 		{
 #if defined(LINUX)
@@ -185,7 +190,7 @@ struct _CryMemoryManagerPoolHelper
 			_CryReallocSize=(FNC_CryReallocSize)::dlsym(hSystem,"CryReallocSize"); 
 			_CryFree=(FNC_CryFree)::dlsym(hSystem,"CryFree"); 
 			_CryFreeSize=(FNC_CryFreeSize)::dlsym(hSystem,"CryFreeSize"); 
-#else
+#elif defined(WIN32)
 			_CryMalloc=(FNC_CryMalloc)GetProcAddress((HINSTANCE)hSystem,"CryMalloc"); 
 			_CryRealloc=(FNC_CryRealloc)GetProcAddress((HINSTANCE)hSystem,"CryRealloc"); 
 			_CryReallocSize=(FNC_CryReallocSize)GetProcAddress((HINSTANCE)hSystem,"CryReallocSize"); 
@@ -193,6 +198,7 @@ struct _CryMemoryManagerPoolHelper
 			_CryFreeSize=(FNC_CryFreeSize)GetProcAddress((HINSTANCE)hSystem,"CryFreeSize"); 
 #endif
 		};
+#endif
 		// Not need system anymore.
 #if defined(LINUX)
 			if(!_CryMalloc)
@@ -207,6 +213,14 @@ struct _CryMemoryManagerPoolHelper
 				printf("Could not read symbol: CryFreeSize from crysystem.so\n");
 			if(!_CryMalloc || !_CryRealloc || !_CryReallocSize || !_CryFree || !_CryFreeSize)
 				exit(1);
+#elif defined(__APPLE__)
+		// macOS doesn't use dynamic library loading for memory manager
+		// Use standard malloc/free instead
+		_CryMalloc = malloc;
+		_CryRealloc = realloc;
+		_CryReallocSize = [](void *memblock, size_t oldsize, size_t size) -> void* { return realloc(memblock, size); };
+		_CryFree = free;
+		_CryFreeSize = [](void *p, size_t size) -> void { free(p); };
 #else
 		if(!hSystem || !_CryMalloc || !_CryRealloc || !_CryReallocSize || !_CryFree || !_CryFreeSize)
 		{
@@ -315,7 +329,11 @@ struct _CryMemoryManagerPoolHelper
 #endif
 
 #ifdef __cplusplus
+#if defined(WIN32)
 #include <new.h>
+#else
+#include <new>
+#endif
 #endif
 
 
@@ -336,14 +354,7 @@ inline void free(void *p) { _CryFree(p); };
 #define realloc_size		CryModuleReallocSize
 #define free_size			CryModuleFreeSize
 
-#ifdef __cplusplus
-	#ifndef GAMECUBE //I don't know how to compile this on GC
-		inline void * __cdecl operator new   (size_t  size) { return CryModuleMalloc(size); } 
-		inline void * __cdecl operator new[](size_t size) { return CryModuleMalloc(size); }; 
-		inline void __cdecl operator delete  (void *p) { CryModuleFree(p); };
-		inline void __cdecl operator delete[](void *p) { CryModuleFree(p); };
-	#endif //GAMECUBE
-#endif //__cplusplus
+
 
 #endif // USE_NEWPOOL
 
@@ -351,4 +362,5 @@ inline void free(void *p) { _CryFree(p); };
 
 //#endif // CRYSYSTEM_EXPORTS
 #endif //LINUX
+
 #endif //_CRY_MEMORY_MANAGER_H_

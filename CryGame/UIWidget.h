@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - Base Widget
@@ -10,6 +10,9 @@
 //-------------------------------------------------------------------------------------------------
 #ifndef UIWIDGET_H
 #define UIWIDGET_H
+
+// Forward declarations
+class CUIScreen;
 
 #define REGISTER_COMMON_MEMBERS(scriptsystem, classname) \
 	REGISTER_SCRIPTOBJECT_MEMBER(scriptsystem, classname, GetName);\

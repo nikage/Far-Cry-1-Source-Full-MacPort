@@ -192,11 +192,14 @@ bool CResFile::mfOpen(int type)
         if (result == 0)
         {
 #if defined(LINUX)
-          if (st.st_mode & FILE_ATTRIBUTE_READONLY)
-            chmod(m_name, 0x777);//set to full access
+        if (st.st_mode & FILE_ATTRIBUTE_READONLY)
+          chmod(m_name, 0x777);//set to full access
+#elif defined(__APPLE__)
+        if (!(st.st_mode & S_IWUSR))
+          chmod(m_name, S_IRUSR | S_IWUSR);
 #else
-          if (!(st.st_mode & _S_IWRITE))
-            _chmod(m_name, _S_IREAD | _S_IWRITE);
+        if (!(st.st_mode & _S_IWRITE))
+          _chmod(m_name, _S_IREAD | _S_IWRITE);
 #endif
         }
         fclose(statusdst);

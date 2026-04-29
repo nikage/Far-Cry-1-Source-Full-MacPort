@@ -29,224 +29,155 @@ typedef string String;
 class CryBasicString
 {
 public:
-	static char* strdup (const char* szSource, size_t nLength)
+	CryBasicString() = default;
+
+	CryBasicString(const char* szRight)
 	{
-		if (szSource && nLength > 0)
-		{
-			char* pNewString = (char*)malloc(nLength+1);
-			memcpy (pNewString, szSource, nLength);
-			pNewString[nLength] = '\0';
-			return pNewString;
-		}
-		else
-			return NULL;
+		assign(szRight);
 	}
 
-	// for debug: to use the memory manager
-	static char* strdup (const char* szSource)
+	CryBasicString(const char* szBegin, const char* szEnd)
 	{
-		if (szSource && szSource[0])
-		{
-			char* pNewString = (char*)malloc(strlen(szSource)+1);
-			strcpy (pNewString, szSource);
-			return pNewString;
-		}
-		else
-			return NULL;
+		assign(szBegin, szEnd);
 	}
 
-	static char* strcat (const char* szLeft, const char*szRight)
+	CryBasicString(const char* szBegin, unsigned nLength)
 	{
-		if (szLeft[0] || szRight[0])
-		{
-			size_t sizeLeft = strlen(szLeft), sizeRight = strlen(szRight);
-			char* pNewString = (char*) malloc (sizeLeft + sizeRight + 1);
-			memcpy (pNewString, szLeft, sizeLeft);
-			// copy together with the terminating null
-			memcpy (pNewString+sizeLeft, szRight, sizeRight+1);
-			return pNewString;
-		}
-		else
-			return NULL;
+		assign(szBegin, nLength);
 	}
 
-	CryBasicString (const char* szRight)
-	{
-		m_pString = strdup(szRight);
-	}
-
-	CryBasicString (const char* szBegin, const char* szEnd)
-	{
-		m_pString = strdup (szBegin, (unsigned int)(szEnd-szBegin));
-	}
-
-	CryBasicString (const char* szBegin, unsigned nLength)
-	{
-		m_pString = strdup (szBegin, nLength);
-	}
-
-	CryBasicString(const CryBasicString& rRight)
-	{
-		m_pString = strdup(rRight.c_str());
-	}
-
+	CryBasicString(const CryBasicString&) = default;
 	CryBasicString(const string& rRight)
 	{
-		m_pString = strdup(rRight.c_str(), rRight.length());
+		assign(rRight.c_str(), (unsigned)rRight.length());
 	}
 
-	CryBasicString():
-		m_pString(NULL)
-	{
-	}
-
-	~CryBasicString()
-	{
-		free (m_pString);
-	}
+	~CryBasicString() = default;
 
 	CryBasicString& operator = (const char* szRight)
 	{
-		//assert (m_pString == m_pDuplicate);
-		free (m_pString);
-		m_pString = strdup (szRight);
-#ifdef _DEBUG
-		//m_pDuplicate = m_pString;
-#endif
+		assign(szRight);
 		return *this;
 	}
 
-	void assign (const char* szBegin, const char* szEnd)
-	{
-		free (m_pString);
-		m_pString = strdup(szBegin, (unsigned int)(szEnd-szBegin));
-	}
-
-	void assign (const char* szBegin, unsigned nLength)
-	{
-		free (m_pString);
-		m_pString = strdup (szBegin, nLength);
-	}
-
-	CryBasicString& operator = (const CryBasicString& rRight)
-	{
-		return (*this) = rRight.c_str();
-	}
-
+	CryBasicString& operator = (const CryBasicString&) = default;
 	CryBasicString& operator = (const string& rRight)
 	{
-		return (*this) = rRight.c_str();
+		assign(rRight.c_str(), (unsigned)rRight.length());
+		return *this;
 	}
 
-	//operator const char*() const {return m_pString?m_pString:"";}
+	void assign(const char* szBegin, const char* szEnd)
+	{
+		if (!szBegin || !szEnd || szEnd < szBegin)
+		{
+			m_value.clear();
+			return;
+		}
+		m_value.assign(szBegin, szEnd - szBegin);
+	}
 
-	//operator char*() {return m_pString;}
+	void assign(const char* szBegin, unsigned nLength)
+	{
+		if (!szBegin || !nLength)
+		{
+			m_value.clear();
+			return;
+		}
+		m_value.assign(szBegin, nLength);
+	}
+
 	const char* c_str() const
 	{
-		//assert (m_pString == m_pDuplicate);
-		return m_pString?m_pString:"";
+		return m_value.c_str();
 	}
 
-	char operator[] (int nIndex)const
+	char operator[](int nIndex) const
 	{
-		//assert (m_pString == m_pDuplicate);
-		assert (nIndex >= 0 && nIndex < length());
-		return m_pString[nIndex];
+		assert(nIndex >= 0 && nIndex < length());
+		return m_value[nIndex];
 	}
 
-	char& operator[] (int nIndex)
+	char& operator[](int nIndex)
 	{
-		//assert (m_pString == m_pDuplicate);
-		assert (nIndex >= 0 && nIndex < length());
-		return m_pString[nIndex];
+		assert(nIndex >= 0 && nIndex < length());
+		return m_value[nIndex];
 	}
 
-	int length()const
+	int length() const
 	{
-		//assert (m_pString == m_pDuplicate);
-		return m_pString ? (int)strlen(m_pString):0;
+		return (int)m_value.length();
 	}
-	int size()const {return length();}
+	int size() const { return length(); }
 
-	bool empty () const
+	bool empty() const
 	{
-		//assert (m_pString == m_pDuplicate);
-		return !m_pString || !m_pString[0];
+		return m_value.empty();
 	}
 
 	bool operator < (const CryBasicString& strRight) const
 	{
-		return strcmp(c_str(), strRight.c_str()) < 0;
+		return m_value < strRight.m_value;
 	}
 	bool operator == (const CryBasicString& strRight) const
 	{
-		return strcmp(c_str(), strRight.c_str()) == 0;
+		return m_value == strRight.m_value;
 	}
 	bool operator > (const CryBasicString& strRight) const
 	{
-		return strcmp(c_str(), strRight.c_str()) > 0;
+		return m_value > strRight.m_value;
 	}
 
-	CryBasicString& operator += (const char*szRight)
+	CryBasicString& operator += (const char* szRight)
 	{
-		char* pResult = strcat (c_str(), szRight);
-		free (m_pString);
-		m_pString = pResult;
-		return (*this);
+		if (szRight && szRight[0])
+			m_value += szRight;
+		return *this;
 	}
 
 	CryBasicString& operator += (const CryBasicString& rRight)
 	{
-		return (*this)+= rRight.c_str();
+		m_value += rRight.m_value;
+		return *this;
 	}
 
-	void swap (CryBasicString& right)
+	void swap(CryBasicString& right)
 	{
-		char* pTmp = m_pString;
-		m_pString = right.m_pString;
-		right.m_pString = pTmp;
+		m_value.swap(right.m_value);
 	}
 
 	friend CryBasicString operator + (const char* szLeft, const CryBasicString& rRight);
 	friend CryBasicString operator + (const CryBasicString& rLeft, const char* szRight);
 	friend CryBasicString operator + (const CryBasicString& rLeft, const CryBasicString& rRight);
-protected:
-	void attach (char* szString)
+
+private:
+	void assign(const char* szRight)
 	{
-		if (m_pString != szString)
-		{
-			free (m_pString);
-			m_pString = szString;
-		}
+		m_value = szRight ? szRight : "";
 	}
-protected:
-	// NULL if the string is empty
-	char* m_pString;
-#ifdef _DEBUG
-	// this is to check against memory corruption - but it breaks ABI and can only be used when
-	// everything is debug
-	//char* m_pDuplicate;
-#endif
+
+private:
+	std::string m_value;
 };
 
 inline CryBasicString operator + (const char* szLeft, const CryBasicString& rRight)
 {
 	CryBasicString strResult;
-	strResult.attach(CryBasicString::strcat (szLeft, rRight.c_str()));
+	strResult.m_value = std::string(szLeft ? szLeft : "") + rRight.m_value;
 	return strResult;
 }
 
 inline CryBasicString operator + (const CryBasicString& rLeft, const char* szRight)
 {
 	CryBasicString strResult;
-	strResult.attach(CryBasicString::strcat (rLeft.c_str(), szRight));
+	strResult.m_value = rLeft.m_value + std::string(szRight ? szRight : "");
 	return strResult;
 }
 
 inline CryBasicString operator + (const CryBasicString& rLeft, const CryBasicString& rRight)
 {
 	CryBasicString strResult;
-	strResult.attach (CryBasicString::strcat (rLeft.c_str(), rRight.c_str()));
+	strResult.m_value = rLeft.m_value + rRight.m_value;
 	return strResult;
 }
 

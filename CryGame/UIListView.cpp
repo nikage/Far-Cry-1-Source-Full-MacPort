@@ -1,5 +1,5 @@
 //-------------------------------------------------------------------------------------------------
-// Author: Márcio Martins
+// Author: Mï¿½rcio Martins
 //
 // Purpose:
 //  - A ListView
@@ -172,7 +172,7 @@ LRESULT CUIListView::Update(unsigned int iMessage, WPARAM wParam, LPARAM lParam)
 			}
 			else
 			{
-				if (m_pVScroll = (CUIScrollBar *)GetChild("vscrollbar"))
+				if ((m_pVScroll = (CUIScrollBar *)GetChild("vscrollbar")) != nullptr)
 				{
 					m_pVScroll->SetFlags(m_pVScroll->GetFlags() & ~UIFLAG_VISIBLE);
 				}
@@ -205,7 +205,7 @@ LRESULT CUIListView::Update(unsigned int iMessage, WPARAM wParam, LPARAM lParam)
 			}
 			else
 			{
-				if (m_pHScroll = (CUIScrollBar *)GetChild("hscrollbar"))
+				if ((m_pHScroll = (CUIScrollBar *)GetChild("hscrollbar")) != nullptr)
 				{
 					m_pHScroll->SetFlags(m_pHScroll->GetFlags() & ~UIFLAG_VISIBLE);
 				}
@@ -2280,11 +2280,11 @@ int CUIListView::AddImageList(IFunctionHandler *pH)
 			continue;
 		}
 
-		char *szTexRect = 0;
+		const char *szTexRect = 0;
 
 		pImage->GetAt(4, szTexRect);
 
-		m_pUISystem->RetrieveTexRect(pListImage.vTexCoord, pListImage.iTextureID, szTexRect);
+		m_pUISystem->RetrieveTexRect(pListImage.vTexCoord, pListImage.iTextureID, (char*)szTexRect);
 
 		m_vImageList.push_back(pListImage);
 	}

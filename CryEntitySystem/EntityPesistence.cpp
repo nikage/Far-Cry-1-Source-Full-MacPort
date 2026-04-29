@@ -180,7 +180,7 @@ bool CEntity::Write(CStream& stm,EntityCloneState *cs)
 		{
 			IPhysicalEntity *pCharEnt;
 			for (int iSlot=0; iSlot<m_nMaxCharNum; iSlot++) if (m_pCryCharInstance[iSlot])
-				for(int iAuxPhys=0; pCharEnt=m_pCryCharInstance[iSlot]->GetCharacterPhysics(iAuxPhys); iAuxPhys++)
+				for(int iAuxPhys=0; (pCharEnt=m_pCryCharInstance[iSlot]->GetCharacterPhysics(iAuxPhys)); iAuxPhys++)
 					pCharEnt->GetStateSnapshot(stm);
 		}
 	//////////////////////////////////////
@@ -417,7 +417,8 @@ bool CEntity::Read(CStream& stm,bool bNoUpdate)
 #if defined(LINUX)
 				_VERIFY(stm.ReadPkd(*(IStreamData*)(&CStreamData_WorldPos(vPos))));
 #else
-				_VERIFY(stm.ReadPkd(CStreamData_WorldPos(vPos)));
+				CStreamData_WorldPos worldPos(vPos);
+				_VERIFY(stm.ReadPkd(worldPos));
 #endif
 				if (!bNoUpdate)
 					SetPos(vPos, false);
@@ -429,7 +430,7 @@ bool CEntity::Read(CStream& stm,bool bNoUpdate)
 		{
 			IPhysicalEntity *pCharEnt;
 			for (int iSlot=0; iSlot<m_nMaxCharNum; iSlot++) if (m_pCryCharInstance[iSlot])
-				for(int iAuxPhys=0; pCharEnt=m_pCryCharInstance[iSlot]->GetCharacterPhysics(iAuxPhys); iAuxPhys++)
+				for(int iAuxPhys=0; (pCharEnt=m_pCryCharInstance[iSlot]->GetCharacterPhysics(iAuxPhys)); iAuxPhys++)
 					pCharEnt->SetStateFromSnapshot(stm,bNoUpdate ? ssf_no_update:0);
 		}
 	//////////////////////////////////////

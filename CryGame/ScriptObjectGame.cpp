@@ -12,6 +12,8 @@
 #include "stdafx.h"
 #if defined LINUX
 #include <sys/io.h>
+#elif defined(__APPLE__)
+#include <unistd.h>
 #else
 #include <io.h>
 #endif
@@ -42,7 +44,7 @@
 
 #include "GameMods.h"
 
-#if !defined(LINUX)
+#if !defined(LINUX) && !defined(__APPLE__)
 #	include <direct.h>
 #	pragma comment (lib, "version.lib")
 #else
@@ -622,7 +624,7 @@ int CScriptObjectGame::GetPlayers(IFunctionHandler *pH)
 
 	int k = 1;
 
-	while (pEntity = pItor->Next())
+	while ((pEntity = pItor->Next()) != nullptr)
 	{	
 		if (m_pGame->GetXSystem()->GetEntityTeam(pEntity->GetId()) < 0)
 		{
@@ -1719,7 +1721,8 @@ int CScriptObjectGame::GetWaterHeight(IFunctionHandler *pH)
 	{
 		CScriptObjectVector vPosition(m_pScriptSystem,true);
 		pH->GetParam(1, *vPosition);		
-		return pH->EndFunction(m_pSystem->GetI3DEngine()->GetWaterLevel(&vPosition.Get()));
+		Vec3 pos = vPosition.Get();
+		return pH->EndFunction(m_pSystem->GetI3DEngine()->GetWaterLevel(&pos));
 	}
 
 	return pH->EndFunction(m_pSystem->GetI3DEngine()->GetWaterLevel());
@@ -1835,7 +1838,7 @@ int CScriptObjectGame::GetEntitiesScreenSpace(IFunctionHandler *pH)
 	IEntity *pEnt;
 	ray_hit RayHit;
 	IEntity *pLocal=m_pGame->GetMyPlayer();
-	while (pEnt=It->Next())
+	while ((pEnt=It->Next()) != nullptr)
 	{
 		if (pEnt==pLocal)
 			continue;
@@ -1889,7 +1892,7 @@ int CScriptObjectGame::GetEntitiesScreenSpace(IFunctionHandler *pH)
 
 							Matrix44 m;
 							m.SetIdentity();
-							m=GetTranslationMat(pEnt->GetPos())*m;
+							m.SetTranslationMat(pEnt->GetPos());
 							m=Matrix44::CreateRotationZYX(-pEnt->GetAngles()*gf_DEGTORAD)*m; //NOTE: angles in radians and negated 
 
 
@@ -3633,7 +3636,7 @@ int CScriptObjectGame::CheckMap(IFunctionHandler *pH)
 
 	XDOM::IXMLDOMNodeListPtr pNodes;
 #if !defined(LINUX64)
-	if(pLevelDataXML != NULL) 
+        if(pLevelDataXML)
 #else
 	if(pLevelDataXML != 0) 
 #endif
@@ -3658,7 +3661,7 @@ int CScriptObjectGame::CheckMap(IFunctionHandler *pH)
 
 				XDOM::IXMLDOMNodePtr pMission;
 
-				while (pMission = pMissionList->nextNode())
+                                while ((pMission = pMissionList->nextNode()))
 				{						 
 					XDOM::IXMLDOMNodePtr pName = pMission->getAttribute("Name");
 
@@ -3727,7 +3730,7 @@ int CScriptObjectGame::GetMapDefaultMission(IFunctionHandler *pH)
 
 	XDOM::IXMLDOMNodeListPtr pNodes;
 #if !defined(LINUX64)
-	if(pLevelDataXML != NULL)
+        if(pLevelDataXML)
 #else
 	if(pLevelDataXML != 0)
 #endif
@@ -3752,7 +3755,7 @@ int CScriptObjectGame::GetMapDefaultMission(IFunctionHandler *pH)
 
 				XDOM::IXMLDOMNodePtr pMission;
 
-				while (pMission = pMissionList->nextNode())
+                                while ((pMission = pMissionList->nextNode()))
 				{						 
 					XDOM::IXMLDOMNodePtr pName = pMission->getAttribute("Name");
 

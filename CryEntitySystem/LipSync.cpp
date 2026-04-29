@@ -240,7 +240,7 @@ void CLipSync::SyncFileLoadFailed()
 void CLipSync::AbortLoading()
 {
 #if !defined(LINUX64)
-	if (m_pReadStream!=NULL)
+        if (m_pReadStream)
 #else
 	if (m_pReadStream!=0)
 #endif
@@ -306,7 +306,7 @@ void CLipSync::StreamOnComplete(IReadStream *pStream, unsigned nError)
 				fLen[i]+=fFramesPerSecondRecp*1000.0f;
 			int nFrame;
 			//m_pPak->FGets(sBuffer, nBufferSize, pFile);	//"%d,%s", &nFrame, sBuffer);
-			const char *pNewBuffer=strnstr(pBuffer, "\n",pEndBuffer-pBuffer);
+                        const char *pNewBuffer=::strnstr(pBuffer, "\n",pEndBuffer-pBuffer);
 			if (pNewBuffer)
 			{
 				nBytesRead+=(pNewBuffer-pBuffer)+1;
@@ -320,7 +320,7 @@ void CLipSync::StreamOnComplete(IReadStream *pStream, unsigned nError)
 				{
 					const char *pCheckBuffer=pBuffer;
 					const char *pLastCheckBuffer=pCheckBuffer;
-					while (((pCheckBuffer=strnstr(pLastCheckBuffer, ",",pEndBuffer-pLastCheckBuffer))!=NULL) && (pCheckBuffer<strnstr(pLastCheckBuffer, "\n",pEndBuffer-pLastCheckBuffer)))
+                                        while (((pCheckBuffer=::strnstr(pLastCheckBuffer, ",",pEndBuffer-pLastCheckBuffer))!=NULL) && (pCheckBuffer<::strnstr(pLastCheckBuffer, "\n",pEndBuffer-pLastCheckBuffer)))
 					{
 						m_nLipSyncTracks++;
 						pLastCheckBuffer=pCheckBuffer+1;
@@ -348,10 +348,10 @@ void CLipSync::StreamOnComplete(IReadStream *pStream, unsigned nError)
 			const char *pLastScanBuffer=pBuffer;
 			const char *pScanBufferComma;
 			const char *pScanBufferBreak;
-			while (((pScanBufferComma=strnstr(pLastScanBuffer, ",",pEndBuffer-pLastScanBuffer))!=NULL) || ((pScanBufferBreak=strnstr(pLastScanBuffer, "\n",pEndBuffer-pLastScanBuffer))!=NULL))
+                        while (((pScanBufferComma=::strnstr(pLastScanBuffer, ",",pEndBuffer-pLastScanBuffer))!=NULL) || ((pScanBufferBreak=::strnstr(pLastScanBuffer, "\n",pEndBuffer-pLastScanBuffer))!=NULL))
 			{
-				pScanBufferComma=strnstr(pLastScanBuffer, ",",pEndBuffer-pLastScanBuffer);
-				pScanBufferBreak=strnstr(pLastScanBuffer, "\n",pEndBuffer-pLastScanBuffer);
+				pScanBufferComma=::strnstr(pLastScanBuffer, ",",pEndBuffer-pLastScanBuffer);
+				pScanBufferBreak=::strnstr(pLastScanBuffer, "\n",pEndBuffer-pLastScanBuffer);
 				if ((!pScanBufferComma) && (!pScanBufferBreak))
 					break;
 				if (!pScanBufferComma)
@@ -715,7 +715,7 @@ bool CLipSync::UpdateLipSync(float fFrameTime, bool bAnimate)
 			MorphParams.fStartTime=(float)(nCurrSmp-ThisData.nOfs)*(1.0f/44100.0f);
 	#endif
 #if !defined(LINUX)
-			TRACE("Morping: %s (%d of %d)", ThisPattern.sName.c_str(), nThisDataIdx, m_vecData[i].size());
+                        // TRACE("Morping: %s (%d of %d)", ThisPattern.sName.c_str(), nThisDataIdx, m_vecData[i].size());
 #endif
 			if (ThisPattern.nMorphTargetId!=-1)
 				m_pCharInst->StartMorph(ThisPattern.nMorphTargetId, MorphParams);

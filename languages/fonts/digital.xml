@@ -1,0 +1,7 @@
+<fontshader>
+<font path="languages/fonts/digib.ttf" w="512" h="512"/>
+<effect name="Digital">
+	<pass>
+	</pass>
+</effect>
+</fontshader>

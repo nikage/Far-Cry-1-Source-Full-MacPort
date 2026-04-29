@@ -48,6 +48,9 @@ extern "C" {
 #define XML_TOK_NAME 18
 #define XML_TOK_NMTOKEN 19
 #define XML_TOK_POUND_NAME 20 /* #name */
+
+/* MINBPC macro definition */
+#define MINBPC(enc) 1
 #define XML_TOK_OR 21 /* | */
 #define XML_TOK_PERCENT 22
 #define XML_TOK_OPEN_PAREN 23

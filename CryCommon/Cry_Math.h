@@ -17,6 +17,11 @@
 # pragma once
 #endif
 
+// Forward declarations
+inline int isneg(float x);
+inline int isneg(int x);
+inline int isneg(double x);
+
 //========================================================================================
 
 #include <math.h>
@@ -56,7 +61,13 @@ const float gf_RADTODEG = 57.29577951308232286465f; // Radians to Degrees
 
 // the check for compatibility with Max SDK: Max gfx.h header defines its own pi
 #if !defined(_GFX_H_)
+// On macOS, avoid conflict with system pi by using a different name
+#ifdef __APPLE__
+const real cry_pi		= (real)3.1415926535897932384626433832795;
+#define pi cry_pi
+#else
 const real pi			= (real)3.1415926535897932384626433832795;
+#endif
 #endif
 const real sqrt2	= (real)1.4142135623730950488016887242097;
 const real sqrt3	= (real)1.7320508075688772935274463415059;
@@ -86,14 +97,10 @@ const real sqrt3	= (real)1.7320508075688772935274463415059;
 #if defined(WIN64) &&  defined(_CPU_AMD64) && !defined(LINUX)
 #define ILINE __forceinline
 
-extern "C" void fastsincosf(float x, float * sincosfx);
-extern "C" float fastsinf(float x);
-extern "C" float fastcosf(float x);
-
-ILINE void cry_sincosf (float angle, float* pCosSin) {	fastsincosf(angle,pCosSin);	}
+ILINE void cry_sincosf (float angle, float* pCosSin) {	pCosSin[0] = cos(angle);	pCosSin[1] = sin(angle); }
 ILINE void cry_sincos  (double angle, double* pCosSin) {	pCosSin[0] = cos(angle);	pCosSin[1] = sin(angle); }
-ILINE float cry_sinf(float x) {return fastsinf(x); }
-ILINE float cry_cosf(float x) {return fastcosf(x); }
+ILINE float cry_sinf(float x) {return sinf(x); }
+ILINE float cry_cosf(float x) {return cosf(x); }
 
 ILINE float cry_fmod(float x, float y) {return (float)fmod((double)x,(double)y);}
 
@@ -268,7 +275,7 @@ template<class F> inline F sqr_signed(const F &op) { return op*fabs_tpl(op); }
 #define sz csz[1]
 
 //#include "Cry_Vector2.h"
-//#include "Cry_Vector3.h"
+//#include "Cry_Vector3.h"  
 #include "Cry_Matrix.h"
 //#include "Cry_Quat.h"
 
@@ -466,7 +473,7 @@ template<class F> int unite_lists(F *pSrc0,INT_PTR nSrc0, F *pSrc1,INT_PTR nSrc1
 	INT_PTR pDummy( (INT_PTR) &dummy );
 	pSrc0 = (F*)((INT_PTR)pSrc0&inrange0 | pDummy&~inrange0); // make pSrc point to valid data even if nSrc is zero	//AMD Port
 	pSrc1 = (F*)((INT_PTR)pSrc1&inrange1 | pDummy&~inrange1);									//AMD Port
-	for(n=i0=i1=0; (inrange0 | inrange1) & n-szdst>>31; inrange0=(i0+=isneg(a0-ares-1))-nSrc0>>31, inrange1=(i1+=isneg(a1-ares-1))-nSrc1>>31)
+	for(n=i0=i1=0; (inrange0 | inrange1) & (n-szdst)>>31; inrange0=(i0+=isneg(a0-ares-1))-nSrc0>>31, inrange1=(i1+=isneg(a1-ares-1))-nSrc1>>31)
 	{
 		a0 = pSrc0[i0&inrange0] + _condmax(pSrc0[0],inrange0); //(1<<(sizeof(index)*8-2)&~inrange0);
 		a1 = pSrc1[i1&inrange1] + _condmax(pSrc1[0],inrange1); //(1<<(sizeof(index)*8-2)&~inrange1);

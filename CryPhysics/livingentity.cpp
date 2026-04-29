@@ -875,7 +875,8 @@ float CLivingEntity::ShootRayDown(CPhysicalEntity **pentlist,int nents, const ve
 		R = matrix3x3f(m_qrot);
 	else
 		R.SetIdentity();
-	CRayGeom aray; aray.CreateRay(pos+R*vectorf(0,0,m_hCyl-m_hPivot),R*vectorf(0,0,-m_hCyl-m_size.x),&(R*vectorf(0,0,-1)));
+	vectorf rayDir = R*vectorf(0,0,-1);
+	CRayGeom aray; aray.CreateRay(pos+R*vectorf(0,0,m_hCyl-m_hPivot),R*vectorf(0,0,-m_hCyl-m_size.x),&rayDir);
 	geom_world_data gwd;
 	geom_contact *pcontacts;
 	CPhysicalEntity *pPrevCollider=m_pLastGroundCollider;
@@ -1191,7 +1192,7 @@ int CLivingEntity::Step(float time_interval)
 						if (iCyl==0 && bHeavy) {
 							if (m_pWorld->m_bWorldStep==2) { // this means step induced by rigid bodies moving around
 								// if the entity is rigid, store the contact
-								if (bPushOther = pentlist[i]->m_iSimClass>0 && pentlist[i]->GetMassInv()>0 && pentlist[i]->m_iGroup==m_pWorld->m_iCurGroup) {
+								if ((bPushOther = pentlist[i]->m_iSimClass>0 && pentlist[i]->GetMassInv()>0 && pentlist[i]->m_iGroup==m_pWorld->m_iCurGroup)) {
 									nUnproj = min(nUnproj+1,sizeof(unproj)/sizeof(unproj[0]));
 									unproj[nUnproj-1].pent = pentlist[i];
 									unproj[nUnproj-1].ipart = j;

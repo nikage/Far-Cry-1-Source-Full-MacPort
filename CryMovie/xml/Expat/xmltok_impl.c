@@ -3,6 +3,10 @@ Copyright (c) 1998, 1999 Thai Open Source Software Center Ltd
 See the file COPYING for copying permission.
 */
 
+#include "xmltok.h"
+#include "xmltok_impl.h"
+#include "ascii.h"
+
 #ifndef IS_INVALID_CHAR
 #define IS_INVALID_CHAR(enc, ptr, n) (0)
 #endif

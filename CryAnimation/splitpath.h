@@ -3,7 +3,7 @@
 #else
 #ifdef _XBOX
 #ifdef __cplusplus
-extern "C" void portable_splitpath (
+void portable_splitpath (
         const char *path,
         char *drive,
         char *dir,
@@ -20,7 +20,7 @@ void portable_splitpath (
         );
 #endif // __cplusplus
 #else // _XBOX
-extern "C" void portable_splitpath (
+void portable_splitpath (
         const char *path,
         char *drive,
         char *dir,
