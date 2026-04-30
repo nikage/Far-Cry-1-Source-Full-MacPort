@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import '../lib/metal_config.dart' as metalCfg;
+
 typedef StageRunner = Future<int> Function(
   String name,
   String executable,
@@ -148,7 +150,7 @@ Future<void> main(List<String> args) async {
   bool skipGenerate = false;
   bool verbose = false;
   bool strict = false;
-  String metalStd = 'metal3.0';
+  String metalStd = metalCfg.metalStd;
   String? overridesPath;
 
   for (int i = 0; i < args.length; i++) {

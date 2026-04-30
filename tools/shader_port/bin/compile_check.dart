@@ -2,12 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../lib/compile_error_cluster.dart';
+import '../lib/metal_config.dart';
 
 void main(List<String> args) {
   String rootArg = '.';
   String? generatedDirArg;
   bool verbose = false;
-  List<String> metalFlags = ['-std=metal3.0'];
+  List<String> metalFlags = ['-std=$metalStd'];
 
   for (int i = 0; i < args.length; i++) {
     if (args[i] == '--verbose' || args[i] == '-v') {

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'metal_config.dart';
+
 void main(List<String> args) {
   if (args.length < 4) {
     stderr.writeln('Usage: build_metal.dart <root> <generatedDir> <airDir> <outputMetallib>');
@@ -40,7 +42,7 @@ void main(List<String> args) {
       '-sdk',
       'macosx',
       'metal',
-      '-std=metal3.0',
+      '-std=$metalStd',
       '-c',
       metalFile.path,
       '-o',

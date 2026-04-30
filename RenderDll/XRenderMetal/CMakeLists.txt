@@ -16,7 +16,9 @@ set(XRENDER_METAL_SOURCES
     MetalStateCache.mm
     MetalVertexDescriptor.mm
     MetalRenderElements.mm
-    MetalREOcean.mm
+    # MetalREOcean.mm excluded: has unresolved linker symbols (BoxSides, LinkVisSectors,
+    # GenerateIndices, mfFillAdditionalBuffer, m_RS) that are never defined in this port.
+    # TODO: port remaining CREOcean methods from XRenderOGL/GLREOcean.cpp
     MetalOptimizations.mm
     MetalImageStubs.mm
 )
@@ -115,6 +117,7 @@ set_source_files_properties(MetalImageStubs.mm PROPERTIES
 # Preprocessor definitions
 target_compile_definitions(XRenderMetal PRIVATE
     XRENDERMETAL_EXPORTS=1
+    $<$<CONFIG:Debug>:DEBUG=1>
 )
 
 find_program(DART_EXECUTABLE dart)
@@ -294,11 +297,22 @@ else()
     endif()
 endif()
 
+# Read the Metal standard version from the shared toolchain config so it stays
+# in sync with the Dart shader migration pipeline (tools/shader_port/).
+file(READ "${CMAKE_SOURCE_DIR}/tools/shader_port/config/metal_toolchain.json" _metal_toolchain_json)
+string(REGEX MATCH "\"metalStd\"[ \t]*:[ \t]*\"([^\"]+)\"" _ "${_metal_toolchain_json}")
+set(METAL_STD "${CMAKE_MATCH_1}")
+if(NOT METAL_STD)
+    set(METAL_STD "metal3.0")
+    message(WARNING "metal_toolchain.json: metalStd not found, falling back to ${METAL_STD}")
+endif()
+message(STATUS "Metal shader standard: ${METAL_STD}")
+
 # Compile Metal shaders at build time
 # Note: Do NOT pass C++ include paths to Metal compiler
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
-    COMMAND xcrun -sdk macosx metal -std=metal4.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air
+    COMMAND xcrun -sdk macosx metal -std=${METAL_STD} -c ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air
     COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/UtilShaders.metal
     COMMENT "Compiling UtilShaders"
@@ -307,7 +321,7 @@ add_custom_command(
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
-    COMMAND xcrun -sdk macosx metal -std=metal4.0 -c ${CMAKE_CURRENT_SOURCE_DIR}/SpriteShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.air
+    COMMAND xcrun -sdk macosx metal -std=${METAL_STD} -c ${CMAKE_CURRENT_SOURCE_DIR}/SpriteShaders.metal -o ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.air
     COMMAND xcrun -sdk macosx metallib ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.air -o ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/SpriteShaders.metal
     COMMENT "Compiling SpriteShaders"
