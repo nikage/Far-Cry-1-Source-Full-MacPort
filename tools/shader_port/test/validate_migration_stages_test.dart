@@ -6,16 +6,34 @@ import '../bin/validate_migration.dart';
 
 void main() {
   group('buildStages', () {
-    test('default produces 3 stages including generate', () {
+    test('default produces 4 stages including validate-ir and generate', () {
       final BuildStagesResult r = buildStages(rootArg: '.');
-      expect(r.stages.length, 3);
-      expect(r.stages.map((s) => s.name), ['generate', 'compile-check', 'validate-pairs']);
+      expect(r.stages.length, 4);
+      expect(r.stages.map((s) => s.name),
+          ['validate-ir', 'generate', 'compile-check', 'validate-pairs']);
     });
 
-    test('skipGenerate omits generate stage', () {
+    test('skipGenerate omits generate stage, keeps validate-ir', () {
       final BuildStagesResult r = buildStages(rootArg: '.', skipGenerate: true);
+      expect(r.stages.length, 3);
+      expect(r.stages.map((s) => s.name),
+          ['validate-ir', 'compile-check', 'validate-pairs']);
+    });
+
+    test('skipValidateIr omits validate-ir stage, keeps generate', () {
+      final BuildStagesResult r =
+          buildStages(rootArg: '.', skipValidateIr: true);
+      expect(r.stages.length, 3);
+      expect(r.stages.map((s) => s.name),
+          ['generate', 'compile-check', 'validate-pairs']);
+    });
+
+    test('skipValidateIr and skipGenerate produce 2 stages', () {
+      final BuildStagesResult r =
+          buildStages(rootArg: '.', skipValidateIr: true, skipGenerate: true);
       expect(r.stages.length, 2);
-      expect(r.stages.map((s) => s.name), ['compile-check', 'validate-pairs']);
+      expect(r.stages.map((s) => s.name),
+          ['compile-check', 'validate-pairs']);
     });
 
     test('all stage executables are dart', () {
@@ -67,6 +85,7 @@ void main() {
     test('script paths are under rootArg resolved directory', () {
       final BuildStagesResult r = buildStages(rootArg: '.');
       final String sep = Platform.pathSeparator;
+      expect(r.validateIrScript, contains('validate_ir.dart'));
       expect(r.generatorScript, contains('metal_generator.dart'));
       expect(r.compileCheckScript, contains('compile_check.dart'));
       expect(r.validatePairsScript, contains('validate_pairs.dart'));
@@ -82,6 +101,13 @@ void main() {
     test('returns skipGenerate flag as provided', () {
       expect(buildStages(rootArg: '.', skipGenerate: true).skipGenerate, isTrue);
       expect(buildStages(rootArg: '.', skipGenerate: false).skipGenerate, isFalse);
+    });
+
+    test('returns skipValidateIr flag as provided', () {
+      expect(
+          buildStages(rootArg: '.', skipValidateIr: true).skipValidateIr, isTrue);
+      expect(
+          buildStages(rootArg: '.', skipValidateIr: false).skipValidateIr, isFalse);
     });
 
     test('overridesPath is null when not provided', () {

@@ -5,6 +5,7 @@ import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
 import 'compiler_backend.dart';
+import 'ir_validator.dart';
 import 'source_resolver.dart';
 
 class Block {
@@ -162,6 +163,14 @@ void main(List<String> args) {
       relative,
       resolver: resolver,
     );
+    final IrValidationResult validation =
+        IrValidator().validateParseResult(result);
+    if (!validation.passed) {
+      for (final IrValidationError e in validation.errors) {
+        stderr.writeln(e.toString());
+      }
+      exit(1);
+    }
     final File targetFile = File(outputDir.path + sep + relative + '.json');
     targetFile.parent.createSync(recursive: true);
     targetFile.writeAsStringSync(encodeResult(result));

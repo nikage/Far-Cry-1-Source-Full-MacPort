@@ -40,9 +40,11 @@ Future<int> runStages(
 class BuildStagesResult {
   BuildStagesResult({
     required this.stages,
+    required this.validateIrScript,
     required this.generatorScript,
     required this.compileCheckScript,
     required this.validatePairsScript,
+    required this.skipValidateIr,
     required this.skipGenerate,
     required this.verbose,
     required this.strict,
@@ -51,9 +53,11 @@ class BuildStagesResult {
   });
 
   final List<Stage> stages;
+  final String validateIrScript;
   final String generatorScript;
   final String compileCheckScript;
   final String validatePairsScript;
+  final bool skipValidateIr;
   final bool skipGenerate;
   final bool verbose;
   final bool strict;
@@ -62,6 +66,7 @@ class BuildStagesResult {
 }
 
 BuildStagesResult buildStages({
+  bool skipValidateIr = false,
   bool skipGenerate = false,
   bool verbose = false,
   bool strict = false,
@@ -77,12 +82,20 @@ BuildStagesResult buildStages({
       '${rootPath}RenderDll${sep}XRenderMetal${sep}Generated';
   final String manifestPath = '$generatedPath${sep}generated_manifest.json';
 
+  final String validateIrScript =
+      '${rootPath}tools${sep}shader_port${sep}bin${sep}validate_ir.dart';
   final String generatorScript =
       '${rootPath}tools${sep}shader_port${sep}lib${sep}metal_generator.dart';
   final String compileCheckScript =
       '${rootPath}tools${sep}shader_port${sep}bin${sep}compile_check.dart';
   final String validatePairsScript =
       '${rootPath}tools${sep}shader_port${sep}bin${sep}validate_pairs.dart';
+
+  final List<String> validateIrArgs = [
+    'run',
+    validateIrScript,
+    rootArg,
+  ];
 
   final List<String> generatorArgs = [
     'run',
@@ -108,6 +121,7 @@ BuildStagesResult buildStages({
   ];
 
   final List<Stage> stages = <Stage>[
+    if (!skipValidateIr) Stage('validate-ir', 'dart', validateIrArgs),
     if (!skipGenerate) Stage('generate', 'dart', generatorArgs),
     Stage('compile-check', 'dart', compileCheckArgs),
     Stage('validate-pairs', 'dart', validatePairsArgs),
@@ -115,9 +129,11 @@ BuildStagesResult buildStages({
 
   return BuildStagesResult(
     stages: stages,
+    validateIrScript: validateIrScript,
     generatorScript: generatorScript,
     compileCheckScript: compileCheckScript,
     validatePairsScript: validatePairsScript,
+    skipValidateIr: skipValidateIr,
     skipGenerate: skipGenerate,
     verbose: verbose,
     strict: strict,
@@ -128,6 +144,7 @@ BuildStagesResult buildStages({
 
 Future<void> main(List<String> args) async {
   String rootArg = '.';
+  bool skipValidateIr = false;
   bool skipGenerate = false;
   bool verbose = false;
   bool strict = false;
@@ -136,6 +153,8 @@ Future<void> main(List<String> args) async {
 
   for (int i = 0; i < args.length; i++) {
     switch (args[i]) {
+      case '--skip-validate-ir':
+        skipValidateIr = true;
       case '--skip-generate':
         skipGenerate = true;
       case '--verbose':
@@ -158,6 +177,7 @@ Future<void> main(List<String> args) async {
 
   final built = buildStages(
     rootArg: rootArg,
+    skipValidateIr: skipValidateIr,
     skipGenerate: skipGenerate,
     verbose: verbose,
     strict: strict,
@@ -165,6 +185,12 @@ Future<void> main(List<String> args) async {
     overridesPath: overridesPath,
   );
 
+  if (!built.skipValidateIr && !File(built.validateIrScript).existsSync()) {
+    stderr.writeln(
+      'Error: validate-ir script not found: ${built.validateIrScript}',
+    );
+    exit(1);
+  }
   if (!built.skipGenerate && !File(built.generatorScript).existsSync()) {
     stderr.writeln(
       'Error: generator script not found: ${built.generatorScript}',
