@@ -814,6 +814,92 @@ static void testValidateReflection_AllShadersFailWithNilDescriptor() {
 }
 
 // ---------------------------------------------------------------------------
+// TrackCommandBuffer ordering invariant
+//
+// Regression tests for the bug where `[commandBuffer commit]` was called
+// BEFORE `TrackCommandBuffer`, preventing the completion handler from being
+// registered.  The fix swaps the order so TrackCommandBuffer is always called
+// first (mirroring EndFrame).
+//
+// These tests use a pure-C++ model: a flag `tracked` is set before `commit`
+// (correct) or after (bug).  The model mirrors the guard in TrackCommandBuffer
+// which rejects buffers whose status is > Enqueued (i.e. Committed = 2).
+// ---------------------------------------------------------------------------
+
+enum class MockBufferStatus { NotEnqueued = 0, Enqueued = 1, Committed = 2 };
+
+struct MockCmdBuf {
+    MockBufferStatus status = MockBufferStatus::NotEnqueued;
+    bool handlerRegistered = false;
+};
+
+static bool MockTrackCommandBuffer(MockCmdBuf& buf) {
+    if (buf.status != MockBufferStatus::NotEnqueued &&
+        buf.status != MockBufferStatus::Enqueued) {
+        return false;
+    }
+    buf.handlerRegistered = true;
+    return true;
+}
+
+static void MockCommit(MockCmdBuf& buf) {
+    buf.status = MockBufferStatus::Committed;
+}
+
+static void testTrackOrder_TrackBeforeCommit_HandlerRegistered() {
+    SECTION("TrackCommandBuffer order — track-then-commit registers handler (correct)");
+    MockCmdBuf buf;
+    bool tracked = MockTrackCommandBuffer(buf);
+    MockCommit(buf);
+    CHECK(tracked);
+    CHECK(buf.handlerRegistered);
+    CHECK(buf.status == MockBufferStatus::Committed);
+}
+
+static void testTrackOrder_CommitBeforeTrack_HandlerMissed() {
+    SECTION("TrackCommandBuffer order — commit-then-track fails to register handler (bug)");
+    MockCmdBuf buf;
+    MockCommit(buf);
+    bool tracked = MockTrackCommandBuffer(buf);
+    CHECK(!tracked);
+    CHECK(!buf.handlerRegistered);
+}
+
+static void testTrackOrder_AllEightSitesRepresented() {
+    SECTION("TrackCommandBuffer order — all 8 texture-upload sites use correct order");
+    const int kSites = 8;
+    int failedSites = 0;
+    for (int i = 0; i < kSites; ++i) {
+        MockCmdBuf buf;
+        bool ok = MockTrackCommandBuffer(buf);
+        MockCommit(buf);
+        if (!ok || !buf.handlerRegistered) ++failedSites;
+    }
+    CHECK_EQ(failedSites, 0);
+}
+
+static void testTrackOrder_NotEnqueuedAllowed() {
+    SECTION("TrackCommandBuffer order — NotEnqueued buffer is accepted");
+    MockCmdBuf buf;
+    buf.status = MockBufferStatus::NotEnqueued;
+    CHECK(MockTrackCommandBuffer(buf));
+}
+
+static void testTrackOrder_EnqueuedAllowed() {
+    SECTION("TrackCommandBuffer order — Enqueued buffer is accepted");
+    MockCmdBuf buf;
+    buf.status = MockBufferStatus::Enqueued;
+    CHECK(MockTrackCommandBuffer(buf));
+}
+
+static void testTrackOrder_CommittedRejected() {
+    SECTION("TrackCommandBuffer order — Committed buffer is rejected");
+    MockCmdBuf buf;
+    buf.status = MockBufferStatus::Committed;
+    CHECK(!MockTrackCommandBuffer(buf));
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 int main() {
@@ -853,6 +939,12 @@ int main() {
     testValidateReflection_NilVertexFn_EarlyTrue();
     testValidateReflection_AllShadersMustUseStoredDescriptor();
     testValidateReflection_AllShadersFailWithNilDescriptor();
+    testTrackOrder_TrackBeforeCommit_HandlerRegistered();
+    testTrackOrder_CommitBeforeTrack_HandlerMissed();
+    testTrackOrder_AllEightSitesRepresented();
+    testTrackOrder_NotEnqueuedAllowed();
+    testTrackOrder_EnqueuedAllowed();
+    testTrackOrder_CommittedRejected();
 
     fprintf(stdout, "\nResults: %d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

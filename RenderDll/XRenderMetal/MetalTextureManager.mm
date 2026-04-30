@@ -1253,8 +1253,8 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
         [blitEncoder generateMipmapsForTexture:texture];
         [blitEncoder endEncoding];
-        [commandBuffer commit];
         m_renderer->TrackCommandBuffer(commandBuffer);
+        [commandBuffer commit];
     }
     
     int textureId = (Id > 0) ? Id : AllocateTextureId();
@@ -1487,8 +1487,8 @@ unsigned int CMetalTextureManager::LoadTexture(const char* filename, int* tex_ty
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
         [blitEncoder generateMipmapsForTexture:texture];
         [blitEncoder endEncoding];
-        [commandBuffer commit];
         m_renderer->TrackCommandBuffer(commandBuffer);
+        [commandBuffer commit];
     }
     
     int textureId = (def_tid > 0 && def_tid != (unsigned int)-1) ? def_tid : AllocateTextureId();
@@ -1647,8 +1647,8 @@ bool CMetalTextureManager::DXTCompress(byte* raw_data, int nWidth, int nHeight, 
             id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
             [blitEncoder generateMipmapsForTexture:sourceTexture];
             [blitEncoder endEncoding];
-            [commandBuffer commit];
             m_renderer->TrackCommandBuffer(commandBuffer);
+            [commandBuffer commit];
             [commandBuffer waitUntilCompleted];
             
             if (callback)
@@ -1819,8 +1819,8 @@ bool CMetalTextureManager::DXTDecompress(byte* srcData, byte* dstData, int nWidt
                    destinationOrigin:MTLOriginMake(0, 0, 0)];
         
         [blitEncoder endEncoding];
-        [commandBuffer commit];
         m_renderer->TrackCommandBuffer(commandBuffer);
+        [commandBuffer commit];
         
         // Note: Synchronous wait - consider using batch API for multiple decompressions
         [commandBuffer waitUntilCompleted];
@@ -2028,8 +2028,8 @@ bool CMetalTextureManager::ExecuteDXTDecompressionBatch()
     }
     
     [blitEncoder endEncoding];
-    [commandBuffer commit];
     m_renderer->TrackCommandBuffer(commandBuffer);
+    [commandBuffer commit];
     [commandBuffer waitUntilCompleted];
     
     size_t jobIdx = 0;
@@ -2840,8 +2840,8 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
     }
     
     [blitEncoder endEncoding];
-    [blitCommandBuffer commit];
     m_renderer->TrackCommandBuffer(blitCommandBuffer);
+    [blitCommandBuffer commit];
     [blitCommandBuffer waitUntilCompleted];  // Single wait for all copies
     
     // ============================================================
@@ -2872,8 +2872,8 @@ bool CMetalTextureManager::EF_ScanEnvironmentCM(const char* name, int size, Vec3
                    destinationOrigin:MTLOriginMake(0, 0, 0)];
         
         [copyEncoder endEncoding];
-        [copyBuffer commit];
         m_renderer->TrackCommandBuffer(copyBuffer);
+        [copyBuffer commit];
         [copyBuffer waitUntilCompleted];
         
         // Read pixel data from GPU
@@ -2994,8 +2994,8 @@ bool CMetalTextureManager::RenderCubeFace(I3DEngine* pEngine,
     
     // Finalize rendering
     [renderEncoder endEncoding];
-    [commandBuffer commit];
     m_renderer->TrackCommandBuffer(commandBuffer);
+    [commandBuffer commit];
     [commandBuffer waitUntilCompleted];
     
     return true;

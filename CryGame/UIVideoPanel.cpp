@@ -1056,12 +1056,11 @@ int CUIVideoPanel::IsPaused(IFunctionHandler *pH)
 ////////////////////////////////////////////////////////////////////// 
 int CUIVideoPanel::SetVolume(IFunctionHandler *pH)
 {
-	CHECK_SCRIPT_FUNCTION_PARAMCOUNT(m_pScriptSystem, GetName().c_str(), SetVolume, 1);
-	CHECK_SCRIPT_FUNCTION_PARAMTYPE(m_pScriptSystem, GetName().c_str(), SetVolume, 1, svtNumber);
+	CHECK_SCRIPT_FUNCTION_PARAMCOUNT2(m_pScriptSystem, GetName().c_str(), SetVolume, 0, 1);
 
-	float fVolume;
-
-	pH->GetParam(1, fVolume);
+	float fVolume = 0.0f;
+	if (pH->GetParamCount() >= 1 && pH->GetParamType(1) == svtNumber)
+		pH->GetParam(1, fVolume);
 
 	for (int i = 0; i < 16; i++)
 	{
