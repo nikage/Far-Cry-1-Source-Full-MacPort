@@ -1,0 +1,33 @@
+{
+  "name": "CGRCBump_ReflLight",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCBump_ReflLight.crycg",
+  "includes": [],
+  "blocks": [],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {}
+}

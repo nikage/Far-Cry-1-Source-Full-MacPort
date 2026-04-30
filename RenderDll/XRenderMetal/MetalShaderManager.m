@@ -302,6 +302,9 @@ protected:
     bool InitializeDefaultShaderLibrary();
     void CreateDefaultShaders(id<MTLLibrary> library);
     void LoadGeneratedShaders(id<MTLLibrary> vertexLibrary);
+#if DEBUG
+    void ValidateShaderPairs(id<MTLDevice> device, id<MTLLibrary> generatedLib);
+#endif
     id<MTLFunction> LoadMetalShader(const char* name, const char* source);
     id<MTLRenderPipelineState> CreatePipelineState(id<MTLFunction> vertexFunction, 
                                                    id<MTLFunction> fragmentFunction,

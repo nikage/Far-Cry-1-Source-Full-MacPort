@@ -1,0 +1,364 @@
+{
+  "name": "CGRCBump_Spec_Atten_PowerGlossAlpha_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCBump_Spec_Atten_PowerGlossAlpha_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D bumpMap : texunit1,\r\n                  uniform sampler2D attenMap : texunit2,\r\n                  uniform sampler2D glossMap : texunit3,\r\n                  uniform float4 Specular"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        half4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the decal\r\n        half4 glossColor = tex2D(glossMap, IN.Tex3.xy);\r\n        // load the bump normal\r\n        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);\r\n        half atten = saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex2.xy).b));\r\n\r\n        // normalize post-filtered bump normals\r\n        bumpNormal.xyz = normalize(bumpNormal.xyz);\r\n\r\n        // normalize light vector\r\n        float3 lightVec = normalize(IN.Tex4.xyz);\r\n\r\n        // normalize view vector\r\n        float3 viewVec = normalize(IN.Tex5.xyz);\r\n        float3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;\r\n        float NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));\r\n        half fSpec = pow(NdotR, Specular.w*glossColor.w);\r\n\r\n        half3 spec = (fSpec * Specular.xyz * atten) * 2;\r\n\r\n        // finally add them all together\r\n        OUT.Color.xyz = spec;\r\n        OUT.Color.w = decalColor.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "half4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half4 glossColor",
+      "rhs": "tex2D(glossMap, IN.Tex3.xy)",
+      "textureSample": true,
+      "raw": "half4 glossColor = tex2D(glossMap, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half atten",
+      "rhs": "saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex2.xy).b))",
+      "textureSample": true,
+      "raw": "half atten = saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex2.xy).b));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize post-filtered bump normals",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal.xyz",
+      "rhs": "normalize(bumpNormal.xyz)",
+      "textureSample": false,
+      "raw": "bumpNormal.xyz = normalize(bumpNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "normalize(IN.Tex4.xyz)",
+      "textureSample": false,
+      "raw": "float3 lightVec = normalize(IN.Tex4.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(IN.Tex5.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(IN.Tex5.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflVec",
+      "rhs": "(2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz",
+      "textureSample": false,
+      "raw": "float3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotR",
+      "rhs": "saturate(dot(reflVec.xyz, viewVec.xyz))",
+      "textureSample": false,
+      "raw": "float NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fSpec",
+      "rhs": "pow(NdotR, Specular.w*glossColor.w)",
+      "textureSample": false,
+      "raw": "half fSpec = pow(NdotR, Specular.w*glossColor.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half3 spec",
+      "rhs": "(fSpec * Specular.xyz * atten) * 2",
+      "textureSample": false,
+      "raw": "half3 spec = (fSpec * Specular.xyz * atten) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "spec",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = spec;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2",
+    "TEXCOORD3_2",
+    "TEXCOORD4_3",
+    "TEXCOORD5_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_3"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half4 glossColor = tex2D(glossMap, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half atten = saturate((2*(IN.Color.b-0.5)) * -(2*(IN.Color.b-0.5)) + (1-tex2D(attenMap, IN.Tex2.xy).b))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal.xyz = normalize(bumpNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = normalize(IN.Tex4.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(IN.Tex5.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotR = saturate(dot(reflVec.xyz, viewVec.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fSpec = pow(NdotR, Specular.w*glossColor.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half3 spec = (fSpec * Specular.xyz * atten) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = spec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4"
+  }
+}

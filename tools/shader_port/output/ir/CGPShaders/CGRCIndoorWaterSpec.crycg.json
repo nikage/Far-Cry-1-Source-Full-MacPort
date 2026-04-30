@@ -1,0 +1,311 @@
+{
+  "name": "CGRCIndoorWaterSpec",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCIndoorWaterSpec.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : texunit0,\r\n            uniform sampler2D refMap : texunit1,\r\n            uniform float4 Matrix,\r\n            uniform float4 Ambient,\r\n            uniform float4 WaterColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_C0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "  \r\n  // load the decal\r\n  float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);\r\n\r\n  // get env bump map surface\r\n# ifdef _PS_1_1\r\n  float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);          \r\n# else\r\n  float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;\r\n  float4 refrColor = tex2D(refMap, newst);\r\n# endif                \r\n  \r\n  // get brightest color  \r\n  float fDiffuse=2*(dot(refrColor.xyz, float3(0.33, 0.59, 0.11))-0.5);                          \r\n\r\n  // aprox~ spec^8      \r\n  float fFakeSpec=fDiffuse;\r\n  fFakeSpec=saturate(2*(fFakeSpec*fFakeSpec-0.6));                                            \r\n        \r\n  // compute water surface color  \r\n  float3 fWaterSurfColor=saturate(fDiffuse*WaterColor.xyz+fFakeSpec*Ambient.w);            \r\n  \r\n  // set water to ambient color\r\n  OUT.Color.xyz =Ambient.xyz*fWaterSurfColor;                                    \r\n  // output fresnel*transparency amount\r\n  OUT.Color.w = IN.Color.w*WaterColor.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColor",
+      "rhs": "tex2D(bumpMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "get env bump map surface",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refrColor",
+      "rhs": "offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "textureSample": true,
+      "raw": "float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "textureSample": false,
+      "raw": "float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refrColor",
+      "rhs": "tex2D(refMap, newst)",
+      "textureSample": true,
+      "raw": "float4 refrColor = tex2D(refMap, newst);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "get brightest color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDiffuse",
+      "rhs": "2*(dot(refrColor.xyz, float3(0.33, 0.59, 0.11))-0.5)",
+      "textureSample": false,
+      "raw": "float fDiffuse=2*(dot(refrColor.xyz, float3(0.33, 0.59, 0.11))-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "aprox~ spec^8",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFakeSpec",
+      "rhs": "fDiffuse",
+      "textureSample": false,
+      "raw": "float fFakeSpec=fDiffuse;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fFakeSpec",
+      "rhs": "saturate(2*(fFakeSpec*fFakeSpec-0.6))",
+      "textureSample": false,
+      "raw": "fFakeSpec=saturate(2*(fFakeSpec*fFakeSpec-0.6));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute water surface color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fWaterSurfColor",
+      "rhs": "saturate(fDiffuse*WaterColor.xyz+fFakeSpec*Ambient.w)",
+      "textureSample": false,
+      "raw": "float3 fWaterSurfColor=saturate(fDiffuse*WaterColor.xyz+fFakeSpec*Ambient.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "set water to ambient color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "Ambient.xyz*fWaterSurfColor",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz =Ambient.xyz*fWaterSurfColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output fresnel*transparency amount",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "IN.Color.w*WaterColor.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = IN.Color.w*WaterColor.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor = tex2D(refMap, newst)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDiffuse=2*(dot(refrColor.xyz, float3(0.33, 0.59, 0.11))-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFakeSpec=fDiffuse",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fFakeSpec=saturate(2*(fFakeSpec*fFakeSpec-0.6))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fWaterSurfColor=saturate(fDiffuse*WaterColor.xyz+fFakeSpec*Ambient.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz =Ambient.xyz*fWaterSurfColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = IN.Color.w*WaterColor.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_PS_1_1"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4"
+  }
+}

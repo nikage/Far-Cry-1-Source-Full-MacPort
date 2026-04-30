@@ -1,0 +1,319 @@
+{
+  "name": "CGRCFurTempl",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCFurTempl.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D furNormalMap : register(sn),\r\n                  uniform sampler3D furLightMap  : register(sn),\r\n                  uniform sampler2D furMap       : register(sn),\r\n                  uniform float4 FurColor,\r\n                  uniform float4 LightColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float4 Tex0       : TEXCOORDN;\r\n          float4 Tex1       : TEXCOORDN;\r\n          float4 Tex2       : TEXCOORDN;\r\n          float4 Tex3       : TEXCOORDN;\r\n          float4 Tex4       : TEXCOORDN;\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the normal\r\n        float4 vNormal = tex2D(furNormalMap, IN.Tex0.xy)*2-1;\r\n        \r\n        float3 tcLight;\r\n        tcLight.x = dot(IN.Tex1.xyz, vNormal.xyz);\r\n        tcLight.y = dot(IN.Tex2.xyz, vNormal.xyz);\r\n        tcLight.z = IN.Tex1.z * 0.5 + 0.5;\r\n        \r\n        float fFurOffs = vNormal.x*vNormal.x + vNormal.y*vNormal.y + 1;\r\n        float2 tcFur = vNormal.xy * fFurOffs * IN.Tex4.xy + IN.Tex3.xy;\r\n        \r\n        float4 vLight = tex3D(furLightMap, tcLight.xyz);\r\n        float4 vFur = tex2D(furMap, tcFur.xy);\r\n        vFur.xyz = vFur.xyz * FurColor.xyz;\r\n\r\n        float3 dif = HDREncodeAmb(vFur.xyz * vLight.xyz);\r\n        float3 spec = HDREncodeAmb(vLight.a * vFur.xyz * LightColor.xyz);\r\n      \r\n        OUT.Color.xyz = dif + spec;\r\n        OUT.Color.w = vFur.a * FurColor.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vNormal",
+      "rhs": "tex2D(furNormalMap, IN.Tex0.xy)*2-1",
+      "textureSample": true,
+      "raw": "float4 vNormal = tex2D(furNormalMap, IN.Tex0.xy)*2-1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3 tcLight;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tcLight.x",
+      "rhs": "dot(IN.Tex1.xyz, vNormal.xyz)",
+      "textureSample": false,
+      "raw": "tcLight.x = dot(IN.Tex1.xyz, vNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tcLight.y",
+      "rhs": "dot(IN.Tex2.xyz, vNormal.xyz)",
+      "textureSample": false,
+      "raw": "tcLight.y = dot(IN.Tex2.xyz, vNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tcLight.z",
+      "rhs": "IN.Tex1.z * 0.5 + 0.5",
+      "textureSample": false,
+      "raw": "tcLight.z = IN.Tex1.z * 0.5 + 0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFurOffs",
+      "rhs": "vNormal.x*vNormal.x + vNormal.y*vNormal.y + 1",
+      "textureSample": false,
+      "raw": "float fFurOffs = vNormal.x*vNormal.x + vNormal.y*vNormal.y + 1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 tcFur",
+      "rhs": "vNormal.xy * fFurOffs * IN.Tex4.xy + IN.Tex3.xy",
+      "textureSample": false,
+      "raw": "float2 tcFur = vNormal.xy * fFurOffs * IN.Tex4.xy + IN.Tex3.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vLight",
+      "rhs": "tex3D(furLightMap, tcLight.xyz)",
+      "textureSample": true,
+      "raw": "float4 vLight = tex3D(furLightMap, tcLight.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vFur",
+      "rhs": "tex2D(furMap, tcFur.xy)",
+      "textureSample": true,
+      "raw": "float4 vFur = tex2D(furMap, tcFur.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vFur.xyz",
+      "rhs": "vFur.xyz * FurColor.xyz",
+      "textureSample": false,
+      "raw": "vFur.xyz = vFur.xyz * FurColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "HDREncodeAmb(vFur.xyz * vLight.xyz)",
+      "textureSample": false,
+      "raw": "float3 dif = HDREncodeAmb(vFur.xyz * vLight.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 spec",
+      "rhs": "HDREncodeAmb(vLight.a * vFur.xyz * LightColor.xyz)",
+      "textureSample": false,
+      "raw": "float3 spec = HDREncodeAmb(vLight.a * vFur.xyz * LightColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "dif + spec",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = dif + spec;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "vFur.a * FurColor.a",
+      "textureSample": false,
+      "raw": "OUT.Color.w = vFur.a * FurColor.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_3",
+    "TEXCOORD2_3",
+    "TEXCOORD3_2",
+    "TEXCOORD4_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Tex1",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Tex2",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Tex3",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Tex4",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "HPosition",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vNormal = tex2D(furNormalMap, IN.Tex0.xy)*2-1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tcLight",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tcLight.x = dot(IN.Tex1.xyz, vNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tcLight.y = dot(IN.Tex2.xyz, vNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tcLight.z = IN.Tex1.z * 0.5 + 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFurOffs = vNormal.x*vNormal.x + vNormal.y*vNormal.y + 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 tcFur = vNormal.xy * fFurOffs * IN.Tex4.xy + IN.Tex3.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vLight = tex3D(furLightMap, tcLight.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vFur = tex2D(furMap, tcFur.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vFur.xyz = vFur.xyz * FurColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = HDREncodeAmb(vFur.xyz * vLight.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 spec = HDREncodeAmb(vLight.a * vFur.xyz * LightColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = dif + spec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = vFur.a * FurColor.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4"
+  }
+}

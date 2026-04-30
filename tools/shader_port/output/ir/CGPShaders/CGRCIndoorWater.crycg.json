@@ -1,0 +1,441 @@
+{
+  "name": "CGRCIndoorWater",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCIndoorWater.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : texunit0,\r\n            uniform sampler2D refMap : texunit1,\r\n            uniform float4 Matrix,\r\n            uniform float4 Ambient,\r\n            uniform float4 WaterColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "  \r\n  // load the decal\r\n  float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);\r\n\r\n// must create 2 versions, since offsetRECT/samplerRECT must be used for gl version...\r\n  float4 refrColor;\r\n#ifdef D3D\r\n  # ifdef _PS_1_1\r\n    refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);\r\n  # else\r\n    float2 newst = IN.Tex1.xy / IN.Tex1.w;\r\n    float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;\r\n    refrColor = tex2D(refMap, newst);\r\n  # endif\r\n#endif\r\n#ifdef OPENGL\r\n  # ifdef _PS_1_1\r\n    refrColor = offsettexRECT(refMap, IN.Tex1.xy, bumpColor, Matrix);\r\n  # else\r\n    float2 newst = IN.Tex1.xy / IN.Tex1.w;\r\n    float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;\r\n    refrColor = texRECT(refMap, newst);\r\n  # endif\r\n#endif  \r\n  \r\n  float fFakeSpec=dot(refrColor.xyz, float3(0.33, 0.59, 0.11));                                 // get brightest color\r\n  fFakeSpec=saturate(0.75*fFakeSpec + fFakeSpec);                                   // bright it a bit\r\n  float3 fFakeSpecColor=refrColor.xyz*fFakeSpec;                                         // compute specular color\r\n  OUT.Color.xyz = Ambient.xyz*( saturate(fFakeSpecColor*WaterColor.w + WaterColor.xyz) );      // compute final surface color"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColor",
+      "rhs": "tex2D(bumpMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "must create 2 versions, since offsetRECT/samplerRECT must be used for gl version...",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float4 refrColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "refrColor",
+      "rhs": "offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "textureSample": true,
+      "raw": "refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "IN.Tex1.xy / IN.Tex1.w",
+      "textureSample": false,
+      "raw": "float2 newst = IN.Tex1.xy / IN.Tex1.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "textureSample": false,
+      "raw": "float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "refrColor",
+      "rhs": "tex2D(refMap, newst)",
+      "textureSample": true,
+      "raw": "refrColor = tex2D(refMap, newst);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "refrColor",
+      "rhs": "offsettexRECT(refMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "textureSample": false,
+      "raw": "refrColor = offsettexRECT(refMap, IN.Tex1.xy, bumpColor, Matrix);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "IN.Tex1.xy / IN.Tex1.w",
+      "textureSample": false,
+      "raw": "float2 newst = IN.Tex1.xy / IN.Tex1.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "textureSample": false,
+      "raw": "float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "refrColor",
+      "rhs": "texRECT(refMap, newst)",
+      "textureSample": false,
+      "raw": "refrColor = texRECT(refMap, newst);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFakeSpec",
+      "rhs": "dot(refrColor.xyz, float3(0.33, 0.59, 0.11))                                 // get brightest color",
+      "textureSample": false,
+      "raw": "float fFakeSpec=dot(refrColor.xyz, float3(0.33, 0.59, 0.11));                                 // get brightest color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fFakeSpec",
+      "rhs": "saturate(0.75*fFakeSpec + fFakeSpec)                                   // bright it a bit",
+      "textureSample": false,
+      "raw": "fFakeSpec=saturate(0.75*fFakeSpec + fFakeSpec);                                   // bright it a bit",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fFakeSpecColor",
+      "rhs": "refrColor.xyz*fFakeSpec                                         // compute specular color",
+      "textureSample": false,
+      "raw": "float3 fFakeSpecColor=refrColor.xyz*fFakeSpec;                                         // compute specular color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "Ambient.xyz*( saturate(fFakeSpecColor*WaterColor.w + WaterColor.xyz) )      // compute final surface color",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = Ambient.xyz*( saturate(fFakeSpecColor*WaterColor.w + WaterColor.xyz) );      // compute final surface color",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_4"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = IN.Tex1.xy / IN.Tex1.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "refrColor = tex2D(refMap, newst)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "refrColor = offsettexRECT(refMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = IN.Tex1.xy / IN.Tex1.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "refrColor = texRECT(refMap, newst)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFakeSpec=dot(refrColor.xyz, float3(0.33, 0.59, 0.11));                                 // get brightest color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fFakeSpec=saturate(0.75*fFakeSpec + fFakeSpec);                                   // bright it a bit",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fFakeSpecColor=refrColor.xyz*fFakeSpec;                                         // compute specular color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = Ambient.xyz*( saturate(fFakeSpecColor*WaterColor.w + WaterColor.xyz) );      // compute final surface color",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL",
+    "_PS_1_1"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

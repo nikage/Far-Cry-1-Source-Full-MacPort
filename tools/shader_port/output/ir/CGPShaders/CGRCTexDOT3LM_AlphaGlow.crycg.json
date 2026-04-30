@@ -1,0 +1,287 @@
+{
+  "name": "CGRCTexDOT3LM_AlphaGlow",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCTexDOT3LM_AlphaGlow.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D bumpMap : texunit1,\r\n                  uniform sampler2D lightMap : texunit2,\r\n                  uniform sampler2D lightDirMap : texunit3,\r\n                  uniform float4 Ambient"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the bump normal\r\n        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);\r\n        // load the lm\r\n        float4 lmColor = tex2D(lightMap, IN.Tex2.xy);\r\n        // load the lm dir\r\n        float4 lmDat = tex2D(lightDirMap, IN.Tex3.xy);\r\n        float3 lmDir = 2*(lmDat.xyz-0.5);\r\n\r\n        float NdotL = saturate(dot(lmDir.xyz, bumpNormal.xyz));\r\n        float  lmIntens = NdotL * lmColor.a + (1-lmColor.a);\r\n        float3 dif = (decalColor.xyz * lmColor.xyz * lmDat.a * lmIntens) * 4;\r\n        float3 amb = decalColor.xyz * decalColor.a + decalColor.xyz * Ambient.xyz;\r\n\r\n        // finally add them all together\r\n        OUT.Color.xyz = amb + dif;\r\n        OUT.Color.w = decalColor.w * Ambient.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the lm",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 lmColor",
+      "rhs": "tex2D(lightMap, IN.Tex2.xy)",
+      "textureSample": true,
+      "raw": "float4 lmColor = tex2D(lightMap, IN.Tex2.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the lm dir",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 lmDat",
+      "rhs": "tex2D(lightDirMap, IN.Tex3.xy)",
+      "textureSample": true,
+      "raw": "float4 lmDat = tex2D(lightDirMap, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lmDir",
+      "rhs": "2*(lmDat.xyz-0.5)",
+      "textureSample": false,
+      "raw": "float3 lmDir = 2*(lmDat.xyz-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotL",
+      "rhs": "saturate(dot(lmDir.xyz, bumpNormal.xyz))",
+      "textureSample": false,
+      "raw": "float NdotL = saturate(dot(lmDir.xyz, bumpNormal.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float  lmIntens",
+      "rhs": "NdotL * lmColor.a + (1-lmColor.a)",
+      "textureSample": false,
+      "raw": "float  lmIntens = NdotL * lmColor.a + (1-lmColor.a);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "(decalColor.xyz * lmColor.xyz * lmDat.a * lmIntens) * 4",
+      "textureSample": false,
+      "raw": "float3 dif = (decalColor.xyz * lmColor.xyz * lmDat.a * lmIntens) * 4;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 amb",
+      "rhs": "decalColor.xyz * decalColor.a + decalColor.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "float3 amb = decalColor.xyz * decalColor.a + decalColor.xyz * Ambient.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "amb + dif",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = amb + dif;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w * Ambient.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w * Ambient.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2",
+    "TEXCOORD3_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 lmColor = tex2D(lightMap, IN.Tex2.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 lmDat = tex2D(lightDirMap, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lmDir = 2*(lmDat.xyz-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotL = saturate(dot(lmDir.xyz, bumpNormal.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float  lmIntens = NdotL * lmColor.a + (1-lmColor.a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = (decalColor.xyz * lmColor.xyz * lmDat.a * lmIntens) * 4",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 amb = decalColor.xyz * decalColor.a + decalColor.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = amb + dif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w * Ambient.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4"
+  }
+}

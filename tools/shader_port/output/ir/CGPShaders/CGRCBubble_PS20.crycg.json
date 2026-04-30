@@ -1,0 +1,230 @@
+{
+  "name": "CGRCBubble_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCBubble_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : register(s0),\r\n                  uniform samplerCUBE envMap : register(s1),\r\n                  uniform float4 AlphaScaleBias : register(c0)"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 baseColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the env cube\r\n        float4 envColor = texCUBE(envMap, IN.Tex1.xyz);\r\n        \r\n        float3 color = saturate(baseColor.xyz * envColor.xyz * 2);\r\n        float fresnel = (1-abs(IN.Tex2.r)) * AlphaScaleBias.x + AlphaScaleBias.y;\r\n        float glow = saturate((envColor.a*envColor.a-0.75)*4);\r\n        \r\n        color = lerp(color.xyz, envColor.xyz, glow);\r\n        float alpha = fresnel + glow;\r\n\r\n        OUT.Color.xyz = color.xyz;\r\n        OUT.Color.a = alpha;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 baseColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 baseColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the env cube",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 envColor",
+      "rhs": "texCUBE(envMap, IN.Tex1.xyz)",
+      "textureSample": true,
+      "raw": "float4 envColor = texCUBE(envMap, IN.Tex1.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "saturate(baseColor.xyz * envColor.xyz * 2)",
+      "textureSample": false,
+      "raw": "float3 color = saturate(baseColor.xyz * envColor.xyz * 2);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fresnel",
+      "rhs": "(1-abs(IN.Tex2.r)) * AlphaScaleBias.x + AlphaScaleBias.y",
+      "textureSample": false,
+      "raw": "float fresnel = (1-abs(IN.Tex2.r)) * AlphaScaleBias.x + AlphaScaleBias.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float glow",
+      "rhs": "saturate((envColor.a*envColor.a-0.75)*4)",
+      "textureSample": false,
+      "raw": "float glow = saturate((envColor.a*envColor.a-0.75)*4);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color",
+      "rhs": "lerp(color.xyz, envColor.xyz, glow)",
+      "textureSample": false,
+      "raw": "color = lerp(color.xyz, envColor.xyz, glow);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float alpha",
+      "rhs": "fresnel + glow",
+      "textureSample": false,
+      "raw": "float alpha = fresnel + glow;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "alpha",
+      "textureSample": false,
+      "raw": "OUT.Color.a = alpha;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_3",
+    "TEXCOORD2_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_3"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 baseColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 envColor = texCUBE(envMap, IN.Tex1.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = saturate(baseColor.xyz * envColor.xyz * 2)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fresnel = (1-abs(IN.Tex2.r)) * AlphaScaleBias.x + AlphaScaleBias.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float glow = saturate((envColor.a*envColor.a-0.75)*4)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color = lerp(color.xyz, envColor.xyz, glow)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float alpha = fresnel + glow",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = alpha",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4"
+  }
+}

@@ -131,9 +131,20 @@ class MetalFragmentBuilder {
   }
 
   void _writePreamble(StringBuffer buffer) {
-  buffer.writeln('#include <metal_stdlib>');
-  buffer.writeln('using namespace metal;');
-  buffer.writeln();
+    buffer.writeln('#include <metal_stdlib>');
+    buffer.writeln('using namespace metal;');
+    buffer.writeln();
+    buffer.writeln('constant bool fog_enabled    [[function_constant(0)]];');
+    buffer.writeln('constant bool hdr_enabled    [[function_constant(1)]];');
+    buffer.writeln('constant bool gloss_alpha    [[function_constant(2)]];');
+    buffer.writeln('constant bool env_light      [[function_constant(3)]];');
+    buffer.writeln('constant bool atten_enabled  [[function_constant(4)]];');
+    buffer.writeln('constant bool proj_light     [[function_constant(5)]];');
+    buffer.writeln('constant bool plants_bending [[function_constant(6)]];');
+    buffer.writeln('constant bool alpha_glow     [[function_constant(7)]];');
+    buffer.writeln('constant bool multiple_lights [[function_constant(8)]];');
+    buffer.writeln('constant bool high_precision [[function_constant(9)]];');
+    buffer.writeln();
   }
 
   void _writeVertexInputStruct(StringBuffer buffer) {
@@ -198,10 +209,10 @@ class MetalFragmentBuilder {
       if (type == 'float') {
         _scalarInputFields.add(field);
       }
-      buffer.writeln('  $type $field;');
-  }
-  buffer.writeln('};');
-  buffer.writeln();
+      buffer.writeln('  $type $field [[user($field)]];');
+    }
+    buffer.writeln('};');
+    buffer.writeln();
   }
 
   void _writeOutputStruct(StringBuffer buffer) {
@@ -220,7 +231,11 @@ class MetalFragmentBuilder {
         buffer.writeln('  $type HPosition [[position]];');
         continue;
       }
-      buffer.writeln('  $type $field;');
+      if (_isVertexStage) {
+        buffer.writeln('  $type $field [[user($field)]];');
+      } else {
+        buffer.writeln('  $type $field;');
+      }
     }
     buffer.writeln('};');
     buffer.writeln();

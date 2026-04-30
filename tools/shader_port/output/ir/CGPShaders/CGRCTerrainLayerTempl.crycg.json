@@ -1,0 +1,2359 @@
+{
+  "name": "CGRCTerrainLayerTempl",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCTerrainLayerTempl.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n        uniform sampler2D baseMap : register(sn),\r\n#if %BUMP_MAP\r\n        uniform sampler2D bumpMap : register(sn),\r\n#endif\r\n#if %DIFFUSE\r\n        uniform float4 Diffuse,\r\n#endif\r\n#if %SPECULAR && !%SPECULAR_PERPIXEL\r\n        uniform samplerCUBE normCubeMapHA : register(sn),\r\n#endif\r\n#if %SPECULAR\r\n        uniform float4 Specular,\r\n#endif\r\n\r\n#if %GLOSS_MAP\r\n        uniform sampler2D glossMap : register(sn),\r\n#endif\r\n\r\n#if %ENVCMAMB || %ENVCMSPEC\r\n        uniform samplerCUBE envMap : register(sn),\r\n#endif\r\n        uniform float4 Ambient,\r\n#if %ENVCMAMB\r\n        uniform float4 Reflect,\r\n#elif %ENVCMSPEC\r\n        uniform float4 EnvMapParams,\r\n        uniform float4 FresnelParams,\r\n#endif\r\n#if %OFFSETBUMPMAPPING\r\n        uniform float4 BumpOffset,\r\n#endif"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float4 baseTC     : TEXCOORDN;\r\n#if %BUMP_MAP\r\n          float4 bumpTC     : TEXCOORDN;\r\n#endif          \r\n#if %SPECULAR && !%SPECULAR_PERPIXEL\r\n          float4 halfAngVec : TEXCOORDN;\r\n#endif   \r\n#if %GLOSS_MAP\r\n          float4 glossTC    : TEXCOORDN;\r\n#endif\r\n#if %DIFFUSE\r\n          float4 lightVec   : TEXCOORDN;\r\n#endif\r\n#if %ENVCMAMB\r\n          float4 envTC      : TEXCOORDN;\r\n#elif %ENVCMSPEC\r\n          float4 tangVec    : TEXCOORDN;\r\n          float4 binormVec  : TEXCOORDN;\r\n          float4 normVec    : TEXCOORDN;\r\n#endif          \r\n#if %OFFSETBUMPMAPPING || %ENVCMSPEC || %SPECULAR_PERPIXEL\r\n          float4 viewVec    : TEXCOORDN;\r\n#endif          \r\n          float4 Color      : COLOR0;\r\n          float4 Color1     : COLOR1;\r\n        };\r\n\r\n# ifdef _HDR_MRT\r\n        FOUT_2\r\n# else\r\n        FOUT\r\n# endif"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float2 baseTC = IN.baseTC.xy;\r\n\r\n#if %BUMP_MAP\r\n        float2 bumpTC = IN.bumpTC.xy;\r\n#endif\r\n\r\n#if %OFFSETBUMPMAPPING\r\n        FLOAT height = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a);\r\n        height *= BumpOffset.x;\r\n        FLOAT3 viewVec = normalize(IN.viewVec.xyz);\r\n        bumpTC.xy += viewVec.xy * height;\r\n        baseTC.xy += viewVec.xy * height;\r\n#endif\r\n        FLOAT3 bumpNormal = float3(0,0,1);\r\n      \r\n#if %BUMP_MAP\r\n        bumpNormal = EXPAND(tex2D(bumpMap, bumpTC.xy).xyz);\r\n    #if %BUMP_NORMALIZE\r\n        // normalize post-filtered bump normals\r\n        bumpNormal.xyz = normalize(bumpNormal.xyz);\r\n    #endif\r\n#endif\r\n        // load the decal\r\n#if %TEMP_NOBASE\r\n        FLOAT4 decalColor = float4(0,0,0,0);\r\n        FLOAT fAlpha = tex2D(baseMap, baseTC.xy).a;\r\n#else\r\n        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);\r\n        FLOAT fAlpha = decalColor.a;\r\n#endif\r\n        FLOAT3 color = decalColor.xyz;\r\n      \r\n#if %GLOSS_MAP\r\n        FLOAT4 glossColor = tex2D(glossMap, IN.glossTC.xy);\r\n#endif\r\n\r\n        FLOAT fWeight = IN.Color.a;\r\n\r\n#if %DIFFUSE && !%TEMP_NOBASE\r\n        // Calculate diffuse contribution\r\n        FLOAT3 lVec = IN.lightVec.xyz;\r\n        FLOAT NdotL = dot(lVec.xyz, bumpNormal.xyz)-lVec.z;\r\n        FLOAT3 dif = NdotL * Diffuse.xyz;\r\n        //FLOAT3 dif = HDREncode(dif);\r\n        color.xyz += dif;\r\n#endif\r\n\r\n        // Calculate specular contribution\r\n#if %SPECULAR && %TEMP_NOBASE\r\n        // Half angle vector from normalization cube-map\r\n  #if !%SPECULAR_PERPIXEL\r\n        FLOAT4 hVec = EXPAND(texCUBE(normCubeMapHA, IN.halfAngVec.xyz));\r\n        FLOAT NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz));\r\n        FLOAT  specVal = saturate((NdotH - 0.75)*4);\r\n        specVal = specVal * specVal;\r\n  #else\r\n    #if !%OFFSETBUMPMAPPING\r\n        FLOAT3 viewVec = normalize(IN.viewVec.xyz);\r\n    #endif\r\n        FLOAT3 lVec = normalize(IN.lightVec.xyz);\r\n        FLOAT3 reflVec = (2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz;\r\n        FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));\r\n        FLOAT fPow = Specular.w;\r\n    #if %SPECULARPOW_GLOSSALPHA\r\n        fPow *= glossColor.a;\r\n    #endif\r\n        FLOAT specVal = pow(NdotR, fPow);\r\n  #endif\r\n        FLOAT3 spec = specVal * Specular.xyz;\r\n  #if %GLOSS_MAP\r\n        spec *= glossColor.xyz;\r\n  #elif %GLOSS_DIFFUSEALPHA        \r\n        spec *= fAlpha;\r\n  #endif\r\n        spec = spec * 2; //HDREncode(spec);\r\n        color.xyz += spec;\r\n#endif\r\n\r\n#elif %ENVCMAMB\r\n        // load the environment map\r\n        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);\r\n        FLOAT fLerp = Reflect.a;\r\n  #if %ENVCM_MASKED\r\n        // load the gloss\r\n        fLerp *= glossColor.a;\r\n  #endif\r\n        color = lerp(color.xyz, envColor.xyz, fLerp);\r\n#elif %ENVCMSPEC && %TEMP_NOBASE\r\n        half fEnvmapAmount = EnvMapParams.x;\r\n\r\n        float fFresnelScale = FresnelParams.x;\r\n        float fFresnelBias = FresnelParams.y;\r\n        float fFresnelPow = FresnelParams.z;\r\n\r\n        // Calc Reflection Vector\r\n        float3x3 worldTangentSpace;\r\n        worldTangentSpace[0] = IN.tangVec.xyz;\r\n        worldTangentSpace[1] = IN.binormVec.xyz;\r\n        worldTangentSpace[2] = IN.normVec.xyz;\r\n\r\n      #if !%OFFSETBUMPMAPPING && !%SPECULAR_PERPIXEL\r\n        float3 viewVec = normalize(IN.viewVec.xyz);\r\n      #endif        \r\n        float NdotE = dot(bumpNormal.xyz, viewVec);\r\n        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);\r\n        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);\r\n\r\n        // Calc Fresnel factor\r\n        FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);\r\n\r\n        // Calc environment\r\n        FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;\r\n        env = env * fresnel;\r\n  #if %GLOSS_MAP\r\n        env *= glossColor.xyz;\r\n  #elif %GLOSS_DIFFUSEALPHA\r\n        env *= fAlpha;\r\n  #endif\r\n        color += HDREncodeAmb(env);\r\n#endif\r\n\r\n#if %ALPHAGLOW\r\n        color += fAlpha * decalColor.xyz;\r\n#endif\r\n\r\n#if !%ALPHA_BLEND || %TEMP_NOBASE\r\n  #if !%TEMP_NOBASE\r\n        color.xyz = color.xyz*fWeight + 0.5*(1-fWeight);\r\n  #else        \r\n        color.xyz = color.xyz*fWeight;\r\n  #endif\r\n#endif  \r\n        FLOAT fOutA = 1;\r\n\r\n#if !%ALPHA_BLEND || %TEMP_NOBASE\r\n  #if !%ALPHAGLOW && %DIFFUSEALPHA\r\n        fOutA = fAlpha;\r\n  #else\r\n        fOutA = 1;\r\n  #endif        \r\n#else\r\n        fOutA = fWeight;\r\n#endif\r\n        // finally add them all together\r\n        HDROutput(OUT, FLOAT4 (color.xyz, fOutA), 1, GlobalFogColor.xyz, IN.Color1.w);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float2 baseTC",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "float2 baseTC = IN.baseTC.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 bumpTC",
+      "rhs": "IN.bumpTC.xy",
+      "textureSample": false,
+      "raw": "float2 bumpTC = IN.bumpTC.xy;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %OFFSETBUMPMAPPING",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT height",
+      "rhs": "EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a)",
+      "textureSample": true,
+      "raw": "FLOAT height = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "height *",
+      "rhs": "BumpOffset.x",
+      "textureSample": false,
+      "raw": "height *= BumpOffset.x;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 viewVec",
+      "rhs": "normalize(IN.viewVec.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 viewVec = normalize(IN.viewVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpTC.xy +",
+      "rhs": "viewVec.xy * height",
+      "textureSample": false,
+      "raw": "bumpTC.xy += viewVec.xy * height;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "baseTC.xy +",
+      "rhs": "viewVec.xy * height",
+      "textureSample": false,
+      "raw": "baseTC.xy += viewVec.xy * height;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 bumpNormal",
+      "rhs": "float3(0,0,1)",
+      "textureSample": false,
+      "raw": "FLOAT3 bumpNormal = float3(0,0,1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal",
+      "rhs": "EXPAND(tex2D(bumpMap, bumpTC.xy).xyz)",
+      "textureSample": true,
+      "raw": "bumpNormal = EXPAND(tex2D(bumpMap, bumpTC.xy).xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_NORMALIZE",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize post-filtered bump normals",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%BUMP_NORMALIZE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal.xyz",
+      "rhs": "normalize(bumpNormal.xyz)",
+      "textureSample": false,
+      "raw": "bumpNormal.xyz = normalize(bumpNormal.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%BUMP_NORMALIZE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_NOBASE",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 decalColor",
+      "rhs": "float4(0,0,0,0)",
+      "textureSample": false,
+      "raw": "FLOAT4 decalColor = float4(0,0,0,0);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fAlpha",
+      "rhs": "tex2D(baseMap, baseTC.xy).a",
+      "textureSample": true,
+      "raw": "FLOAT fAlpha = tex2D(baseMap, baseTC.xy).a;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 decalColor",
+      "rhs": "tex2D(baseMap, baseTC.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fAlpha",
+      "rhs": "decalColor.a",
+      "textureSample": false,
+      "raw": "FLOAT fAlpha = decalColor.a;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 color",
+      "rhs": "decalColor.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 color = decalColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %GLOSS_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 glossColor",
+      "rhs": "tex2D(glossMap, IN.glossTC.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 glossColor = tex2D(glossMap, IN.glossTC.xy);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%GLOSS_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fWeight",
+      "rhs": "IN.Color.a",
+      "textureSample": false,
+      "raw": "FLOAT fWeight = IN.Color.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %DIFFUSE && !%TEMP_NOBASE",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calculate diffuse contribution",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%DIFFUSE && !%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 lVec",
+      "rhs": "IN.lightVec.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 lVec = IN.lightVec.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%DIFFUSE && !%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT NdotL",
+      "rhs": "dot(lVec.xyz, bumpNormal.xyz)-lVec.z",
+      "textureSample": false,
+      "raw": "FLOAT NdotL = dot(lVec.xyz, bumpNormal.xyz)-lVec.z;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%DIFFUSE && !%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 dif",
+      "rhs": "NdotL * Diffuse.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 dif = NdotL * Diffuse.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%DIFFUSE && !%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "FLOAT3 dif = HDREncode(dif);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%DIFFUSE && !%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.xyz +",
+      "rhs": "dif",
+      "textureSample": false,
+      "raw": "color.xyz += dif;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%DIFFUSE && !%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calculate specular contribution",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %SPECULAR && %TEMP_NOBASE",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Half angle vector from normalization cube-map",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%SPECULAR_PERPIXEL",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 hVec",
+      "rhs": "EXPAND(texCUBE(normCubeMapHA, IN.halfAngVec.xyz))",
+      "textureSample": true,
+      "raw": "FLOAT4 hVec = EXPAND(texCUBE(normCubeMapHA, IN.halfAngVec.xyz));",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%SPECULAR_PERPIXEL",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT NdotH",
+      "rhs": "saturate(dot(hVec.xyz, bumpNormal.xyz))",
+      "textureSample": false,
+      "raw": "FLOAT NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz));",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%SPECULAR_PERPIXEL",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT  specVal",
+      "rhs": "saturate((NdotH - 0.75)*4)",
+      "textureSample": false,
+      "raw": "FLOAT  specVal = saturate((NdotH - 0.75)*4);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%SPECULAR_PERPIXEL",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "specVal",
+      "rhs": "specVal * specVal",
+      "textureSample": false,
+      "raw": "specVal = specVal * specVal;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%SPECULAR_PERPIXEL",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%OFFSETBUMPMAPPING",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 viewVec",
+      "rhs": "normalize(IN.viewVec.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 viewVec = normalize(IN.viewVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 lVec",
+      "rhs": "normalize(IN.lightVec.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 lVec = normalize(IN.lightVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 reflVec",
+      "rhs": "(2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 reflVec = (2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT NdotR",
+      "rhs": "saturate(dot(reflVec.xyz, viewVec.xyz))",
+      "textureSample": false,
+      "raw": "FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fPow",
+      "rhs": "Specular.w",
+      "textureSample": false,
+      "raw": "FLOAT fPow = Specular.w;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %SPECULARPOW_GLOSSALPHA",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fPow *",
+      "rhs": "glossColor.a",
+      "textureSample": false,
+      "raw": "fPow *= glossColor.a;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%SPECULARPOW_GLOSSALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT specVal",
+      "rhs": "pow(NdotR, fPow)",
+      "textureSample": false,
+      "raw": "FLOAT specVal = pow(NdotR, fPow);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 spec",
+      "rhs": "specVal * Specular.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 spec = specVal * Specular.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %GLOSS_MAP",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "spec *",
+      "rhs": "glossColor.xyz",
+      "textureSample": false,
+      "raw": "spec *= glossColor.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%GLOSS_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %GLOSS_DIFFUSEALPHA",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "spec *",
+      "rhs": "fAlpha",
+      "textureSample": false,
+      "raw": "spec *= fAlpha;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%GLOSS_DIFFUSEALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "spec",
+      "rhs": "spec * 2 //HDREncode(spec)",
+      "textureSample": false,
+      "raw": "spec = spec * 2; //HDREncode(spec);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.xyz +",
+      "rhs": "spec",
+      "textureSample": false,
+      "raw": "color.xyz += spec;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR && %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the environment map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 envColor",
+      "rhs": "texCUBE(envMap, IN.envTC.xyz)",
+      "textureSample": true,
+      "raw": "FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fLerp",
+      "rhs": "Reflect.a",
+      "textureSample": false,
+      "raw": "FLOAT fLerp = Reflect.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ENVCM_MASKED",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the gloss",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fLerp *",
+      "rhs": "glossColor.a",
+      "textureSample": false,
+      "raw": "fLerp *= glossColor.a;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color",
+      "rhs": "lerp(color.xyz, envColor.xyz, fLerp)",
+      "textureSample": false,
+      "raw": "color = lerp(color.xyz, envColor.xyz, fLerp);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "half fEnvmapAmount",
+      "rhs": "EnvMapParams.x",
+      "textureSample": false,
+      "raw": "half fEnvmapAmount = EnvMapParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnelScale",
+      "rhs": "FresnelParams.x",
+      "textureSample": false,
+      "raw": "float fFresnelScale = FresnelParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnelBias",
+      "rhs": "FresnelParams.y",
+      "textureSample": false,
+      "raw": "float fFresnelBias = FresnelParams.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnelPow",
+      "rhs": "FresnelParams.z",
+      "textureSample": false,
+      "raw": "float fFresnelPow = FresnelParams.z;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calc Reflection Vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 worldTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[0]",
+      "rhs": "IN.tangVec.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[0] = IN.tangVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[1]",
+      "rhs": "IN.binormVec.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[1] = IN.binormVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[2]",
+      "rhs": "IN.normVec.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[2] = IN.normVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%OFFSETBUMPMAPPING && !%SPECULAR_PERPIXEL",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(IN.viewVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(IN.viewVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%OFFSETBUMPMAPPING && !%SPECULAR_PERPIXEL",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotE",
+      "rhs": "dot(bumpNormal.xyz, viewVec)",
+      "textureSample": false,
+      "raw": "float NdotE = dot(bumpNormal.xyz, viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflectVect",
+      "rhs": "(2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec)",
+      "textureSample": false,
+      "raw": "float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldReflectVec",
+      "rhs": "mul(reflectVect, worldTangentSpace)",
+      "textureSample": false,
+      "raw": "float3 worldReflectVec = mul(reflectVect, worldTangentSpace);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calc Fresnel factor",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fresnel",
+      "rhs": "fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale)",
+      "textureSample": false,
+      "raw": "FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calc environment",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 env",
+      "rhs": "texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount",
+      "textureSample": true,
+      "raw": "FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "env",
+      "rhs": "env * fresnel",
+      "textureSample": false,
+      "raw": "env = env * fresnel;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %GLOSS_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "env *",
+      "rhs": "glossColor.xyz",
+      "textureSample": false,
+      "raw": "env *= glossColor.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%GLOSS_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %GLOSS_DIFFUSEALPHA",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "env *",
+      "rhs": "fAlpha",
+      "textureSample": false,
+      "raw": "env *= fAlpha;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%GLOSS_DIFFUSEALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color +",
+      "rhs": "HDREncodeAmb(env)",
+      "textureSample": false,
+      "raw": "color += HDREncodeAmb(env);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ALPHAGLOW",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color +",
+      "rhs": "fAlpha * decalColor.xyz",
+      "textureSample": false,
+      "raw": "color += fAlpha * decalColor.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%ALPHAGLOW",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%ALPHA_BLEND || %TEMP_NOBASE",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%TEMP_NOBASE",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.xyz",
+      "rhs": "color.xyz*fWeight + 0.5*(1-fWeight)",
+      "textureSample": false,
+      "raw": "color.xyz = color.xyz*fWeight + 0.5*(1-fWeight);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.xyz",
+      "rhs": "color.xyz*fWeight",
+      "textureSample": false,
+      "raw": "color.xyz = color.xyz*fWeight;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fOutA",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "FLOAT fOutA = 1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%ALPHA_BLEND || %TEMP_NOBASE",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%ALPHAGLOW && %DIFFUSEALPHA",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fOutA",
+      "rhs": "fAlpha",
+      "textureSample": false,
+      "raw": "fOutA = fAlpha;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%ALPHAGLOW && %DIFFUSEALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fOutA",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "fOutA = 1;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "!%ALPHA_BLEND || %TEMP_NOBASE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fOutA",
+      "rhs": "fWeight",
+      "textureSample": false,
+      "raw": "fOutA = fWeight;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "HDROutput(OUT, FLOAT4 (color.xyz, fOutA), 1, GlobalFogColor.xyz, IN.Color1.w);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "COLOR1_4",
+    "COLOR_4",
+    "NORMAL_3",
+    "POSITION_3",
+    "TANGENT_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "binormVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Color1",
+      "semantic": "COLOR1",
+      "components": 4,
+      "category": "color",
+      "source": "declaration"
+    },
+    {
+      "token": "Color",
+      "semantic": "COLOR0",
+      "components": 4,
+      "category": "color",
+      "source": "declaration"
+    },
+    {
+      "token": "normVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "tangVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "baseTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "bumpTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "envTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "glossTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "halfAngVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "lightVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "viewVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "HPosition",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 baseTC = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 bumpTC = IN.bumpTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT height = EXPAND(tex2D(bumpMap, IN.bumpTC.xy).a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "height *= BumpOffset.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 viewVec = normalize(IN.viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpTC.xy += viewVec.xy * height",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "baseTC.xy += viewVec.xy * height",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 bumpNormal = float3(0,0,1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal = EXPAND(tex2D(bumpMap, bumpTC.xy).xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_NORMALIZE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal.xyz = normalize(bumpNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 decalColor = float4(0,0,0,0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fAlpha = tex2D(baseMap, baseTC.xy).a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 decalColor = tex2D(baseMap, baseTC.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fAlpha = decalColor.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 color = decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %GLOSS_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 glossColor = tex2D(glossMap, IN.glossTC.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fWeight = IN.Color.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %DIFFUSE && !%TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 lVec = IN.lightVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT NdotL = dot(lVec.xyz, bumpNormal.xyz)-lVec.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 dif = NdotL * Diffuse.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.xyz += dif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %SPECULAR && %TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%SPECULAR_PERPIXEL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 hVec = EXPAND(texCUBE(normCubeMapHA, IN.halfAngVec.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT NdotH = saturate(dot(hVec.xyz, bumpNormal.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT  specVal = saturate((NdotH - 0.75)*4)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "specVal = specVal * specVal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 viewVec = normalize(IN.viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 lVec = normalize(IN.lightVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 reflVec = (2*dot(lVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fPow = Specular.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %SPECULARPOW_GLOSSALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fPow *= glossColor.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT specVal = pow(NdotR, fPow)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 spec = specVal * Specular.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %GLOSS_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "spec *= glossColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %GLOSS_DIFFUSEALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "spec *= fAlpha",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "spec = spec * 2; //HDREncode(spec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.xyz += spec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMAMB",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fLerp = Reflect.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ENVCM_MASKED",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fLerp *= glossColor.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color = lerp(color.xyz, envColor.xyz, fLerp)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMSPEC && %TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "half fEnvmapAmount = EnvMapParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnelScale = FresnelParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnelBias = FresnelParams.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnelPow = FresnelParams.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 worldTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[0] = IN.tangVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[1] = IN.binormVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[2] = IN.normVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%OFFSETBUMPMAPPING && !%SPECULAR_PERPIXEL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(IN.viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotE = dot(bumpNormal.xyz, viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldReflectVec = mul(reflectVect, worldTangentSpace)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fresnel = fFresnelBias + (pow((1-NdotE), fFresnelPow) * fFresnelScale)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 env = texCUBE(envMap, worldReflectVec).xyz * fEnvmapAmount",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env = env * fresnel",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %GLOSS_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env *= glossColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %GLOSS_DIFFUSEALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "env *= fAlpha",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color += HDREncodeAmb(env)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ALPHAGLOW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color += fAlpha * decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%ALPHA_BLEND || %TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.xyz = color.xyz*fWeight + 0.5*(1-fWeight)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.xyz = color.xyz*fWeight",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fOutA = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%ALPHA_BLEND || %TEMP_NOBASE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%ALPHAGLOW && %DIFFUSEALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fOutA = fAlpha",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fOutA = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fOutA = fWeight",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "HDROutput(OUT, FLOAT4 (color.xyz, fOutA), 1, GlobalFogColor.xyz, IN.Color1.w)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "ALPHAGLOW",
+    "ALPHA_BLEND",
+    "BUMP_MAP",
+    "BUMP_NORMALIZE",
+    "DIFFUSE",
+    "DIFFUSEALPHA",
+    "ENVCMAMB",
+    "ENVCMSPEC",
+    "ENVCM_MASKED",
+    "GLOSS_DIFFUSEALPHA",
+    "GLOSS_MAP",
+    "OFFSETBUMPMAPPING",
+    "SPECULAR",
+    "SPECULARPOW_GLOSSALPHA",
+    "SPECULAR_PERPIXEL",
+    "TEMP_NOBASE",
+    "_HDR_MRT"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "baseTC": "float4",
+    "bumpTC": "float4",
+    "halfAngVec": "float4",
+    "glossTC": "float4",
+    "lightVec": "float4",
+    "envTC": "float4",
+    "tangVec": "float4",
+    "binormVec": "float4",
+    "normVec": "float4",
+    "viewVec": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

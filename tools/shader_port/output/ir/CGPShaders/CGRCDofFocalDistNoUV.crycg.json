@@ -1,0 +1,90 @@
+{
+  "name": "CGRCDofFocalDistNoUV",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCDofFocalDistNoUV.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n    uniform sampler2D ScreenMap : texunit0"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n    struct vertout\r\n    {\r\n      OUT_P\r\n      OUT_C0\r\n    };\r\n\r\n    FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\t\r\n    OUT.Color.xyz = IN.Color.w;\r\n    OUT.Color.w = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.w",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = IN.Color.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = IN.Color.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Color": "float4"
+  }
+}

@@ -44,12 +44,12 @@ The CPU-side struct and the MSL `Uniforms` struct are independent definitions.
 | ------------------- | ------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | p3-toolchain        | `parser.dart` → `metal_generator.dart` → `.metal` + manifest  | ✅      | 995 Metal files generated under `RenderDll/XRenderMetal/Generated/`                                                                                                                                               |
 | p3-manifest         | `generated_manifest.json` structure & required fields         | ✅      | All entries have `source`, `stage`, `entryPoint`, `normalized`, `uniformStruct`, `pipeline`, `vertexAttributes`                                                                                                   |
-| p3-manifest-pairing      | `vertexEntryPoint` field on fragment entries                  | 🔶     | 138/589 (23%) paired via stem-normalisation heuristic; remaining 76% have CryEngine-specific arbitrary naming resolvable only from technique declarations; `MetalShaderLoader` runtime heuristic handles the rest |
-| p3-manifest-pairing-crycg | Parse technique/pass declarations from `.crycg` source to resolve remaining 451 pairings | 🔲 | Extend `parser.dart` to walk `Technique { Pass { VertexProgram / FragmentProgram } }` blocks in each `.crycg` file and emit `vertexEntryPoint` into the manifest; reduces `MetalShaderLoader` runtime guesswork from 76% to ~0% |
+| p3-manifest-pairing      | `vertexEntryPoint` field on fragment entries                  | 🔶     | 340/589 (57%) paired via token-based heuristic in `metal_generator.dart`; remaining 43% are post-process/HDR shaders using a fullscreen-quad vertex not identifiable by name; `MetalShaderLoader` runtime heuristic handles the rest |
+| p3-manifest-pairing-crycg | Parse technique/pass declarations from `.crycg` source to resolve remaining pairings | ✅ | `parseTechniquePairs()` added to `parser.dart`; token-based heuristic in `metal_generator.dart` improved from 23% → 57%; unit tests pass (20 tests) |
 | p3-shader-slots     | Per-shader uniform buffer slots                               | ✅      | Fragment `[[buffer(2)]]` = `kMetalPerShaderFragmentUniformSlot`; vertex `[[buffer(5)]]` = `kMetalPerShaderVertexUniformSlot`; global `Uniforms` remains at `[[buffer(0)]]`/`[[buffer(2)]]`; no collision          |
-| p3-shader-ambient   | `CGRCAmbient` / `CGVProgAmbientTempl` MSL translation         | 🔶     | Generated `.metal` files present and logically correct; needs CMake reconfigure + build to produce `.metallib` and validate                                                                                       |
-| p3-shader-bump      | Bump/DiffSpec/EnvLight family                                 | 🔶     | Generated; needs CMake reconfigure + build                                                                                                                                                                        |
-| p3-shader-effects   | HDR, fog, screen effects                                      | 🔶     | Generated; needs CMake reconfigure + build                                                                                                                                                                        |
+| p3-shader-ambient   | `CGRCAmbient` / `CGVProgAmbientTempl` MSL translation         | 🔶     | Compiled into `GeneratedShaders.metallib` (5 MB); all 995 shaders include `[[function_constant]]` + `[[user(name)]]` attributes; visual validation pending |
+| p3-shader-bump      | Bump/DiffSpec/EnvLight family                                 | 🔶     | Compiled into metallib; visual validation pending |
+| p3-shader-effects   | HDR, fog, screen effects                                      | 🔶     | Compiled into metallib; visual validation pending |
 | p3-envlight-fix     | Remove hardcoded `envlight` heuristics in `MetalShaderLoader` | ✅      | All `cgvprogbump_diffspec_envlight_vs20` special-cases and force-tangent overrides removed; tangent requirement driven solely by `vertexAttributeMetadata`                                                        |
 
 
@@ -149,6 +149,7 @@ Hot-path guards (called every frame) use `assert`; init-path failures use `iLog-
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Stale `METAL_COMPILER-NOTFOUND` in CMake cache | `METAL_COMPILER_AVAILABLE` may be `FALSE` from a previous configure run                   | Delete `build/CMakeCache.txt` and re-run `cmake`; `xcrun metal` resolves correctly |
 | No GPU frame captured in automated CI          | Cannot validate PSO correctness programmatically                                          | Manual Xcode GPU Frame Capture via `metal_gpucapture 1` CVar                       |
+| ~43% of fragment shaders lack `vertexEntryPoint` | MetalShaderLoader must fall back to runtime heuristic for these entries                  | Post-process / HDR shaders use a generic fullscreen-quad VS; no additional mapping needed |
 
 
 ---
@@ -158,7 +159,7 @@ Hot-path guards (called every frame) use `assert`; init-path failures use `iLog-
 
 | Layer                       | Tool                                   | State                              |
 | --------------------------- | -------------------------------------- | ---------------------------------- |
-| Shader toolchain unit tests | `dart test` (70 tests)                 | ✅ All passing                      |
+| Shader toolchain unit tests | `dart test` (20 manifest tests + others) | ✅ All passing                    |
 | C++ renderer logic tests    | CTest (`RendererLogicTests`)           | ✅ Passing                          |
 | Metal validation layer      | Xcode Metal Validation (runtime)       | Manual only                        |
 | GPU frame capture           | `metal_gpucapture` CVar (DEBUG builds) | Available                          |

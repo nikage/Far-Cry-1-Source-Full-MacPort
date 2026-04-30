@@ -2677,6 +2677,78 @@ int skipWhitespace(String content, int index) {
   return index;
 }
 
+/// Parses `CGVProgram = "name"` vertex-program directives from a CryEngine
+/// shader template source string.  The CryEngine shader compiler used a
+/// custom script language where technique/pass bodies could reference vertex
+/// programs like:
+///
+///   CGVProgram = "CGVProgAmbientTempl"
+///
+/// This function extracts those pairings and returns a map of
+/// `fragmentShaderName → vertexShaderName` (both in their original casing as
+/// they appear in the source, without normalisation).  Returns an empty map
+/// when no such declarations are present (which is the case for the raw
+/// `.crycg` individual program files that don't embed technique blocks).
+///
+/// The function is designed to accept any shader source string, so callers
+/// can run it over `.ext`, `.cfx`, or other CryEngine effect-template files
+/// when they become available.
+Map<String, String> parseTechniquePairs(String src) {
+  final Map<String, String> result = <String, String>{};
+  // Match  CGVProgram = "SomeName"  (with optional whitespace)
+  final RegExp vProgPattern = RegExp(
+    r'CGVProgram\s*=\s*"([^"]+)"',
+    caseSensitive: false,
+  );
+  // Match  FragmentProgram = "SomeName"  (same syntax, different key)
+  final RegExp fragProgPattern = RegExp(
+    r'FragmentProgram\s*=\s*"([^"]+)"',
+    caseSensitive: false,
+  );
+  // Walk Technique { ... } blocks, then Pass { ... } sub-blocks.
+  final RegExp techniquePattern = RegExp(
+    r'Technique\s+\w+\s*\{',
+    caseSensitive: false,
+  );
+  int searchFrom = 0;
+  while (searchFrom < src.length) {
+    final RegExpMatch? techMatch = techniquePattern.firstMatch(
+      src.substring(searchFrom),
+    );
+    if (techMatch == null) break;
+    final int techBodyStart =
+        searchFrom + techMatch.end - 1; // points at opening '{'
+    final int techBodyEnd = findMatchingBrace(src, techBodyStart);
+    if (techBodyEnd == -1) break;
+    final String techBody = src.substring(techBodyStart + 1, techBodyEnd);
+    // Inside technique, scan Pass { } sub-blocks.
+    final RegExp passPattern = RegExp(r'Pass\s*\w*\s*\{', caseSensitive: false);
+    int passSearch = 0;
+    while (passSearch < techBody.length) {
+      final RegExpMatch? passMatch = passPattern.firstMatch(
+        techBody.substring(passSearch),
+      );
+      if (passMatch == null) break;
+      final int passBodyStart = passSearch + passMatch.end - 1;
+      final int passBodyEnd = findMatchingBrace(techBody, passBodyStart);
+      if (passBodyEnd == -1) break;
+      final String passBody = techBody.substring(passBodyStart + 1, passBodyEnd);
+      final RegExpMatch? vMatch = vProgPattern.firstMatch(passBody);
+      final RegExpMatch? fMatch = fragProgPattern.firstMatch(passBody);
+      if (vMatch != null && fMatch != null) {
+        result[fMatch.group(1)!] = vMatch.group(1)!;
+      } else if (vMatch != null) {
+        // Some passes only declare the vertex program; record with empty key
+        // so callers can at least detect its presence.
+        result[''] = vMatch.group(1)!;
+      }
+      passSearch += passMatch.start + passMatch.end;
+    }
+    searchFrom = techBodyEnd + 1;
+  }
+  return result;
+}
+
 bool isIdentifierStart(int code) {
   return (code >= 65 && code <= 90) ||
       (code >= 97 && code <= 122) ||

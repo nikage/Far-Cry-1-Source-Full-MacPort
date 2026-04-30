@@ -1,0 +1,420 @@
+{
+  "name": "CGRCWater_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCWater_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler3D noiseMap : register(s0),\r\n                  uniform sampler2D envMap   : register(s1),\r\n                  uniform sampler2D dirtyMap : register(s2),\r\n                  uniform float4 BumpScale,\r\n                  uniform float4 ReflectAmount,\r\n                  uniform float4 FadeParams,\r\n                  uniform float4 TimeParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "        \r\n        float3 pos = IN.Tex0.xyz + TimeParams.xyz * TimeParams.w;\r\n        float4 noisy = tex3D(noiseMap, pos.xyz);\r\n\r\n        // Signed noise \r\n        float3 bump = 2*noisy.a-1;\r\n\r\n        // Make sure the normal always points upwards\r\n        //bump.z = 0.8 * abs(bump.z) + 0.2;\r\n\r\n        // fade bump normals on the distance (emulate mipmapping)\r\n        float fZ = (IN.Tex5.x / IN.Tex5.y);\r\n        fZ = pow(fZ, 16);\r\n        bump.xyz = lerp(bump.xyz, float3(0,0,1), fZ);\r\n\r\n        // environment\r\n        float2 newst = IN.Tex1.xy / IN.Tex1.w;\r\n        newst.xy = newst.xy + bump.xy*BumpScale.xy*16;\r\n        float4 refl = tex2D(envMap, newst.xy);\r\n\r\n        // result color\r\n        float4 baseColor = tex2D(dirtyMap, IN.Tex2.xy);\r\n\r\n        // Interpolate between the dirty color and reflection\r\n        float3 color = lerp(baseColor.xyz, refl.xyz, ReflectAmount.xyz);\r\n\r\n        // Fresnel term\r\n        float lrp = 1 - dot(-normalize(IN.Tex4.xyz), bump.xyz);\r\n        float fadeBias = FadeParams.x;\r\n        float fadeExp = FadeParams.y;\r\n        float fTransp = saturate(fadeBias + pow(lrp, fadeExp)); // + (baseColor.b-0.75);\r\n        \r\n        OUT.Color.xyz = color.xyz;\r\n        OUT.Color.a = IN.Color.a * ReflectAmount.a * fTransp;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 pos",
+      "rhs": "IN.Tex0.xyz + TimeParams.xyz * TimeParams.w",
+      "textureSample": false,
+      "raw": "float3 pos = IN.Tex0.xyz + TimeParams.xyz * TimeParams.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 noisy",
+      "rhs": "tex3D(noiseMap, pos.xyz)",
+      "textureSample": true,
+      "raw": "float4 noisy = tex3D(noiseMap, pos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Signed noise",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 bump",
+      "rhs": "2*noisy.a-1",
+      "textureSample": false,
+      "raw": "float3 bump = 2*noisy.a-1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Make sure the normal always points upwards",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "bump.z = 0.8 * abs(bump.z) + 0.2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "fade bump normals on the distance (emulate mipmapping)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fZ",
+      "rhs": "(IN.Tex5.x / IN.Tex5.y)",
+      "textureSample": false,
+      "raw": "float fZ = (IN.Tex5.x / IN.Tex5.y);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fZ",
+      "rhs": "pow(fZ, 16)",
+      "textureSample": false,
+      "raw": "fZ = pow(fZ, 16);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bump.xyz",
+      "rhs": "lerp(bump.xyz, float3(0,0,1), fZ)",
+      "textureSample": false,
+      "raw": "bump.xyz = lerp(bump.xyz, float3(0,0,1), fZ);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "environment",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "IN.Tex1.xy / IN.Tex1.w",
+      "textureSample": false,
+      "raw": "float2 newst = IN.Tex1.xy / IN.Tex1.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "newst.xy",
+      "rhs": "newst.xy + bump.xy*BumpScale.xy*16",
+      "textureSample": false,
+      "raw": "newst.xy = newst.xy + bump.xy*BumpScale.xy*16;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refl",
+      "rhs": "tex2D(envMap, newst.xy)",
+      "textureSample": true,
+      "raw": "float4 refl = tex2D(envMap, newst.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "result color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 baseColor",
+      "rhs": "tex2D(dirtyMap, IN.Tex2.xy)",
+      "textureSample": true,
+      "raw": "float4 baseColor = tex2D(dirtyMap, IN.Tex2.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Interpolate between the dirty color and reflection",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "lerp(baseColor.xyz, refl.xyz, ReflectAmount.xyz)",
+      "textureSample": false,
+      "raw": "float3 color = lerp(baseColor.xyz, refl.xyz, ReflectAmount.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Fresnel term",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float lrp",
+      "rhs": "1 - dot(-normalize(IN.Tex4.xyz), bump.xyz)",
+      "textureSample": false,
+      "raw": "float lrp = 1 - dot(-normalize(IN.Tex4.xyz), bump.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fadeBias",
+      "rhs": "FadeParams.x",
+      "textureSample": false,
+      "raw": "float fadeBias = FadeParams.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fadeExp",
+      "rhs": "FadeParams.y",
+      "textureSample": false,
+      "raw": "float fadeExp = FadeParams.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fTransp",
+      "rhs": "saturate(fadeBias + pow(lrp, fadeExp)) // + (baseColor.b-0.75)",
+      "textureSample": false,
+      "raw": "float fTransp = saturate(fadeBias + pow(lrp, fadeExp)); // + (baseColor.b-0.75);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "IN.Color.a * ReflectAmount.a * fTransp",
+      "textureSample": false,
+      "raw": "OUT.Color.a = IN.Color.a * ReflectAmount.a * fTransp;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_3",
+    "TEXCOORD1_4",
+    "TEXCOORD2_2",
+    "TEXCOORD4_3",
+    "TEXCOORD5_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_3"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_3"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 pos = IN.Tex0.xyz + TimeParams.xyz * TimeParams.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 noisy = tex3D(noiseMap, pos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 bump = 2*noisy.a-1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fZ = (IN.Tex5.x / IN.Tex5.y)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fZ = pow(fZ, 16)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bump.xyz = lerp(bump.xyz, float3(0,0,1), fZ)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = IN.Tex1.xy / IN.Tex1.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "newst.xy = newst.xy + bump.xy*BumpScale.xy*16",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refl = tex2D(envMap, newst.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 baseColor = tex2D(dirtyMap, IN.Tex2.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = lerp(baseColor.xyz, refl.xyz, ReflectAmount.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float lrp = 1 - dot(-normalize(IN.Tex4.xyz), bump.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fadeBias = FadeParams.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fadeExp = FadeParams.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fTransp = saturate(fadeBias + pow(lrp, fadeExp)); // + (baseColor.b-0.75)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = IN.Color.a * ReflectAmount.a * fTransp",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4"
+  }
+}

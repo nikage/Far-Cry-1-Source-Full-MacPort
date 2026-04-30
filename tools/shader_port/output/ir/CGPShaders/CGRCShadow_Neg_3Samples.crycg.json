@@ -1,0 +1,308 @@
+{
+  "name": "CGRCShadow_Neg_3Samples",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCShadow_Neg_3Samples.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D shadowMap0 : texunit0,\r\n                  uniform sampler2D shadowMap1 : texunit1,\r\n                  uniform sampler2D shadowMap2 : texunit2,\r\n                  uniform sampler2D baseMap : texunit3,\r\n                  uniform float4 Ambient,\r\n                  uniform float4 Fading"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 shadowColor0 = tex2Dproj(shadowMap0, IN.Tex0.xyw);\r\n        float4 shadowColor1 = tex2Dproj(shadowMap1, IN.Tex1.xyw);\r\n        float4 shadowColor2 = tex2Dproj(shadowMap2, IN.Tex2.xyw);\r\n        float4 decalColor = tex2D(baseMap, IN.Tex3.xy);\r\n        float3 color = decalColor.xyz * Ambient.xyz;\r\n        color = HDREncodeAmb(color);\r\n        float3 vShadow = (float3)0;\r\n        vShadow.x = shadowColor0.a;\r\n        vShadow.y = shadowColor1.a;\r\n        vShadow.z = shadowColor2.a;\r\n        vShadow.xyz = vShadow.xyz * Fading.xyz;\r\n        float shadow = dot(vShadow.xyz, float3(1, 1, 1));\r\n        OUT.Color.xyz = color.xyz;\r\n        OUT.Color.a = shadow;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadowColor0",
+      "rhs": "tex2Dproj(shadowMap0, IN.Tex0.xyw)",
+      "textureSample": true,
+      "raw": "float4 shadowColor0 = tex2Dproj(shadowMap0, IN.Tex0.xyw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadowColor1",
+      "rhs": "tex2Dproj(shadowMap1, IN.Tex1.xyw)",
+      "textureSample": true,
+      "raw": "float4 shadowColor1 = tex2Dproj(shadowMap1, IN.Tex1.xyw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadowColor2",
+      "rhs": "tex2Dproj(shadowMap2, IN.Tex2.xyw)",
+      "textureSample": true,
+      "raw": "float4 shadowColor2 = tex2Dproj(shadowMap2, IN.Tex2.xyw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex3.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "decalColor.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "float3 color = decalColor.xyz * Ambient.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color",
+      "rhs": "HDREncodeAmb(color)",
+      "textureSample": false,
+      "raw": "color = HDREncodeAmb(color);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vShadow",
+      "rhs": "(float3)0",
+      "textureSample": false,
+      "raw": "float3 vShadow = (float3)0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vShadow.x",
+      "rhs": "shadowColor0.a",
+      "textureSample": false,
+      "raw": "vShadow.x = shadowColor0.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vShadow.y",
+      "rhs": "shadowColor1.a",
+      "textureSample": false,
+      "raw": "vShadow.y = shadowColor1.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vShadow.z",
+      "rhs": "shadowColor2.a",
+      "textureSample": false,
+      "raw": "vShadow.z = shadowColor2.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vShadow.xyz",
+      "rhs": "vShadow.xyz * Fading.xyz",
+      "textureSample": false,
+      "raw": "vShadow.xyz = vShadow.xyz * Fading.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float shadow",
+      "rhs": "dot(vShadow.xyz, float3(1, 1, 1))",
+      "textureSample": false,
+      "raw": "float shadow = dot(vShadow.xyz, float3(1, 1, 1));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "shadow",
+      "textureSample": false,
+      "raw": "OUT.Color.a = shadow;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_4",
+    "TEXCOORD1_4",
+    "TEXCOORD2_4",
+    "TEXCOORD3_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_4"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_4"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadowColor0 = tex2Dproj(shadowMap0, IN.Tex0.xyw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadowColor1 = tex2Dproj(shadowMap1, IN.Tex1.xyw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadowColor2 = tex2Dproj(shadowMap2, IN.Tex2.xyw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = decalColor.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color = HDREncodeAmb(color)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vShadow = (float3)0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vShadow.x = shadowColor0.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vShadow.y = shadowColor1.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vShadow.z = shadowColor2.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vShadow.xyz = vShadow.xyz * Fading.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float shadow = dot(vShadow.xyz, float3(1, 1, 1))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = shadow",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4"
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "name": "CGRCLight_Diff_SingleLight_Atten_Plants",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCLight_Diff_SingleLight_Atten_Plants.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D attenMap : texunit1,\r\n                  uniform float4 Ambient,\r\n                  uniform float4 Diffuse"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        float atten = saturate((2*(IN.Color.a-0.5)) * -(2*(IN.Color.a-0.5)) + (1-tex2D(attenMap, IN.Tex1.xy).b));\r\n\r\n        // Light vector from normalization cube-map\r\n        float3 dif = HDREncode(decalColor.xyz * atten * Diffuse.xyz);\r\n        float3 amb = HDREncode(Ambient.xyz * decalColor.xyz * IN.Color.xyz);\r\n\r\n        // finally add them all together\r\n        OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);\r\n        OUT.Color.w = decalColor.w * Ambient.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float atten",
+      "rhs": "saturate((2*(IN.Color.a-0.5)) * -(2*(IN.Color.a-0.5)) + (1-tex2D(attenMap, IN.Tex1.xy).b))",
+      "textureSample": true,
+      "raw": "float atten = saturate((2*(IN.Color.a-0.5)) * -(2*(IN.Color.a-0.5)) + (1-tex2D(attenMap, IN.Tex1.xy).b));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Light vector from normalization cube-map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "HDREncode(decalColor.xyz * atten * Diffuse.xyz)",
+      "textureSample": false,
+      "raw": "float3 dif = HDREncode(decalColor.xyz * atten * Diffuse.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 amb",
+      "rhs": "HDREncode(Ambient.xyz * decalColor.xyz * IN.Color.xyz)",
+      "textureSample": false,
+      "raw": "float3 amb = HDREncode(Ambient.xyz * decalColor.xyz * IN.Color.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w * Ambient.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w * Ambient.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float atten = saturate((2*(IN.Color.a-0.5)) * -(2*(IN.Color.a-0.5)) + (1-tex2D(attenMap, IN.Tex1.xy).b))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = HDREncode(decalColor.xyz * atten * Diffuse.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 amb = HDREncode(Ambient.xyz * decalColor.xyz * IN.Color.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w * Ambient.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

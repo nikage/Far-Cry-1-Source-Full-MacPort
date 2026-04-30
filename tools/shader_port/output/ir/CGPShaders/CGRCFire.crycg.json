@@ -1,0 +1,227 @@
+{
+  "name": "CGRCFire",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCFire.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : texunit0,\r\n            uniform sampler2D refMap : texunit1,                        \r\n            uniform float4 Matrix"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_C0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "  \r\n  // load the decal  \r\n  float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);      \r\n\r\n# ifdef _PS_1_1\r\n  float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);          // get env bump map surface\r\n# else\r\n        float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;\r\n        float4 refrColor = tex2D(refMap, newst);\r\n# endif                \r\n    \r\n  //float3 fColorSquare=refrColor.xyz*refrColor.xyz; \r\n  //float fColorLum=dot(refrColor.xyz, float3(0.33, 0.59, 0.11)); \r\n\r\n  OUT.Color.xyz =refrColor.xyz*refrColor.w*IN.Color.w;\r\n  OUT.Color.w = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColor",
+      "rhs": "tex2D(bumpMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refrColor",
+      "rhs": "offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix)          // get env bump map surface",
+      "textureSample": true,
+      "raw": "float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);          // get env bump map surface",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "textureSample": false,
+      "raw": "float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refrColor",
+      "rhs": "tex2D(refMap, newst)",
+      "textureSample": true,
+      "raw": "float4 refrColor = tex2D(refMap, newst);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float3 fColorSquare=refrColor.xyz*refrColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float fColorLum=dot(refrColor.xyz, float3(0.33, 0.59, 0.11));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "refrColor.xyz*refrColor.w*IN.Color.w",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz =refrColor.xyz*refrColor.w*IN.Color.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor = offsettex2D(refMap, IN.Tex1.xy, bumpColor, Matrix);          // get env bump map surface",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = IN.Tex1.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor = tex2D(refMap, newst)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz =refrColor.xyz*refrColor.w*IN.Color.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_PS_1_1"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4"
+  }
+}

@@ -1,0 +1,329 @@
+{
+  "name": "CGRCWater",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCWater.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : texunit0,\r\n                  uniform sampler2D envMap : texunit1,\r\n                  uniform sampler2D fresnelMap : texunit2,\r\n                  uniform sampler2D baseMap : texunit3,\r\n                  uniform float4 Matrix,\r\n                  uniform float4 ReflectAmount,\r\n                  uniform float4 WaterColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);\r\n\r\n# ifdef _PS_1_1\r\n        float4 env = offsettex2D(envMap, IN.Tex1.xy, bumpColor, Matrix);\r\n# else\r\n        float2 newst = IN.Tex1.xy / IN.Tex1.w;\r\n        newst.xy = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;\r\n        float4 env = tex2D(envMap, newst.xy);\r\n# endif        \r\n        float4 fresnelColor = tex2D(fresnelMap, IN.Tex2.xy);\r\n        float4 baseColor = tex2D(baseMap, IN.Tex3.xy);\r\n\r\n        float3 color = lerp(HDREncodeAmb(baseColor.xyz), env.xyz, ReflectAmount.xyz);\r\n        \r\n        OUT.Color.xyz = HDRFogBlend(color.xyz, IN.Color1.w, GlobalFogColor.xyz);\r\n        float fTransp = fresnelColor.b + (baseColor.b-0.5);\r\n                \r\n        OUT.Color.a = IN.Color.a*ReflectAmount.a * fTransp;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColor",
+      "rhs": "tex2D(bumpMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 env",
+      "rhs": "offsettex2D(envMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "textureSample": true,
+      "raw": "float4 env = offsettex2D(envMap, IN.Tex1.xy, bumpColor, Matrix);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "IN.Tex1.xy / IN.Tex1.w",
+      "textureSample": false,
+      "raw": "float2 newst = IN.Tex1.xy / IN.Tex1.w;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "newst.xy",
+      "rhs": "newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "textureSample": false,
+      "raw": "newst.xy = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 env",
+      "rhs": "tex2D(envMap, newst.xy)",
+      "textureSample": true,
+      "raw": "float4 env = tex2D(envMap, newst.xy);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fresnelColor",
+      "rhs": "tex2D(fresnelMap, IN.Tex2.xy)",
+      "textureSample": true,
+      "raw": "float4 fresnelColor = tex2D(fresnelMap, IN.Tex2.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 baseColor",
+      "rhs": "tex2D(baseMap, IN.Tex3.xy)",
+      "textureSample": true,
+      "raw": "float4 baseColor = tex2D(baseMap, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "lerp(HDREncodeAmb(baseColor.xyz), env.xyz, ReflectAmount.xyz)",
+      "textureSample": false,
+      "raw": "float3 color = lerp(HDREncodeAmb(baseColor.xyz), env.xyz, ReflectAmount.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDRFogBlend(color.xyz, IN.Color1.w, GlobalFogColor.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDRFogBlend(color.xyz, IN.Color1.w, GlobalFogColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fTransp",
+      "rhs": "fresnelColor.b + (baseColor.b-0.5)",
+      "textureSample": false,
+      "raw": "float fTransp = fresnelColor.b + (baseColor.b-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "IN.Color.a*ReflectAmount.a * fTransp",
+      "textureSample": false,
+      "raw": "OUT.Color.a = IN.Color.a*ReflectAmount.a * fTransp;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_4",
+    "TEXCOORD2_2",
+    "TEXCOORD3_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 env = offsettex2D(envMap, IN.Tex1.xy, bumpColor, Matrix)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = IN.Tex1.xy / IN.Tex1.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "newst.xy = newst.xy + Matrix.xy * bumpColor.xx + Matrix.zw * bumpColor.yy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 env = tex2D(envMap, newst.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fresnelColor = tex2D(fresnelMap, IN.Tex2.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 baseColor = tex2D(baseMap, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = lerp(HDREncodeAmb(baseColor.xyz), env.xyz, ReflectAmount.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDRFogBlend(color.xyz, IN.Color1.w, GlobalFogColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fTransp = fresnelColor.b + (baseColor.b-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = IN.Color.a*ReflectAmount.a * fTransp",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_PS_1_1"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

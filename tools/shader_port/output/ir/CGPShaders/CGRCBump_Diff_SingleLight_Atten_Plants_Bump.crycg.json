@@ -1,0 +1,354 @@
+{
+  "name": "CGRCBump_Diff_SingleLight_Atten_Plants_Bump",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCBump_Diff_SingleLight_Atten_Plants_Bump.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D bumpMap : texunit1,\r\n                  uniform samplerCUBE normCubeMap : texunit2,\r\n                  uniform sampler2D attenMap : texunit3,\r\n                  uniform float4 Ambient,\r\n                  uniform float4 Diffuse,\r\n                  uniform float4 DiffuseSun"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the bump normal\r\n        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);\r\n        float atten = saturate(EXPAND(IN.Color1.b) * -(EXPAND(IN.Color1.b-0.5)) + (1-tex2D(attenMap, IN.Tex3.xy).b));\r\n\r\n        // Light vector from normalization cube-map\r\n        float4 lVec = EXPAND(texCUBE(normCubeMap, IN.Tex2.xyz));\r\n        float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));\r\n        float3 dif = NdotL * atten * Diffuse.xyz * decalColor.xyz;\r\n        dif = HDREncode(dif);\r\n\r\n        // light vector from static sun light\r\n        float3 lightVecSun = EXPAND(IN.Color1.xyz);\r\n        float fDifSun = saturate(dot(bumpNormal.xyz, lightVecSun));\r\n        float3 difSun = (fDifSun * DiffuseSun.xyz);\r\n        float3 amb = Ambient.xyz * (IN.Color.xyz + difSun.xyz) * decalColor.xyz;\r\n        amb.xyz = HDREncode(amb.xyz);\r\n\r\n        // finally add them all together\r\n        OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);\r\n        OUT.Color.w = decalColor.w * Ambient.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float atten",
+      "rhs": "saturate(EXPAND(IN.Color1.b) * -(EXPAND(IN.Color1.b-0.5)) + (1-tex2D(attenMap, IN.Tex3.xy).b))",
+      "textureSample": true,
+      "raw": "float atten = saturate(EXPAND(IN.Color1.b) * -(EXPAND(IN.Color1.b-0.5)) + (1-tex2D(attenMap, IN.Tex3.xy).b));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Light vector from normalization cube-map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 lVec",
+      "rhs": "EXPAND(texCUBE(normCubeMap, IN.Tex2.xyz))",
+      "textureSample": true,
+      "raw": "float4 lVec = EXPAND(texCUBE(normCubeMap, IN.Tex2.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotL",
+      "rhs": "saturate(dot(lVec.xyz, bumpNormal.xyz))",
+      "textureSample": false,
+      "raw": "float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "NdotL * atten * Diffuse.xyz * decalColor.xyz",
+      "textureSample": false,
+      "raw": "float3 dif = NdotL * atten * Diffuse.xyz * decalColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "dif",
+      "rhs": "HDREncode(dif)",
+      "textureSample": false,
+      "raw": "dif = HDREncode(dif);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "light vector from static sun light",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVecSun",
+      "rhs": "EXPAND(IN.Color1.xyz)",
+      "textureSample": false,
+      "raw": "float3 lightVecSun = EXPAND(IN.Color1.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDifSun",
+      "rhs": "saturate(dot(bumpNormal.xyz, lightVecSun))",
+      "textureSample": false,
+      "raw": "float fDifSun = saturate(dot(bumpNormal.xyz, lightVecSun));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 difSun",
+      "rhs": "(fDifSun * DiffuseSun.xyz)",
+      "textureSample": false,
+      "raw": "float3 difSun = (fDifSun * DiffuseSun.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 amb",
+      "rhs": "Ambient.xyz * (IN.Color.xyz + difSun.xyz) * decalColor.xyz",
+      "textureSample": false,
+      "raw": "float3 amb = Ambient.xyz * (IN.Color.xyz + difSun.xyz) * decalColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "amb.xyz",
+      "rhs": "HDREncode(amb.xyz)",
+      "textureSample": false,
+      "raw": "amb.xyz = HDREncode(amb.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w * Ambient.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w * Ambient.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_3",
+    "TEXCOORD3_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float atten = saturate(EXPAND(IN.Color1.b) * -(EXPAND(IN.Color1.b-0.5)) + (1-tex2D(attenMap, IN.Tex3.xy).b))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 lVec = EXPAND(texCUBE(normCubeMap, IN.Tex2.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotL = saturate(dot(lVec.xyz, bumpNormal.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = NdotL * atten * Diffuse.xyz * decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dif = HDREncode(dif)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVecSun = EXPAND(IN.Color1.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDifSun = saturate(dot(bumpNormal.xyz, lightVecSun))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 difSun = (fDifSun * DiffuseSun.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 amb = Ambient.xyz * (IN.Color.xyz + difSun.xyz) * decalColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "amb.xyz = HDREncode(amb.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDRFogBlend(amb + dif, IN.Color1.w, GlobalFogColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w * Ambient.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

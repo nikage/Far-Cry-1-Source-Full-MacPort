@@ -1,0 +1,135 @@
+{
+  "name": "CGRC_HDR_CalculateAdaptedLum_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRC_HDR_CalculateAdaptedLum_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D lumMap0 : texunit0,\r\n  uniform sampler2D lumMap1 : texunit1,\r\n  uniform FLOAT4 fElapsedTime"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  FLOAT fAdaptedLum = tex2D(lumMap0, float2(0.5f, 0.5f));\r\n  FLOAT fCurrentLum = tex2D(lumMap1, float2(0.5f, 0.5f));\r\n  \r\n  // The user's adapted luminance level is simulated by closing the gap between\r\n  // adapted luminance and current luminance by 2% every frame, based on a\r\n  // 30 fps rate. This is not an accurate model of human adaptation, which can\r\n  // take longer than half an hour.\r\n  FLOAT fNewAdaptation = fAdaptedLum + (fCurrentLum - fAdaptedLum) * ( 1 - pow( 0.98f, 30 * fElapsedTime.x));\r\n\r\n  OUT.Color = float4(fNewAdaptation, fNewAdaptation, fNewAdaptation, 1.0f);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fAdaptedLum",
+      "rhs": "tex2D(lumMap0, float2(0.5f, 0.5f))",
+      "textureSample": true,
+      "raw": "FLOAT fAdaptedLum = tex2D(lumMap0, float2(0.5f, 0.5f));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fCurrentLum",
+      "rhs": "tex2D(lumMap1, float2(0.5f, 0.5f))",
+      "textureSample": true,
+      "raw": "FLOAT fCurrentLum = tex2D(lumMap1, float2(0.5f, 0.5f));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "The user's adapted luminance level is simulated by closing the gap between",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "adapted luminance and current luminance by 2% every frame, based on a",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "30 fps rate. This is not an accurate model of human adaptation, which can",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "take longer than half an hour.",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fNewAdaptation",
+      "rhs": "fAdaptedLum + (fCurrentLum - fAdaptedLum) * ( 1 - pow( 0.98f, 30 * fElapsedTime.x))",
+      "textureSample": false,
+      "raw": "FLOAT fNewAdaptation = fAdaptedLum + (fCurrentLum - fAdaptedLum) * ( 1 - pow( 0.98f, 30 * fElapsedTime.x));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "float4(fNewAdaptation, fNewAdaptation, fNewAdaptation, 1.0f)",
+      "textureSample": false,
+      "raw": "OUT.Color = float4(fNewAdaptation, fNewAdaptation, fNewAdaptation, 1.0f);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fAdaptedLum = tex2D(lumMap0, float2(0.5f, 0.5f))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fCurrentLum = tex2D(lumMap1, float2(0.5f, 0.5f))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fNewAdaptation = fAdaptedLum + (fCurrentLum - fAdaptedLum) * ( 1 - pow( 0.98f, 30 * fElapsedTime.x))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = float4(fNewAdaptation, fNewAdaptation, fNewAdaptation, 1.0f)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4"
+  }
+}

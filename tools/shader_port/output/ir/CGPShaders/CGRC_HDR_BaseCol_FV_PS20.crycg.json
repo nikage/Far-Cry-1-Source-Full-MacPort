@@ -1,0 +1,205 @@
+{
+  "name": "CGRC_HDR_BaseCol_FV_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRC_HDR_BaseCol_FV_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D baseMap : texunit0,\r\n  uniform sampler2D fogMap : texunit1,\r\n  uniform sampler2D fogEnterMap : texunit2,\r\n  uniform float4 FogColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_T2\r\n    OUT_C0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float4 vSample = tex2D(baseMap, IN.Tex0.xy) * IN.Color;\r\n  // load the fog\r\n  float4 fogColor = tex2D(fogMap, IN.Tex1.xy);\r\n  float4 fogEnterColor = tex2D(fogEnterMap, IN.Tex2.xy);\r\n\r\n  float fog = fogColor.a * fogEnterColor.a;\r\n  vSample.xyz = HDREncode(vSample.xyz);\r\n  vSample.xyz = HDREncodeAmb(FogColor.xyz)*fog + vSample.xyz*(1-fog);\r\n\r\n  OUT.Color = vSample;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 vSample",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy) * IN.Color",
+      "textureSample": true,
+      "raw": "float4 vSample = tex2D(baseMap, IN.Tex0.xy) * IN.Color;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the fog",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fogColor",
+      "rhs": "tex2D(fogMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 fogColor = tex2D(fogMap, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 fogEnterColor",
+      "rhs": "tex2D(fogEnterMap, IN.Tex2.xy)",
+      "textureSample": true,
+      "raw": "float4 fogEnterColor = tex2D(fogEnterMap, IN.Tex2.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fog",
+      "rhs": "fogColor.a * fogEnterColor.a",
+      "textureSample": false,
+      "raw": "float fog = fogColor.a * fogEnterColor.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.xyz",
+      "rhs": "HDREncode(vSample.xyz)",
+      "textureSample": false,
+      "raw": "vSample.xyz = HDREncode(vSample.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.xyz",
+      "rhs": "HDREncodeAmb(FogColor.xyz)*fog + vSample.xyz*(1-fog)",
+      "textureSample": false,
+      "raw": "vSample.xyz = HDREncodeAmb(FogColor.xyz)*fog + vSample.xyz*(1-fog);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "vSample",
+      "textureSample": false,
+      "raw": "OUT.Color = vSample;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vSample = tex2D(baseMap, IN.Tex0.xy) * IN.Color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fogColor = tex2D(fogMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 fogEnterColor = tex2D(fogEnterMap, IN.Tex2.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fog = fogColor.a * fogEnterColor.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.xyz = HDREncode(vSample.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.xyz = HDREncodeAmb(FogColor.xyz)*fog + vSample.xyz*(1-fog)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = vSample",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Color": "float4"
+  }
+}

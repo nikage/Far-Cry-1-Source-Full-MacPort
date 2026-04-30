@@ -1,0 +1,591 @@
+{
+  "name": "CGRCMetallic_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCMetallic_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : register(s0),\r\n                  uniform sampler2D bumpMap : register(s1),\r\n                  uniform samplerCUBE envMap : register(s2),\r\n                  uniform float4 Diffuse,\r\n                  uniform float4 Specular,\r\n                  uniform float4 Params,\r\n                  uniform float4 SparkleDistort,\r\n                  uniform float4 SparkleColor,\r\n                  uniform float4 BaseColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the bump normal\r\n        float3 bumpNormal = EXPAND(tex2D(bumpMap, IN.Tex1.xy).xyz);\r\n        \r\n        // Increase the microflake perturbed normal a bit\r\n        //bumpNormal.xyz = lerp(float3(0,0,1), bumpNormal.xyz, Params.x);\r\n        bumpNormal.xyz = normalize(bumpNormal.xyz);\r\n        \r\n        float3x3 worldTangentSpace;\r\n        worldTangentSpace[0] = IN.Tex2.xyz;\r\n        worldTangentSpace[1] = IN.Tex3.xyz;\r\n        worldTangentSpace[2] = IN.Tex4.xyz;\r\n        \r\n        float3 viewVec = normalize(IN.Tex5.xyz);\r\n        float NdotE = dot(bumpNormal.xyz, viewVec);\r\n        float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec.xyz);\r\n        float3 worldReflectVec = mul(reflectVect, worldTangentSpace);\r\n        // load the env noise map\r\n        float4 envColorNoise = texCUBE(envMap, worldReflectVec.xyz);\r\n        envColorNoise.xyz = HDREncode(envColorNoise.xyz * envColorNoise.a) * 2;\r\n        \r\n        // load the env bumbed map\r\n        float3 bumpNormalEnv = float3(0,0,1);\r\n        float NdotEEnv = dot(bumpNormalEnv.xyz, viewVec);\r\n        float3 reflectVectEnv = (2.0*NdotEEnv*bumpNormalEnv.xyz)-(dot(bumpNormalEnv.xyz, bumpNormalEnv.xyz)*viewVec.xyz);\r\n        float3 worldReflectVecEnv = mul(reflectVectEnv, worldTangentSpace);\r\n        float4 envColor = texCUBE(envMap, worldReflectVecEnv.xyz);\r\n        envColor.xyz = HDREncode(envColor.xyz * envColor.a);\r\n                \r\n        // load the bump normal\r\n        float4 bumpNormal2 = tex2D(bumpMap, IN.Tex1.xy);\r\n        \r\n        // Compute (1-N.V)^2\r\n        float fAtten = ((1-viewVec.z) * (1-viewVec.z)) + 0.255;\r\n        // Simulate color scattering\r\n        float3 scatt = lerp(viewVec.z, NdotE, SparkleDistort.xyz);\r\n        // Combine resulting color with base color\r\n        float3 color = HDREncodeAmb(scatt * BaseColor.xyz);\r\n        // Combine sparkles with base color gradient\r\n        color.xyz = bumpNormal2.xyz * envColorNoise.xyz * envColor.xyz + color.xyz; \r\n        // Add reflections from the environment map\r\n        color.xyz = lerp(color.xyz, envColor.xyz, fAtten);\r\n        \r\n        OUT.Color.xyz = color.xyz;\r\n        OUT.Color.a = envColorNoise.a * SparkleColor.a * BaseColor.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 bumpNormal",
+      "rhs": "EXPAND(tex2D(bumpMap, IN.Tex1.xy).xyz)",
+      "textureSample": true,
+      "raw": "float3 bumpNormal = EXPAND(tex2D(bumpMap, IN.Tex1.xy).xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Increase the microflake perturbed normal a bit",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "bumpNormal.xyz = lerp(float3(0,0,1), bumpNormal.xyz, Params.x);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal.xyz",
+      "rhs": "normalize(bumpNormal.xyz)",
+      "textureSample": false,
+      "raw": "bumpNormal.xyz = normalize(bumpNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 worldTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[0]",
+      "rhs": "IN.Tex2.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[0] = IN.Tex2.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[1]",
+      "rhs": "IN.Tex3.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[1] = IN.Tex3.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "worldTangentSpace[2]",
+      "rhs": "IN.Tex4.xyz",
+      "textureSample": false,
+      "raw": "worldTangentSpace[2] = IN.Tex4.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(IN.Tex5.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(IN.Tex5.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotE",
+      "rhs": "dot(bumpNormal.xyz, viewVec)",
+      "textureSample": false,
+      "raw": "float NdotE = dot(bumpNormal.xyz, viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflectVect",
+      "rhs": "(2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldReflectVec",
+      "rhs": "mul(reflectVect, worldTangentSpace)",
+      "textureSample": false,
+      "raw": "float3 worldReflectVec = mul(reflectVect, worldTangentSpace);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the env noise map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 envColorNoise",
+      "rhs": "texCUBE(envMap, worldReflectVec.xyz)",
+      "textureSample": true,
+      "raw": "float4 envColorNoise = texCUBE(envMap, worldReflectVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "envColorNoise.xyz",
+      "rhs": "HDREncode(envColorNoise.xyz * envColorNoise.a) * 2",
+      "textureSample": false,
+      "raw": "envColorNoise.xyz = HDREncode(envColorNoise.xyz * envColorNoise.a) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the env bumbed map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 bumpNormalEnv",
+      "rhs": "float3(0,0,1)",
+      "textureSample": false,
+      "raw": "float3 bumpNormalEnv = float3(0,0,1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotEEnv",
+      "rhs": "dot(bumpNormalEnv.xyz, viewVec)",
+      "textureSample": false,
+      "raw": "float NdotEEnv = dot(bumpNormalEnv.xyz, viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflectVectEnv",
+      "rhs": "(2.0*NdotEEnv*bumpNormalEnv.xyz)-(dot(bumpNormalEnv.xyz, bumpNormalEnv.xyz)*viewVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 reflectVectEnv = (2.0*NdotEEnv*bumpNormalEnv.xyz)-(dot(bumpNormalEnv.xyz, bumpNormalEnv.xyz)*viewVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldReflectVecEnv",
+      "rhs": "mul(reflectVectEnv, worldTangentSpace)",
+      "textureSample": false,
+      "raw": "float3 worldReflectVecEnv = mul(reflectVectEnv, worldTangentSpace);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 envColor",
+      "rhs": "texCUBE(envMap, worldReflectVecEnv.xyz)",
+      "textureSample": true,
+      "raw": "float4 envColor = texCUBE(envMap, worldReflectVecEnv.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "envColor.xyz",
+      "rhs": "HDREncode(envColor.xyz * envColor.a)",
+      "textureSample": false,
+      "raw": "envColor.xyz = HDREncode(envColor.xyz * envColor.a);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal2",
+      "rhs": "tex2D(bumpMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal2 = tex2D(bumpMap, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Compute (1-N.V)^2",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fAtten",
+      "rhs": "((1-viewVec.z) * (1-viewVec.z)) + 0.255",
+      "textureSample": false,
+      "raw": "float fAtten = ((1-viewVec.z) * (1-viewVec.z)) + 0.255;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Simulate color scattering",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 scatt",
+      "rhs": "lerp(viewVec.z, NdotE, SparkleDistort.xyz)",
+      "textureSample": false,
+      "raw": "float3 scatt = lerp(viewVec.z, NdotE, SparkleDistort.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Combine resulting color with base color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "HDREncodeAmb(scatt * BaseColor.xyz)",
+      "textureSample": false,
+      "raw": "float3 color = HDREncodeAmb(scatt * BaseColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Combine sparkles with base color gradient",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.xyz",
+      "rhs": "bumpNormal2.xyz * envColorNoise.xyz * envColor.xyz + color.xyz",
+      "textureSample": false,
+      "raw": "color.xyz = bumpNormal2.xyz * envColorNoise.xyz * envColor.xyz + color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Add reflections from the environment map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.xyz",
+      "rhs": "lerp(color.xyz, envColor.xyz, fAtten)",
+      "textureSample": false,
+      "raw": "color.xyz = lerp(color.xyz, envColor.xyz, fAtten);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "envColorNoise.a * SparkleColor.a * BaseColor.a",
+      "textureSample": false,
+      "raw": "OUT.Color.a = envColorNoise.a * SparkleColor.a * BaseColor.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_3",
+    "TEXCOORD3_3",
+    "TEXCOORD4_3",
+    "TEXCOORD5_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_3"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_3"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 bumpNormal = EXPAND(tex2D(bumpMap, IN.Tex1.xy).xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal.xyz = normalize(bumpNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 worldTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[0] = IN.Tex2.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[1] = IN.Tex3.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "worldTangentSpace[2] = IN.Tex4.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(IN.Tex5.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotE = dot(bumpNormal.xyz, viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflectVect = (2.0*NdotE*bumpNormal.xyz)-(dot(bumpNormal.xyz, bumpNormal.xyz)*viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldReflectVec = mul(reflectVect, worldTangentSpace)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 envColorNoise = texCUBE(envMap, worldReflectVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "envColorNoise.xyz = HDREncode(envColorNoise.xyz * envColorNoise.a) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 bumpNormalEnv = float3(0,0,1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotEEnv = dot(bumpNormalEnv.xyz, viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflectVectEnv = (2.0*NdotEEnv*bumpNormalEnv.xyz)-(dot(bumpNormalEnv.xyz, bumpNormalEnv.xyz)*viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldReflectVecEnv = mul(reflectVectEnv, worldTangentSpace)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 envColor = texCUBE(envMap, worldReflectVecEnv.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "envColor.xyz = HDREncode(envColor.xyz * envColor.a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal2 = tex2D(bumpMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fAtten = ((1-viewVec.z) * (1-viewVec.z)) + 0.255",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 scatt = lerp(viewVec.z, NdotE, SparkleDistort.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = HDREncodeAmb(scatt * BaseColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.xyz = bumpNormal2.xyz * envColorNoise.xyz * envColor.xyz + color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.xyz = lerp(color.xyz, envColor.xyz, fAtten)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = envColorNoise.a * SparkleColor.a * BaseColor.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4"
+  }
+}

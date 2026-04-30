@@ -1,0 +1,274 @@
+{
+  "name": "CGRC_HDR_BrightPassFilter_FromMRT_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRC_HDR_BrightPassFilter_FromMRT_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D baseMapRG : texunit0,\r\n  uniform sampler2D baseMapBA : texunit1,\r\n  uniform sampler2D lumMap : texunit2,\r\n  uniform FLOAT4 Params"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  FLOAT fMiddleGray = Params.x;\r\n  FLOAT fBrightOffset = Params.y;\r\n  FLOAT fBrightThreshold = Params.z;\r\n  \r\n  FLOAT4 vSample;\r\n  vSample.xy = tex2D(baseMapRG, IN.Tex0.xy).xy;\r\n  vSample.zw = tex2D(baseMapBA, IN.Tex0.xy).xy;\r\n  FLOAT  fAdaptedLum = tex2D(lumMap, float2(0.5f, 0.5f));\r\n  \r\n  // Determine what the pixel's value will be after tone-mapping occurs\r\n  vSample.rgb *= fMiddleGray/(fAdaptedLum + 0.001);\r\n  \r\n  // Subtract out dark pixels\r\n  vSample.rgb -= fBrightThreshold;\r\n  \r\n  // Clamp to 0\r\n  vSample = max(vSample, 0.0);\r\n  \r\n  // Map the resulting value into the 0 to 1 range. Higher values for\r\n  // BRIGHT_PASS_OFFSET will isolate lights from illuminated scene \r\n  // objects.\r\n  vSample.rgb /= (fBrightOffset+vSample);\r\n\r\n  OUT.Color = vSample;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fMiddleGray",
+      "rhs": "Params.x",
+      "textureSample": false,
+      "raw": "FLOAT fMiddleGray = Params.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fBrightOffset",
+      "rhs": "Params.y",
+      "textureSample": false,
+      "raw": "FLOAT fBrightOffset = Params.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fBrightThreshold",
+      "rhs": "Params.z",
+      "textureSample": false,
+      "raw": "FLOAT fBrightThreshold = Params.z;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "FLOAT4 vSample;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.xy",
+      "rhs": "tex2D(baseMapRG, IN.Tex0.xy).xy",
+      "textureSample": true,
+      "raw": "vSample.xy = tex2D(baseMapRG, IN.Tex0.xy).xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.zw",
+      "rhs": "tex2D(baseMapBA, IN.Tex0.xy).xy",
+      "textureSample": true,
+      "raw": "vSample.zw = tex2D(baseMapBA, IN.Tex0.xy).xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT  fAdaptedLum",
+      "rhs": "tex2D(lumMap, float2(0.5f, 0.5f))",
+      "textureSample": true,
+      "raw": "FLOAT  fAdaptedLum = tex2D(lumMap, float2(0.5f, 0.5f));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Determine what the pixel's value will be after tone-mapping occurs",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.rgb *",
+      "rhs": "fMiddleGray/(fAdaptedLum + 0.001)",
+      "textureSample": false,
+      "raw": "vSample.rgb *= fMiddleGray/(fAdaptedLum + 0.001);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Subtract out dark pixels",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.rgb -",
+      "rhs": "fBrightThreshold",
+      "textureSample": false,
+      "raw": "vSample.rgb -= fBrightThreshold;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Clamp to 0",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample",
+      "rhs": "max(vSample, 0.0)",
+      "textureSample": false,
+      "raw": "vSample = max(vSample, 0.0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Map the resulting value into the 0 to 1 range. Higher values for",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "BRIGHT_PASS_OFFSET will isolate lights from illuminated scene",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "objects.",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.rgb /",
+      "rhs": "(fBrightOffset+vSample)",
+      "textureSample": false,
+      "raw": "vSample.rgb /= (fBrightOffset+vSample);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "vSample",
+      "textureSample": false,
+      "raw": "OUT.Color = vSample;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fMiddleGray = Params.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fBrightOffset = Params.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fBrightThreshold = Params.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 vSample",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.xy = tex2D(baseMapRG, IN.Tex0.xy).xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.zw = tex2D(baseMapBA, IN.Tex0.xy).xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT  fAdaptedLum = tex2D(lumMap, float2(0.5f, 0.5f))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.rgb *= fMiddleGray/(fAdaptedLum + 0.001)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.rgb -= fBrightThreshold",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample = max(vSample, 0.0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.rgb /= (fBrightOffset+vSample)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = vSample",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4"
+  }
+}

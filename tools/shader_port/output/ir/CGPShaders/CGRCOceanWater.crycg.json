@@ -1,0 +1,588 @@
+{
+  "name": "CGRCOceanWater",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCOceanWater.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : register(s0),\r\n                  uniform sampler2D envMap : register(s1),\r\n                  uniform float4 Matrix,\r\n                  uniform float4 ReflectAmount,\r\n                  uniform float4 WaterColor,\r\n                  uniform float4 SpecularSun"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3 \r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "                  \r\n        float2 vScale=saturate(Matrix.xw);//float2(IN.Tex4.w, IN.Tex4.w))*Matrix.xw;\r\n                        \r\n        // load the decal\r\n        float4 bumpColorA = tex2D(bumpMap, IN.Tex0.xy);\r\n        float4 bumpColorB = tex2D(bumpMap, IN.Tex0.zw);\r\n        float4 vNormal = 0.5*( (2*bumpColorA-1)+(2*bumpColorB-1) );\r\n                \r\n        float2 newst = (IN.Tex1.xy / IN.Tex1.w)+ vScale.xy * vNormal.xy;        \r\n        float4 reflColor = tex2D(envMap, newst.xy);                \r\n        \r\n        float3 vWaterColor=float3(0.0, 0.3, 0.5)*WaterColor.xyz;\r\n        reflColor.xyz=vWaterColor*(1.0-ReflectAmount.w)+reflColor.xyz*ReflectAmount.w;\r\n                                             \r\n        // load the decal\r\n        bumpColorA = tex2D(bumpMap, IN.Tex0.yx*2.0);\r\n        bumpColorB = tex2D(bumpMap, IN.Tex0.wz*2.0);\r\n        float4 vRefrNormal = 2*((bumpColorA*0.5+bumpColorB*0.5)-0.5);\r\n                                             \r\n        float3 vView=normalize(IN.Tex4.xyz);        \r\n        float3 vLight=normalize(IN.Tex5.xyz);\r\n                \r\n        float fDot=(dot(vNormal.xyz, vLight.xyz));\r\n        float3 vReflect=normalize(2.0*vNormal.xyz*fDot-vView.xyz);\r\n                                          \r\n        float fSunGlow=saturate(dot(vReflect.xyz, vLight.xyz));                \r\n                        \r\n        float fR0=0.5;\r\n        float fDist=saturate(IN.Tex3.z);\r\n        \r\n        float fFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)));                \r\n        float fAtten=saturate( saturate(IN.Color.w*(1.0-IN.Tex2.z))+IN.Color.w );\r\n        float fFresnel=saturate(fFoam*fAtten + fAtten);\r\n                                \r\n        float3 vFinal=saturate(reflColor*fFresnel);                                \r\n                                                        \r\n        float3 vSunCol=float3(1.0, 0.8, 0.5);\r\n        fSunGlow=2.0*pow(fSunGlow, 64)*fFresnel; //*IN.Tex5.w;                        \r\n        float3 vSunGlow=fSunGlow*vFinal.xyz*vSunCol.xyz; //*reflColor*fFresnel;\r\n\r\n        fR0=0.0;        \r\n        float3 vFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))*vFinal*WaterColor*0.5;                \r\n        vFoam*=vFoam*4.0;\r\n                                                                                                                                 \r\n        OUT.Color.xyz = vFoam+vFinal+vSunGlow-vFinal.xyz*vSunGlow;                \r\n        OUT.Color.a = saturate(IN.Color.w*fSunGlow+IN.Color.w);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float2 vScale",
+      "rhs": "saturate(Matrix.xw)//float2(IN.Tex4.w, IN.Tex4.w))*Matrix.xw",
+      "textureSample": false,
+      "raw": "float2 vScale=saturate(Matrix.xw);//float2(IN.Tex4.w, IN.Tex4.w))*Matrix.xw;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColorA",
+      "rhs": "tex2D(bumpMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpColorA = tex2D(bumpMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColorB",
+      "rhs": "tex2D(bumpMap, IN.Tex0.zw)",
+      "textureSample": true,
+      "raw": "float4 bumpColorB = tex2D(bumpMap, IN.Tex0.zw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vNormal",
+      "rhs": "0.5*( (2*bumpColorA-1)+(2*bumpColorB-1) )",
+      "textureSample": false,
+      "raw": "float4 vNormal = 0.5*( (2*bumpColorA-1)+(2*bumpColorB-1) );",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 newst",
+      "rhs": "(IN.Tex1.xy / IN.Tex1.w)+ vScale.xy * vNormal.xy",
+      "textureSample": false,
+      "raw": "float2 newst = (IN.Tex1.xy / IN.Tex1.w)+ vScale.xy * vNormal.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 reflColor",
+      "rhs": "tex2D(envMap, newst.xy)",
+      "textureSample": true,
+      "raw": "float4 reflColor = tex2D(envMap, newst.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vWaterColor",
+      "rhs": "float3(0.0, 0.3, 0.5)*WaterColor.xyz",
+      "textureSample": false,
+      "raw": "float3 vWaterColor=float3(0.0, 0.3, 0.5)*WaterColor.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "reflColor.xyz",
+      "rhs": "vWaterColor*(1.0-ReflectAmount.w)+reflColor.xyz*ReflectAmount.w",
+      "textureSample": false,
+      "raw": "reflColor.xyz=vWaterColor*(1.0-ReflectAmount.w)+reflColor.xyz*ReflectAmount.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpColorA",
+      "rhs": "tex2D(bumpMap, IN.Tex0.yx*2.0)",
+      "textureSample": true,
+      "raw": "bumpColorA = tex2D(bumpMap, IN.Tex0.yx*2.0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpColorB",
+      "rhs": "tex2D(bumpMap, IN.Tex0.wz*2.0)",
+      "textureSample": true,
+      "raw": "bumpColorB = tex2D(bumpMap, IN.Tex0.wz*2.0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vRefrNormal",
+      "rhs": "2*((bumpColorA*0.5+bumpColorB*0.5)-0.5)",
+      "textureSample": false,
+      "raw": "float4 vRefrNormal = 2*((bumpColorA*0.5+bumpColorB*0.5)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vView",
+      "rhs": "normalize(IN.Tex4.xyz)",
+      "textureSample": false,
+      "raw": "float3 vView=normalize(IN.Tex4.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vLight",
+      "rhs": "normalize(IN.Tex5.xyz)",
+      "textureSample": false,
+      "raw": "float3 vLight=normalize(IN.Tex5.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDot",
+      "rhs": "(dot(vNormal.xyz, vLight.xyz))",
+      "textureSample": false,
+      "raw": "float fDot=(dot(vNormal.xyz, vLight.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vReflect",
+      "rhs": "normalize(2.0*vNormal.xyz*fDot-vView.xyz)",
+      "textureSample": false,
+      "raw": "float3 vReflect=normalize(2.0*vNormal.xyz*fDot-vView.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fSunGlow",
+      "rhs": "saturate(dot(vReflect.xyz, vLight.xyz))",
+      "textureSample": false,
+      "raw": "float fSunGlow=saturate(dot(vReflect.xyz, vLight.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fR0",
+      "rhs": "0.5",
+      "textureSample": false,
+      "raw": "float fR0=0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDist",
+      "rhs": "saturate(IN.Tex3.z)",
+      "textureSample": false,
+      "raw": "float fDist=saturate(IN.Tex3.z);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFoam",
+      "rhs": "saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))",
+      "textureSample": false,
+      "raw": "float fFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fAtten",
+      "rhs": "saturate( saturate(IN.Color.w*(1.0-IN.Tex2.z))+IN.Color.w )",
+      "textureSample": false,
+      "raw": "float fAtten=saturate( saturate(IN.Color.w*(1.0-IN.Tex2.z))+IN.Color.w );",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFresnel",
+      "rhs": "saturate(fFoam*fAtten + fAtten)",
+      "textureSample": false,
+      "raw": "float fFresnel=saturate(fFoam*fAtten + fAtten);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFinal",
+      "rhs": "saturate(reflColor*fFresnel)",
+      "textureSample": false,
+      "raw": "float3 vFinal=saturate(reflColor*fFresnel);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vSunCol",
+      "rhs": "float3(1.0, 0.8, 0.5)",
+      "textureSample": false,
+      "raw": "float3 vSunCol=float3(1.0, 0.8, 0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fSunGlow",
+      "rhs": "2.0*pow(fSunGlow, 64)*fFresnel //*IN.Tex5.w",
+      "textureSample": false,
+      "raw": "fSunGlow=2.0*pow(fSunGlow, 64)*fFresnel; //*IN.Tex5.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vSunGlow",
+      "rhs": "fSunGlow*vFinal.xyz*vSunCol.xyz //*reflColor*fFresnel",
+      "textureSample": false,
+      "raw": "float3 vSunGlow=fSunGlow*vFinal.xyz*vSunCol.xyz; //*reflColor*fFresnel;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fR0",
+      "rhs": "0.0",
+      "textureSample": false,
+      "raw": "fR0=0.0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFoam",
+      "rhs": "saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))*vFinal*WaterColor*0.5",
+      "textureSample": false,
+      "raw": "float3 vFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))*vFinal*WaterColor*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vFoam*",
+      "rhs": "vFoam*4.0",
+      "textureSample": false,
+      "raw": "vFoam*=vFoam*4.0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "vFoam+vFinal+vSunGlow-vFinal.xyz*vSunGlow",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = vFoam+vFinal+vSunGlow-vFinal.xyz*vSunGlow;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "saturate(IN.Color.w*fSunGlow+IN.Color.w)",
+      "textureSample": false,
+      "raw": "OUT.Color.a = saturate(IN.Color.w*fSunGlow+IN.Color.w);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_4",
+    "TEXCOORD1_4",
+    "TEXCOORD2_3",
+    "TEXCOORD3_3",
+    "TEXCOORD4_4",
+    "TEXCOORD5_4"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_4"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_3"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_4"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_4"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vScale=saturate(Matrix.xw);//float2(IN.Tex4.w, IN.Tex4.w))*Matrix.xw",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColorA = tex2D(bumpMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColorB = tex2D(bumpMap, IN.Tex0.zw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vNormal = 0.5*( (2*bumpColorA-1)+(2*bumpColorB-1) )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 newst = (IN.Tex1.xy / IN.Tex1.w)+ vScale.xy * vNormal.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 reflColor = tex2D(envMap, newst.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vWaterColor=float3(0.0, 0.3, 0.5)*WaterColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "reflColor.xyz=vWaterColor*(1.0-ReflectAmount.w)+reflColor.xyz*ReflectAmount.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpColorA = tex2D(bumpMap, IN.Tex0.yx*2.0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpColorB = tex2D(bumpMap, IN.Tex0.wz*2.0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vRefrNormal = 2*((bumpColorA*0.5+bumpColorB*0.5)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vView=normalize(IN.Tex4.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vLight=normalize(IN.Tex5.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDot=(dot(vNormal.xyz, vLight.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vReflect=normalize(2.0*vNormal.xyz*fDot-vView.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fSunGlow=saturate(dot(vReflect.xyz, vLight.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fR0=0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDist=saturate(IN.Tex3.z)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fAtten=saturate( saturate(IN.Color.w*(1.0-IN.Tex2.z))+IN.Color.w )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFresnel=saturate(fFoam*fAtten + fAtten)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFinal=saturate(reflColor*fFresnel)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vSunCol=float3(1.0, 0.8, 0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fSunGlow=2.0*pow(fSunGlow, 64)*fFresnel; //*IN.Tex5.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vSunGlow=fSunGlow*vFinal.xyz*vSunCol.xyz; //*reflColor*fFresnel",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fR0=0.0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFoam=saturate(saturate(fR0+(1-fR0)*pow((1-fDot), 5.0)))*vFinal*WaterColor*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vFoam*=vFoam*4.0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = vFoam+vFinal+vSunGlow-vFinal.xyz*vSunGlow",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = saturate(IN.Color.w*fSunGlow+IN.Color.w)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

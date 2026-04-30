@@ -1,0 +1,118 @@
+{
+  "name": "CGRC_HDR_ShowRG_MRT_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRC_HDR_ShowRG_MRT_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D baseMapRG : texunit0,\r\n  uniform sampler2D baseMapBA : texunit1"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float4 vSample;\r\n  vSample.xy = tex2D(baseMapRG, IN.Tex0.xy).xy;\r\n  vSample.zw = tex2D(baseMapBA, IN.Tex0.xy).xy;\r\n\r\n  OUT.Color = vSample;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "statement",
+      "raw": "float4 vSample;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.xy",
+      "rhs": "tex2D(baseMapRG, IN.Tex0.xy).xy",
+      "textureSample": true,
+      "raw": "vSample.xy = tex2D(baseMapRG, IN.Tex0.xy).xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.zw",
+      "rhs": "tex2D(baseMapBA, IN.Tex0.xy).xy",
+      "textureSample": true,
+      "raw": "vSample.zw = tex2D(baseMapBA, IN.Tex0.xy).xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "vSample",
+      "textureSample": false,
+      "raw": "OUT.Color = vSample;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vSample",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.xy = tex2D(baseMapRG, IN.Tex0.xy).xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.zw = tex2D(baseMapBA, IN.Tex0.xy).xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = vSample",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4"
+  }
+}

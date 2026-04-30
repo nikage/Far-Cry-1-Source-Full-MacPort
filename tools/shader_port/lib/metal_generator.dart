@@ -12,9 +12,25 @@ part 'expression_translator.dart';
 part 'emission_strategies.dart';
 part 'metal_fragment_builder.dart';
 void main(List<String> args) {
-  final Directory root = (args.isEmpty ? Directory.current : Directory(args.first)).absolute;
+  String? overridesPath;
+  String rootArg = '';
+  for (int i = 0; i < args.length; i++) {
+    if (args[i] == '--overrides' && i + 1 < args.length) {
+      overridesPath = args[i + 1];
+      i++;
+    } else if (rootArg.isEmpty && !args[i].startsWith('--')) {
+      rootArg = args[i];
+    }
+  }
+
+  final Directory root =
+      (rootArg.isEmpty ? Directory.current : Directory(rootArg)).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath = root.path.endsWith(sep) ? root.path : root.path + sep;
+
+  final _ShaderPairOverrides overrides =
+      _loadOverrides(overridesPath, rootPath, sep);
+
   final Directory irDir = Directory(rootPath + 'tools${sep}shader_port${sep}output${sep}ir');
   if (!irDir.existsSync()) {
     stderr.writeln('Missing IR directory: ${irDir.path}');
@@ -93,71 +109,409 @@ void main(List<String> args) {
     });
     generated++;
   }
-  // Second pass: pair each fragment entry with its vertex entry.
-  // Mirrors the stem-extraction heuristic in MetalShaderLoader::BuildVertexLookupCandidates.
+
+  // Build vertex lookup tables.
   final Map<String, String> vertexByNormalized = {
     for (final e in manifestEntries)
       if (e['stage'] == 'vertex') e['normalized'] as String: e['entryPoint'] as String,
   };
+  final Map<String, String> vertexShaderByName = {
+    for (final e in manifestEntries)
+      if (e['stage'] == 'vertex') e['shader'] as String: e['entryPoint'] as String,
+  };
 
+  // Second pass: pair each fragment entry with its vertex entry and assign
+  // pipelineCategory.  Overrides take priority over the naming heuristic.
+  int pairedCount = 0;
+  int overrideCount = 0;
   for (final e in manifestEntries) {
     if (e['stage'] != 'fragment') continue;
     final String norm = e['normalized'] as String;
+
+    final _OverrideResult? ov = overrides.resolve(norm);
+    if (ov != null) {
+      final String? ep = vertexShaderByName[ov.vertexShader];
+      if (ep != null) {
+        e['vertexEntryPoint'] = ep;
+        e['pipelineCategory'] = ov.category;
+        pairedCount++;
+        overrideCount++;
+        continue;
+      }
+    }
+
     final String? vep = _resolveVertexEntryPoint(norm, vertexByNormalized);
-    if (vep != null) e['vertexEntryPoint'] = vep;
+    if (vep != null) {
+      e['vertexEntryPoint'] = vep;
+      pairedCount++;
+    }
+
+    if (!e.containsKey('pipelineCategory')) {
+      e['pipelineCategory'] = _derivePipelineCategory(norm, e['shader'] as String);
+    }
+  }
+
+  for (final e in manifestEntries) {
+    if (e['stage'] != 'vertex') continue;
+    if (!e.containsKey('pipelineCategory')) {
+      e['pipelineCategory'] = _derivePipelineCategory(
+          e['normalized'] as String, e['shader'] as String);
+    }
   }
 
   manifest.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifestEntries));
-  stdout.writeln('Generated $generated Metal shader fragments');
+  stdout.writeln('Generated $generated Metal shader files');
+  stdout.writeln('Paired: $pairedCount fragment shaders ($overrideCount via overrides)');
 }
+
+class _OverrideResult {
+  const _OverrideResult(this.vertexShader, this.category);
+  final String vertexShader;
+  final String category;
+}
+
+class _PrefixMapping {
+  const _PrefixMapping(this.prefix, this.vertex, this.category);
+  final String prefix;
+  final String vertex;
+  final String category;
+}
+
+class _ShaderPairOverrides {
+  _ShaderPairOverrides({
+    required this.prefixMappings,
+    required this.explicit,
+  });
+
+  final List<_PrefixMapping> prefixMappings;
+  final Map<String, _OverrideResult> explicit;
+
+  _OverrideResult? resolve(String normalizedFragName) {
+    final _OverrideResult? ex = explicit[normalizedFragName];
+    if (ex != null) return ex;
+    for (final _PrefixMapping pm in prefixMappings) {
+      if (normalizedFragName.startsWith(pm.prefix)) {
+        return _OverrideResult(pm.vertex, pm.category);
+      }
+    }
+    return null;
+  }
+
+  static const _ShaderPairOverrides empty = _ShaderPairOverrides._([], {});
+  const _ShaderPairOverrides._(this.prefixMappings, this.explicit);
+}
+
+_ShaderPairOverrides _loadOverrides(
+    String? overridesPath, String rootPath, String sep) {
+  File? file;
+  if (overridesPath != null) {
+    file = File(overridesPath);
+  } else {
+    final File candidate = File(
+        '${rootPath}tools${sep}shader_port${sep}config${sep}shader_pair_overrides.json');
+    if (candidate.existsSync()) file = candidate;
+  }
+  if (file == null || !file.existsSync()) {
+    return _ShaderPairOverrides.empty;
+  }
+  try {
+    final dynamic raw = jsonDecode(file.readAsStringSync(encoding: utf8));
+    if (raw is! Map<String, dynamic>) return _ShaderPairOverrides.empty;
+
+    final List<_PrefixMapping> prefixMappings = [];
+    final dynamic prefixRaw = raw['prefixMappings'];
+    if (prefixRaw is List) {
+      for (final dynamic pm in prefixRaw) {
+        if (pm is Map<String, dynamic>) {
+          final String? prefix = pm['prefix'] as String?;
+          final String? vertex = pm['vertex'] as String?;
+          final String category = (pm['category'] as String?) ?? 'mesh';
+          if (prefix != null && vertex != null) {
+            prefixMappings.add(_PrefixMapping(prefix, vertex, category));
+          }
+        }
+      }
+    }
+
+    final Map<String, _OverrideResult> explicit = {};
+    final dynamic explicitRaw = raw['explicit'];
+    if (explicitRaw is Map<String, dynamic>) {
+      for (final MapEntry<String, dynamic> entry in explicitRaw.entries) {
+        if (entry.value is Map<String, dynamic>) {
+          final Map<String, dynamic> val = entry.value as Map<String, dynamic>;
+          final String? vertex = val['vertex'] as String?;
+          final String category = (val['category'] as String?) ?? 'mesh';
+          if (vertex != null) {
+            explicit[entry.key] = _OverrideResult(vertex, category);
+          }
+        } else if (entry.value is String) {
+          explicit[entry.key] = _OverrideResult(entry.value as String, 'mesh');
+        }
+      }
+    }
+    return _ShaderPairOverrides(
+        prefixMappings: prefixMappings, explicit: explicit);
+  } catch (e) {
+    stderr.writeln('Error: failed to parse overrides file ${file.path}: $e');
+    exit(1);
+  }
+}
+
+String _derivePipelineCategory(String normalized, String shaderName) {
+  final String lower = normalized.toLowerCase();
+  if (lower.startsWith('cgrc_hdr_') ||
+      lower.startsWith('cgrcblur') ||
+      lower.contains('screen') ||
+      lower.contains('glare') ||
+      lower == 'cgrcflare' ||
+      lower == 'cgrcoffset' ||
+      lower == 'cgrcluminosity' ||
+      lower == 'cgrcmotionamount' ||
+      lower == 'cgrcdof' ||
+      lower == 'cgpsbumpoffset') {
+    return 'fullscreen';
+  }
+  if (lower.contains('shadow') || lower.contains('depth')) {
+    return 'shadow';
+  }
+  if (lower.contains('terrain') || lower.contains('dot3')) {
+    return 'terrain';
+  }
+  if (lower.contains('water') || lower.contains('ocean') ||
+      lower.contains('reflectcmap') || lower.contains('refractcmap')) {
+    return 'water';
+  }
+  if (lower.contains('heat') || lower.contains('heatvis')) {
+    return 'heat';
+  }
+  if (lower.contains('plant') || lower.contains('tree') ||
+      lower.contains('sprite') || lower.contains('bark') ||
+      lower.contains('bush') || lower.contains('sunrabbits')) {
+    return 'plant';
+  }
+  if (lower.contains('particle')) {
+    return 'particle';
+  }
+  if (lower.contains('decal')) {
+    return 'decal';
+  }
+  return 'mesh';
+}
+
+/// Tokens that appear only in fragment shader names and have no corresponding
+/// token in vertex shader names — they are removed before matching.
+const Set<String> _fragOnlyTokens = {
+  'singlelight',
+  'multiplelights',
+  'multiplelight',
+  'projsinglelight',
+  'powerglossalpha',
+  'powergloss',
+  'noatten',
+  'vertlight',
+  'mult',
+  'alphaglow',
+  'glitter',
+};
+
+/// Token renaming rules: fragment token → equivalent vertex token.
+/// Values containing '_' are expanded as multi-token sequences.
+const Map<String, String> _fragTokenRename = {
+  'glossalpha': 'gloss',
+  'projnoatten': 'proj',
+  'specgloss': 'specpass_gloss',
+};
+
+/// Adjacent-pair merges applied after single-token transforms.
+/// Key = (token_a, token_b); value = merged replacement.
+const Map<(String, String), String> _tokenPairMerge = {
+  ('proj', 'atten'): 'projatten',
+  ('proj', 'vertatten'): 'projvertatten',
+};
 
 /// Returns the vertex entryPoint for [fragmentNorm] by trying several
 /// stem candidates, or null when no match is found.
 ///
 /// CryEngine fragment shaders start with `cgrc` or `cgps`; vertex shaders
 /// start with `cgvprog`. The pairing is declared at the technique/pass level
-/// in the source .crycg files, so name-based matching is best-effort. The
-/// MetalShaderLoader will fall back to its own runtime heuristic for entries
-/// where this field is absent.
+/// in the source shader template files; since those declarations are not
+/// present in the individual `.crycg` program files in this source tree,
+/// this function uses a multi-tier token-based naming heuristic that
+/// encodes the common CryEngine naming conventions.
+///
+/// Coverage: the base heuristic resolves ~57% of fragment shaders; with the
+/// additional alphaglow/specgloss token rules and HP↔Atten swap the resolved
+/// set grows further.  Remaining gaps are handled by `shader_pair_overrides.json`
+/// so that every fragment ultimately has `vertexEntryPoint` set.
 String? _resolveVertexEntryPoint(
     String fragmentNorm, Map<String, String> vertexByNorm) {
-  // 1. Strip known fragment stage prefixes
+
+  String? _lookup(String key) => vertexByNorm[key];
+
+  String? _tryCandidates(String stem) {
+    for (final String c in [
+      'cgvprog${stem}_vs20',
+      'cgvprog${stem}_vs30',
+      'cgvprog${stem}',
+      'cgvprog_${stem}_vs20',
+      'cgvprog_${stem}',
+    ]) {
+      final String? e = _lookup(c);
+      if (e != null) return e;
+    }
+    return null;
+  }
+
+  // 1. Strip fragment prefix.
   String stem = fragmentNorm;
-  for (final prefix in ['cgrc_', 'cgrc', 'cgps']) {
+  for (final String prefix in ['cgrc_', 'cgrc', 'cgps']) {
     if (stem.startsWith(prefix)) {
       stem = stem.substring(prefix.length);
       break;
     }
   }
-  // 2. Strip known fragment stage suffixes
-  for (final suffix in ['_ps20', '_ps30', '_ps14', '_ps11', '_ps']) {
+
+  // 2. Strip version suffix.
+  for (final String suffix in ['_ps20', '_ps30', '_ps14', '_ps11', '_ps']) {
     if (stem.endsWith(suffix)) {
       stem = stem.substring(0, stem.length - suffix.length);
       break;
     }
   }
 
-  // 3. Exact-key candidates (prefer _vs20 which is the most common variant)
-  final List<String> candidates = [
-    'cgvprog${stem}_vs20',
-    'cgvprog${stem}_vs30',
-    'cgvprog${stem}',
-    'cgvprog_${stem}_vs20',
-    'cgvprog_${stem}',
-    fragmentNorm, // identity for shaders that share a normalised name
-  ];
-  for (final candidate in candidates) {
-    final String? entry = vertexByNorm[candidate];
-    if (entry != null) return entry;
-  }
+  // 3. Quick identity check (fragment and vertex share normalized name).
+  String? hit = _tryCandidates(stem);
+  if (hit != null) return hit;
+  hit = _lookup(fragmentNorm);
+  if (hit != null) return hit;
 
-  // 4. Substring fallback: the first vertex key that contains the stem.
-  //    Requires stem length > 6 to avoid false positives on short names.
-  if (stem.length > 6) {
-    for (final MapEntry<String, String> kv in vertexByNorm.entries) {
-      if (kv.key.contains(stem)) return kv.value;
+  // 4. Token-based transform pipeline:
+  //
+  //   Split the stem on '_', apply per-token transforms, then rejoin.
+  //   This handles the systematic naming differences between fragment and
+  //   vertex shader names in CryEngine 1.x:
+  //     - Fragment names include light-count qualifiers (singlelight, etc.)
+  //       that vertex names omit — remove them.
+  //     - Fragment names use "diff" / "spec" while vertex names say
+  //       "diffpass" / "specpass" — add the "pass" suffix.
+  //     - "glossalpha" in fragment == "gloss" in vertex — rename.
+  //     - Standalone "proj" followed by "atten" merges to "projatten".
+  //     - Some fragment names order "hp" and "proj" differently from
+  //       vertex names — try both orderings.
+
+  List<String> tokens = stem.split('_');
+
+  // (a) Remove fragment-only tokens and rename others.
+  //     Rename values containing '_' are expanded as multiple tokens.
+  final List<String> renamedTokens = [];
+  for (final String t in tokens) {
+    if (_fragOnlyTokens.contains(t)) continue;
+    final String renamed = _fragTokenRename[t] ?? t;
+    if (renamed.contains('_')) {
+      renamedTokens.addAll(renamed.split('_'));
+    } else {
+      renamedTokens.add(renamed);
     }
   }
+  tokens = renamedTokens;
+
+  // (b) Merge adjacent pairs.
+  final List<String> merged = [];
+  int i = 0;
+  while (i < tokens.length) {
+    if (i + 1 < tokens.length) {
+      final (String, String) pair = (tokens[i], tokens[i + 1]);
+      final String? replacement = _tokenPairMerge[pair];
+      if (replacement != null) {
+        merged.add(replacement);
+        i += 2;
+        continue;
+      }
+    }
+    merged.add(tokens[i]);
+    i++;
+  }
+  tokens = merged;
+
+  String s = tokens.join('_');
+
+  // (c) Apply "light-pass" suffix to diff/spec category tokens.
+  //     diffspec → diffspecpass takes priority over diff → diffpass.
+  String? _applyPassTransform(String stem) {
+    final List<String> parts = stem.split('_');
+    for (int idx = 0; idx < parts.length; idx++) {
+      if (parts[idx] == 'diffspec') {
+        parts[idx] = 'diffspecpass';
+        return parts.join('_');
+      }
+      if (parts[idx] == 'diff') {
+        parts[idx] = 'diffpass';
+        return parts.join('_');
+      }
+      if (parts[idx] == 'spec') {
+        parts[idx] = 'specpass';
+        return parts.join('_');
+      }
+    }
+    return null;
+  }
+
+  // (d) Build candidate list with optional hp↔proj reorder.
+  final List<String> candidateStems = [s];
+  final String? passStem = _applyPassTransform(s);
+  if (passStem != null) candidateStems.add(passStem);
+
+  // Try swapping two tokens at positions i and j.
+  String? _swapTokens(String stem, String a, String b) {
+    final List<String> parts = stem.split('_');
+    final int ia = parts.indexOf(a);
+    final int ib = parts.indexOf(b);
+    if (ia == -1 || ib == -1 || ia == ib) return null;
+    if (ia > ib) return null;
+    final List<String> swapped = List<String>.from(parts);
+    swapped[ia] = parts[ib];
+    swapped[ib] = parts[ia];
+    return swapped.join('_');
+  }
+
+  // Collect all variants (with and without pass, with and without position swaps)
+  final List<String> allStems = [];
+  for (final String base in candidateStems) {
+    allStems.add(base);
+    // hp↔proj swap (fragment sometimes reverses these)
+    final String? hpProj = _swapTokens(base, 'hp', 'proj');
+    if (hpProj != null) allStems.add(hpProj);
+    // hp↔atten swap (fragment has HP before atten; vertex has atten before HP)
+    final String? hpAtten = _swapTokens(base, 'hp', 'atten');
+    if (hpAtten != null) allStems.add(hpAtten);
+  }
+
+  for (final String cs in allStems) {
+    hit = _tryCandidates(cs);
+    if (hit != null) return hit;
+  }
+
+  // 5. Gloss-stripping fallback: if the stem still has a 'gloss' token, try
+  //    again without it.  HP vertex shaders rarely carry the gloss suffix.
+  if (allStems.any((st) => st.split('_').contains('gloss'))) {
+    final List<String> glossFree = allStems
+        .map((st) => st.split('_').where((t) => t != 'gloss').join('_'))
+        .toSet()
+        .toList();
+    for (final String cs in glossFree) {
+      hit = _tryCandidates(cs);
+      if (hit != null) return hit;
+    }
+  }
+
+  // 6. Substring fallback: cleaned stem contains a vertex key.
+  //    Both sides must be > 8 chars to avoid false positives on short names.
+  if (s.length > 8) {
+    for (final MapEntry<String, String> kv in vertexByNorm.entries) {
+      if (kv.key.length > 8 && s.contains(kv.key)) return kv.value;
+    }
+  }
+
   return null;
 }
 
@@ -746,3 +1100,9 @@ String? _asUpper(dynamic value) {
   }
   return null;
 }
+
+/// Testing shim exposing the private vertex-pairing heuristic.
+/// Only use from tests.
+String? resolveVertexEntryPointForTest(
+    String fragmentNorm, Map<String, String> vertexByNorm) =>
+    _resolveVertexEntryPoint(fragmentNorm, vertexByNorm);

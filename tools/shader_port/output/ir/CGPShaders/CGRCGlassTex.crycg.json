@@ -1,0 +1,221 @@
+{
+  "name": "CGRCGlassTex",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCGlassTex.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D envMap : texunit1,\r\n                  uniform float4 ReflAmount"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n\r\n        // load the reflection map\r\n# ifdef _PS_1_1\r\n        float4 envColor = tex2D(envMap, IN.Tex1.xy);\r\n# else\r\n        float4 envColor = tex2Dproj(envMap, IN.Tex1.xyzw);\r\n# endif\r\n        \r\n        float3 env = envColor.xyz*ReflAmount.xyz + decalColor.xyz*(1-ReflAmount.xyz);\r\n        // finally add them all together\r\n        OUT.Color.xyz = env;\r\n        OUT.Color.w = ReflAmount.a * IN.Color.a * decalColor.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the reflection map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 envColor",
+      "rhs": "tex2D(envMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 envColor = tex2D(envMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 envColor",
+      "rhs": "tex2Dproj(envMap, IN.Tex1.xyzw)",
+      "textureSample": true,
+      "raw": "float4 envColor = tex2Dproj(envMap, IN.Tex1.xyzw);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 env",
+      "rhs": "envColor.xyz*ReflAmount.xyz + decalColor.xyz*(1-ReflAmount.xyz)",
+      "textureSample": false,
+      "raw": "float3 env = envColor.xyz*ReflAmount.xyz + decalColor.xyz*(1-ReflAmount.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "env",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = env;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "ReflAmount.a * IN.Color.a * decalColor.a",
+      "textureSample": false,
+      "raw": "OUT.Color.w = ReflAmount.a * IN.Color.a * decalColor.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_4"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 envColor = tex2D(envMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 envColor = tex2Dproj(envMap, IN.Tex1.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 env = envColor.xyz*ReflAmount.xyz + decalColor.xyz*(1-ReflAmount.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = env",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = ReflAmount.a * IN.Color.a * decalColor.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_PS_1_1"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4"
+  }
+}

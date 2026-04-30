@@ -16,6 +16,7 @@ set(XRENDER_METAL_SOURCES
     MetalStateCache.mm
     MetalVertexDescriptor.mm
     MetalRenderElements.mm
+    MetalREOcean.mm
     MetalOptimizations.mm
     MetalImageStubs.mm
 )
@@ -99,6 +100,10 @@ set_source_files_properties(MetalRenderElements.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 
+set_source_files_properties(MetalREOcean.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
 set_source_files_properties(MetalOptimizations.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
@@ -165,20 +170,51 @@ if(DART_COMMAND)
     set(SHADER_HLSL_GENERATOR ${SHADER_PORT_ROOT}/tools/shader_port/lib/hlsl_generator.dart)
     set(METAL_CONVERTER_SCRIPT ${SHADER_PORT_ROOT}/tools/shader_port/bin/metal_converter.dart)
     set(GENERATED_STAMP ${CMAKE_CURRENT_BINARY_DIR}/generated_shaders.stamp)
+    set(SHADER_PAIR_VALIDATOR ${SHADER_PORT_ROOT}/tools/shader_port/bin/validate_pairs.dart)
+    set(SHADER_PAIR_OVERRIDES ${SHADER_PORT_ROOT}/tools/shader_port/config/shader_pair_overrides.json)
+
+    # Locate the .crycg source files. The canonical location inside this
+    # repo is Assets/Shaders/Source/Shaders/HWScripts/Declarations; fall back
+    # to the legacy Shaders/Legacy symlink for backwards compatibility.
+    if(NOT DEFINED CRYCG_SHADERS_DIR)
+        if(EXISTS ${CMAKE_SOURCE_DIR}/Assets/Shaders/Source/Shaders/HWScripts/Declarations)
+            set(CRYCG_SHADERS_DIR ${CMAKE_SOURCE_DIR}/Assets/Shaders/Source/Shaders/HWScripts/Declarations)
+        elseif(EXISTS ${CMAKE_SOURCE_DIR}/Shaders/Legacy)
+            set(CRYCG_SHADERS_DIR ${CMAKE_SOURCE_DIR}/Shaders/Legacy)
+        else()
+            message(FATAL_ERROR
+                "Cannot find .crycg shader source files. "
+                "Expected at: ${CMAKE_SOURCE_DIR}/Assets/Shaders/Source/Shaders/HWScripts/Declarations\n"
+                "Override with: cmake -DCRYCG_SHADERS_DIR=<path> .")
+        endif()
+    endif()
+    message(STATUS "CryCG shader source directory: ${CRYCG_SHADERS_DIR}")
 
     add_custom_command(
         OUTPUT ${GENERATED_STAMP}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_SOURCE_DIR}/Generated
-        COMMAND ${DART_COMMAND} ${SHADER_PARSER} ${SHADER_PORT_ROOT}
+        COMMAND ${DART_COMMAND} ${SHADER_PARSER} --shaders-dir ${CRYCG_SHADERS_DIR} ${SHADER_PORT_ROOT}
         COMMAND ${DART_COMMAND} ${SHADER_METAL_GENERATOR} ${SHADER_PORT_ROOT}
+            --overrides ${SHADER_PAIR_OVERRIDES}
         COMMAND ${CMAKE_COMMAND} -E touch ${GENERATED_STAMP}
-        DEPENDS ${SHADER_PARSER} ${SHADER_METAL_GENERATOR}
+        DEPENDS ${SHADER_PARSER} ${SHADER_METAL_GENERATOR} ${SHADER_PAIR_OVERRIDES}
         WORKING_DIRECTORY ${SHADER_PORT_ROOT}
         COMMENT "Generating Metal shader sources from Cry scripts"
         VERBATIM
     )
 
     add_custom_target(GenerateMetalShaderSources ALL DEPENDS ${GENERATED_STAMP})
+
+    set(GENERATED_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json)
+
+    add_custom_target(ValidateShaderPairs ALL
+        COMMAND ${DART_COMMAND} ${SHADER_PAIR_VALIDATOR}
+            ${GENERATED_MANIFEST}
+        DEPENDS GenerateMetalShaderSources ${SHADER_PAIR_VALIDATOR}
+        WORKING_DIRECTORY ${SHADER_PORT_ROOT}
+        COMMENT "Validating shader vertex/fragment pairing (100% required)"
+        VERBATIM
+    )
 
     if(DXC_EXECUTABLE AND METAL_SHADER_CONVERTER_EXECUTABLE)
         set(USE_HLSL_CONVERSION TRUE)

@@ -1,0 +1,474 @@
+{
+  "name": "CGRCPredator",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCPredator.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " \r\n    uniform sampler2D baseMap : register(s0),\r\n    uniform sampler2D diffuseMap : register(s1),\r\n    uniform sampler2D refrMap : register(s2),\r\n    uniform sampler2D envMap : register(s3),\r\n    uniform sampler2D plasmaMap : register(s4),\r\n    uniform float4 Matrix,\r\n    uniform float4 Ambient,\r\n    uniform float4 RealAmbient,\r\n    uniform float4 Diffuse"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n    struct vertout\r\n    {\r\n      OUT_T0\r\n      OUT_T1\r\n      OUT_T2\r\n      OUT_T3\r\n      OUT_T4\r\n      OUT_T5\r\n      OUT_C0\r\n    };\r\n\r\n    FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "   \r\n    float4 bumpColor = 2*tex2D(baseMap, IN.Tex0.xy)-1;\r\n    float4 diffuseColor = tex2D(diffuseMap, IN.Tex0.xy);\r\n    \r\n    const float2 vScale=float2(0.025, 0.025);\r\n    float2 vNewUv= (IN.Tex1.xy/IN.Tex1.w) + vScale.xy*bumpColor.xy;\r\n    float4 refrColor = tex2D(refrMap, vNewUv);\r\n    \r\n    // compute illumination    \r\n    float3 vAmbient=(Ambient.xyz+Ambient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)));    \r\n    float3 vAmbientDiffuse=diffuseColor*(RealAmbient.xyz+RealAmbient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)));   \r\n    float3 vDiffuse=saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz))*Diffuse.xyz*IN.Color.w;\r\n\r\n    float2 vEnvUV=IN.Tex2.xy+ Matrix.xw * bumpColor.xy;\r\n    float4 envColor = tex2D(envMap, vEnvUV.xy);  \r\n    \r\n    // \"electricity\" effect\r\n    float2 vPlasmaUvA= IN.Tex5.xy + vScale.xy*bumpColor.xy;\r\n    float4 vPlasmaColorA=tex2D(plasmaMap, vPlasmaUvA);\r\n    float2 vPlasmaUvV= IN.Tex5.zw + vScale.xy*bumpColor.xy;\r\n    float4 vPlasmaColorB=tex2D(plasmaMap, vPlasmaUvV);    \r\n    // blend plasma layers\r\n    float4 vPlasmaColor=vPlasmaColorA*0.5+vPlasmaColorB*0.5;           \r\n    \r\n    // remove low-luminosity pixels, brighten up a bit \r\n    vPlasmaColor.xyz=saturate((vPlasmaColor.xyz*vPlasmaColor.xyz-0.5)*4);            \r\n    vPlasmaColor.xyz*=float3(0.5, 0.7, 1.0)*2*Ambient.w;\r\n    \r\n    // compute final refraction        \r\n    float3 vFinalRefr=saturate(envColor.xyz*vDiffuse.xyz+refrColor.xyz*vAmbient.xyz);\r\n    // interpolate between refractive version and ambient bump mapped version\r\n    float3 vFinal=saturate(vFinalRefr.xyz*(1-RealAmbient.w)+vAmbientDiffuse*RealAmbient.w);    \r\n    \r\n    // add plasma effect on top\r\n    OUT.Color.xyz = vFinal+vPlasmaColor-vPlasmaColor*vFinal;\r\n    OUT.Color.a = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColor",
+      "rhs": "2*tex2D(baseMap, IN.Tex0.xy)-1",
+      "textureSample": true,
+      "raw": "float4 bumpColor = 2*tex2D(baseMap, IN.Tex0.xy)-1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 diffuseColor",
+      "rhs": "tex2D(diffuseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 diffuseColor = tex2D(diffuseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "const float2 vScale",
+      "rhs": "float2(0.025, 0.025)",
+      "textureSample": false,
+      "raw": "const float2 vScale=float2(0.025, 0.025);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vNewUv",
+      "rhs": "(IN.Tex1.xy/IN.Tex1.w) + vScale.xy*bumpColor.xy",
+      "textureSample": false,
+      "raw": "float2 vNewUv= (IN.Tex1.xy/IN.Tex1.w) + vScale.xy*bumpColor.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refrColor",
+      "rhs": "tex2D(refrMap, vNewUv)",
+      "textureSample": true,
+      "raw": "float4 refrColor = tex2D(refrMap, vNewUv);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute illumination",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vAmbient",
+      "rhs": "(Ambient.xyz+Ambient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)))",
+      "textureSample": false,
+      "raw": "float3 vAmbient=(Ambient.xyz+Ambient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vAmbientDiffuse",
+      "rhs": "diffuseColor*(RealAmbient.xyz+RealAmbient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)))",
+      "textureSample": false,
+      "raw": "float3 vAmbientDiffuse=diffuseColor*(RealAmbient.xyz+RealAmbient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vDiffuse",
+      "rhs": "saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz))*Diffuse.xyz*IN.Color.w",
+      "textureSample": false,
+      "raw": "float3 vDiffuse=saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz))*Diffuse.xyz*IN.Color.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vEnvUV",
+      "rhs": "IN.Tex2.xy+ Matrix.xw * bumpColor.xy",
+      "textureSample": false,
+      "raw": "float2 vEnvUV=IN.Tex2.xy+ Matrix.xw * bumpColor.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 envColor",
+      "rhs": "tex2D(envMap, vEnvUV.xy)",
+      "textureSample": true,
+      "raw": "float4 envColor = tex2D(envMap, vEnvUV.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "\"electricity\" effect",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vPlasmaUvA",
+      "rhs": "IN.Tex5.xy + vScale.xy*bumpColor.xy",
+      "textureSample": false,
+      "raw": "float2 vPlasmaUvA= IN.Tex5.xy + vScale.xy*bumpColor.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vPlasmaColorA",
+      "rhs": "tex2D(plasmaMap, vPlasmaUvA)",
+      "textureSample": true,
+      "raw": "float4 vPlasmaColorA=tex2D(plasmaMap, vPlasmaUvA);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vPlasmaUvV",
+      "rhs": "IN.Tex5.zw + vScale.xy*bumpColor.xy",
+      "textureSample": false,
+      "raw": "float2 vPlasmaUvV= IN.Tex5.zw + vScale.xy*bumpColor.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vPlasmaColorB",
+      "rhs": "tex2D(plasmaMap, vPlasmaUvV)",
+      "textureSample": true,
+      "raw": "float4 vPlasmaColorB=tex2D(plasmaMap, vPlasmaUvV);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "blend plasma layers",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vPlasmaColor",
+      "rhs": "vPlasmaColorA*0.5+vPlasmaColorB*0.5",
+      "textureSample": false,
+      "raw": "float4 vPlasmaColor=vPlasmaColorA*0.5+vPlasmaColorB*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "remove low-luminosity pixels, brighten up a bit",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vPlasmaColor.xyz",
+      "rhs": "saturate((vPlasmaColor.xyz*vPlasmaColor.xyz-0.5)*4)",
+      "textureSample": false,
+      "raw": "vPlasmaColor.xyz=saturate((vPlasmaColor.xyz*vPlasmaColor.xyz-0.5)*4);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vPlasmaColor.xyz*",
+      "rhs": "float3(0.5, 0.7, 1.0)*2*Ambient.w",
+      "textureSample": false,
+      "raw": "vPlasmaColor.xyz*=float3(0.5, 0.7, 1.0)*2*Ambient.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute final refraction",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFinalRefr",
+      "rhs": "saturate(envColor.xyz*vDiffuse.xyz+refrColor.xyz*vAmbient.xyz)",
+      "textureSample": false,
+      "raw": "float3 vFinalRefr=saturate(envColor.xyz*vDiffuse.xyz+refrColor.xyz*vAmbient.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "interpolate between refractive version and ambient bump mapped version",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFinal",
+      "rhs": "saturate(vFinalRefr.xyz*(1-RealAmbient.w)+vAmbientDiffuse*RealAmbient.w)",
+      "textureSample": false,
+      "raw": "float3 vFinal=saturate(vFinalRefr.xyz*(1-RealAmbient.w)+vAmbientDiffuse*RealAmbient.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "add plasma effect on top",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "vFinal+vPlasmaColor-vPlasmaColor*vFinal",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = vFinal+vPlasmaColor-vPlasmaColor*vFinal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.a = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_4",
+    "TEXCOORD2_2",
+    "TEXCOORD4_3",
+    "TEXCOORD5_4"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_3"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_4"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColor = 2*tex2D(baseMap, IN.Tex0.xy)-1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 diffuseColor = tex2D(diffuseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "const float2 vScale=float2(0.025, 0.025)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vNewUv= (IN.Tex1.xy/IN.Tex1.w) + vScale.xy*bumpColor.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor = tex2D(refrMap, vNewUv)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vAmbient=(Ambient.xyz+Ambient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vAmbientDiffuse=diffuseColor*(RealAmbient.xyz+RealAmbient.xyz*saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz)))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vDiffuse=saturate(dot(normalize(IN.Tex4.xyz), bumpColor.xyz))*Diffuse.xyz*IN.Color.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vEnvUV=IN.Tex2.xy+ Matrix.xw * bumpColor.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 envColor = tex2D(envMap, vEnvUV.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vPlasmaUvA= IN.Tex5.xy + vScale.xy*bumpColor.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vPlasmaColorA=tex2D(plasmaMap, vPlasmaUvA)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vPlasmaUvV= IN.Tex5.zw + vScale.xy*bumpColor.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vPlasmaColorB=tex2D(plasmaMap, vPlasmaUvV)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vPlasmaColor=vPlasmaColorA*0.5+vPlasmaColorB*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPlasmaColor.xyz=saturate((vPlasmaColor.xyz*vPlasmaColor.xyz-0.5)*4)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPlasmaColor.xyz*=float3(0.5, 0.7, 1.0)*2*Ambient.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFinalRefr=saturate(envColor.xyz*vDiffuse.xyz+refrColor.xyz*vAmbient.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFinal=saturate(vFinalRefr.xyz*(1-RealAmbient.w)+vAmbientDiffuse*RealAmbient.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = vFinal+vPlasmaColor-vPlasmaColor*vFinal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4"
+  }
+}

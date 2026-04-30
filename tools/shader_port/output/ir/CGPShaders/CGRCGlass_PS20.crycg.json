@@ -1,0 +1,543 @@
+{
+  "name": "CGRCGlass_PS20",
+  "extension": "crycg",
+  "path": "CGPShaders/CGRCGlass_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n        uniform samplerCUBE Environment : register(s0),\r\n        uniform sampler1D Rainbow : register(s1),\r\n        uniform float4 Params,\r\n        uniform float4 Params1,\r\n        uniform float4 BaseColor"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float3 normal = normalize(IN.Tex0.xyz);\r\n        float3 viewVec = normalize(IN.Tex1.xyz);\r\n        \r\n        float refractionScale = Params.x;\r\n        float reflectionScale = Params.y;\r\n        float rainbowScale    = Params.z;\r\n        float rainbowSpread   = Params.w;\r\n        \r\n        float ambient         = Params1.x;\r\n        float indexOfRefractionRatio = Params1.y;\r\n\r\n        // Look up the reflection\r\n        float3 reflVec = reflect(-viewVec, normal);\r\n        float4 reflection = texCUBE(Environment, reflVec.xyz);\r\n\r\n        // We'll use Snell's refraction law:\r\n        // n  * sin(theta ) = n  * sin(theta )\r\n        //  i            i     r            r\r\n\r\n        // sin(theta )\r\n        //          i\r\n        float cosine = dot(viewVec, normal);\r\n        float sine = sqrt(1 - cosine * cosine);\r\n\r\n        // sin(theta )\r\n        //          r\r\n        float sine2 = saturate(indexOfRefractionRatio * sine);\r\n        float cosine2 = sqrt(1 - sine2 * sine2);\r\n\r\n        // Out of the sine and cosine of the angle between the\r\n        // refraction vector and the normal we can construct the\r\n        // refraction vector itself given two base vectors.\r\n        // These two base vectors are the negative normal and\r\n        // a tangent vector along the path of the incoming vector\r\n        // relative to the surface.\r\n        float3 x = -normal;\r\n        float3 y = normalize(cross(cross(viewVec, normal), normal));\r\n\r\n        // Refraction\r\n        float3 refrVec = x * cosine2 + y * sine2;\r\n        float4 refraction = texCUBE(Environment, refrVec.xyz);\r\n\r\n        // Colors refract differently and the difference is more\r\n        // visible the stronger the refraction. We'll fake this\r\n        // effect by adding some rainbowish colors accordingly.\r\n        float4 rainbow = tex1D(Rainbow, pow(cosine, rainbowSpread));\r\n\r\n        float4 rain = rainbowScale * rainbow * BaseColor;\r\n        float4 refl = reflectionScale * reflection;\r\n        float4 refr = refractionScale * refraction * BaseColor;\r\n\r\n        // There is more light reflected at sharp angles and less\r\n        // light refracted. There is more color separation of refracted\r\n        // light at sharper angles\r\n        OUT.Color = sine * refl + (1 - sine2) * refr + sine2 * rain + ambient;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 normal",
+      "rhs": "normalize(IN.Tex0.xyz)",
+      "textureSample": false,
+      "raw": "float3 normal = normalize(IN.Tex0.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(IN.Tex1.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(IN.Tex1.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float refractionScale",
+      "rhs": "Params.x",
+      "textureSample": false,
+      "raw": "float refractionScale = Params.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float reflectionScale",
+      "rhs": "Params.y",
+      "textureSample": false,
+      "raw": "float reflectionScale = Params.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float rainbowScale",
+      "rhs": "Params.z",
+      "textureSample": false,
+      "raw": "float rainbowScale    = Params.z;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float rainbowSpread",
+      "rhs": "Params.w",
+      "textureSample": false,
+      "raw": "float rainbowSpread   = Params.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float ambient",
+      "rhs": "Params1.x",
+      "textureSample": false,
+      "raw": "float ambient         = Params1.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float indexOfRefractionRatio",
+      "rhs": "Params1.y",
+      "textureSample": false,
+      "raw": "float indexOfRefractionRatio = Params1.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Look up the reflection",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflVec",
+      "rhs": "reflect(-viewVec, normal)",
+      "textureSample": false,
+      "raw": "float3 reflVec = reflect(-viewVec, normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 reflection",
+      "rhs": "texCUBE(Environment, reflVec.xyz)",
+      "textureSample": true,
+      "raw": "float4 reflection = texCUBE(Environment, reflVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "We'll use Snell's refraction law:",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "n  * sin(theta ) = n  * sin(theta )",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "i            i     r            r",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "sin(theta )",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "i",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float cosine",
+      "rhs": "dot(viewVec, normal)",
+      "textureSample": false,
+      "raw": "float cosine = dot(viewVec, normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float sine",
+      "rhs": "sqrt(1 - cosine * cosine)",
+      "textureSample": false,
+      "raw": "float sine = sqrt(1 - cosine * cosine);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "sin(theta )",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "r",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float sine2",
+      "rhs": "saturate(indexOfRefractionRatio * sine)",
+      "textureSample": false,
+      "raw": "float sine2 = saturate(indexOfRefractionRatio * sine);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float cosine2",
+      "rhs": "sqrt(1 - sine2 * sine2)",
+      "textureSample": false,
+      "raw": "float cosine2 = sqrt(1 - sine2 * sine2);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Out of the sine and cosine of the angle between the",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "refraction vector and the normal we can construct the",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "refraction vector itself given two base vectors.",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "These two base vectors are the negative normal and",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "a tangent vector along the path of the incoming vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "relative to the surface.",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 x",
+      "rhs": "-normal",
+      "textureSample": false,
+      "raw": "float3 x = -normal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 y",
+      "rhs": "normalize(cross(cross(viewVec, normal), normal))",
+      "textureSample": false,
+      "raw": "float3 y = normalize(cross(cross(viewVec, normal), normal));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Refraction",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 refrVec",
+      "rhs": "x * cosine2 + y * sine2",
+      "textureSample": false,
+      "raw": "float3 refrVec = x * cosine2 + y * sine2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refraction",
+      "rhs": "texCUBE(Environment, refrVec.xyz)",
+      "textureSample": true,
+      "raw": "float4 refraction = texCUBE(Environment, refrVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Colors refract differently and the difference is more",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "visible the stronger the refraction. We'll fake this",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "effect by adding some rainbowish colors accordingly.",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 rainbow",
+      "rhs": "tex1D(Rainbow, pow(cosine, rainbowSpread))",
+      "textureSample": false,
+      "raw": "float4 rainbow = tex1D(Rainbow, pow(cosine, rainbowSpread));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 rain",
+      "rhs": "rainbowScale * rainbow * BaseColor",
+      "textureSample": false,
+      "raw": "float4 rain = rainbowScale * rainbow * BaseColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refl",
+      "rhs": "reflectionScale * reflection",
+      "textureSample": false,
+      "raw": "float4 refl = reflectionScale * reflection;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refr",
+      "rhs": "refractionScale * refraction * BaseColor",
+      "textureSample": false,
+      "raw": "float4 refr = refractionScale * refraction * BaseColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "There is more light reflected at sharp angles and less",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "light refracted. There is more color separation of refracted",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "light at sharper angles",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "sine * refl + (1 - sine2) * refr + sine2 * rain + ambient",
+      "textureSample": false,
+      "raw": "OUT.Color = sine * refl + (1 - sine2) * refr + sine2 * rain + ambient;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_3",
+    "TEXCOORD1_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_3"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 normal = normalize(IN.Tex0.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(IN.Tex1.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float refractionScale = Params.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float reflectionScale = Params.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float rainbowScale    = Params.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float rainbowSpread   = Params.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float ambient         = Params1.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float indexOfRefractionRatio = Params1.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflVec = reflect(-viewVec, normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 reflection = texCUBE(Environment, reflVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float cosine = dot(viewVec, normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float sine = sqrt(1 - cosine * cosine)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float sine2 = saturate(indexOfRefractionRatio * sine)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float cosine2 = sqrt(1 - sine2 * sine2)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 x = -normal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 y = normalize(cross(cross(viewVec, normal), normal))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 refrVec = x * cosine2 + y * sine2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refraction = texCUBE(Environment, refrVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 rainbow = tex1D(Rainbow, pow(cosine, rainbowSpread))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 rain = rainbowScale * rainbow * BaseColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refl = reflectionScale * reflection",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refr = refractionScale * refraction * BaseColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = sine * refl + (1 - sine2) * refr + sine2 * rain + ambient",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

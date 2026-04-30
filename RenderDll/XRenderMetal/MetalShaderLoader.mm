@@ -32,7 +32,6 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include <unordered_map>
 #include <unordered_set>
 #ifdef min
 #undef min
@@ -1158,6 +1157,9 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
             iLog->Log("MetalShaderManager: base shader '%s' has id=%d\n", kv.first.c_str(), kv.second);
         }
     }
+#if DEBUG
+    ValidateShaderPairs(m_renderer->m_device, defaultLibrary);
+#endif
     InitializeShaderFallbacks();
     
     return true;
@@ -1247,6 +1249,98 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
     
     iLog->Log("Default shaders created: %zu shaders\n", m_shaders.size());
 }
+
+#if DEBUG
+static bool ValidateShaderPairReflection(
+    id<MTLDevice> device,
+    id<MTLFunction> vertexFn,
+    id<MTLFunction> fragmentFn,
+    NSString* shaderName)
+{
+    if (!device || !vertexFn || !fragmentFn)
+        return true;
+
+    MTLRenderPipelineDescriptor* desc = [[MTLRenderPipelineDescriptor alloc] init];
+    desc.vertexFunction   = vertexFn;
+    desc.fragmentFunction = fragmentFn;
+    desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    desc.depthAttachmentPixelFormat      = MTLPixelFormatDepth32Float_Stencil8;
+
+    MTLRenderPipelineReflection* reflection = nil;
+    NSError* err = nil;
+    id<MTLRenderPipelineState> pso =
+        [device newRenderPipelineStateWithDescriptor:desc
+                                            options:MTLPipelineOptionArgumentInfo
+                                         reflection:&reflection
+                                              error:&err];
+    if (!pso)
+    {
+        if (iLog)
+            iLog->LogError("[ValidateShaderPairs] Pipeline dry-run FAILED for '%s': %s",
+                shaderName ? [shaderName UTF8String] : "<unknown>",
+                err ? [[err localizedDescription] UTF8String] : "unknown error");
+        return false;
+    }
+
+    if (iLog)
+        iLog->Log("[ValidateShaderPairs] pair OK: %s (VS args: %lu, FS args: %lu)\n",
+            shaderName ? [shaderName UTF8String] : "<unknown>",
+            reflection ? (unsigned long)[reflection.vertexArguments count] : 0ul,
+            reflection ? (unsigned long)[reflection.fragmentArguments count] : 0ul);
+
+    return true;
+}
+
+void CMetalShaderManager::ValidateShaderPairs(
+    id<MTLDevice> device,
+    id<MTLLibrary> generatedLib)
+{
+    if (!device || !generatedLib)
+        return;
+
+    if (iLog)
+        iLog->Log("[ValidateShaderPairs] Starting debug validation pass...\n");
+
+    int totalPaired      = 0;
+    int validationFailed = 0;
+    const int kMaxFailuresAllowed = 10;
+
+    for (const auto& kv : m_shaders)
+    {
+        @autoreleasepool {
+            const ShaderInfo& info = kv.second;
+            if (!info.isLoaded || !info.vertexFunction || !info.fragmentFunction)
+                continue;
+            if (info.pipelineState != nil)
+            {
+                totalPaired++;
+                continue;
+            }
+
+            NSString* nameStr = nil;
+            for (const auto& nameKv : m_shaderNameMap)
+            {
+                if (nameKv.second == kv.first)
+                {
+                    nameStr = [NSString stringWithUTF8String:nameKv.first.c_str()];
+                    break;
+                }
+            }
+
+            if (!ValidateShaderPairReflection(device, info.vertexFunction, info.fragmentFunction, nameStr))
+                validationFailed++;
+            totalPaired++;
+        }
+    }
+
+    if (iLog)
+        iLog->Log("[ValidateShaderPairs] Validated %d shader pairs; %d pipeline dry-runs failed.\n",
+            totalPaired, validationFailed);
+
+    assert(validationFailed <= kMaxFailuresAllowed &&
+           "Too many shader pairs failed pipeline state creation — check engine log for details");
+}
+#endif
 
 void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 {
