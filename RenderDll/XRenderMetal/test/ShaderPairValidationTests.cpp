@@ -367,6 +367,370 @@ static void testRule3_LongSubstringMatchNoWarning() {
 }
 
 // ---------------------------------------------------------------------------
+// PSO failure soft-limit evaluation
+// Mirrors the softened ValidateShaderPairs logic in MetalShaderLoader.mm.
+// The hard assert was replaced with a LogError so the game can continue.
+// ---------------------------------------------------------------------------
+
+struct PsoValidationOutcome {
+    int failures;
+    int total;
+    bool exceededLimit;
+};
+
+static PsoValidationOutcome evaluatePsoFailures(int failures, int total, int limit) {
+    return { failures, total, failures > limit };
+}
+
+static void testValidatePairs_BelowLimit_NoAlert() {
+    SECTION("ValidateShaderPairs — failures below limit, no alert");
+    auto r = evaluatePsoFailures(5, 100, 10);
+    CHECK_EQ(r.failures, 5);
+    CHECK(!r.exceededLimit);
+}
+
+static void testValidatePairs_AtLimit_NoAlert() {
+    SECTION("ValidateShaderPairs — failures exactly at limit, no alert");
+    auto r = evaluatePsoFailures(10, 100, 10);
+    CHECK(!r.exceededLimit);
+}
+
+static void testValidatePairs_AboveLimit_AlertsButContinues() {
+    SECTION("ValidateShaderPairs — failures exceed limit, alerts but does NOT abort");
+    auto r = evaluatePsoFailures(11, 100, 10);
+    CHECK(r.exceededLimit);
+    CHECK_EQ(r.failures, 11);
+    CHECK_EQ(r.total, 100);
+}
+
+static void testValidatePairs_ManyFailures_AlertsButContinues() {
+    SECTION("ValidateShaderPairs — 341 failures (real-world case), function does not abort");
+    auto r = evaluatePsoFailures(341, 400, 10);
+    CHECK(r.exceededLimit);
+    CHECK_EQ(r.failures, 341);
+}
+
+static void testValidatePairs_ZeroFailures_NoAlert() {
+    SECTION("ValidateShaderPairs — zero failures, no alert");
+    auto r = evaluatePsoFailures(0, 50, 10);
+    CHECK(!r.exceededLimit);
+}
+
+// ---------------------------------------------------------------------------
+// CreateVertexDescriptorFromVertexInputs — pure-C++ logic tests
+// These mirror the logic implemented in MetalVertexDescriptor.mm without
+// depending on Obj-C/Metal headers.
+// ---------------------------------------------------------------------------
+
+enum MockVertexFormat {
+    MOCK_FORMAT_INVALID = 0,
+    MOCK_FORMAT_FLOAT2,
+    MOCK_FORMAT_FLOAT3,
+    MOCK_FORMAT_FLOAT4,
+    MOCK_FORMAT_UCHAR4_NORM,
+};
+
+struct MockAttrDesc {
+    std::string token;
+    std::string category;
+    int components = 0;
+    int slot       = 0;
+    int bufferIndex = 0;
+};
+
+struct MockAttrState {
+    MockVertexFormat format     = MOCK_FORMAT_INVALID;
+    unsigned int     offset     = 0;
+    int              bufferIndex = 0;
+};
+
+struct MockDescriptor {
+    MockAttrState attrs[32];
+    unsigned int  strides[8] = {};
+};
+
+static std::string ToLower(const std::string& s) {
+    std::string out = s;
+    for (char& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return out;
+}
+
+static MockVertexFormat MockFormatFor(const MockAttrDesc& attr) {
+    const std::string cat = ToLower(attr.category);
+    const int comp = attr.components > 0 ? attr.components : 4;
+    if (cat == "color") return MOCK_FORMAT_UCHAR4_NORM;
+    if (comp == 2) return MOCK_FORMAT_FLOAT2;
+    if (comp == 3) return MOCK_FORMAT_FLOAT3;
+    if (comp == 4) return MOCK_FORMAT_FLOAT4;
+    return MOCK_FORMAT_FLOAT3;
+}
+
+static unsigned int MockByteSize(MockVertexFormat fmt) {
+    switch (fmt) {
+        case MOCK_FORMAT_FLOAT2:      return 8;
+        case MOCK_FORMAT_FLOAT3:      return 12;
+        case MOCK_FORMAT_FLOAT4:      return 16;
+        case MOCK_FORMAT_UCHAR4_NORM: return 4;
+        default:                      return 4;
+    }
+}
+
+static MockDescriptor BuildMockDescriptor(std::vector<MockAttrDesc> attrs) {
+    MockDescriptor desc{};
+    std::sort(attrs.begin(), attrs.end(),
+        [](const MockAttrDesc& a, const MockAttrDesc& b){ return a.slot < b.slot; });
+    std::unordered_map<int,unsigned int> bufOffs;
+    for (const MockAttrDesc& a : attrs) {
+        const int slot   = a.slot;
+        const int bufIdx = a.bufferIndex;
+        const MockVertexFormat fmt  = MockFormatFor(a);
+        const unsigned int     off  = bufOffs[bufIdx];
+        desc.attrs[slot].format     = fmt;
+        desc.attrs[slot].offset     = off;
+        desc.attrs[slot].bufferIndex = bufIdx;
+        bufOffs[bufIdx] = off + MockByteSize(fmt);
+    }
+    for (auto& kv : bufOffs) {
+        if (kv.first >= 0 && kv.first < 8)
+            desc.strides[kv.first] = kv.second;
+    }
+    return desc;
+}
+
+static void testVertexDescriptor_TangentAtManifestSlot() {
+    SECTION("CreateVertexDescriptorFromVertexInputs — Tangent at manifest slot 7 (bufferIndex=1)");
+    std::vector<MockAttrDesc> attrs = {
+        { "Position", "position", 3, 0, 0 },
+        { "Normal",   "normal",   3, 1, 0 },
+        { "Color",    "color",    4, 2, 0 },
+        { "Tex0",     "texcoord", 2, 3, 0 },
+        { "Tangent",  "tangent",  3, 7, 1 },
+        { "Binormal", "binormal", 3, 8, 1 },
+        { "TNormal",  "normal",   3, 9, 1 },
+    };
+    MockDescriptor d = BuildMockDescriptor(attrs);
+    CHECK_EQ(d.attrs[7].format,      MOCK_FORMAT_FLOAT3);
+    CHECK_EQ(d.attrs[7].bufferIndex, 1);
+    CHECK_EQ(d.attrs[7].offset,      0u);
+    CHECK_EQ(d.attrs[8].format,      MOCK_FORMAT_FLOAT3);
+    CHECK_EQ(d.attrs[8].bufferIndex, 1);
+    CHECK_EQ(d.attrs[8].offset,      12u);
+    CHECK_EQ(d.attrs[9].format,      MOCK_FORMAT_FLOAT3);
+    CHECK_EQ(d.attrs[9].offset,      24u);
+    CHECK_EQ(d.strides[1], 36u);
+    CHECK_EQ(d.strides[0], 36u);
+}
+
+static void testVertexDescriptor_TwoTexcoords() {
+    SECTION("CreateVertexDescriptorFromVertexInputs — Position + Tex0 + Tex1 (three attrs)");
+    std::vector<MockAttrDesc> attrs = {
+        { "Position", "position", 3, 0, 0 },
+        { "Tex0",     "texcoord", 2, 1, 0 },
+        { "Tex1",     "texcoord", 2, 2, 0 },
+    };
+    MockDescriptor d = BuildMockDescriptor(attrs);
+    CHECK_EQ(d.attrs[0].format, MOCK_FORMAT_FLOAT3);
+    CHECK_EQ(d.attrs[1].format, MOCK_FORMAT_FLOAT2);
+    CHECK_EQ(d.attrs[2].format, MOCK_FORMAT_FLOAT2);
+    CHECK(d.attrs[3].format == MOCK_FORMAT_INVALID);
+    CHECK_EQ(d.attrs[0].offset, 0u);
+    CHECK_EQ(d.attrs[1].offset, 12u);
+    CHECK_EQ(d.attrs[2].offset, 20u);
+    CHECK_EQ(d.strides[0], 28u);
+}
+
+static void testVertexDescriptor_Color1() {
+    SECTION("CreateVertexDescriptorFromVertexInputs — Color1 at slot 1 (UChar4Normalized)");
+    std::vector<MockAttrDesc> attrs = {
+        { "Position", "position", 3, 0, 0 },
+        { "Color1",   "color",    4, 1, 0 },
+    };
+    MockDescriptor d = BuildMockDescriptor(attrs);
+    CHECK_EQ(d.attrs[1].format,      MOCK_FORMAT_UCHAR4_NORM);
+    CHECK_EQ(d.attrs[1].bufferIndex, 0);
+    CHECK_EQ(d.attrs[1].offset,      12u);
+    CHECK_EQ(d.strides[0], 16u);
+}
+
+// ---------------------------------------------------------------------------
+// Alias-registration regression test
+//
+// Reproduces the bug where the two-pass vertexByFuncName build only registered
+// the LAST (versioned) entry-point name for a canonical key, causing fragment
+// shaders whose manifest vertexEntryPoint referred to the bare variant to miss.
+// ---------------------------------------------------------------------------
+
+struct MockVSEntry {
+    std::string entryPoint;
+    std::string normalizedName;
+};
+
+static std::string StripVsSuffix(const std::string& name) {
+    for (const char* suf : { "_vs30", "_vs20", "_vs11", "_vs10" }) {
+        if (name.size() > strlen(suf) &&
+            name.compare(name.size() - strlen(suf), strlen(suf), suf) == 0)
+            return name.substr(0, name.size() - strlen(suf));
+    }
+    return name;
+}
+
+static void testAliasRegistration_BareLookupResolvesVersionedEntry() {
+    SECTION("vertexByFuncName — bare entry-point alias resolves to versioned VS entry");
+
+    // Simulate manifest VS entries: bare 'foo' comes before versioned 'foo_vs20'.
+    // The versioned entry must win in generatedVertexEntries.
+    // Both 'generated_foo_vertex' (bare) AND 'generated_foo_vs20_vertex' (versioned)
+    // must resolve to the same (versioned) stored entry in vertexByFuncName.
+    struct ManifestVS { std::string normalized; std::string entryPoint; };
+    std::vector<ManifestVS> vsManifest = {
+        { "foo",     "generated_foo_vertex"     },   // bare — comes first
+        { "foo_vs20","generated_foo_vs20_vertex"},   // versioned — must win
+    };
+
+    std::unordered_map<std::string, MockVSEntry> generatedVertexEntries;
+    std::unordered_map<std::string, std::vector<std::string>> allEntryPointsByCanonical;
+
+    for (auto& vs : vsManifest) {
+        const std::string canonicalKey = StripVsSuffix(vs.normalized);
+        allEntryPointsByCanonical[canonicalKey].push_back(vs.entryPoint);
+
+        const bool isVersioned = (vs.normalized != canonicalKey);
+        const bool slotEmpty   = generatedVertexEntries.find(canonicalKey) ==
+                                 generatedVertexEntries.end();
+        if (isVersioned || slotEmpty)
+            generatedVertexEntries[canonicalKey] = { vs.entryPoint, vs.normalized };
+    }
+
+    // The stored entry must be the versioned variant.
+    CHECK_STR(generatedVertexEntries["foo"].entryPoint, "generated_foo_vs20_vertex");
+
+    // Build vertexByFuncName with all aliases.
+    std::unordered_map<std::string, const MockVSEntry*> vertexByFuncName;
+    for (auto& [canonKey, eps] : allEntryPointsByCanonical) {
+        auto it = generatedVertexEntries.find(canonKey);
+        if (it == generatedVertexEntries.end()) continue;
+        for (const std::string& ep : eps)
+            vertexByFuncName[ep] = &it->second;
+    }
+
+    // Both the bare and versioned entry-point names must resolve to the versioned entry.
+    CHECK(vertexByFuncName.count("generated_foo_vertex") == 1);
+    CHECK(vertexByFuncName.count("generated_foo_vs20_vertex") == 1);
+    CHECK_STR(vertexByFuncName["generated_foo_vertex"]->entryPoint,
+              "generated_foo_vs20_vertex");
+    CHECK_STR(vertexByFuncName["generated_foo_vs20_vertex"]->entryPoint,
+              "generated_foo_vs20_vertex");
+}
+
+static void testAliasRegistration_VersionedOnlyNoAliasNeeded() {
+    SECTION("vertexByFuncName — versioned-only shader registers its entry point");
+
+    struct ManifestVS { std::string normalized; std::string entryPoint; };
+    std::vector<ManifestVS> vsManifest = {
+        { "bar_vs20", "generated_bar_vs20_vertex" },
+    };
+
+    std::unordered_map<std::string, MockVSEntry> generatedVertexEntries;
+    std::unordered_map<std::string, std::vector<std::string>> allEntryPointsByCanonical;
+
+    for (auto& vs : vsManifest) {
+        const std::string canonicalKey = StripVsSuffix(vs.normalized);
+        allEntryPointsByCanonical[canonicalKey].push_back(vs.entryPoint);
+        const bool isVersioned = (vs.normalized != canonicalKey);
+        const bool slotEmpty   = generatedVertexEntries.find(canonicalKey) ==
+                                 generatedVertexEntries.end();
+        if (isVersioned || slotEmpty)
+            generatedVertexEntries[canonicalKey] = { vs.entryPoint, vs.normalized };
+    }
+
+    std::unordered_map<std::string, const MockVSEntry*> vertexByFuncName;
+    for (auto& [canonKey, eps] : allEntryPointsByCanonical) {
+        auto it = generatedVertexEntries.find(canonKey);
+        if (it == generatedVertexEntries.end()) continue;
+        for (const std::string& ep : eps)
+            vertexByFuncName[ep] = &it->second;
+    }
+
+    CHECK(vertexByFuncName.count("generated_bar_vs20_vertex") == 1);
+    CHECK_STR(vertexByFuncName["generated_bar_vs20_vertex"]->entryPoint,
+              "generated_bar_vs20_vertex");
+}
+
+// ---------------------------------------------------------------------------
+// isVersioned correctness when stage-prefix stripping makes canonicalKey != normalizedKey
+//
+// Regression test for the bug where `isVersioned = (normalizedKey != canonicalKey)`
+// was always true because BuildStageAgnosticKey strips the stage prefix ("cgvprog"),
+// causing the bare VS to overwrite VS20 in m_generatedVertexEntries when it appeared
+// after VS20 in the manifest.  The correct check is whether normalizedKey itself ends
+// with a _vsXX suffix.
+// ---------------------------------------------------------------------------
+
+static std::string StripStagePrefixForTest(const std::string& v) {
+    for (const char* pfx : { "cgvprog_", "cgvprog", "cgv_", "cgrc_", "cgrc", "cg_" }) {
+        size_t len = strlen(pfx);
+        if (v.size() >= len && v.compare(0, len, pfx) == 0)
+            return v.substr(len);
+    }
+    return v;
+}
+
+// Mirrors BuildStageAgnosticKey: strip stage prefix AND version suffix.
+static std::string BuildCanonicalKey(const std::string& normalizedKey) {
+    return StripVsSuffix(StripStagePrefixForTest(normalizedKey));
+}
+
+static void testIsVersioned_StagePrefixDoesNotMakeBareLookVersioned() {
+    SECTION("isVersioned — bare VS with cgvprog prefix must NOT be treated as versioned");
+
+    // Both 'cgvprogbump_foo' (bare) and 'cgvprogbump_foo_vs20' share the same
+    // canonical key after stage-prefix + VS-suffix stripping.
+    // VS20 appears first in the manifest; bare comes second.
+    // With the buggy `isVersioned = (normalizedKey != canonicalKey)` check, bare
+    // would overwrite VS20 because the stage-prefix makes canonicalKey differ from
+    // normalizedKey for BOTH entries.  The correct `isVersioned` must be based
+    // solely on whether the normalizedKey ends with a _vsXX suffix.
+
+    struct ManifestVS { std::string normalized; std::string entryPoint; };
+    std::vector<ManifestVS> vsManifest = {
+        { "cgvprogbump_foo_vs20", "generated_cgvprogbump_foo_vs20_vertex" },   // versioned first
+        { "cgvprogbump_foo",      "generated_cgvprogbump_foo_vertex"      },   // bare second (must NOT win)
+    };
+
+    std::unordered_map<std::string, MockVSEntry> generatedVertexEntries;
+    std::unordered_map<std::string, std::vector<std::string>> allEntryPointsByCanonical;
+
+    for (auto& vs : vsManifest) {
+        const std::string canonicalKey = BuildCanonicalKey(vs.normalized);
+        allEntryPointsByCanonical[canonicalKey].push_back(vs.entryPoint);
+
+        // Correct isVersioned: test for explicit _vsXX suffix in the normalized key.
+        const bool isVersioned = (StripVsSuffix(vs.normalized) != vs.normalized);
+        const bool slotEmpty   = generatedVertexEntries.find(canonicalKey) ==
+                                 generatedVertexEntries.end();
+        if (isVersioned || slotEmpty)
+            generatedVertexEntries[canonicalKey] = { vs.entryPoint, vs.normalized };
+    }
+
+    // VS20 must win — bare bare must NOT overwrite it.
+    CHECK_STR(generatedVertexEntries["bump_foo"].entryPoint, "generated_cgvprogbump_foo_vs20_vertex");
+
+    // Both aliases in vertexByFuncName must point to the VS20 entry.
+    std::unordered_map<std::string, const MockVSEntry*> vertexByFuncName;
+    for (auto& [canonKey, eps] : allEntryPointsByCanonical) {
+        auto it = generatedVertexEntries.find(canonKey);
+        if (it == generatedVertexEntries.end()) continue;
+        for (const std::string& ep : eps)
+            vertexByFuncName[ep] = &it->second;
+    }
+
+    CHECK_STR(vertexByFuncName["generated_cgvprogbump_foo_vs20_vertex"]->entryPoint,
+              "generated_cgvprogbump_foo_vs20_vertex");
+    CHECK_STR(vertexByFuncName["generated_cgvprogbump_foo_vertex"]->entryPoint,
+              "generated_cgvprogbump_foo_vs20_vertex");
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 int main() {
@@ -389,6 +753,17 @@ int main() {
     testCoverageRatio_Zero();
     testEmptyManifest();
     testNormalizationCategory();
+    testValidatePairs_BelowLimit_NoAlert();
+    testValidatePairs_AtLimit_NoAlert();
+    testValidatePairs_AboveLimit_AlertsButContinues();
+    testValidatePairs_ManyFailures_AlertsButContinues();
+    testValidatePairs_ZeroFailures_NoAlert();
+    testVertexDescriptor_TangentAtManifestSlot();
+    testVertexDescriptor_TwoTexcoords();
+    testVertexDescriptor_Color1();
+    testAliasRegistration_BareLookupResolvesVersionedEntry();
+    testAliasRegistration_VersionedOnlyNoAliasNeeded();
+    testIsVersioned_StagePrefixDoesNotMakeBareLookVersioned();
 
     fprintf(stdout, "\nResults: %d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

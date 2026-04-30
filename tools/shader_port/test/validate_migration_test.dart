@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 
 import '../bin/validate_migration.dart';
@@ -91,6 +93,39 @@ void main() {
 
       expect(capturedExe, 'dart');
       expect(capturedArgs, ['run', 'foo.dart', '--verbose']);
+    });
+  });
+
+  group('touchGeneratedStamp', () {
+    test('returns true and updates mtime when stamp file exists', () {
+      final Directory root = Directory.systemTemp.createTempSync('stamp_root_');
+      try {
+        // Mirror the path structure the function expects.
+        final Directory stampDir = Directory(
+          '${root.path}/build/RenderDll/XRenderMetal',
+        )..createSync(recursive: true);
+        final File stamp = File('${stampDir.path}/generated_shaders.stamp')
+          ..writeAsStringSync('');
+        final DateTime before = stamp.lastModifiedSync();
+        sleep(const Duration(milliseconds: 1100));
+
+        final bool result = touchGeneratedStamp(root.path);
+
+        expect(result, isTrue);
+        expect(stamp.lastModifiedSync().isAfter(before), isTrue);
+      } finally {
+        root.deleteSync(recursive: true);
+      }
+    });
+
+    test('returns false and does not throw when stamp file is absent', () {
+      final Directory root = Directory.systemTemp.createTempSync('stamp_root2_');
+      try {
+        final bool result = touchGeneratedStamp(root.path);
+        expect(result, isFalse);
+      } finally {
+        root.deleteSync(recursive: true);
+      }
     });
   });
 

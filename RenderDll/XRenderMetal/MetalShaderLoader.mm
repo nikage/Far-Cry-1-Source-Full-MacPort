@@ -685,6 +685,38 @@ static std::vector<GeneratedVertexAttributeDesc> BuildGeneratedVertexAttributes(
     return attributes;
 }
 
+static std::vector<GeneratedVertexAttributeDesc> BuildGeneratedVertexInputs(NSArray* vertexInputs)
+{
+    std::vector<GeneratedVertexAttributeDesc> result;
+    if (!vertexInputs || ![vertexInputs isKindOfClass:[NSArray class]])
+        return result;
+    for (id entry in vertexInputs)
+    {
+        if (![entry isKindOfClass:[NSDictionary class]])
+            continue;
+        NSDictionary* dict = (NSDictionary*)entry;
+        GeneratedVertexAttributeDesc attr;
+        NSString* name     = dict[@"name"];
+        NSString* category = dict[@"category"];
+        NSString* semantic = dict[@"semantic"];
+        NSString* label    = dict[@"label"];
+        NSNumber* components  = dict[@"components"];
+        NSNumber* index       = dict[@"index"];
+        NSNumber* slot        = dict[@"slot"];
+        NSNumber* bufferIndex = dict[@"bufferIndex"];
+        attr.token       = NSStringToStdString(name);
+        attr.category    = NSStringToStdString(category);
+        attr.semantic    = NSStringToStdString(semantic);
+        attr.label       = NSStringToStdString(label);
+        attr.components  = components  ? components.intValue  : 0;
+        attr.index       = index       ? index.intValue       : -1;
+        attr.slot        = slot        ? slot.intValue        : static_cast<int>(result.size());
+        attr.bufferIndex = bufferIndex ? bufferIndex.intValue : 0;
+        result.push_back(attr);
+    }
+    return result;
+}
+
 static std::vector<GeneratedVertexOutputDesc> BuildGeneratedVertexOutputs(NSArray* outputsArray)
 {
     std::vector<GeneratedVertexOutputDesc> outputs;
@@ -1332,8 +1364,14 @@ void CMetalShaderManager::ValidateShaderPairs(
         iLog->Log("[ValidateShaderPairs] Validated %d shader pairs; %d pipeline dry-runs failed.\n",
             totalPaired, validationFailed);
 
-    assert(validationFailed <= kMaxFailuresAllowed &&
-           "Too many shader pairs failed pipeline state creation — check engine log for details");
+    if (validationFailed > kMaxFailuresAllowed)
+    {
+        if (iLog)
+            iLog->LogError(
+                "[ValidateShaderPairs] %d/%d shader pairs failed pipeline dry-run "
+                "(limit %d) — game continues with fallback shaders\n",
+                validationFailed, totalPaired, kMaxFailuresAllowed);
+    }
 }
 #endif
 
@@ -1421,6 +1459,10 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
     size_t matchedFragmentVertexCount = 0;
     size_t missingFragmentVertexCount = 0;
     std::unordered_map<std::string, const GeneratedVertexEntry*> vertexByFuncName;
+    // Tracks every entry-point name (bare AND versioned) that appeared for each
+    // canonical key.  Used below to register aliases in vertexByFuncName so
+    // that a manifest vertexEntryPoint pointing to either form resolves correctly.
+    std::unordered_map<std::string, std::vector<std::string>> allEntryPointsByCanonical;
 
     for (NSDictionary* entry in entries)
     {
@@ -1448,28 +1490,58 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             continue;
 
         const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
+        const std::string thisEntryPoint = NSStringToStdString(fragmentName);
+
+        // Remember every entry-point name seen for this canonical key (bare and
+        // versioned alike) — we register them all as aliases after the map is stable.
+        allEntryPointsByCanonical[canonicalKey].push_back(thisEntryPoint);
+
         GeneratedVertexEntry vertexEntry;
         vertexEntry.shaderName = NSStringToStdString(shaderName);
         vertexEntry.normalizedName = normalizedKey;
-        vertexEntry.entryPoint = NSStringToStdString(fragmentName);
+        vertexEntry.entryPoint = thisEntryPoint;
         vertexEntry.attributes = BuildGeneratedVertexAttributes(vertexAttrMetaArray);
+        NSArray* vertexInputsArray = entry[@"vertexInputs"];
+        vertexEntry.vertexInputDescs = BuildGeneratedVertexInputs(vertexInputsArray);
         NSArray* vertexOutputsArray = entry[@"vertexOutputs"];
         vertexEntry.outputs = BuildGeneratedVertexOutputs(vertexOutputsArray);
-        m_generatedVertexEntries[canonicalKey] = std::move(vertexEntry);
-        vertexByFuncName[m_generatedVertexEntries[canonicalKey].entryPoint] =
-            &m_generatedVertexEntries[canonicalKey];
-        if (iLog)
+        // When both a versioned (_vs10/_vs20 etc.) and a bare shader map to the
+        // same canonical key, the versioned entry must win.  The Dart generator
+        // pairs each FS with the versioned VS in the manifest and builds the
+        // FS stage_in to match that variant's outputs; if the bare VS were
+        // selected at runtime the types would mismatch and PSO creation fails.
+        //
+        // IMPORTANT: do NOT use (normalizedKey != canonicalKey) here — that is
+        // always true for every VS entry because BuildStageAgnosticKey strips the
+        // stage prefix ("cgvprog"), making canonicalKey differ from normalizedKey
+        // even for bare shaders.  Instead, test whether the normalizedKey itself
+        // has an explicit _vsXX suffix, which is the true signal of a versioned VS.
+        const bool isVersioned = (StripVertexSuffix(normalizedKey) != normalizedKey);
+        const bool slotEmpty =
+            m_generatedVertexEntries.find(canonicalKey) ==
+            m_generatedVertexEntries.end();
+        if (isVersioned || slotEmpty)
         {
-            iLog->Log("MetalShaderManager: cached generated vertex '%s' (key=%s)",
-                      shaderName ? [shaderName UTF8String] : "<unnamed>",
-                      canonicalKey.c_str());
+            m_generatedVertexEntries[canonicalKey] = std::move(vertexEntry);
+            // NOTE: do NOT populate vertexByFuncName here.  Inserting into
+            // m_generatedVertexEntries may trigger a rehash that moves all
+            // elements, invalidating any pointer stored before the rehash.
+            // vertexByFuncName is built in a second scan below, after all VS
+            // entries have been inserted and the map layout is stable.
         }
-        else
-        {
-            fprintf(stderr, "MetalShaderManager: cached generated vertex '%s' (key=%s)\n",
-                    shaderName ? [shaderName UTF8String] : "<unnamed>",
-                    canonicalKey.c_str());
-        }
+    }
+
+    // Build vertexByFuncName NOW — after all insertions — so no pointer is
+    // ever taken from a map that will subsequently rehash.
+    // Register EVERY known entry-point alias (bare and versioned) so that
+    // manifest vertexEntryPoint values of either form resolve correctly.
+    for (auto& [canonKey, eps] : allEntryPointsByCanonical)
+    {
+        auto it = m_generatedVertexEntries.find(canonKey);
+        if (it == m_generatedVertexEntries.end())
+            continue;
+        for (const std::string& ep : eps)
+            vertexByFuncName[ep] = &it->second;
     }
 
     if (iLog)
@@ -1638,13 +1710,20 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         bool metadataNeedsTangents = layout.needsTangents;
         if (matchedVertexEntry)
         {
-            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(
-                matchedVertexEntry->attributes,
-                &metadataNeedsTangents,
-                &vertexFormat);
-            if (descriptor)
+            if (!matchedVertexEntry->vertexInputDescs.empty())
             {
-                layout.needsTangents = metadataNeedsTangents;
+                descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromVertexInputs(
+                    matchedVertexEntry->vertexInputDescs);
+                layout.needsTangents = false;
+            }
+            else
+            {
+                descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(
+                    matchedVertexEntry->attributes,
+                    &metadataNeedsTangents,
+                    &vertexFormat);
+                if (descriptor)
+                    layout.needsTangents = metadataNeedsTangents;
             }
         }
         if (layout.needsTangents && iLog)
@@ -1663,7 +1742,16 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         {
             if (matchedVertexEntry && generatedLibrary)
             {
-                NSString* generatedVertexName = [NSString stringWithUTF8String:matchedVertexEntry->entryPoint.c_str()];
+                // Prefer the manifest vertexEntryPoint name directly: it names
+                // the exact VS function the generator paired with this FS.
+                // matchedVertexEntry may be the canonical-winner (e.g. _vs20) whose
+                // entryPoint differs from manifestVEP (e.g. bare VS).  Loading the
+                // function by manifestVEP ensures VS output types match the FS
+                // stage_in regardless of which VS variant won the canonical slot.
+                NSString* generatedVertexName =
+                    (manifestVEP && [manifestVEP length] > 0)
+                        ? manifestVEP
+                        : [NSString stringWithUTF8String:matchedVertexEntry->entryPoint.c_str()];
                 if (generatedVertexName && [generatedVertexName length] > 0)
                 {
                     NSError* vertFuncErr = nil;
@@ -1679,7 +1767,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                     else if (iLog)
                     {
                         iLog->Log("MetalShaderManager: Missing generated vertex function '%s' for shader '%s'\n",
-                                  matchedVertexEntry->entryPoint.c_str(),
+                                  [generatedVertexName UTF8String],
                                   shaderName ? [shaderName UTF8String] : "<unnamed>");
                     }
                 }

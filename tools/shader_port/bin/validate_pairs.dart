@@ -33,7 +33,7 @@ void main(List<String> args) {
   );
 
   if (result.warnings.isNotEmpty) {
-    stdout.writeln('\nWarnings (Rule 3 — structural compatibility):');
+    stdout.writeln('\nWarnings (Rule 3/3c — structural compatibility / component counts):');
     for (final ValidationError w in result.warnings) {
       stdout.writeln('  $w');
     }

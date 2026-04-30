@@ -25,6 +25,8 @@ struct GeneratedVertexAttributeDesc
     std::string label;
     int components = 0;
     int index = -1;
+    int slot = -1;
+    int bufferIndex = 0;
 };
 
 struct GeneratedVertexOutputDesc
@@ -40,6 +42,7 @@ struct GeneratedVertexEntry
     std::string entryPoint;
     std::vector<GeneratedVertexAttributeDesc> attributes;
     std::vector<GeneratedVertexOutputDesc> outputs;
+    std::vector<GeneratedVertexAttributeDesc> vertexInputDescs;
 };
 
 #endif

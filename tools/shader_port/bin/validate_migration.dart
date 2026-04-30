@@ -144,6 +144,23 @@ BuildStagesResult buildStages({
   );
 }
 
+/// Touches the CMake-managed stamp file that guards `GeneratedShaders.metallib`
+/// so that the next `cmake --build` detects the generator output as changed.
+///
+/// Returns true if the stamp existed and was updated, false if it was absent.
+bool touchGeneratedStamp(String rootArg) {
+  final String sep = Platform.pathSeparator;
+  final String rootPath = rootArg.endsWith(sep)
+      ? rootArg.substring(0, rootArg.length - sep.length)
+      : rootArg;
+  final File stamp = File(
+    '$rootPath${sep}build${sep}RenderDll${sep}XRenderMetal${sep}generated_shaders.stamp',
+  );
+  if (!stamp.existsSync()) return false;
+  stamp.setLastModifiedSync(DateTime.now());
+  return true;
+}
+
 Future<void> main(List<String> args) async {
   String rootArg = '.';
   bool skipValidateIr = false;
@@ -217,8 +234,23 @@ Future<void> main(List<String> args) async {
   );
 
   final StageRunner runner = _makeProcessRunner(built.verbose);
-  final int exitCode = await runStages(built.stages, runner);
-  if (exitCode != 0) exit(exitCode);
+
+  // Run stages one by one so we can hook post-generate behaviour.
+  for (final Stage stage in built.stages) {
+    final int code = await runner(stage.name, stage.executable, stage.args);
+    if (code != 0) exit(code);
+
+    // After the generator runs, touch GENERATED_STAMP so that the next
+    // `cmake --build` knows the Metal source files have changed and recompiles
+    // GeneratedShaders.metallib.  Without this, running validate_migration.dart
+    // outside CMake leaves the stamp stale and the metallib is silently skipped.
+    if (stage.name == 'generate') {
+      final bool touched = touchGeneratedStamp(rootArg);
+      if (built.verbose && touched) {
+        stdout.writeln('  [info] Touched generated_shaders.stamp');
+      }
+    }
+  }
 
   stdout.writeln('\nAll stages passed.');
 }

@@ -570,6 +570,82 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F_N_COL4UB
     return descriptor;
 }
 
+static MTLVertexFormat VertexFormatForAttribute(const GeneratedVertexAttributeDesc& attr)
+{
+    const std::string cat = ToLowerCopy(attr.category);
+    const int comp = attr.components > 0 ? attr.components : 4;
+    if (cat == "color")
+        return MTLVertexFormatUChar4Normalized;
+    if (comp == 2)
+        return MTLVertexFormatFloat2;
+    if (comp == 3)
+        return MTLVertexFormatFloat3;
+    if (comp == 4)
+        return MTLVertexFormatFloat4;
+    return MTLVertexFormatFloat3;
+}
+
+static NSUInteger ByteSizeForVertexFormat(MTLVertexFormat format)
+{
+    switch (format)
+    {
+        case MTLVertexFormatFloat2:             return 8;
+        case MTLVertexFormatFloat3:             return 12;
+        case MTLVertexFormatFloat4:             return 16;
+        case MTLVertexFormatUChar4Normalized:   return 4;
+        case MTLVertexFormatUChar4:             return 4;
+        default:                                return 4;
+    }
+}
+
+MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptorFromVertexInputs(
+    const std::vector<GeneratedVertexAttributeDesc>& attributes)
+{
+    if (attributes.empty())
+        return nil;
+
+    MTLVertexDescriptor* descriptor = [[MTLVertexDescriptor alloc] init];
+    if (!descriptor)
+        return nil;
+
+    std::unordered_map<int, NSUInteger> bufferOffsets;
+
+    std::vector<GeneratedVertexAttributeDesc> sorted = attributes;
+    std::sort(sorted.begin(), sorted.end(),
+        [](const GeneratedVertexAttributeDesc& a, const GeneratedVertexAttributeDesc& b) {
+            return a.slot < b.slot;
+        });
+
+    for (const GeneratedVertexAttributeDesc& attr : sorted)
+    {
+        const int slot = attr.slot >= 0 ? attr.slot : 0;
+        const int bufIdx = attr.bufferIndex;
+        const MTLVertexFormat fmt = VertexFormatForAttribute(attr);
+        const NSUInteger byteSize = ByteSizeForVertexFormat(fmt);
+        const NSUInteger offset = bufferOffsets[bufIdx];
+
+        descriptor.attributes[slot].format = fmt;
+        descriptor.attributes[slot].offset = offset;
+        descriptor.attributes[slot].bufferIndex = bufIdx;
+
+        bufferOffsets[bufIdx] = offset + byteSize;
+    }
+
+    for (const auto& kv : bufferOffsets)
+    {
+        const int bufIdx = kv.first;
+        const NSUInteger stride = kv.second;
+        if (stride > 0)
+        {
+            descriptor.layouts[bufIdx].stride = stride;
+            descriptor.layouts[bufIdx].stepRate = 1;
+            descriptor.layouts[bufIdx].stepFunction = MTLVertexStepFunctionPerVertex;
+        }
+    }
+
+    return descriptor;
+}
+
 void CMetalVertexDescriptorHelper::AttachTangentAttributes(MTLVertexDescriptor* descriptor)
 {
     if (!descriptor)

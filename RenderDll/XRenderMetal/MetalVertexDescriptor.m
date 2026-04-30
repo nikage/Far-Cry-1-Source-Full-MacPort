@@ -31,6 +31,8 @@ public:
         const std::vector<GeneratedVertexAttributeDesc>& attributes,
         bool* outNeedsTangents,
         int* outVertexFormat);
+    static MTLVertexDescriptor* CreateVertexDescriptorFromVertexInputs(
+        const std::vector<GeneratedVertexAttributeDesc>& attributes);
     static void AttachTangentAttributes(MTLVertexDescriptor* descriptor);
     
 private:
