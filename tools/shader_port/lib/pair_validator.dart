@@ -117,39 +117,69 @@ void _checkStructuralCompatibility(
   final dynamic vsOutputsRaw = vert['vertexOutputs'];
   if (vsOutputsRaw is! List || vsOutputsRaw.isEmpty) return;
 
-  final dynamic fsAttrsRaw = frag['vertexAttributes'];
-  if (fsAttrsRaw is! List || fsAttrsRaw.isEmpty) return;
-
-  final Set<String> vsOutputNames = {
+  // Build a name→components map from vertex outputs (shared by Rule 3 and 3c).
+  final Map<String, int> vsOutputComponents = {
     for (final dynamic o in vsOutputsRaw)
-      if (o is Map<String, dynamic> && o['name'] is String)
-        (o['name'] as String).toLowerCase(),
+      if (o is Map<String, dynamic> &&
+          o['name'] is String &&
+          o['components'] is int)
+        (o['name'] as String).toLowerCase(): o['components'] as int,
   };
 
-  final List<String> missingFromVs = [];
-  for (final dynamic attr in fsAttrsRaw) {
-    if (attr is! String) continue;
-    final String trimmed = attr.trim();
-    if (trimmed.isEmpty) continue;
-    // Skip raw CG/HLSL semantic strings (POSITION_3, TEXCOORD0_2, etc.) —
-    // these are always covered by the hardware pipeline, not by VS output names.
-    if (_kCgSemanticPattern.hasMatch(trimmed)) continue;
-    final String normalized = trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    if (normalized.isEmpty) continue;
-    if (normalized == 'hposition' || normalized == 'position') continue;
-    if (!vsOutputNames.any((o) =>
-        o == normalized ||
-        (o.length > 4 && normalized.length > 4 && normalized.contains(o)))) {
-      missingFromVs.add(trimmed);
+  final Set<String> vsOutputNames = vsOutputComponents.keys.toSet();
+
+  // Rule 3: VS vertexOutputs must cover FS vertexAttributes by name.
+  final dynamic fsAttrsRaw = frag['vertexAttributes'];
+  if (fsAttrsRaw is List && fsAttrsRaw.isNotEmpty) {
+    final List<String> missingFromVs = [];
+    for (final dynamic attr in fsAttrsRaw) {
+      if (attr is! String) continue;
+      final String trimmed = attr.trim();
+      if (trimmed.isEmpty) continue;
+      // Skip raw CG/HLSL semantic strings (POSITION_3, TEXCOORD0_2, etc.) —
+      // these are always covered by the hardware pipeline, not by VS output names.
+      if (_kCgSemanticPattern.hasMatch(trimmed)) continue;
+      final String normalized =
+          trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (normalized.isEmpty) continue;
+      if (normalized == 'hposition' || normalized == 'position') continue;
+      if (!vsOutputNames.any((o) =>
+          o == normalized ||
+          (o.length > 4 && normalized.length > 4 && normalized.contains(o)))) {
+        missingFromVs.add(trimmed);
+      }
+    }
+    if (missingFromVs.isNotEmpty) {
+      warnings.add(ValidationError(
+        '3',
+        shaderName,
+        'VS output set may not cover FS varyings: ${missingFromVs.join(', ')}',
+      ));
     }
   }
 
-  if (missingFromVs.isNotEmpty) {
-    warnings.add(ValidationError(
-      '3',
-      shaderName,
-      'VS output set may not cover FS varyings: ${missingFromVs.join(', ')}',
-    ));
+  // Rule 3c: component-count mismatch between VS vertexOutputs and FS
+  // vertexAttributeMetadata for the same field name.  A mismatch means the
+  // generated VS and FS structs will use different widths for the same
+  // [[user(N)]] slot, causing a Metal PSO link failure at runtime.
+  final dynamic fsMeta = frag['vertexAttributeMetadata'];
+  if (fsMeta is! List) return;
+  for (final dynamic meta in fsMeta) {
+    if (meta is! Map<String, dynamic>) continue;
+    final String? token = meta['token'] as String?;
+    final int? fsComponents = meta['components'] as int?;
+    if (token == null || fsComponents == null) continue;
+    final String tokenLower = token.toLowerCase();
+    final int? vsComponents = vsOutputComponents[tokenLower];
+    if (vsComponents != null && vsComponents != fsComponents) {
+      warnings.add(ValidationError(
+        '3c',
+        shaderName,
+        'component count mismatch for "$token": '
+        'VS output has $vsComponents component(s), '
+        'FS metadata has $fsComponents component(s)',
+      ));
+    }
   }
 }
 

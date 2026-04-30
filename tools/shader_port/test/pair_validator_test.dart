@@ -201,6 +201,163 @@ void main() {
     });
   });
 
+  group('pair_validator — Rule 3c (component-count mismatch warnings)', () {
+    test('no warning when FS metadata component counts match VS outputs', () {
+      final List<Map<String, dynamic>> m = _manifest(extras: [
+        {
+          'shader': 'CGRCMatchedCounts',
+          'normalized': 'cgrcmatchedcounts',
+          'stage': 'fragment',
+          'entryPoint': 'cgrcmatchedcounts_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvprogsimple_vertex',
+          'vertexAttributes': ['Tex0'],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex0', 'components': 2, 'category': 'texcoord'},
+          ],
+        },
+      ]);
+      final ValidatorResult r = validate(m);
+      expect(r.passed, isTrue);
+      expect(r.warnings.where((w) => w.rule == '3c'), isEmpty);
+    });
+
+    test('warning when FS metadata has fewer components than VS output', () {
+      final List<Map<String, dynamic>> m = _manifest(extras: [
+        {
+          'shader': 'CGRCTex2Mismatch',
+          'normalized': 'cgrctex2mismatch',
+          'stage': 'fragment',
+          'entryPoint': 'cgrctex2mismatch_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvprogsimple_vertex',
+          'vertexAttributes': ['Tex0'],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex0', 'components': 1, 'category': 'texcoord'},
+          ],
+        },
+      ]);
+      final ValidatorResult r = validate(m);
+      expect(r.passed, isTrue);
+      final List<ValidationError> rule3c =
+          r.warnings.where((w) => w.rule == '3c').toList();
+      expect(rule3c, hasLength(1));
+      expect(rule3c.first.message, contains('Tex0'));
+      expect(rule3c.first.message, contains('2'));
+      expect(rule3c.first.message, contains('1'));
+    });
+
+    test('warning when FS metadata has more components than VS output', () {
+      final List<Map<String, dynamic>> m = _manifest(extras: [
+        {
+          'shader': 'CGRCTex0MoreComponents',
+          'normalized': 'cgrctex0morecomponents',
+          'stage': 'fragment',
+          'entryPoint': 'cgrctex0morecomponents_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvprogsimple_vertex',
+          'vertexAttributes': ['Tex0'],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex0', 'components': 4, 'category': 'texcoord'},
+          ],
+        },
+      ]);
+      final ValidatorResult r = validate(m);
+      final List<ValidationError> rule3c =
+          r.warnings.where((w) => w.rule == '3c').toList();
+      expect(rule3c, hasLength(1));
+      expect(rule3c.first.message, contains('Tex0'));
+    });
+
+    test('no warning when FS metadata token not present in VS outputs', () {
+      final List<Map<String, dynamic>> m = _manifest(extras: [
+        {
+          'shader': 'CGRCUnpairedToken',
+          'normalized': 'cgrcunpairedtoken',
+          'stage': 'fragment',
+          'entryPoint': 'cgrcunpairedtoken_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvprogsimple_vertex',
+          'vertexAttributes': [],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex9', 'components': 3, 'category': 'texcoord'},
+          ],
+        },
+      ]);
+      final ValidatorResult r = validate(m);
+      expect(r.warnings.where((w) => w.rule == '3c'), isEmpty);
+    });
+
+    test('multiple mismatched fields produce multiple 3c warnings', () {
+      final List<Map<String, dynamic>> m = [
+        {
+          'shader': 'CGVMultiOut',
+          'normalized': 'cgvmultiout',
+          'stage': 'vertex',
+          'entryPoint': 'generated_cgvmultiout_vertex',
+          'pipelineCategory': 'mesh',
+          'vertexOutputs': [
+            {'name': 'Tex0', 'components': 3},
+            {'name': 'Tex1', 'components': 4},
+          ],
+        },
+        {
+          'shader': 'CGRCMultiMismatch',
+          'normalized': 'cgrcmultimismatch',
+          'stage': 'fragment',
+          'entryPoint': 'cgrcmultimismatch_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvmultiout_vertex',
+          'vertexAttributes': [],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex0', 'components': 2, 'category': 'texcoord'},
+            {'token': 'Tex1', 'components': 2, 'category': 'texcoord'},
+          ],
+        },
+      ];
+      final ValidatorResult r = validate(m);
+      final List<ValidationError> rule3c =
+          r.warnings.where((w) => w.rule == '3c').toList();
+      expect(rule3c, hasLength(2));
+    });
+
+    test('real-world Refractive mismatch: VS Tex1=float2, FS metadata=float4', () {
+      final List<Map<String, dynamic>> m = [
+        {
+          'shader': 'CGVProgRefractive',
+          'normalized': 'cgvprogrefractive',
+          'stage': 'vertex',
+          'entryPoint': 'generated_cgvprogrefractive_vertex',
+          'pipelineCategory': 'mesh',
+          'vertexOutputs': [
+            {'name': 'Tex0', 'components': 2},
+            {'name': 'Tex1', 'components': 2},
+          ],
+        },
+        {
+          'shader': 'CGRCRefractive',
+          'normalized': 'cgrcrefractive',
+          'stage': 'fragment',
+          'entryPoint': 'cgrcrefractive_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvprogrefractive_vertex',
+          'vertexAttributes': ['TEXCOORD0_2', 'TEXCOORD1_4'],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex0', 'components': 2, 'category': 'texcoord'},
+            {'token': 'Tex1', 'components': 4, 'category': 'texcoord'},
+          ],
+        },
+      ];
+      final ValidatorResult r = validate(m);
+      final List<ValidationError> rule3c =
+          r.warnings.where((w) => w.rule == '3c').toList();
+      expect(rule3c, hasLength(1));
+      expect(rule3c.first.message, contains('Tex1'));
+      expect(rule3c.first.message, contains('2'));
+      expect(rule3c.first.message, contains('4'));
+    });
+  });
+
   group('pair_validator — coverage metrics', () {
     test('reports correct totals for mixed manifest', () {
       final List<Map<String, dynamic>> m = _manifest(extras: [

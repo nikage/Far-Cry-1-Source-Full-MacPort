@@ -78,8 +78,11 @@ endif()
 
 # Compiler flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    # Enable AddressSanitizer for debug builds only
-    if(APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # ASAN is opt-in (ENABLE_ASAN=ON) because libclang_rt.asan has a dyld
+    # initialisation deadlock on macOS Sequoia+ when the shared cache is large.
+    # Pass -DENABLE_ASAN=ON to cmake to re-enable.
+    option(ENABLE_ASAN "Enable AddressSanitizer (Debug builds only)" OFF)
+    if(ENABLE_ASAN AND APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
         add_link_options(-fsanitize=address)
     endif()

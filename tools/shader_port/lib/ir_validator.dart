@@ -55,6 +55,7 @@ class IrValidator {
       hasCoreScript: hasCoreScript,
       hasPositionScripts: hasPositionScripts,
       hasPositionScriptBlocks: hasPositionScriptBlocks,
+      maskReferences: const <String>[],
       errors: errors,
     );
 
@@ -96,11 +97,17 @@ class IrValidator {
     final List<dynamic> positionScriptBlocks =
         ir['positionScriptBlocks'] as List<dynamic>? ?? const [];
 
+    final List<String> maskReferences = (ir['maskReferences'] as List<dynamic>?)
+            ?.whereType<String>()
+            .toList() ??
+        const <String>[];
+
     _checkEmpty(
       shader: shader,
       hasCoreScript: hasCoreScript,
       hasPositionScripts: positionScripts.isNotEmpty,
       hasPositionScriptBlocks: positionScriptBlocks.isNotEmpty,
+      maskReferences: maskReferences,
       errors: errors,
     );
 
@@ -133,21 +140,36 @@ class IrValidator {
     return IrValidationResult(shader: shader, errors: errors);
   }
 
+  // Backends that are NOT Metal. A shader masked exclusively to these is
+  // intentionally empty for the Metal pipeline.
+  static const Set<String> _nonMetalBackends = <String>{
+    'D3D', 'DX', 'OPENGL', 'GL', 'DIRECTX', 'DX8', 'DX9', 'D3D8', 'D3D9',
+  };
+
   void _checkEmpty({
     required String shader,
     required bool hasCoreScript,
     required bool hasPositionScripts,
     required bool hasPositionScriptBlocks,
+    required List<String> maskReferences,
     required List<IrValidationError> errors,
   }) {
-    if (!hasCoreScript && !hasPositionScripts && !hasPositionScriptBlocks) {
-      errors.add(IrValidationError(
-        'IR-1',
-        shader,
-        'shader has no CoreScript block, no positionScripts, and no positionScriptBlocks — '
-        'it is completely empty and will produce a no-op Metal function',
-      ));
+    if (hasCoreScript || hasPositionScripts || hasPositionScriptBlocks) return;
+
+    // Exempt shaders that are explicitly limited to non-Metal backends.
+    if (maskReferences.isNotEmpty &&
+        maskReferences.every(
+          (String m) => _nonMetalBackends.contains(m.toUpperCase()),
+        )) {
+      return;
     }
+
+    errors.add(IrValidationError(
+      'IR-1',
+      shader,
+      'shader has no CoreScript block, no positionScripts, and no positionScriptBlocks — '
+      'it is completely empty and will produce a no-op Metal function',
+    ));
   }
 
   void _checkDeadCoreScript({
@@ -180,44 +202,87 @@ class IrValidator {
   }) {
     if (mainInputContent.isEmpty) return;
 
-    final RegExp uniformPattern = RegExp(
+    // Process line-by-line to respect preprocessor branches.
+    // Two declarations with the same name in different branches of the same
+    // conditional block (or in separate independent #ifdef blocks) are NOT
+    // duplicates — they are mutually exclusive at runtime.
+    // A true duplicate is the same name appearing *twice in the same branch*.
+    //
+    // Branch path: each #if/ifdef push a unique block ID + branch index.
+    // #elif/#else increment the branch index of the current block.
+    // Independent sibling #ifdef blocks get different block IDs.
+    int _blockCounter = 0;
+    // Stack of (blockId, branchIndex) pairs
+    final List<(int, int)> branchStack = <(int, int)>[];
+    // Key format: "<(blockId,branch)...>:<u|t>:<name>"
+    final Set<String> seenBranchKeys = <String>{};
+    // Separate set for type-error deduplication (report type error only once per name)
+    final Set<String> typeErrorNames = <String>{};
+
+    final RegExp ifRe = RegExp(r'^\s*#\s*if(?:n?def)?\b');
+    final RegExp elifRe = RegExp(r'^\s*#\s*elif\b');
+    final RegExp elseRe = RegExp(r'^\s*#\s*else\b');
+    final RegExp endifRe = RegExp(r'^\s*#\s*endif\b');
+    final RegExp uniformRe = RegExp(
       r'uniform\s+([A-Za-z0-9_]+)\s+([A-Za-z0-9_]+)',
-      multiLine: true,
     );
 
-    final Set<String> uniformNames = <String>{};
-    final Set<String> textureNames = <String>{};
-
-    for (final RegExpMatch match in uniformPattern.allMatches(mainInputContent)) {
-      final String type = match.group(1) ?? '';
-      final String name = match.group(2) ?? '';
-      if (type.isEmpty || name.isEmpty) continue;
-
-      final bool isTexture = type.toLowerCase().startsWith('sampler');
-
-      if (isTexture) {
-        if (!textureNames.add(name)) {
-          errors.add(IrValidationError(
-            'IR-4',
-            shader,
-            'duplicate texture name "$name" in MainInput',
-          ));
+    for (final String line
+        in mainInputContent.split(RegExp(r'\r?\n'))) {
+      if (ifRe.hasMatch(line)) {
+        branchStack.add((_blockCounter++, 0));
+      } else if (elifRe.hasMatch(line)) {
+        if (branchStack.isNotEmpty) {
+          final (int id, int idx) = branchStack.last;
+          branchStack[branchStack.length - 1] = (id, idx + 1);
         }
+      } else if (elseRe.hasMatch(line)) {
+        if (branchStack.isNotEmpty) {
+          final (int id, int idx) = branchStack.last;
+          branchStack[branchStack.length - 1] = (id, idx + 1);
+        }
+      } else if (endifRe.hasMatch(line)) {
+        if (branchStack.isNotEmpty) branchStack.removeLast();
       } else {
-        if (!uniformNames.add(name)) {
-          errors.add(IrValidationError(
-            'IR-3',
-            shader,
-            'duplicate uniform name "$name" in MainInput',
-          ));
-        }
-        if (!_allowedUniformTypes.contains(type)) {
-          errors.add(IrValidationError(
-            'IR-5',
-            shader,
-            'uniform "$name" has unrecognized type "$type" — '
-            'expected one of: ${_allowedUniformTypes.join(', ')}',
-          ));
+        if (line.trim().startsWith('//')) continue;
+        final RegExpMatch? m = uniformRe.firstMatch(line);
+        if (m == null) continue;
+
+        final String type = m.group(1) ?? '';
+        final String name = m.group(2) ?? '';
+        if (type.isEmpty || name.isEmpty) continue;
+
+        final String branchPath =
+            branchStack.map(((int, int) p) => '${p.$1}_${p.$2}').join('/');
+        final bool isTexture = type.toLowerCase().startsWith('sampler');
+        final String prefix = isTexture ? 't' : 'u';
+        final String key = '$branchPath:$prefix:$name';
+
+        if (isTexture) {
+          if (!seenBranchKeys.add(key)) {
+            errors.add(IrValidationError(
+              'IR-4',
+              shader,
+              'duplicate texture name "$name" in MainInput',
+            ));
+          }
+        } else {
+          if (!seenBranchKeys.add(key)) {
+            errors.add(IrValidationError(
+              'IR-3',
+              shader,
+              'duplicate uniform name "$name" in MainInput',
+            ));
+          }
+          if (!_allowedUniformTypes.contains(type) &&
+              typeErrorNames.add(name)) {
+            errors.add(IrValidationError(
+              'IR-5',
+              shader,
+              'uniform "$name" has unrecognized type "$type" — '
+              'expected one of: ${_allowedUniformTypes.join(', ')}',
+            ));
+          }
         }
       }
     }

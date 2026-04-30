@@ -2625,7 +2625,7 @@ void CMetalRenderer::BeginFrame() {
 #if defined(DEBUG) || defined(_DEBUG)
   if (m_nFrameID == 2 && m_shaderManager)
   {
-      int fallbacks = m_shaderManager->m_generatedFallbackCount;
+      int fallbacks = m_shaderManager->GetGeneratedFallbackCount();
       if (fallbacks > 0)
           iLog->Log("WARNING: Generated shader fallback detected on first frame — "
                     "%d shader(s) fell back to basic/terrain. Check shader registration.", fallbacks);

@@ -140,6 +140,9 @@ bool CSystem::OpenRenderLibrary(const char *t_rend)
       case R_GL_RENDERER:
         GetILog()->LogToFile("System: Using OpenGL renderer...");
     	  break;
+      case R_METAL_RENDERER:
+        GetILog()->LogToFile("System: Using Metal renderer...");
+          break;
       case R_NULL_RENDERER:
         GetILog()->LogToFile("System: Using NULL renderer...");
     	  break;

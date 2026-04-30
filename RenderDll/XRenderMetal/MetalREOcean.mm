@@ -2,13 +2,18 @@
   MetalREOcean.mm : Metal-specific ocean render element.
 =============================================================================*/
 
-#include "RenderPCH.h"
-#import <Metal/Metal.h>
-#import <MetalKit/MetalKit.h>
-
-#include "../Common/RendElements/CREOcean.h"
 #include "MetalRenderPCH.h"
+#include "RenderPCH.h"
+#include "../Common/RendElements/CREOcean.h"
 #include "MetalBaseRenderer.m"
+#include <I3DEngine.h>
+
+static _inline int Compare(SOceanSector*& p1, SOceanSector*& p2)
+{
+    if (p1->m_Flags > p2->m_Flags) return 1;
+    if (p1->m_Flags < p2->m_Flags) return -1;
+    return 0;
+}
 
 static CMetalBaseRenderer* MetalRend()
 {
@@ -74,7 +79,7 @@ void CREOcean::UnlockVBPtr()
 
 void CREOcean::DrawOceanSector(SOceanIndicies* oi)
 {
-    if (!oi || !oi->m_Inds || oi->m_nInds == 0)
+    if (!oi || !oi->m_pIndicies || oi->m_nInds == 0)
         return;
 
     CMetalBaseRenderer* r = MetalRend();
@@ -91,7 +96,7 @@ void CREOcean::DrawOceanSector(SOceanIndicies* oi)
                                  length:(NSUInteger)nVerts * sizeof(struct_VERTEX_FORMAT_P3F_N)
                                 options:MTLResourceStorageModeShared];
     id<MTLBuffer> idxBuf =
-        [r->m_device newBufferWithBytes:oi->m_Inds
+        [r->m_device newBufferWithBytes:oi->m_pIndicies
                                  length:(NSUInteger)oi->m_nInds * sizeof(ushort)
                                 options:MTLResourceStorageModeShared];
 
@@ -197,7 +202,7 @@ void CREOcean::mfDrawOceanSectors()
             GenerateIndices(nLodCode);
 
         SOceanIndicies* oi = m_OceanIndicies[nLodCode];
-        if (!oi || !oi->m_Inds || oi->m_nInds == 0)
+        if (!oi || !oi->m_pIndicies || oi->m_nInds == 0)
             continue;
 
         int nDummy = 0;
@@ -224,7 +229,7 @@ void CREOcean::mfDrawOceanSectors()
         }
 
         id<MTLBuffer> idxBuf =
-            [r->m_device newBufferWithBytes:oi->m_Inds
+            [r->m_device newBufferWithBytes:oi->m_pIndicies
                                      length:(NSUInteger)oi->m_nInds * sizeof(ushort)
                                     options:MTLResourceStorageModeShared];
 
@@ -261,11 +266,11 @@ void CREOcean::mfDrawOceanScreenLod()
         GenerateIndices(0);
 
     SOceanIndicies* oi = m_OceanIndicies[0];
-    if (!oi || !oi->m_Inds || oi->m_nInds == 0)
+    if (!oi || !oi->m_pIndicies || oi->m_nInds == 0)
         return;
 
     id<MTLBuffer> idxBuf =
-        [r->m_device newBufferWithBytes:oi->m_Inds
+        [r->m_device newBufferWithBytes:oi->m_pIndicies
                                  length:(NSUInteger)oi->m_nInds * sizeof(ushort)
                                 options:MTLResourceStorageModeShared];
 

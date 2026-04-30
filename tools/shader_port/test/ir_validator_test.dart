@@ -8,6 +8,7 @@ Map<String, dynamic> _ir({
   List<dynamic> coreScriptExpressions = const [],
   List<String> positionScripts = const [],
   List<dynamic> positionScriptBlocks = const [],
+  List<String> maskReferences = const [],
 }) {
   return <String, dynamic>{
     'name': name,
@@ -15,6 +16,7 @@ Map<String, dynamic> _ir({
     'coreScriptExpressions': coreScriptExpressions,
     'positionScripts': positionScripts,
     'positionScriptBlocks': positionScriptBlocks,
+    'maskReferences': maskReferences,
   };
 }
 
@@ -93,6 +95,33 @@ void main() {
         'CGPShaders/Valid.crycg',
       );
       expect(result.passed, isTrue);
+    });
+
+    test('passes when empty shader is masked to non-Metal backends only (D3D, OPENGL)', () {
+      final IrValidationResult result = validator.validateIr(
+        _ir(name: 'CGRCBump_ReflLight', maskReferences: ['D3D', 'OPENGL']),
+        'CGPShaders/CGRCBump_ReflLight.crycg',
+      );
+      expect(result.passed, isTrue,
+          reason: 'D3D/OPENGL-only shaders are intentionally empty for Metal');
+    });
+
+    test('fails when empty shader has no maskReferences (platform-agnostic missing body)', () {
+      final IrValidationResult result = validator.validateIr(
+        _ir(name: 'PlatformAgnosticEmpty'),
+        'CGPShaders/PlatformAgnosticEmpty.crycg',
+      );
+      expect(result.passed, isFalse);
+      expect(result.errors.first.rule, 'IR-1');
+    });
+
+    test('fails when empty shader maskReferences contains METAL', () {
+      final IrValidationResult result = validator.validateIr(
+        _ir(name: 'MetalEmptyShader', maskReferences: ['METAL', 'D3D']),
+        'CGPShaders/MetalEmptyShader.crycg',
+      );
+      expect(result.passed, isFalse,
+          reason: 'METAL in maskReferences means Metal body is expected');
     });
   });
 
@@ -179,6 +208,77 @@ void main() {
         'CGPShaders/DistinctUniforms.crycg',
       );
       expect(result.passed, isTrue);
+    });
+
+    test('passes when same uniform name appears in mutually-exclusive #if/#elif branches', () {
+      const String content = '''
+#if %ENVCMAMB
+uniform float4x4 TexMatrix,
+#elif %TEMP_ENVLIGHT
+uniform float4 EnvColors[6],
+uniform float4x4 TexMatrix,
+#elif %ENVCMSPEC
+uniform float4x4 ModelMatrix,
+#endif''';
+      final IrValidationResult result = validator.validateIr(
+        _ir(
+          blocks: [
+            _block('MainInput', content),
+            _block('CoreScript', 'OUT.envTC = mul(tRM, TexMatrix);'),
+          ],
+          coreScriptExpressions: [_expr('OUT.envTC = mul(tRM, TexMatrix);')],
+        ),
+        'CGVShaders/CGVProgAmbientTempl.crycg',
+      );
+      final List<IrValidationError> ir3 =
+          result.errors.where((e) => e.rule == 'IR-3').toList();
+      expect(ir3, isEmpty,
+          reason: 'TexMatrix in different #if/#elif branches must not be flagged as a duplicate');
+    });
+
+    test('fails when same uniform name appears twice in the same branch', () {
+      const String content = '''
+#if %ENVCMAMB
+uniform float4x4 TexMatrix,
+uniform float4x4 TexMatrix,
+#endif''';
+      final IrValidationResult result = validator.validateIr(
+        _ir(
+          blocks: [
+            _block('MainInput', content),
+            _block('CoreScript', 'OUT.envTC = mul(tRM, TexMatrix);'),
+          ],
+          coreScriptExpressions: [_expr('OUT.envTC = mul(tRM, TexMatrix);')],
+        ),
+        'CGVShaders/DupSameBranch.crycg',
+      );
+      final List<IrValidationError> ir3 =
+          result.errors.where((e) => e.rule == 'IR-3').toList();
+      expect(ir3, hasLength(1), reason: 'Two TexMatrix in the same branch IS a real duplicate');
+    });
+
+    test('passes when same texture name appears in independent sibling #ifdef blocks', () {
+      const String content = '''
+#ifdef OPENGL
+uniform samplerRECT refMap : texunit2,
+#endif
+#ifdef D3D
+uniform sampler2D refMap : texunit2,
+#endif''';
+      final IrValidationResult result = validator.validateIr(
+        _ir(
+          blocks: [
+            _block('MainInput', content),
+            _block('CoreScript', 'OUT.Color = tex2D(refMap, IN.Tex0.xy);'),
+          ],
+          coreScriptExpressions: [_expr('OUT.Color = tex2D(refMap, IN.Tex0.xy);')],
+        ),
+        'CGPShaders/CGRCRefractiveOverlay.crycg',
+      );
+      final List<IrValidationError> ir4 =
+          result.errors.where((e) => e.rule == 'IR-4').toList();
+      expect(ir4, isEmpty,
+          reason: 'refMap in sibling #ifdef/#ifdef blocks must not be flagged as a duplicate');
     });
   });
 

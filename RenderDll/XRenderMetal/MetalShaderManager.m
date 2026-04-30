@@ -296,6 +296,7 @@ public:
     id<MTLRenderPipelineState> GetPipelineStateForFormat(int vertexFormat);
 
     id<MTLLibrary> GetDefaultLibrary() const { return m_defaultLibrary; }
+    int GetGeneratedFallbackCount() const { return m_generatedFallbackCount; }
 
 protected:
     // Metal-specific shader management

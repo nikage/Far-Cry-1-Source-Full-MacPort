@@ -36,6 +36,20 @@ if(APPLE)
     # Temporarily exclude MacOSFileSystem due to Carbon framework conflicts
     # TODO: Fix Foundation.h include conflict with GetCurrentThread
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX "MacOSFileSystem.cpp$")
+    # Exclude legacy zlib 1.1.x sources that have been superseded by their
+    # zlib 1.2.x replacements already present in the same directory:
+    #   gzio.c      → gzclose.c + gzlib.c + gzread.c + gzwrite.c
+    #   infblock.c  \
+    #   infcodes.c   } → inflate.c (unified in zlib 1.2)
+    #   infutil.c   /
+    #   infback.c   → now a standalone optional module; conflicts with new inflate
+    list(REMOVE_ITEM CRYSYSTEM_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/zlib/gzio.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/zlib/infblock.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/zlib/infcodes.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/zlib/infutil.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/zlib/infback.c"
+    )
 endif()
 
 if(NOT UNIX OR APPLE)

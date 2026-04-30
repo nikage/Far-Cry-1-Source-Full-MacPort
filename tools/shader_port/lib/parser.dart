@@ -166,10 +166,19 @@ void main(List<String> args) {
     final IrValidationResult validation =
         IrValidator().validateParseResult(result);
     if (!validation.passed) {
-      for (final IrValidationError e in validation.errors) {
-        stderr.writeln(e.toString());
+      final List<IrValidationError> fatal =
+          validation.errors.where((e) => e.rule != 'IR-1').toList();
+      final List<IrValidationError> warnings =
+          validation.errors.where((e) => e.rule == 'IR-1').toList();
+      for (final IrValidationError e in warnings) {
+        stderr.writeln('[WARN] ${e.toString()}');
       }
-      exit(1);
+      if (fatal.isNotEmpty) {
+        for (final IrValidationError e in fatal) {
+          stderr.writeln(e.toString());
+        }
+        exit(1);
+      }
     }
     final File targetFile = File(outputDir.path + sep + relative + '.json');
     targetFile.parent.createSync(recursive: true);

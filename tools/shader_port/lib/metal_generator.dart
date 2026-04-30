@@ -44,42 +44,142 @@ void main(List<String> args) {
   final Directory outDir = Directory(rootPath + 'RenderDll${sep}XRenderMetal${sep}Generated');
   outDir.createSync(recursive: true);
   final File manifest = File(outDir.path + sep + 'generated_manifest.json');
-  final List<Map<String, dynamic>> manifestEntries = [];
-  int generated = 0;
   final ShaderIrParser parser = ShaderIrParser();
-  for (final FileSystemEntity entity in irDir.listSync(recursive: true, followLinks: false)) {
+
+  // Pre-parse all IR JSON files so vertex and fragment shaders can be
+  // processed in separate passes.
+  final List<({
+    String relative,
+    ShaderIrParseResult result,
+    ShaderIrData data,
+    String metalFileName,
+  })> allShaders = [];
+  for (final FileSystemEntity entity
+      in irDir.listSync(recursive: true, followLinks: false)) {
     if (entity is! File) continue;
     if (!entity.path.endsWith('.json')) continue;
-    final dynamic parsed = jsonDecode(entity.readAsStringSync(encoding: utf8));
+    final dynamic parsed =
+        jsonDecode(entity.readAsStringSync(encoding: utf8));
     if (parsed is! Map<String, dynamic>) continue;
     final Map<String, dynamic> ir = parsed;
-    final String extension = (ir['extension'] as String? ?? '').toLowerCase();
+    final String extension =
+        (ir['extension'] as String? ?? '').toLowerCase();
     if (extension != 'cryps' && extension != 'crycg') continue;
-    final String relative =
-        entity.path.substring(irDir.path.length + 1).replaceAll(RegExp(r'[\\/]'), '/');
+    final String relative = entity.path
+        .substring(irDir.path.length + 1)
+        .replaceAll(RegExp(r'[\\/]'), '/');
     final ShaderIrParseResult result = parser.parse(ir, relative);
     final ShaderIrData data = result.data;
-    final String metalFileName = '${relative.replaceAll('/', '_')}.metal';
-    final File targetFile = File(outDir.path + sep + metalFileName);
+    final String metalFileName =
+        '${relative.replaceAll('/', '_')}.metal';
+    allShaders.add((
+      relative: relative,
+      result: result,
+      data: data,
+      metalFileName: metalFileName,
+    ));
+  }
+
+  final List<Map<String, dynamic>> manifestEntries = [];
+  int generated = 0;
+
+  // Build vertex lookup tables from pre-parsed IR (no emission needed).
+  // Entry point names are deterministic: 'generated_<normalizedName>_vertex'.
+  final Map<String, String> vertexByNormalized = {
+    for (final s in allShaders)
+      if (s.data.stage == 'vertex')
+        s.data.normalizedName: 'generated_${s.data.normalizedName}_vertex',
+  };
+  final Map<String, String> vertexShaderByName = {
+    for (final s in allShaders)
+      if (s.data.stage == 'vertex')
+        s.data.shaderName: 'generated_${s.data.normalizedName}_vertex',
+  };
+  final Map<String, String> vertexNormByEntryPoint = {
+    for (final s in allShaders)
+      if (s.data.stage == 'vertex')
+        'generated_${s.data.normalizedName}_vertex': s.data.normalizedName,
+  };
+
+  // Phase 1: resolve vertex–fragment pairing before emitting any shaders so
+  // that VS requirement aggregation (Phase 1.5) can use the pairing map.
+  final Map<
+      String,
+      ({
+        String vertexEntryPoint,
+        String? vertexNorm,
+        String? overrideCategory,
+      })> fragmentPairing = {};
+  int overrideCount = 0;
+  for (final s in allShaders) {
+    if (s.data.stage != 'fragment') continue;
+    final String norm = s.data.normalizedName;
+    final _OverrideResult? ov = overrides.resolve(norm);
+    if (ov != null) {
+      final String? ep = vertexShaderByName[ov.vertexShader];
+      if (ep != null) {
+        fragmentPairing[norm] = (
+          vertexEntryPoint: ep,
+          vertexNorm: vertexNormByEntryPoint[ep],
+          overrideCategory: ov.category,
+        );
+        overrideCount++;
+        continue;
+      }
+    }
+    final String? vep =
+        _resolveVertexEntryPoint(norm, vertexByNormalized);
+    if (vep != null) {
+      fragmentPairing[norm] = (
+        vertexEntryPoint: vep,
+        vertexNorm: vertexNormByEntryPoint[vep],
+        overrideCategory: null,
+      );
+    }
+  }
+
+  // Phase 1.5: aggregate per-VS output requirements from all paired FSes so
+  // that the vertex output struct is wide enough to satisfy every fragment
+  // that shares this vertex shader.
+  final Map<String, Map<String, int>> vsRequiredOutputs =
+      collectVsRequiredOutputs(allShaders, fragmentPairing);
+
+  // Phase 2: emit vertex shaders using the aggregated output requirements,
+  // and record the actual emitted output component maps for Phase 3.
+  final Map<String, Map<String, int>> vertexOutputsByNorm = {};
+  for (final s in allShaders) {
+    if (s.data.stage != 'vertex') continue;
+    final ShaderIrData data = s.data;
+    final ShaderIrParseResult result = s.result;
+    final File targetFile =
+        File(outDir.path + sep + s.metalFileName);
     targetFile.parent.createSync(recursive: true);
-    targetFile.writeAsStringSync(buildMetal(data));
+    final Map<String, int>? vsReqs = vsRequiredOutputs[data.normalizedName];
+    targetFile.writeAsStringSync(
+      MetalFragmentBuilder(
+        data,
+        isVertexStage: true,
+        vsOutputRequirements: vsReqs,
+      ).build(),
+    );
+    final List<Map<String, dynamic>> vsOutputsList =
+        summarizeVertexOutputs(data, vsReqs);
+    vertexOutputsByNorm[data.normalizedName] = {
+      for (final o in vsOutputsList)
+        o['name'] as String: o['components'] as int,
+    };
     final Map<String, dynamic> pipeline =
-        derivePipelineMetadata(data.shaderName, result.directives, data.passStates);
-    final bool isVertexStage = data.stage == 'vertex';
-    final List<Map<String, dynamic>> manifestVertexMetadata = isVertexStage
-        ? orderVertexAttributes(data.vertexAttributeMetadata)
-        : data.vertexAttributeMetadata;
-    final String entryPointName = isVertexStage
-        ? 'generated_${data.normalizedName}_vertex'
-        : data.fragmentName;
-    final List<Map<String, dynamic>> vertexInputs = isVertexStage
-        ? _summarizeVertexInputs(manifestVertexMetadata)
-        : const [];
-    final List<Map<String, dynamic>> vertexOutputs =
-        isVertexStage ? summarizeVertexOutputs(data) : const [];
+        derivePipelineMetadata(
+            data.shaderName, result.directives, data.passStates);
+    final List<Map<String, dynamic>> manifestVertexMetadata =
+        orderVertexAttributes(data.vertexAttributeMetadata);
+    final String entryPointName =
+        'generated_${data.normalizedName}_vertex';
+    final List<Map<String, dynamic>> vertexInputs =
+        _summarizeVertexInputs(manifestVertexMetadata);
     manifestEntries.add({
-      'source': relative,
-      'metal': metalFileName,
+      'source': s.relative,
+      'metal': s.metalFileName,
       'shader': data.shaderName,
       'normalized': data.normalizedName,
       'fragment': entryPointName,
@@ -91,7 +191,7 @@ void main(List<String> args) {
       'vertexAttributes': data.vertexAttributes,
       'vertexAttributeMetadata': manifestVertexMetadata,
       if (vertexInputs.isNotEmpty) 'vertexInputs': vertexInputs,
-      if (vertexOutputs.isNotEmpty) 'vertexOutputs': vertexOutputs,
+      if (vsOutputsList.isNotEmpty) 'vertexOutputs': vsOutputsList,
       'directives': result.directives,
       'maskReferences': data.maskReferences,
       'uniforms': data.uniforms
@@ -115,47 +215,79 @@ void main(List<String> args) {
     generated++;
   }
 
-  // Build vertex lookup tables.
-  final Map<String, String> vertexByNormalized = {
-    for (final e in manifestEntries)
-      if (e['stage'] == 'vertex') e['normalized'] as String: e['entryPoint'] as String,
-  };
-  final Map<String, String> vertexShaderByName = {
-    for (final e in manifestEntries)
-      if (e['stage'] == 'vertex') e['shader'] as String: e['entryPoint'] as String,
-  };
-
-  // Second pass: pair each fragment entry with its vertex entry and assign
-  // pipelineCategory.  Overrides take priority over the naming heuristic.
-  int pairedCount = 0;
-  int overrideCount = 0;
-  for (final e in manifestEntries) {
-    if (e['stage'] != 'fragment') continue;
-    final String norm = e['normalized'] as String;
-
-    final _OverrideResult? ov = overrides.resolve(norm);
-    if (ov != null) {
-      final String? ep = vertexShaderByName[ov.vertexShader];
-      if (ep != null) {
-        e['vertexEntryPoint'] = ep;
-        e['pipelineCategory'] = ov.category;
-        pairedCount++;
-        overrideCount++;
-        continue;
-      }
-    }
-
-    final String? vep = _resolveVertexEntryPoint(norm, vertexByNormalized);
-    if (vep != null) {
-      e['vertexEntryPoint'] = vep;
-      pairedCount++;
-    }
-
-    if (!e.containsKey('pipelineCategory')) {
-      e['pipelineCategory'] = _derivePipelineCategory(norm, e['shader'] as String);
-    }
+  // Phase 3: emit fragment shaders, passing the paired vertex output
+  // component map so stage_in field types match vertex output types exactly.
+  for (final s in allShaders) {
+    if (s.data.stage != 'fragment') continue;
+    final ShaderIrData data = s.data;
+    final ShaderIrParseResult result = s.result;
+    final String norm = data.normalizedName;
+    final ({
+      String vertexEntryPoint,
+      String? vertexNorm,
+      String? overrideCategory,
+    })? pairing = fragmentPairing[norm];
+    // Use the manifest-paired VS's exact norm (including _vs20 suffix if
+    // present).  The C++ runtime now consistently prefers the versioned variant
+    // over the bare one when both share the same canonical key, so the FS
+    // stage_in built against the versioned VS outputs will always match.
+    final Map<String, int>? pairedOutputs = pairing?.vertexNorm != null
+        ? vertexOutputsByNorm[pairing!.vertexNorm!]
+        : null;
+    final File targetFile =
+        File(outDir.path + sep + s.metalFileName);
+    targetFile.parent.createSync(recursive: true);
+    targetFile.writeAsStringSync(
+      MetalFragmentBuilder(
+        data,
+        isVertexStage: false,
+        pairedVertexOutputs: pairedOutputs,
+      ).build(),
+    );
+    final Map<String, dynamic> pipeline =
+        derivePipelineMetadata(
+            data.shaderName, result.directives, data.passStates);
+    final String pipelineCategory = pairing?.overrideCategory ??
+        _derivePipelineCategory(norm, data.shaderName);
+    manifestEntries.add({
+      'source': s.relative,
+      'metal': s.metalFileName,
+      'shader': data.shaderName,
+      'normalized': norm,
+      'fragment': data.fragmentName,
+      'entryPoint': data.fragmentName,
+      'stage': data.stage,
+      'uniformStruct': data.uniformStruct,
+      'uniformCount': data.uniforms.length,
+      'textureCount': data.textures.length,
+      'vertexAttributes': data.vertexAttributes,
+      'vertexAttributeMetadata': data.vertexAttributeMetadata,
+      'directives': result.directives,
+      'maskReferences': data.maskReferences,
+      if (pairing != null) 'vertexEntryPoint': pairing.vertexEntryPoint,
+      'pipelineCategory': pipelineCategory,
+      'uniforms': data.uniforms
+          .map((u) => {
+                'name': u.name,
+                'type': u.type,
+                'semantic': u.semantic,
+                if (u.arraySize != null) 'arraySize': u.arraySize,
+              })
+          .toList(),
+      'textures': data.textures
+          .map((t) => {
+                'name': t.name,
+                'type': t.type,
+                'semantic': t.semantic,
+                'slot': t.slot,
+              })
+          .toList(),
+      'pipeline': pipeline,
+    });
+    generated++;
   }
 
+  // Assign pipelineCategory to vertex entries.
   for (final e in manifestEntries) {
     if (e['stage'] != 'vertex') continue;
     if (!e.containsKey('pipelineCategory')) {
@@ -164,9 +296,11 @@ void main(List<String> args) {
     }
   }
 
-  manifest.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(manifestEntries));
+  manifest.writeAsStringSync(
+      const JsonEncoder.withIndent('  ').convert(manifestEntries));
   stdout.writeln('Generated $generated Metal shader files');
-  stdout.writeln('Paired: $pairedCount fragment shaders ($overrideCount via overrides)');
+  stdout.writeln(
+      'Paired: ${fragmentPairing.length} fragment shaders ($overrideCount via overrides)');
 }
 
 class _OverrideResult {
@@ -696,7 +830,10 @@ List<Map<String, dynamic>> _summarizeVertexInputs(
   return result;
 }
 
-List<Map<String, dynamic>> summarizeVertexOutputs(ShaderIrData data) {
+List<Map<String, dynamic>> summarizeVertexOutputs(
+  ShaderIrData data, [
+  Map<String, int>? vsOutputRequirements,
+]) {
   if (data.stage != 'vertex') {
     return const [];
   }
@@ -706,6 +843,11 @@ List<Map<String, dynamic>> summarizeVertexOutputs(ShaderIrData data) {
   );
   final Map<String, int> resolved =
       _resolveOutputComponentCounts(data, analyzer);
+  if (vsOutputRequirements != null) {
+    vsOutputRequirements.forEach((String field, int req) {
+      resolved[field] = math.max(resolved[field] ?? 0, req);
+    });
+  }
   if (resolved.isEmpty) {
     return const [];
   }
@@ -723,6 +865,103 @@ List<Map<String, dynamic>> summarizeVertexOutputs(ShaderIrData data) {
           (a['name'] as String).compareTo(b['name'] as String),
     );
   return outputs;
+}
+
+/// Strips version suffixes used by vertex shader CG names (_vs10, _vs11,
+/// _vs20, _vs30) from [norm]. The C++ runtime's BuildStageAgnosticKey does
+/// the same so both the versioned and bare shader end up on the same canonical
+/// key — we must widen both.
+String _stripVsSuffix(String norm) {
+  const List<String> suffixes = <String>[
+    '_vs30', '_vs20', '_vs11', '_vs10',
+  ];
+  for (final String suffix in suffixes) {
+    if (norm.endsWith(suffix)) {
+      return norm.substring(0, norm.length - suffix.length);
+    }
+  }
+  return norm;
+}
+
+Map<String, Map<String, int>> collectVsRequiredOutputs(
+  List<({
+    String relative,
+    ShaderIrParseResult result,
+    ShaderIrData data,
+    String metalFileName,
+  })> allShaders,
+  Map<String, ({
+    String vertexEntryPoint,
+    String? vertexNorm,
+    String? overrideCategory,
+  })> fragmentPairing,
+) {
+  final Map<String, Map<String, int>> result = <String, Map<String, int>>{};
+
+  void _mergeInto(String key, Map<String, int> additions) {
+    final Map<String, int> bucket =
+        result.putIfAbsent(key, () => <String, int>{});
+    additions.forEach((String token, int components) {
+      bucket[token] = math.max(bucket[token] ?? 0, components);
+    });
+  }
+
+  for (final s in allShaders) {
+    if (s.data.stage != 'fragment') continue;
+    final String? vsNorm = fragmentPairing[s.data.normalizedName]?.vertexNorm;
+    if (vsNorm == null) continue;
+
+    // Use the same widening logic as _typeForInputField (incl. macro hints
+    // such as texCUBE) so the VS output struct is widened to the width that
+    // the FS stage_in will actually declare.
+    final Map<String, int> inputReqs =
+        MetalFragmentBuilder.computeInputRequirements(s.data);
+
+    // Build a fast position-category lookup from the raw metadata.
+    final Set<String> positionTokens = <String>{
+      for (final Map<String, dynamic> meta in s.data.vertexAttributeMetadata)
+        if ((meta['category'] as String? ?? '').toLowerCase() == 'position' &&
+            meta['token'] is String)
+          meta['token'] as String,
+    };
+
+    final Map<String, int> filtered = <String, int>{
+      for (final MapEntry<String, int> e in inputReqs.entries)
+        if (!positionTokens.contains(e.key)) e.key: e.value,
+    };
+
+    // Write requirements for the exact versioned VS norm (e.g. _vs20 variant).
+    _mergeInto(vsNorm, filtered);
+  }
+
+  // Synchronize canonical ↔ versioned variants.
+  //
+  // The C++ runtime's BuildStageAgnosticKey strips _vs20 etc., so both the
+  // bare and versioned VS shader compete for the SAME runtime slot.  Whichever
+  // is loaded last wins.  Both variants must therefore output the SAME field
+  // types; otherwise the FS stage_in built against one variant will fail PSO
+  // validation when the other is selected at runtime.
+  //
+  // Strategy: merge every versioned key into its canonical bucket, then
+  // propagate the canonical bucket back into all versioned keys — giving every
+  // variant the max-widened union of requirements.
+  final List<String> keys = result.keys.toList();
+  // Pass 1 – versioned → canonical
+  for (final String k in keys) {
+    final String canonical = _stripVsSuffix(k);
+    if (canonical != k) {
+      _mergeInto(canonical, result[k]!);
+    }
+  }
+  // Pass 2 – canonical → versioned
+  for (final String k in keys) {
+    final String canonical = _stripVsSuffix(k);
+    if (canonical != k && result.containsKey(canonical)) {
+      _mergeInto(k, result[canonical]!);
+    }
+  }
+
+  return result;
 }
 
 int _componentCountFromType(String type) {

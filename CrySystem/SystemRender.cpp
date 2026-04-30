@@ -798,13 +798,12 @@ int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
 /////////////////////////////////////////////////////////////////////////////////
 int CSystem::AutoDetectRenderer(char *Vendor, char *Device)
 {
-  // macOS implementation - use OpenGL renderer by default
   strcpy(Vendor, "Apple");
-  strcpy(Device, "Metal/OpenGL");
-  
-  GetILog()->LogToFile("System: INFO: Using OpenGL renderer on macOS\n");
-  
-  return R_GL_RENDERER;
+  strcpy(Device, "Metal");
+
+  GetILog()->LogToFile("System: INFO: Using Metal renderer on macOS\n");
+
+  return R_METAL_RENDERER;
 }
 #endif
 

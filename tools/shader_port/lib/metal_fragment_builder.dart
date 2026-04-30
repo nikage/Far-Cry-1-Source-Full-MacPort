@@ -1,19 +1,31 @@
 part of 'metal_generator.dart';
 
 class MetalFragmentBuilder {
-  MetalFragmentBuilder(this.data, {required bool isVertexStage})
-    : _isVertexStage = isVertexStage,
-      _stageStrategy =
-          isVertexStage ? const VertexEmissionStrategy() : const FragmentEmissionStrategy(),
-      _vertexAttributeMetadata = data.vertexAttributeMetadata,
-      _orderedVertexAttributes = orderVertexAttributes(data.vertexAttributeMetadata),
-      _analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow),
-      _positionScripts = data.positionScripts
-          .map((String script) => script.toLowerCase())
-          .toSet(),
-      _positionScriptBlocks = data.positionScriptBlocks {
+  MetalFragmentBuilder(
+    this.data, {
+    required bool isVertexStage,
+    Map<String, int>? pairedVertexOutputs,
+    Map<String, int>? vsOutputRequirements,
+  }) : _isVertexStage = isVertexStage,
+       _pairedVertexOutputs = pairedVertexOutputs,
+       _vsOutputRequirements = vsOutputRequirements,
+       _stageStrategy =
+           isVertexStage ? const VertexEmissionStrategy() : const FragmentEmissionStrategy(),
+       _vertexAttributeMetadata = data.vertexAttributeMetadata,
+       _orderedVertexAttributes = orderVertexAttributes(data.vertexAttributeMetadata),
+       _analyzer = _InOutAnalyzer(data.coreExpressions, data.coreFlow),
+       _positionScripts = data.positionScripts
+           .map((String script) => script.toLowerCase())
+           .toSet(),
+       _positionScriptBlocks = data.positionScriptBlocks {
     _resolvedOutputComponents =
         _resolveOutputComponentCounts(data, _analyzer);
+    if (isVertexStage && vsOutputRequirements != null) {
+      vsOutputRequirements.forEach((String field, int req) {
+        _resolvedOutputComponents[field] =
+            math.max(_resolvedOutputComponents[field] ?? 0, req);
+      });
+    }
     for (final String field in _analyzer.inputFields) {
       final String? override = _inputFieldTypeOverrides[field];
       final int components = _attributeComponentCount(field);
@@ -25,6 +37,8 @@ class MetalFragmentBuilder {
 
   final ShaderIrData data;
   final bool _isVertexStage;
+  final Map<String, int>? _pairedVertexOutputs;
+  final Map<String, int>? _vsOutputRequirements;
   final StageEmissionStrategy _stageStrategy;
   final _InOutAnalyzer _analyzer;
   final Set<String> _positionScripts;
@@ -113,10 +127,50 @@ class MetalFragmentBuilder {
       SwizzleAssignmentTransformer(),
     ],
     forcedReturnExpression: _isVertexStage ? 'OUT' : null,
+    resolvedOutputComponents: _isVertexStage ? _resolvedOutputComponents : null,
   );
   late final String _inputStructName = '${data.normalizedName}_input';
   late final String _outputStructName = '${data.normalizedName}_output';
   late final String _positionFieldName = _resolvePositionFieldName();
+
+  /// Returns the minimum component-width each FS input field requires,
+  /// applying the same [_macroComponentHints] and body-analysis logic
+  /// that [_typeForInputField] uses — but WITHOUT any pairedVertexOutputs
+  /// bias. This is used by [collectVsRequiredOutputs] so the VS output
+  /// struct is widened to match the FS stage_in declaration exactly.
+  static Map<String, int> computeInputRequirements(ShaderIrData data) {
+    final _InOutAnalyzer analyzer =
+        _InOutAnalyzer(data.coreExpressions, data.coreFlow);
+    final List<Map<String, dynamic>> metadata = data.vertexAttributeMetadata;
+
+    int metaComponents(String token) {
+      for (final Map<String, dynamic> entry in metadata) {
+        if ((entry['token'] as String?) == token) {
+          final int? c = entry['components'] as int?;
+          if (c != null && c > 0) return c;
+          break;
+        }
+      }
+      return 4;
+    }
+
+    // Seed from vertexAttributeMetadata first so fields that appear only in
+    // the metadata (no body reference) are still included.
+    final Map<String, int> result = <String, int>{};
+    for (final Map<String, dynamic> entry in metadata) {
+      final String? token = entry['token'] as String?;
+      final int? c = entry['components'] as int?;
+      if (token != null && c != null && c > 0) {
+        result[token] = c;
+      }
+    }
+    // Apply analyzer usage (macro hints + explicit swizzle widths).
+    analyzer.inputComponentUsage.forEach((String token, int required) {
+      final int current = result[token] ?? 0;
+      if (required > current) result[token] = required;
+    });
+    return result;
+  }
 
   String build() {
     final StringBuffer buffer = StringBuffer();
@@ -223,6 +277,7 @@ class MetalFragmentBuilder {
     };
     if (_isVertexStage) {
       outputFields.add('HPosition');
+      _vsOutputRequirements?.keys.forEach(outputFields.add);
     }
     final List<String> sorted = outputFields.toList()..sort();
     for (final String field in sorted) {
@@ -374,6 +429,27 @@ float3 CMKYToRGB(float4 vColor) {
         '  OUT.HPosition = (uniforms.ModelViewProj) * float4(${_positionAccessor('.xyz')}, 1.0);',
       );
     }
+    if (_isVertexStage && _vsOutputRequirements != null) {
+      final Set<String> bodyWritten = <String>{
+        ..._analyzer.outputFields,
+        ...data.outputFieldTypes.keys,
+      };
+      final Map<String, String> inputAttrTypes = <String, String>{
+        for (final Map<String, dynamic> a in _orderedVertexAttributes)
+          if (a['token'] is String) a['token'] as String: _vertexAttributeType(a),
+      };
+      final List<String> sortedFields = _vsOutputRequirements!.keys.toList()..sort();
+      for (final String field in sortedFields) {
+        if (field == 'HPosition' || bodyWritten.contains(field)) continue;
+        final String outType = _outputType(field);
+        final String? inType = inputAttrTypes[field];
+        if (inType != null) {
+          buffer.writeln('  OUT.$field = ${_coerceValue('IN.$field', inType, outType)};');
+        } else {
+          buffer.writeln('  OUT.$field = ${_zeroValueForType(outType)};');
+        }
+      }
+    }
   }
 
   List<String> _buildParameters() {
@@ -400,6 +476,15 @@ float3 CMKYToRGB(float4 vColor) {
     final String? override = _inputFieldTypeOverrides[field];
     if (override != null) {
       return override;
+    }
+    final int? pairedComponents = _pairedVertexOutputs?[field];
+    if (pairedComponents != null) {
+      // Use the vertex output count as the base (PSO stage interface must
+      // match), but never go below what the fragment body actually accesses.
+      final int required = _requiredComponentCount(field);
+      return _attributeTypeForComponents(
+        pairedComponents > required ? pairedComponents : required,
+      );
     }
     int components = _attributeComponentCount(field);
     final int required = _requiredComponentCount(field);
@@ -442,6 +527,29 @@ float3 CMKYToRGB(float4 vColor) {
       return '0.0';
     }
     return '$type(0.0)';
+  }
+
+  String _coerceValue(String expr, String fromType, String toType) {
+    if (fromType == toType) return expr;
+    final int from = _componentCountFromTypeName(fromType);
+    final int to = _componentCountFromTypeName(toType);
+    if (from == to) return expr;
+    if (to > from) {
+      final List<String> zeros = List<String>.filled(to - from, '0.0');
+      return '$toType($expr, ${zeros.join(', ')})';
+    }
+    const List<String> swizzles = <String>['x', 'xy', 'xyz', 'xyzw'];
+    final String swizzle = to >= 1 && to <= 4 ? swizzles[to - 1] : 'xyzw';
+    return '$expr.$swizzle';
+  }
+
+  int _componentCountFromTypeName(String type) {
+    final String lower = type.toLowerCase();
+    if (lower == 'float' || lower == 'float1') return 1;
+    if (lower == 'float2') return 2;
+    if (lower == 'float3') return 3;
+    if (lower == 'float4') return 4;
+    return 4;
   }
 
   String _vertexAttributeType(Map<String, dynamic> entry) {

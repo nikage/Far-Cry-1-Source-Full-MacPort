@@ -1,0 +1,32 @@
+---
+description: CMake build commands must always use Ninja with -j8
+alwaysApply: true
+---
+
+# CMake Build Convention
+
+Always compile with **Ninja** and **-j8** parallelism.
+
+## Command pattern
+
+```bash
+cmake --build <build-dir> --target <target> -- -j8
+```
+
+For a full rebuild from the project root:
+
+```bash
+cd /Users/mykolamikhno/projects/FarCry/build
+cmake --build . --target <target> -- -j8
+```
+
+## Rules
+
+- Never use `make` directly — always go through `cmake --build`.
+- Always append `-- -j8` (passes `-j8` to the underlying Ninja process).
+- If the build directory does not exist yet, configure first:
+
+```bash
+cmake -G Ninja -B build -S .
+cmake --build build -- -j8
+```

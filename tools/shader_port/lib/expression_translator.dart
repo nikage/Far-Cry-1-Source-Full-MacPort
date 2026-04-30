@@ -7,10 +7,11 @@ class ExpressionTranslator {
     Set<String> scalarInputFields,
     List<LineTransformer> transformers, {
     String? forcedReturnExpression,
+    Map<String, int>? resolvedOutputComponents,
   }) : _scalarInputFields = Set<String>.from(scalarInputFields),
       _transformers = transformers,
       _resolvedOutputComponents =
-          _resolveOutputComponentCounts(data, analyzer),
+          resolvedOutputComponents ?? _resolveOutputComponentCounts(data, analyzer),
       macros = data.coreMacros,
       _forcedReturnExpression = forcedReturnExpression {
     _initializeMacroValues();
