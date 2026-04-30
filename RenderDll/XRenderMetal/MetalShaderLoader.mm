@@ -1559,8 +1559,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             g_missingVertexLogCount++;
         }
 
-        NSArray* directivesArray = [shaderDict objectForKey:@"directives"];
-        MTLFunctionConstantValues* funcConstants = BuildFunctionConstants(lowerName, directivesArray);
+        NSString* lowerShaderName = [shaderName lowercaseString];
+        MTLFunctionConstantValues* funcConstants = BuildFunctionConstants(lowerShaderName, directiveArray);
 
         // Tangent-frame requirement is determined solely by vertex attribute metadata
         bool forceTangentFrame = false;

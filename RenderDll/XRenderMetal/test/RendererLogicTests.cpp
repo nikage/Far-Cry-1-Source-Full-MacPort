@@ -301,6 +301,94 @@ static void test_fog_params()
     }
 }
 
+// -----------------------------------------------------------------------
+// Tests: shader-name → function-constant inference
+// Mirrors the substring logic in BuildFunctionConstants (MetalShaderLoader.mm).
+// Regression for the bug where an undeclared `lowerName` was passed instead of
+// the lowercase shader name, causing all name-derived constants to be false.
+// -----------------------------------------------------------------------
+struct FCFlags {
+    bool fog_enabled     = false;
+    bool hdr_enabled     = false;
+    bool gloss_alpha     = false;
+    bool env_light       = false;
+    bool atten_enabled   = false;
+    bool proj_light      = false;
+    bool plants_bending  = false;
+    bool alpha_glow      = false;
+    bool multiple_lights = false;
+    bool high_precision  = false;
+};
+
+static bool str_contains(const char* haystack, const char* needle) {
+    return std::strstr(haystack, needle) != nullptr;
+}
+
+static FCFlags InferFCFlagsFromName(const char* lowerName) {
+    FCFlags f;
+    if (!lowerName) return f;
+    f.env_light       = str_contains(lowerName, "envlight");
+    f.alpha_glow      = str_contains(lowerName, "alphaglow");
+    f.gloss_alpha     = str_contains(lowerName, "glossalpha");
+    f.multiple_lights = str_contains(lowerName, "multiplelight");
+    f.atten_enabled   = str_contains(lowerName, "atten");
+    f.proj_light      = str_contains(lowerName, "proj");
+    f.plants_bending  = str_contains(lowerName, "plants") || str_contains(lowerName, "vegetation");
+    return f;
+}
+
+static void test_function_constant_name_inference()
+{
+    {
+        auto f = InferFCFlagsFromName("generated_cgpsbump_diffspec_envlight_ps_fragment");
+        CHECK(f.env_light);
+        CHECK(!f.alpha_glow);
+        CHECK(!f.gloss_alpha);
+        CHECK(!f.multiple_lights);
+    }
+    {
+        auto f = InferFCFlagsFromName("generated_cgpsbump_diffspec_multiplelight_ps_fragment");
+        CHECK(f.multiple_lights);
+        CHECK(!f.env_light);
+    }
+    {
+        auto f = InferFCFlagsFromName("generated_cgpsbump_glossalpha_ps_fragment");
+        CHECK(f.gloss_alpha);
+        CHECK(!f.env_light);
+    }
+    {
+        auto f = InferFCFlagsFromName("generated_cgvprog_vegetation_vertex");
+        CHECK(f.plants_bending);
+        CHECK(!f.env_light);
+    }
+    {
+        auto f = InferFCFlagsFromName("generated_cgpsbump_atten_proj_ps_fragment");
+        CHECK(f.atten_enabled);
+        CHECK(f.proj_light);
+    }
+    {
+        auto f = InferFCFlagsFromName("generated_cgpsbump_alphaglow_ps_fragment");
+        CHECK(f.alpha_glow);
+        CHECK(!f.multiple_lights);
+    }
+    {
+        auto f = InferFCFlagsFromName(nullptr);
+        CHECK(!f.env_light);
+        CHECK(!f.alpha_glow);
+        CHECK(!f.plants_bending);
+    }
+    {
+        auto f = InferFCFlagsFromName("generated_cgpsbump_diffspec_ps_fragment");
+        CHECK(!f.env_light);
+        CHECK(!f.alpha_glow);
+        CHECK(!f.gloss_alpha);
+        CHECK(!f.multiple_lights);
+        CHECK(!f.atten_enabled);
+        CHECK(!f.proj_light);
+        CHECK(!f.plants_bending);
+    }
+}
+
 int main()
 {
     printf("=== RendererLogicTests ===\n");
@@ -311,6 +399,7 @@ int main()
     test_unpack_0565();
     test_unpack_dimensions();
     test_fog_params();
+    test_function_constant_name_inference();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;
