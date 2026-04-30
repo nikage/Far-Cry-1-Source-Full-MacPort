@@ -1,0 +1,140 @@
+{
+  "name": "CGVProgDofFocalDistNoUV",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgDofFocalDistNoUV.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  VIEWPROJ_MATRIX,  \r\n  uniform float4   CameraPos,\r\n  uniform float4   DofFocalParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P    \r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P   \r\n    OUT_T0 \r\n    OUT_C0\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float4 vHPos = mul(ModelViewProj, IN.Position);\r\n  // encode in 8bits focal distance\r\n  float fFinalDist=abs(vHPos.w-DofFocalParams.x)/DofFocalParams.y;\r\n  \r\n  OUT.Color.xyzw =fFinalDist;\r\n  \r\n  // output planar distance  \r\n  OUT.Tex0.xyzw= vHPos.zwzw;\r\n        \r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 vHPos",
+      "rhs": "mul(ModelViewProj, IN.Position)",
+      "textureSample": false,
+      "raw": "float4 vHPos = mul(ModelViewProj, IN.Position);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "encode in 8bits focal distance",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFinalDist",
+      "rhs": "abs(vHPos.w-DofFocalParams.x)/DofFocalParams.y",
+      "textureSample": false,
+      "raw": "float fFinalDist=abs(vHPos.w-DofFocalParams.x)/DofFocalParams.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyzw",
+      "rhs": "fFinalDist",
+      "textureSample": false,
+      "raw": "OUT.Color.xyzw =fFinalDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output planar distance",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xyzw",
+      "rhs": "vHPos.zwzw",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xyzw= vHPos.zwzw;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHPos = mul(ModelViewProj, IN.Position)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFinalDist=abs(vHPos.w-DofFocalParams.x)/DofFocalParams.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyzw =fFinalDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xyzw= vHPos.zwzw",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

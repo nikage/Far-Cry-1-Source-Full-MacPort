@@ -1,0 +1,384 @@
+{
+  "name": "CGVProgFire",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgFire.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 PRIM_COLOR"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  uniform float4x4 ModelViewProj,\r\n  uniform float4   CameraPos,  \r\n  uniform float4   Constants,\r\n  uniform float4   TexGenRipple0,\r\n  uniform float4   TexGenRipple1,\r\n  uniform float4   TexShiftRipple,\r\n  uniform float4   TexDetailScale,\r\n  uniform float4   BumpMatrix,\r\n  uniform float4   DetailTexParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n    IN_C0\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1_2\r\n    OUT_C0\r\n    OUT_C1\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": " \r\n  float2 vTranslation=DetailTexParams.zw*TexShiftRipple.zw;\r\n  // bump texture coordinates  \r\n  float3 vTex;\r\n  vTex.xy=(IN.TexCoord0.xy+vTranslation.xy)-0.5; \r\n  vTex.z=1;\r\n  \r\n  float fCos=cos(TexShiftRipple.z*100);\r\n  float fSin=sin(TexShiftRipple.z*100);\r\n  \r\n  float3x3 mRot;\r\n  mRot[0]=float3(fCos, -fSin, 0);\r\n  mRot[1]=float3(fSin,  fCos, 0);\r\n  mRot[2]=float3(   0,     0, 1);\r\n      \r\n  // rotate coordinates\r\n  vTex=mul(mRot, vTex);  \r\n  OUT.Tex0.xy = (vTex.xy+0.5)*DetailTexParams.xy;\r\n    \r\n  // output environment map texture coordinates  \r\n  OUT.Tex1.xy = IN.TexCoord0.xy;  \r\n  // output particle transparency\r\n  OUT.Color.w = IN.Color.w;                 \r\n\r\n# ifdef _HDR\r\n  float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);\r\n  OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);\r\n# endif        \r\n\r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float2 vTranslation",
+      "rhs": "DetailTexParams.zw*TexShiftRipple.zw",
+      "textureSample": false,
+      "raw": "float2 vTranslation=DetailTexParams.zw*TexShiftRipple.zw;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "bump texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3 vTex;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.xy",
+      "rhs": "(IN.TexCoord0.xy+vTranslation.xy)-0.5",
+      "textureSample": false,
+      "raw": "vTex.xy=(IN.TexCoord0.xy+vTranslation.xy)-0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.z",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "vTex.z=1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fCos",
+      "rhs": "cos(TexShiftRipple.z*100)",
+      "textureSample": false,
+      "raw": "float fCos=cos(TexShiftRipple.z*100);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fSin",
+      "rhs": "sin(TexShiftRipple.z*100)",
+      "textureSample": false,
+      "raw": "float fSin=sin(TexShiftRipple.z*100);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 mRot;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "mRot[0]",
+      "rhs": "float3(fCos, -fSin, 0)",
+      "textureSample": false,
+      "raw": "mRot[0]=float3(fCos, -fSin, 0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "mRot[1]",
+      "rhs": "float3(fSin,  fCos, 0)",
+      "textureSample": false,
+      "raw": "mRot[1]=float3(fSin,  fCos, 0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "mRot[2]",
+      "rhs": "float3(   0,     0, 1)",
+      "textureSample": false,
+      "raw": "mRot[2]=float3(   0,     0, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "rotate coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex",
+      "rhs": "mul(mRot, vTex)",
+      "textureSample": false,
+      "raw": "vTex=mul(mRot, vTex);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "(vTex.xy+0.5)*DetailTexParams.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = (vTex.xy+0.5)*DetailTexParams.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output environment map texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output particle transparency",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "IN.Color.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = IN.Color.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _HDR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float ffCameraSpacePosZ",
+      "rhs": "dot(ModelViewProj._31_32_33_34, vPos)",
+      "textureSample": false,
+      "raw": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_HDR",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color1.xyzw",
+      "rhs": "clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "textureSample": false,
+      "raw": "OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_HDR",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTranslation=DetailTexParams.zw*TexShiftRipple.zw",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vTex",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.xy=(IN.TexCoord0.xy+vTranslation.xy)-0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.z=1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fCos=cos(TexShiftRipple.z*100)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fSin=sin(TexShiftRipple.z*100)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 mRot",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "mRot[0]=float3(fCos, -fSin, 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "mRot[1]=float3(fSin,  fCos, 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "mRot[2]=float3(   0,     0, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex=mul(mRot, vTex)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = (vTex.xy+0.5)*DetailTexParams.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = IN.Color.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _HDR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color1.xyzw = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_HDR"
+  ],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

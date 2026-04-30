@@ -475,6 +475,7 @@ float3 CMKYToRGB(float4 vColor) {
   }
 
   static const Map<String, String> _macroUniformTypes = <String, String>{
+    'ModelViewProj': 'float4x4',
     'Ambient': 'float4',
     'Diffuse': 'float4',
     'DiffuseSun': 'float4',
@@ -531,6 +532,19 @@ float3 CMKYToRGB(float4 vColor) {
         _syntheticUniforms[name] = entry.value;
         _uniformTypes[name] = entry.value;
       }
+    }
+    _ensureModelViewProjForHPosition();
+  }
+
+  void _ensureModelViewProjForHPosition() {
+    if (!_isVertexStage) return;
+    if (!data.outputFieldTypes.containsKey('HPosition')) return;
+    if (_uniformTypes.containsKey('ModelViewProj')) return;
+    final bool translatorAssignedHPosition =
+        _translator.body.any((String line) => line.contains('OUT.HPosition'));
+    if (!translatorAssignedHPosition) {
+      _syntheticUniforms['ModelViewProj'] = 'float4x4';
+      _uniformTypes['ModelViewProj'] = 'float4x4';
     }
   }
 

@@ -1,0 +1,591 @@
+{
+  "name": "CGVProgOceanWater",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgOceanWater.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 PRIM_COLOR"
+    },
+    {
+      "name": "MainInput",
+      "content": " \r\n        VIEWPROJ_MATRIX, \r\n        uniform float4 NoisePos, \r\n        CAMERA_POS, \r\n        LIGHT_POS,\r\n        ATTEN,\r\n        uniform float4 TexShiftRipple, \r\n        uniform float4 TexGenRipple0, \r\n        uniform float4 TexGenRipple1, \r\n        uniform float4 TexDetailScale, \r\n        uniform float4 WaterLevel, \r\n        uniform float4 BumpScale,\r\n        uniform float4x4 TexProjMatrix, \r\n        uniform float4 pg[66] : register(c30)"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_C0\r\n          OUT_C1\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // compute eye vector\r\n        float3 ViewVec=CameraPos.xyz-IN.Position.xyz;\r\n        float3 LightVec=LightPos.xyz-IN.Position.xyz;\r\n        \r\n        float fiSqDist = rsqrt(dot(ViewVec, ViewVec));\r\n        float fAtten = PROC_ATTENVERT;        \r\n        \r\n        float2 vAttenuation=float2(saturate(1-fAtten)*0.2+0.1, saturate(1-fAtten)*2);\r\n                        \r\n        // set the 3x3 tranform from tangent space to object space\r\n        float3x3 objToTangentSpace;\r\n        objToTangentSpace[0] = float3(0, -1, 0);\r\n        objToTangentSpace[1] = float3(1, 0, 0);\r\n        objToTangentSpace[2] = float3(0, 0, 1);              \r\n      \r\n        float2 vTex;\r\n        \r\n        float3 vEye=abs(vPos.xyz-CameraPos.xyz);\r\n        float fDist=sqrt(dot(vEye, vEye));\r\n        \r\n        // virtual map center...\r\n        float2 vMapCenter=float2(1024.0, 2048.0);\r\n        \r\n        // set translation to bump layers\r\n                \r\n                \r\n        float2 vTranslation=TexShiftRipple.xy%1;        \r\n        \r\n        vTex.xy= (vMapCenter.xy-vPos.xy)*0.0125;                \r\n        OUT.Tex0.xy = vTex.xy + vTranslation.xy*2.0;\r\n        \r\n        vTex.xy= (vMapCenter.xy-vPos.xy)*0.0085;        \r\n        OUT.Tex0.wz = vTex.xy - vTranslation.xy;                \r\n                                      \r\n        OUT.Tex4.xyz=mul(objToTangentSpace, ViewVec.xyz);                \r\n        OUT.Tex4.w=vAttenuation.x*1.5;        \r\n        \r\n        OUT.Tex5.xyz=mul(objToTangentSpace, LightVec.xyz);\r\n        OUT.Tex5.w=vAttenuation.y;        \r\n                \r\n        OUT.Tex3.xy = (vTex.xy + TexShiftRipple.xy) * TexDetailScale.xy;\r\n        \r\n       \r\n        //float4 vProjTex = mul(TexProjMatrix, vPos);\r\n        //vProjTex.xy = vProjTex.xy + fNoise * CameraPos.w;\r\n  \r\n        // optimized perspective correct projection\r\n        float4 vHPos = mul(ModelViewProj, vPos);\r\n        OUT.Tex1.x = (vHPos.x  + vHPos.w)*0.5;\r\n        OUT.Tex1.y = (vHPos.y  + vHPos.w)*0.5; // for reflection\r\n        OUT.Tex1.z = (-vHPos.y  + vHPos.w)*0.5; // for refraction\r\n        OUT.Tex1.w   = vHPos.w;  \r\n        \r\n        float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);\r\n                \r\n        OUT.Tex3.z=(eyeVec.z<0)?vHPos.w*0.1:vHPos.w*0.05;                \r\n        OUT.Tex2.xyz = (eyeVec.z<0)?1:TexProjMatrix[2]; //*0.5+0.5;\r\n        \r\n        OUT.Color = IN.Color;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "compute eye vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 ViewVec",
+      "rhs": "CameraPos.xyz-IN.Position.xyz",
+      "textureSample": false,
+      "raw": "float3 ViewVec=CameraPos.xyz-IN.Position.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 LightVec",
+      "rhs": "LightPos.xyz-IN.Position.xyz",
+      "textureSample": false,
+      "raw": "float3 LightVec=LightPos.xyz-IN.Position.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fiSqDist",
+      "rhs": "rsqrt(dot(ViewVec, ViewVec))",
+      "textureSample": false,
+      "raw": "float fiSqDist = rsqrt(dot(ViewVec, ViewVec));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fAtten",
+      "rhs": "PROC_ATTENVERT",
+      "textureSample": false,
+      "raw": "float fAtten = PROC_ATTENVERT;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vAttenuation",
+      "rhs": "float2(saturate(1-fAtten)*0.2+0.1, saturate(1-fAtten)*2)",
+      "textureSample": false,
+      "raw": "float2 vAttenuation=float2(saturate(1-fAtten)*0.2+0.1, saturate(1-fAtten)*2);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "set the 3x3 tranform from tangent space to object space",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 objToTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[0]",
+      "rhs": "float3(0, -1, 0)",
+      "textureSample": false,
+      "raw": "objToTangentSpace[0] = float3(0, -1, 0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[1]",
+      "rhs": "float3(1, 0, 0)",
+      "textureSample": false,
+      "raw": "objToTangentSpace[1] = float3(1, 0, 0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[2]",
+      "rhs": "float3(0, 0, 1)",
+      "textureSample": false,
+      "raw": "objToTangentSpace[2] = float3(0, 0, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2 vTex;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vEye",
+      "rhs": "abs(vPos.xyz-CameraPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 vEye=abs(vPos.xyz-CameraPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDist",
+      "rhs": "sqrt(dot(vEye, vEye))",
+      "textureSample": false,
+      "raw": "float fDist=sqrt(dot(vEye, vEye));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "virtual map center...",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vMapCenter",
+      "rhs": "float2(1024.0, 2048.0)",
+      "textureSample": false,
+      "raw": "float2 vMapCenter=float2(1024.0, 2048.0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "set translation to bump layers",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vTranslation",
+      "rhs": "TexShiftRipple.xy%1",
+      "textureSample": false,
+      "raw": "float2 vTranslation=TexShiftRipple.xy%1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.xy",
+      "rhs": "(vMapCenter.xy-vPos.xy)*0.0125",
+      "textureSample": false,
+      "raw": "vTex.xy= (vMapCenter.xy-vPos.xy)*0.0125;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "vTex.xy + vTranslation.xy*2.0",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = vTex.xy + vTranslation.xy*2.0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.xy",
+      "rhs": "(vMapCenter.xy-vPos.xy)*0.0085",
+      "textureSample": false,
+      "raw": "vTex.xy= (vMapCenter.xy-vPos.xy)*0.0085;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.wz",
+      "rhs": "vTex.xy - vTranslation.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.wz = vTex.xy - vTranslation.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex4.xyz",
+      "rhs": "mul(objToTangentSpace, ViewVec.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex4.xyz=mul(objToTangentSpace, ViewVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex4.w",
+      "rhs": "vAttenuation.x*1.5",
+      "textureSample": false,
+      "raw": "OUT.Tex4.w=vAttenuation.x*1.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5.xyz",
+      "rhs": "mul(objToTangentSpace, LightVec.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex5.xyz=mul(objToTangentSpace, LightVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5.w",
+      "rhs": "vAttenuation.y",
+      "textureSample": false,
+      "raw": "OUT.Tex5.w=vAttenuation.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xy",
+      "rhs": "(vTex.xy + TexShiftRipple.xy) * TexDetailScale.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xy = (vTex.xy + TexShiftRipple.xy) * TexDetailScale.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float4 vProjTex = mul(TexProjMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "vProjTex.xy = vProjTex.xy + fNoise * CameraPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "optimized perspective correct projection",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vHPos",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "float4 vHPos = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.x",
+      "rhs": "(vHPos.x  + vHPos.w)*0.5",
+      "textureSample": false,
+      "raw": "OUT.Tex1.x = (vHPos.x  + vHPos.w)*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.y",
+      "rhs": "(vHPos.y  + vHPos.w)*0.5 // for reflection",
+      "textureSample": false,
+      "raw": "OUT.Tex1.y = (vHPos.y  + vHPos.w)*0.5; // for reflection",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.z",
+      "rhs": "(-vHPos.y  + vHPos.w)*0.5 // for refraction",
+      "textureSample": false,
+      "raw": "OUT.Tex1.z = (-vHPos.y  + vHPos.w)*0.5; // for refraction",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.w",
+      "rhs": "vHPos.w",
+      "textureSample": false,
+      "raw": "OUT.Tex1.w   = vHPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 eyeVec",
+      "rhs": "normalize(CameraPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.z",
+      "rhs": "(eyeVec.z<0)?vHPos.w*0.1:vHPos.w*0.05",
+      "textureSample": false,
+      "raw": "OUT.Tex3.z=(eyeVec.z<0)?vHPos.w*0.1:vHPos.w*0.05;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "(eyeVec.z<0)?1:TexProjMatrix[2] //*0.5+0.5",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = (eyeVec.z<0)?1:TexProjMatrix[2]; //*0.5+0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "IN.Color",
+      "textureSample": false,
+      "raw": "OUT.Color = IN.Color;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [
+    "Projected"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 ViewVec=CameraPos.xyz-IN.Position.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 LightVec=LightPos.xyz-IN.Position.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fiSqDist = rsqrt(dot(ViewVec, ViewVec))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fAtten = PROC_ATTENVERT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vAttenuation=float2(saturate(1-fAtten)*0.2+0.1, saturate(1-fAtten)*2)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 objToTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[0] = float3(0, -1, 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[1] = float3(1, 0, 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[2] = float3(0, 0, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTex",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vEye=abs(vPos.xyz-CameraPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDist=sqrt(dot(vEye, vEye))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vMapCenter=float2(1024.0, 2048.0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTranslation=TexShiftRipple.xy%1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.xy= (vMapCenter.xy-vPos.xy)*0.0125",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = vTex.xy + vTranslation.xy*2.0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.xy= (vMapCenter.xy-vPos.xy)*0.0085",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.wz = vTex.xy - vTranslation.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex4.xyz=mul(objToTangentSpace, ViewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex4.w=vAttenuation.x*1.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5.xyz=mul(objToTangentSpace, LightVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5.w=vAttenuation.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xy = (vTex.xy + TexShiftRipple.xy) * TexDetailScale.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHPos = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.x = (vHPos.x  + vHPos.w)*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.y = (vHPos.y  + vHPos.w)*0.5; // for reflection",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.z = (-vHPos.y  + vHPos.w)*0.5; // for refraction",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.w   = vHPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.z=(eyeVec.z<0)?vHPos.w*0.1:vHPos.w*0.05",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = (eyeVec.z<0)?1:TexProjMatrix[2]; //*0.5+0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = IN.Color",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "1"
+  ],
+  "positionScripts": [
+    "PosWaterDeform_PlusWaterLevel"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

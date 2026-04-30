@@ -1,0 +1,420 @@
+{
+  "name": "CGVProgBump_DiffSpecPass_Proj_Gloss_EnvCM_VS20",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgBump_DiffSpecPass_Proj_Gloss_EnvCM_VS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, ATTEN, LIGHT_MATRIX, uniform float4x4 TexMatrix"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_T6\r\n          OUT_T7\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xy = IN.TexCoord0.xy;\r\n        OUT.Tex1.xy = IN.TexCoord0.xy;\r\n        OUT.Tex4.xy = IN.TexCoord0.xy;\r\n        OUT.Tex2 = mul(LightMatrix, vPos);\r\n\r\n        TANG_MATR\r\n\r\n        float3 lVec = LightPos.xyz - vPos.xyz;\r\n        float3 lightVec = mul(objToTangentSpace, lVec);          \r\n        float3 vDist = PROC_ATTENPIX;\r\n        \r\n        OUT.Tex3.xyz = vDist;\r\n        OUT.Color.xyz = vDist;\r\n        \r\n        OUT.Tex6.xyz = lightVec;\r\n\r\n        // store normalized light vector\r\n        float3 vVec = CameraPos.xyz - vPos.xyz;\r\n        float3 viewVec = mul(objToTangentSpace, vVec);\r\n\r\n        // transform light vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex7.xyz = viewVec.xyz;\r\n\r\n        float3 tCamVec = normalize(vVec);\r\n        float3 tNormal = IN.TNormal.xyz;\r\n        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;\r\n        float4 tRM;\r\n        tRM.xyz = tRef.xyz;\r\n        tRM.w = vPos.w;\r\n        OUT.Tex5 = mul(tRM, TexMatrix);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex4.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex4.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2",
+      "rhs": "mul(LightMatrix, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex2 = mul(LightMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lVec",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lVec = LightPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "mul(objToTangentSpace, lVec)",
+      "textureSample": false,
+      "raw": "float3 lightVec = mul(objToTangentSpace, lVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vDist",
+      "rhs": "PROC_ATTENPIX",
+      "textureSample": false,
+      "raw": "float3 vDist = PROC_ATTENPIX;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xyz",
+      "rhs": "vDist",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xyz = vDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "vDist",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = vDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex6.xyz",
+      "rhs": "lightVec",
+      "textureSample": false,
+      "raw": "OUT.Tex6.xyz = lightVec;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 vVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "mul(objToTangentSpace, vVec)",
+      "textureSample": false,
+      "raw": "float3 viewVec = mul(objToTangentSpace, vVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform light vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex7.xyz",
+      "rhs": "viewVec.xyz",
+      "textureSample": false,
+      "raw": "OUT.Tex7.xyz = viewVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tCamVec",
+      "rhs": "normalize(vVec)",
+      "textureSample": false,
+      "raw": "float3 tCamVec = normalize(vVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tNormal",
+      "rhs": "IN.TNormal.xyz",
+      "textureSample": false,
+      "raw": "float3 tNormal = IN.TNormal.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tRef",
+      "rhs": "dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz",
+      "textureSample": false,
+      "raw": "float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float4 tRM;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tRM.xyz",
+      "rhs": "tRef.xyz",
+      "textureSample": false,
+      "raw": "tRM.xyz = tRef.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tRM.w",
+      "rhs": "vPos.w",
+      "textureSample": false,
+      "raw": "tRM.w = vPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5",
+      "rhs": "mul(tRM, TexMatrix)",
+      "textureSample": false,
+      "raw": "OUT.Tex5 = mul(tRM, TexMatrix);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "derived",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex4.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2 = mul(LightMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lVec = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = mul(objToTangentSpace, lVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vDist = PROC_ATTENPIX",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xyz = vDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = vDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex6.xyz = lightVec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = mul(objToTangentSpace, vVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex7.xyz = viewVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tCamVec = normalize(vVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tNormal = IN.TNormal.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 tRM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tRM.xyz = tRef.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tRM.w = vPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5 = mul(tRM, TexMatrix)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Tex6": "float4",
+    "Tex7": "float4",
+    "Color": "float4"
+  }
+}

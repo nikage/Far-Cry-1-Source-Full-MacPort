@@ -1,0 +1,165 @@
+{
+  "name": "CGVProgProjectTex_Bump",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgProjectTex_Bump.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 NORMAL_3 TEXCOORD0_2"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 Constants"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1_2\r\n          OUT_T2_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        vPos.xyz = vPos.xyz + IN.Normal.xyz * Constants.z;\r\n        float4 vHPos = mul(ModelViewProj, vPos);        \r\n        OUT.Tex1.xy = (vHPos.xy / vHPos.w + Constants.x) * Constants.y;\r\n        OUT.Color.xyz = (0.3).xxx;\r\n        OUT.Tex0.xy = IN.TexCoord0;\r\n        OUT.Tex2.xy = IN.TexCoord0;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "vPos.xyz",
+      "rhs": "vPos.xyz + IN.Normal.xyz * Constants.z",
+      "textureSample": false,
+      "raw": "vPos.xyz = vPos.xyz + IN.Normal.xyz * Constants.z;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vHPos",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "float4 vHPos = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "(vHPos.xy / vHPos.w + Constants.x) * Constants.y",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = (vHPos.xy / vHPos.w + Constants.x) * Constants.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "(0.3).xxx",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = (0.3).xxx;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xy",
+      "rhs": "IN.TexCoord0",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xy = IN.TexCoord0;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "NORMAL_3",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPos.xyz = vPos.xyz + IN.Normal.xyz * Constants.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHPos = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = (vHPos.xy / vHPos.w + Constants.x) * Constants.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = (0.3).xxx",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xy = IN.TexCoord0",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float2",
+    "Color": "float4"
+  }
+}

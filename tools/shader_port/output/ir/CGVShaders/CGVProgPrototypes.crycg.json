@@ -1,0 +1,255 @@
+{
+  "name": "CGVProgPrototypes",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgPrototypes.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": "\r\n    POSITION_3\r\n    TEXCOORD0_2\r\n    TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n    VIEWPROJ_MATRIX,\r\n    LIGHT_POS,\r\n    CAMERA_POS"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n    IN_T0_TANG\r\n    OUT_T0_T1_C0"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\r\n    OUT.Tex0.xy = IN.TexCoord0.xy;\r\n    OUT.Tex1.xy = IN.TexCoord0.xy;\r\n\r\n    // get 3x3 tangent space tranformation matrix\r\n    float3x3 MatrixTS;\r\n    MatrixTS[0] = IN.Tangent;\r\n    MatrixTS[1] = IN.Binormal;\r\n    MatrixTS[2] = IN.TNormal;\r\n\r\n    //  compute light vector\r\n    float3 vLightOS = normalize(LightPos.xyz - IN.Position.xyz);\r\n\r\n    // xform to tangent space\r\n    vLightOS= mul(MatrixTS, vLightOS);\r\n    OUT.Color.xyz=normalize(vLightOS);\r\n\r\n    return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "get 3x3 tangent space tranformation matrix",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 MatrixTS;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "MatrixTS[0]",
+      "rhs": "IN.Tangent",
+      "textureSample": false,
+      "raw": "MatrixTS[0] = IN.Tangent;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "MatrixTS[1]",
+      "rhs": "IN.Binormal",
+      "textureSample": false,
+      "raw": "MatrixTS[1] = IN.Binormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "MatrixTS[2]",
+      "rhs": "IN.TNormal",
+      "textureSample": false,
+      "raw": "MatrixTS[2] = IN.TNormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vLightOS",
+      "rhs": "normalize(LightPos.xyz - IN.Position.xyz)",
+      "textureSample": false,
+      "raw": "float3 vLightOS = normalize(LightPos.xyz - IN.Position.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "xform to tangent space",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vLightOS",
+      "rhs": "mul(MatrixTS, vLightOS)",
+      "textureSample": false,
+      "raw": "vLightOS= mul(MatrixTS, vLightOS);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "normalize(vLightOS)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz=normalize(vLightOS);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "explicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "explicit",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 MatrixTS",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "MatrixTS[0] = IN.Tangent",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "MatrixTS[1] = IN.Binormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "MatrixTS[2] = IN.TNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vLightOS = normalize(LightPos.xyz - IN.Position.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vLightOS= mul(MatrixTS, vLightOS)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz=normalize(vLightOS)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4"
+  }
+}

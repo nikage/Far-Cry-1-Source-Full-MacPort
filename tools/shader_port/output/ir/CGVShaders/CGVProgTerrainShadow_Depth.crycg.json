@@ -1,0 +1,220 @@
+{
+  "name": "CGVProgTerrainShadow_Depth",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgTerrainShadow_Depth.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 BaseTexGen0, uniform float4 BaseTexGen1, uniform float4x4 ShadowTexGen0, uniform float2x4 ShadowModelMatr, uniform float4 ObjPos, uniform float4 ObjColor, uniform float ShadowBias"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1\r\n          OUT_T2_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex1 = mul(ShadowTexGen0, vPos);\r\n        float fZ = dot(ShadowModelMatr._11_12_13_14, vPos);\r\n        float fW = dot(ShadowModelMatr._21_22_23_24, vPos);\r\n        OUT.Tex2.x = fZ;\r\n        OUT.Tex2.y = fW;\r\n        OUT.Tex0.x = dot(BaseTexGen0, vPos);          \r\n        OUT.Tex0.y = dot(BaseTexGen1, vPos);          \r\n        float fBright = min(1, length(vPos.xyz - ObjPos.xyz) * ObjColor.w);\r\n        float3 vCol = ObjColor.xyz*(vPos.w-fBright) + fBright;\r\n        OUT.Color.xyz = IN.Color.www * vCol;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1",
+      "rhs": "mul(ShadowTexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex1 = mul(ShadowTexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fZ",
+      "rhs": "dot(ShadowModelMatr._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "float fZ = dot(ShadowModelMatr._11_12_13_14, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fW",
+      "rhs": "dot(ShadowModelMatr._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "float fW = dot(ShadowModelMatr._21_22_23_24, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.x",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.Tex2.x = fZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.y",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.Tex2.y = fW;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "dot(BaseTexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = dot(BaseTexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "dot(BaseTexGen1, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = dot(BaseTexGen1, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fBright",
+      "rhs": "min(1, length(vPos.xyz - ObjPos.xyz) * ObjColor.w)",
+      "textureSample": false,
+      "raw": "float fBright = min(1, length(vPos.xyz - ObjPos.xyz) * ObjColor.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vCol",
+      "rhs": "ObjColor.xyz*(vPos.w-fBright) + fBright",
+      "textureSample": false,
+      "raw": "float3 vCol = ObjColor.xyz*(vPos.w-fBright) + fBright;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.www * vCol",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = IN.Color.www * vCol;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1 = mul(ShadowTexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fZ = dot(ShadowModelMatr._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fW = dot(ShadowModelMatr._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.x = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.y = fW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = dot(BaseTexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = dot(BaseTexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fBright = min(1, length(vPos.xyz - ObjPos.xyz) * ObjColor.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vCol = ObjColor.xyz*(vPos.w-fBright) + fBright",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = IN.Color.www * vCol",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosTerrainOverlay"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Tex2": "float2",
+    "Color": "float4"
+  }
+}

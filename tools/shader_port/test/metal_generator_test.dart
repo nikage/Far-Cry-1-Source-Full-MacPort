@@ -87,8 +87,8 @@ void main() {
 
       final String code = buildMetal(data);
       expect(code, contains('struct ${normalized}_input'));
-      expect(code, contains('float2 Tex0;'));
-      expect(code, contains('float4 Color;'));
+      expect(code, contains('float2 Tex0 [[user(Tex0)]];'));
+      expect(code, contains('float4 Color [[user(Color)]];'));
       expect(
         code,
         contains('baseMap.sample(baseMapSampler, IN.Tex0.xy)'),
@@ -569,6 +569,199 @@ void main() {
       expect(code, contains('float3 Tangent [[attribute(4)]];'));
       expect(code, contains('float3 Binormal [[attribute(5)]];'));
       expect(code, contains('float3 TNormal [[attribute(6)]];'));
+    });
+  });
+
+  group('resolveVertexEntryPoint heuristic — token transform rules', () {
+    Map<String, String> _verts(List<String> keys) => {
+          for (final String k in keys) k: 'generated_${k}_vertex',
+        };
+
+    String? _resolve(String fragNorm, List<String> vertKeys) =>
+        resolveVertexEntryPointForTest(fragNorm, _verts(vertKeys));
+
+    test('alphaglow token is removed before matching', () {
+      expect(
+        _resolve('cgrcambient_alphaglow',
+            ['cgvprogambient_vs20', 'cgvprogambient']),
+        isNotNull,
+      );
+    });
+
+    test('glitter token is removed before matching', () {
+      expect(
+        _resolve('cgrcambient_glitter',
+            ['cgvprogambient_vs20', 'cgvprogambient']),
+        isNotNull,
+      );
+    });
+
+    test('specgloss is renamed to specpass_gloss before matching', () {
+      expect(
+        _resolve('cgrcbump_specgloss',
+            ['cgvprogbump_specpass_gloss_vs20', 'cgvprogbump_specpass_gloss']),
+        isNotNull,
+      );
+    });
+
+    test('singlelight token is removed before matching', () {
+      expect(
+        _resolve('cgrcbump_diffspec_singlelight',
+            ['cgvprogbump_diffspecpass_vs20', 'cgvprogbump_diffspecpass']),
+        isNotNull,
+      );
+    });
+
+    test('hp and atten tokens are swapped to match vertex ordering', () {
+      expect(
+        _resolve('cgrcbump_diffspec_hp_atten',
+            ['cgvprogbump_diffspecpass_atten_hp_vs20',
+             'cgvprogbump_diffspecpass_atten_hp']),
+        isNotNull,
+      );
+    });
+
+    test('gloss-stripping fallback resolves when vertex lacks gloss suffix', () {
+      expect(
+        _resolve('cgrcbump_diffspec_gloss',
+            ['cgvprogbump_diffspecpass_vs20', 'cgvprogbump_diffspecpass']),
+        isNotNull,
+      );
+    });
+
+    test('substring fallback (corrected direction) does not produce false match', () {
+      // After stripping the cgrc prefix, the fragment stem never starts with
+      // cgvprog, so it cannot contain a vertex key as a substring. The fallback
+      // is inert for standard naming conventions — which is correct behaviour.
+      expect(
+        _resolve('cgrcbump_diffspecpass_extra',
+            ['cgvprogbump_diffspecpass']),
+        isNull,
+      );
+    });
+
+    test('substring fallback does not match when vertex key is <= 8 chars', () {
+      expect(
+        _resolve('cgrcbumplong_extra',
+            ['cgvbump']),
+        isNull,
+      );
+    });
+
+    test('returns null when no match exists', () {
+      expect(
+        _resolve('cgrccompletely_unknown_shader', ['cgvprogambient_vs20']),
+        isNull,
+      );
+    });
+  });
+
+  group('ModelViewProj synthetic uniform', () {
+    ShaderIrData _makeVertexShaderWithout({
+      List<UniformBinding> extraUniforms = const [],
+      List<Map<String, dynamic>> extraExpressions = const [],
+    }) {
+      final String normalized = normalizeName('CGVProgModelVP');
+      return ShaderIrData(
+        shaderName: 'CGVProgModelVP',
+        normalizedName: normalized,
+        fragmentName: 'generated_${normalized}_vertex',
+        uniformStruct: '${normalized}_uniforms',
+        uniforms: [...extraUniforms],
+        textures: const [],
+        coreExpressions: [
+          ...extraExpressions,
+          {
+            'type': 'assignment',
+            'lhs': 'OUT.Tex0.xy',
+            'rhs': 'IN.TexCoord0.xy',
+            'raw': 'OUT.Tex0.xy = IN.TexCoord0.xy;',
+            'active': true,
+          },
+        ],
+        coreMacros: const [],
+        coreFlow: const [],
+        passStates: const [],
+        positionScripts: const [],
+        positionScriptBlocks: const [],
+        outputFieldTypes: const {'HPosition': 'float4', 'Tex0': 'float2'},
+        maskReferences: const [],
+        stage: 'vertex',
+        vertexAttributes: const ['POSITION_3', 'TEXCOORD0_2'],
+        vertexAttributeMetadata: const [
+          {
+            'token': 'Position',
+            'category': 'position',
+            'semantic': 'POSITION',
+            'components': 4,
+          },
+          {
+            'token': 'TexCoord0',
+            'category': 'texcoord',
+            'semantic': 'TEXCOORD0',
+            'components': 2,
+            'index': 0,
+          },
+        ],
+      );
+    }
+
+    test(
+        'ModelViewProj is injected into uniform struct when body references it '
+        'and IR did not declare it', () {
+      final ShaderIrData data = _makeVertexShaderWithout(
+        extraExpressions: [
+          {
+            'type': 'assignment',
+            'lhs': 'OUT.HPosition',
+            'rhs': 'uniforms.ModelViewProj * float4(IN.Position.xyz, 1.0)',
+            'raw':
+                'OUT.HPosition = uniforms.ModelViewProj * float4(IN.Position.xyz, 1.0);',
+            'active': true,
+          },
+        ],
+      );
+      final String metal = buildMetal(data);
+      expect(metal, contains('ModelViewProj'));
+      expect(metal, contains('float4x4'));
+    });
+
+    test(
+        'ModelViewProj is injected via HPosition fallback path even when '
+        'core expressions do not reference it directly', () {
+      final ShaderIrData data = _makeVertexShaderWithout();
+      final String metal = buildMetal(data);
+      expect(metal, contains('ModelViewProj'),
+          reason: 'fallback HPosition assignment requires ModelViewProj in uniform struct');
+      expect(metal, contains('float4x4'),
+          reason: 'ModelViewProj must be typed as float4x4 in the struct');
+    });
+
+    test(
+        'ModelViewProj is not duplicated when IR already declares it', () {
+      final ShaderIrData data = _makeVertexShaderWithout(
+        extraUniforms: [UniformBinding('float4x4', 'ModelViewProj', '')],
+        extraExpressions: [
+          {
+            'type': 'assignment',
+            'lhs': 'OUT.HPosition',
+            'rhs': 'uniforms.ModelViewProj * float4(IN.Position.xyz, 1.0)',
+            'raw':
+                'OUT.HPosition = uniforms.ModelViewProj * float4(IN.Position.xyz, 1.0);',
+            'active': true,
+          },
+        ],
+      );
+      final String metal = buildMetal(data);
+      final int occurrences = 'ModelViewProj'.allMatches(metal).length;
+      expect(occurrences, greaterThan(0));
+      final RegExp structField =
+          RegExp(r'float4x4\s+ModelViewProj\s*;');
+      expect(
+        structField.allMatches(metal).length,
+        equals(1),
+        reason: 'ModelViewProj should appear exactly once in the struct',
+      );
     });
   });
 }

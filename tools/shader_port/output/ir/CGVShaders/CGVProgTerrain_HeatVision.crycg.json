@@ -1,0 +1,121 @@
+{
+  "name": "CGVProgTerrain_HeatVision",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgTerrain_HeatVision.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 SunDirect"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float3 vNormal = IN.Color.xyz * (2).xxx - vPos.www;\r\n        float fDot = dot(SunDirect.xyz, vNormal);\r\n        OUT.Tex0.xy = (fDot * 0.2).xx;\r\n        OUT.Color.xyz = fDot.xxx;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 vNormal",
+      "rhs": "IN.Color.xyz * (2).xxx - vPos.www",
+      "textureSample": false,
+      "raw": "float3 vNormal = IN.Color.xyz * (2).xxx - vPos.www;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDot",
+      "rhs": "dot(SunDirect.xyz, vNormal)",
+      "textureSample": false,
+      "raw": "float fDot = dot(SunDirect.xyz, vNormal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "(fDot * 0.2).xx",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = (fDot * 0.2).xx;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "fDot.xxx",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = fDot.xxx;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vNormal = IN.Color.xyz * (2).xxx - vPos.www",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDot = dot(SunDirect.xyz, vNormal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = (fDot * 0.2).xx",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = fDot.xxx",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Color": "float4"
+  }
+}

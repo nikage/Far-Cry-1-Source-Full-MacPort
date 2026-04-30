@@ -1,0 +1,395 @@
+{
+  "name": "CGVProgWaterVolumeReflCM",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgWaterVolumeReflCM.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " \r\n  POSITION_3 \r\n  TEXCOORD0_2 \r\n  PRIM_COLOR \r\n  TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": " \r\n  VIEWPROJ_MATRIX, \r\n  uniform float3x4 ObjToCubeSpace, \r\n  uniform float3 CameraPos, \r\n  uniform float BumpScale,\r\n  uniform float4 AnimProperties"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n    IN_C0\r\n    IN_TANG\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1\r\n    OUT_T2\r\n    OUT_T3\r\n    OUT_C0\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float2 fShear= float2(cos(AnimProperties.x*AnimProperties.w), sin(AnimProperties.y*AnimProperties.w));\r\n  \r\n  // pass texture coordinates for fetching the normal map  \r\n  OUT.Tex0.xy = IN.TexCoord0.xy+fShear.xy*0.01;\r\n\r\n  // compute the 3x3 tranform from tangent space to object space\r\n  float3x3 objToTangentSpace;\r\n  // first rows are the tangent and binormal scaled by the bump scale\r\n  objToTangentSpace[0] = BumpScale * IN.Tangent;\r\n  objToTangentSpace[1] = BumpScale * IN.Binormal;\r\n  objToTangentSpace[2] = IN.TNormal;\r\n\r\n  // compute the 3x3 transform from tangent space to cube space:\r\n  // TangentToCubeSpace = object2cube * tangent2object\r\n  //              = object2cube * transpose(objToTangentSpace) (since the inverse of a rotation is its transpose)\r\n  // so a row of TangentToCubeSpace is the transform by objToTangentSpace of the corresponding row of ObjToCubeSpace\r\n  OUT.Tex1.xyz = mul(objToTangentSpace, ObjToCubeSpace[0].xyz);\r\n  OUT.Tex2.xyz = mul(objToTangentSpace, ObjToCubeSpace[1].xyz);\r\n  OUT.Tex3.xyz = mul(objToTangentSpace, ObjToCubeSpace[2].xyz);\r\n\r\n  // compute the eye vector (going from shaded point to eye) in cube space\r\n  float3 eyeVector = CameraPos.xyz - vPos.xyz;\r\n  OUT.Tex1.w = dot(eyeVector, ObjToCubeSpace[0].xyz);\r\n  OUT.Tex2.w = dot(eyeVector, ObjToCubeSpace[1].xyz);\r\n  OUT.Tex3.w = dot(eyeVector, ObjToCubeSpace[2].xyz);\r\n\r\n  // output color and fresnel term hack             \r\n  float4 vHPos = mul(ModelViewProj, vPos);      \r\n      \r\n  OUT.Color.xyz = IN.Color.xyz;\r\n  OUT.Color.w = IN.Color.w*(vHPos.w*0.15);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float2 fShear",
+      "rhs": "float2(cos(AnimProperties.x*AnimProperties.w), sin(AnimProperties.y*AnimProperties.w))",
+      "textureSample": false,
+      "raw": "float2 fShear= float2(cos(AnimProperties.x*AnimProperties.w), sin(AnimProperties.y*AnimProperties.w));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "pass texture coordinates for fetching the normal map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy+fShear.xy*0.01",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy+fShear.xy*0.01;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute the 3x3 tranform from tangent space to object space",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 objToTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "first rows are the tangent and binormal scaled by the bump scale",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[0]",
+      "rhs": "BumpScale * IN.Tangent",
+      "textureSample": false,
+      "raw": "objToTangentSpace[0] = BumpScale * IN.Tangent;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[1]",
+      "rhs": "BumpScale * IN.Binormal",
+      "textureSample": false,
+      "raw": "objToTangentSpace[1] = BumpScale * IN.Binormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[2]",
+      "rhs": "IN.TNormal",
+      "textureSample": false,
+      "raw": "objToTangentSpace[2] = IN.TNormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute the 3x3 transform from tangent space to cube space:",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "TangentToCubeSpace = object2cube * tangent2object",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "= object2cube * transpose(objToTangentSpace) (since the inverse of a rotation is its transpose)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "so a row of TangentToCubeSpace is the transform by objToTangentSpace of the corresponding row of ObjToCubeSpace",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xyz",
+      "rhs": "mul(objToTangentSpace, ObjToCubeSpace[0].xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xyz = mul(objToTangentSpace, ObjToCubeSpace[0].xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "mul(objToTangentSpace, ObjToCubeSpace[1].xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = mul(objToTangentSpace, ObjToCubeSpace[1].xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xyz",
+      "rhs": "mul(objToTangentSpace, ObjToCubeSpace[2].xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xyz = mul(objToTangentSpace, ObjToCubeSpace[2].xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute the eye vector (going from shaded point to eye) in cube space",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 eyeVector",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 eyeVector = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.w",
+      "rhs": "dot(eyeVector, ObjToCubeSpace[0].xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.w = dot(eyeVector, ObjToCubeSpace[0].xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.w",
+      "rhs": "dot(eyeVector, ObjToCubeSpace[1].xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex2.w = dot(eyeVector, ObjToCubeSpace[1].xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.w",
+      "rhs": "dot(eyeVector, ObjToCubeSpace[2].xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex3.w = dot(eyeVector, ObjToCubeSpace[2].xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output color and fresnel term hack",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vHPos",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "float4 vHPos = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = IN.Color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "IN.Color.w*(vHPos.w*0.15)",
+      "textureSample": false,
+      "raw": "OUT.Color.w = IN.Color.w*(vHPos.w*0.15);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "COLOR_4",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "explicit",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 fShear= float2(cos(AnimProperties.x*AnimProperties.w), sin(AnimProperties.y*AnimProperties.w))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy+fShear.xy*0.01",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 objToTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[0] = BumpScale * IN.Tangent",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[1] = BumpScale * IN.Binormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[2] = IN.TNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xyz = mul(objToTangentSpace, ObjToCubeSpace[0].xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = mul(objToTangentSpace, ObjToCubeSpace[1].xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xyz = mul(objToTangentSpace, ObjToCubeSpace[2].xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 eyeVector = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.w = dot(eyeVector, ObjToCubeSpace[0].xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.w = dot(eyeVector, ObjToCubeSpace[1].xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.w = dot(eyeVector, ObjToCubeSpace[2].xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHPos = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = IN.Color.w*(vHPos.w*0.15)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Color": "float4"
+  }
+}

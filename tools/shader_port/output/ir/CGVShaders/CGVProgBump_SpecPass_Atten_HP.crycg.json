@@ -1,0 +1,264 @@
+{
+  "name": "CGVProgBump_SpecPass_Atten_HP",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgBump_SpecPass_Atten_HP.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, ATTEN"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xy = IN.TexCoord0.xy;\r\n        OUT.Tex1.xy = IN.TexCoord0.xy;\r\n\r\n        TANG_MATR\r\n\r\n        // store normalized light vector\r\n        float3 lightVec = LightPos.xyz - vPos.xyz;\r\n        float fiSqDist = rsqrt(dot(lightVec,lightVec));\r\n        lightVec = lightVec * fiSqDist;\r\n        OUT.Color.w = PROC_ATTENVERT;\r\n\r\n        // compute view vector\r\n        float3 viewVec = normalize(CameraPos.xyz - vPos.xyz);\r\n\r\n        // compute half angle vector\r\n        float3 halfAngleVector = normalize(lightVec.xyz + viewVec);\r\n\r\n        // transform half angle vector from object space to tangent space and pass it as a color\r\n        OUT.Color.xyz = 0.5 * mul(objToTangentSpace, halfAngleVector) + 0.5.xxx;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lightVec = LightPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fiSqDist",
+      "rhs": "rsqrt(dot(lightVec,lightVec))",
+      "textureSample": false,
+      "raw": "float fiSqDist = rsqrt(dot(lightVec,lightVec));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "lightVec",
+      "rhs": "lightVec * fiSqDist",
+      "textureSample": false,
+      "raw": "lightVec = lightVec * fiSqDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "PROC_ATTENVERT",
+      "textureSample": false,
+      "raw": "OUT.Color.w = PROC_ATTENVERT;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "normalize(CameraPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = normalize(CameraPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute half angle vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 halfAngleVector",
+      "rhs": "normalize(lightVec.xyz + viewVec)",
+      "textureSample": false,
+      "raw": "float3 halfAngleVector = normalize(lightVec.xyz + viewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform half angle vector from object space to tangent space and pass it as a color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "0.5 * mul(objToTangentSpace, halfAngleVector) + 0.5.xxx",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = 0.5 * mul(objToTangentSpace, halfAngleVector) + 0.5.xxx;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "derived",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fiSqDist = rsqrt(dot(lightVec,lightVec))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "lightVec = lightVec * fiSqDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = PROC_ATTENVERT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = normalize(CameraPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 halfAngleVector = normalize(lightVec.xyz + viewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = 0.5 * mul(objToTangentSpace, halfAngleVector) + 0.5.xxx",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Color": "float4"
+  }
+}

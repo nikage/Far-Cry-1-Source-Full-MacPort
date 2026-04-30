@@ -1,0 +1,109 @@
+{
+  "name": "CGVProgNightVision",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgNightVision.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  VIEWPROJ_MATRIX,\r\n  \r\n  // screen noise parameters, xy is tilling, zw is offset\r\n  uniform float4   fNoiseParams"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1_2\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  // output texture coordinates\r\n  OUT.Tex0.xy = IN.TexCoord0.xy;\r\n  OUT.Tex1.xy = float2(IN.TexCoord0.x*fNoiseParams.x+fNoiseParams.z, IN.TexCoord0.y*fNoiseParams.y+fNoiseParams.w);\r\n\r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "output texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "float2(IN.TexCoord0.x*fNoiseParams.x+fNoiseParams.z, IN.TexCoord0.y*fNoiseParams.y+fNoiseParams.w)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = float2(IN.TexCoord0.x*fNoiseParams.x+fNoiseParams.z, IN.TexCoord0.y*fNoiseParams.y+fNoiseParams.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = float2(IN.TexCoord0.x*fNoiseParams.x+fNoiseParams.z, IN.TexCoord0.y*fNoiseParams.y+fNoiseParams.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2"
+  }
+}

@@ -1,3 +1,6 @@
+import 'dart:convert' as dart_convert;
+import 'dart:io';
+
 import 'package:shader_port/parser.dart';
 import 'package:test/test.dart';
 
@@ -454,6 +457,109 @@ CoreScript
       expect(result.outputFieldTypes['Tex5'], 'float2');
       expect(result.outputFieldTypes['Color'], 'float4');
       expect(result.outputFieldTypes['Color1'], 'float4');
+    });
+  });
+
+  group('encodeResult', () {
+    test('encodes name, extension, and path correctly', () {
+      final ParseResult result = parseShaderFromSource(
+        'MainInput { uniform float4 Color; }\nCoreScript { OUT.Color = Color; }',
+        'Shaders/Simple.crycg',
+      );
+      final String json = encodeResult(result);
+      final dynamic decoded = dart_convert.jsonDecode(json);
+      expect(decoded['name'], 'Simple');
+      expect(decoded['extension'], 'crycg');
+      expect(decoded['path'], 'Shaders/Simple.crycg');
+    });
+
+    test('encodes blocks with name and content', () {
+      final ParseResult result = parseShaderFromSource(
+        'MainInput { uniform float4 Color; }',
+        'Shaders/Test.crycg',
+      );
+      final String json = encodeResult(result);
+      final dynamic decoded = dart_convert.jsonDecode(json);
+      final List<dynamic> blocks = decoded['blocks'] as List<dynamic>;
+      expect(blocks, isNotEmpty);
+      expect(blocks.first['name'], 'MainInput');
+    });
+
+    test('encodes maskReferences list', () {
+      final ParseResult result = parseShaderFromSource(
+        '#ifdef D3D\n#endif\nCoreScript {}',
+        'Shaders/Mask.crycg',
+      );
+      final String json = encodeResult(result);
+      final dynamic decoded = dart_convert.jsonDecode(json);
+      expect((decoded['maskReferences'] as List<dynamic>), contains('D3D'));
+    });
+
+    test('round-trips: decoding and re-encoding produces same JSON', () {
+      const String source = '''
+MainInput { uniform float4 Tint : COLOR; }
+CoreScript
+{
+  OUT.Color = Tint;
+}
+''';
+      final ParseResult result = parseShaderFromSource(source, 'Shaders/RoundTrip.crycg');
+      final String json1 = encodeResult(result);
+      final dynamic decoded = dart_convert.jsonDecode(json1);
+      expect(decoded['name'], isA<String>());
+      expect(decoded['coreScriptExpressions'], isA<List<dynamic>>());
+      expect(decoded['passStates'], isA<List<dynamic>>());
+      expect(decoded['vertexAttributes'], isA<List<dynamic>>());
+    });
+
+    test('omits compilerMetadata key when null', () {
+      final ParseResult result = parseShaderFromSource(
+        'CoreScript { }',
+        'Shaders/NoMeta.crycg',
+      );
+      final String json = encodeResult(result);
+      expect(json, isNot(contains('compilerMetadata')));
+    });
+
+    test('includes compilerMetadata when provided', () {
+      final ParseResult result = parseShaderFromSource(
+        'CoreScript { }',
+        'Shaders/WithMeta.crycg',
+        compilerMetadata: <String, dynamic>{'EntryPoint': 'main'},
+      );
+      final String json = encodeResult(result);
+      final dynamic decoded = dart_convert.jsonDecode(json);
+      expect(decoded['compilerMetadata']['EntryPoint'], 'main');
+    });
+  });
+
+  group('parseShader (file-backed)', () {
+    test('produces same result as parseShaderFromSource for same content', () {
+      final Directory tmpDir = Directory.systemTemp.createTempSync('parser_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+      const String source =
+          'MainInput { uniform float4 Ambient; }\nCoreScript { OUT.Color = Ambient; }';
+      final File shaderFile = File('${tmpDir.path}/Ambient.crycg')
+        ..writeAsStringSync(source);
+      final ParseResult fileResult =
+          parseShader(shaderFile, 'Testing/Ambient.crycg');
+      final ParseResult sourceResult =
+          parseShaderFromSource(source, 'Testing/Ambient.crycg');
+      expect(fileResult.name, sourceResult.name);
+      expect(fileResult.extension, sourceResult.extension);
+      expect(fileResult.blocks.length, sourceResult.blocks.length);
+      expect(fileResult.maskReferences, equals(sourceResult.maskReferences));
+    });
+
+    test('name and extension are derived from the relativePath argument', () {
+      final Directory tmpDir = Directory.systemTemp.createTempSync('parser_test_');
+      addTearDown(() => tmpDir.deleteSync(recursive: true));
+      final File shaderFile = File('${tmpDir.path}/ignored_filename.crycg')
+        ..writeAsStringSync('CoreScript {}');
+      final ParseResult result =
+          parseShader(shaderFile, 'MyDir/ActualName.crycg');
+      expect(result.name, 'ActualName');
+      expect(result.extension, 'crycg');
     });
   });
 }

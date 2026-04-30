@@ -1,0 +1,172 @@
+{
+  "name": "CGVProgFogCaust",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgFogCaust.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3"
+    },
+    {
+      "name": "MainInput",
+      "content": " uniform float4x4 ModelViewProj, uniform float2x4 FogMatrix, uniform float2x4 FogEnterMatrix, uniform float4 CaustTexGen0, uniform float4 CaustTexGen1, uniform float3 WaterLevel, uniform float4 CameraPos"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1_2\r\n          OUT_T2_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xy  = mul(FogEnterMatrix, vPos);\r\n        OUT.Tex1.xy  = mul(FogMatrix, vPos);\r\n        OUT.Tex2.x = dot(CaustTexGen0, vPos);\r\n        OUT.Tex2.y = dot(CaustTexGen1, vPos);\r\n\r\n        float fDistBlendFactor = vPos.w - length(vPos.xyz - CameraPos.xyz) * CameraPos.w;\r\n        OUT.Color.w = fDistBlendFactor * (float)((WaterLevel.x - vPos.z) >= vPos.w);\r\n        OUT.Color.xyz = IN.Color.xyz;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "mul(FogEnterMatrix, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy  = mul(FogEnterMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "mul(FogMatrix, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy  = mul(FogMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.x",
+      "rhs": "dot(CaustTexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex2.x = dot(CaustTexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.y",
+      "rhs": "dot(CaustTexGen1, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex2.y = dot(CaustTexGen1, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDistBlendFactor",
+      "rhs": "vPos.w - length(vPos.xyz - CameraPos.xyz) * CameraPos.w",
+      "textureSample": false,
+      "raw": "float fDistBlendFactor = vPos.w - length(vPos.xyz - CameraPos.xyz) * CameraPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "fDistBlendFactor * (float)((WaterLevel.x - vPos.z) >= vPos.w)",
+      "textureSample": false,
+      "raw": "OUT.Color.w = fDistBlendFactor * (float)((WaterLevel.x - vPos.z) >= vPos.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = IN.Color.xyz;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy  = mul(FogEnterMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy  = mul(FogMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.x = dot(CaustTexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.y = dot(CaustTexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDistBlendFactor = vPos.w - length(vPos.xyz - CameraPos.xyz) * CameraPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = fDistBlendFactor * (float)((WaterLevel.x - vPos.z) >= vPos.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = IN.Color.xyz",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float2",
+    "Color": "float4"
+  }
+}

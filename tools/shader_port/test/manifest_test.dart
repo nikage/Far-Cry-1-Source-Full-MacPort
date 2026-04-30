@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../lib/parser.dart' show parseTechniquePairs;
+
 List<Map<String, dynamic>> _loadManifest() {
   final File f = File(
     p.join(Directory.current.path, '..', '..', 'RenderDll', 'XRenderMetal',
@@ -247,6 +249,110 @@ void main() {
           );
         }
       }
+    });
+
+    test('every fragment has vertexEntryPoint or pipelineCategory == fullscreen', () {
+      final List<Map<String, dynamic>> fragments =
+          manifest.where((e) => e['stage'] == 'fragment').toList();
+      final List<Map<String, dynamic>> uncovered = fragments.where((e) {
+        final bool hasPair = e.containsKey('vertexEntryPoint');
+        final bool isFullscreen = e['pipelineCategory'] == 'fullscreen';
+        return !hasPair && !isFullscreen;
+      }).toList();
+      expect(
+        uncovered,
+        isEmpty,
+        reason: 'Uncovered fragments (no vertexEntryPoint and not fullscreen):\n'
+            '${uncovered.map((e) => '  ${e['shader']}').join('\n')}\n'
+            'Re-run the generator with shader_pair_overrides.json.',
+      );
+    });
+
+    test('vertex-pairing coverage is 100%', () {
+      final List<Map<String, dynamic>> fragments =
+          manifest.where((e) => e['stage'] == 'fragment').toList();
+      final int paired =
+          fragments.where((e) => e.containsKey('vertexEntryPoint')).length;
+      final int fullscreen = fragments
+          .where((e) =>
+              !e.containsKey('vertexEntryPoint') &&
+              e['pipelineCategory'] == 'fullscreen')
+          .length;
+      final int covered = paired + fullscreen;
+      final double coverage =
+          fragments.isEmpty ? 1.0 : covered / fragments.length;
+      expect(
+        coverage,
+        greaterThanOrEqualTo(1.0),
+        reason: 'Coverage is ${(coverage * 100).toStringAsFixed(1)}% '
+            '($covered/${fragments.length}: $paired paired, $fullscreen fullscreen). '
+            'Expected 100%. Re-run the generator to regenerate the manifest.',
+      );
+    });
+
+    test('every entry has pipelineCategory', () {
+      final List<Map<String, dynamic>> missing =
+          manifest.where((e) => !e.containsKey('pipelineCategory')).toList();
+      expect(
+        missing,
+        isEmpty,
+        reason: 'Entries missing pipelineCategory: '
+            '${missing.map((e) => e['shader']).join(', ')}',
+      );
+    });
+  });
+
+  group('parseTechniquePairs', () {
+    test('returns empty map for plain crycg shader without technique blocks', () {
+      const String src = '''
+        MainInput { uniform sampler2D baseMap : texunit0 }
+        CoreScript { OUT.Color = tex2D(baseMap, IN.Tex0.xy); }
+      ''';
+      expect(parseTechniquePairs(src), isEmpty);
+    });
+
+    test('extracts vertex/fragment pairs from technique/pass blocks', () {
+      final String src = '''
+        Technique Ambient {
+          Pass p0 {
+            CGVProgram = "CGVProgAmbientTempl"
+            FragmentProgram = "CGRCAmbient"
+          }
+        }
+      ''';
+      final Map<String, String> pairs = parseTechniquePairs(src);
+      expect(pairs['CGRCAmbient'], equals('CGVProgAmbientTempl'));
+    });
+
+    test('handles multiple passes in one technique', () {
+      final String src = '''
+        Technique BumpSpec {
+          Pass DiffPass {
+            CGVProgram = "CGVProgBump_DiffPass"
+            FragmentProgram = "CGRCBump_Diff"
+          }
+          Pass SpecPass {
+            CGVProgram = "CGVProgBump_SpecPass"
+            FragmentProgram = "CGRCBump_Spec"
+          }
+        }
+      ''';
+      final Map<String, String> pairs = parseTechniquePairs(src);
+      expect(pairs['CGRCBump_Diff'], equals('CGVProgBump_DiffPass'));
+      expect(pairs['CGRCBump_Spec'], equals('CGVProgBump_SpecPass'));
+    });
+
+    test('returns empty map when no FragmentProgram is declared', () {
+      final String src = '''
+        Technique T {
+          Pass p0 {
+            CGVProgram = "CGVProgSimple"
+          }
+        }
+      ''';
+      final Map<String, String> pairs = parseTechniquePairs(src);
+      expect(pairs.containsKey(''), isTrue);
+      expect(pairs[''], equals('CGVProgSimple'));
     });
   });
 }

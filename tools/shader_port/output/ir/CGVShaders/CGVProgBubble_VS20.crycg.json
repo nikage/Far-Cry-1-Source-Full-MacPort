@@ -1,0 +1,321 @@
+{
+  "name": "CGVProgBubble_VS20",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgBubble_VS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 NoisePos, CAMERA_POS, uniform float4x4 ObjMatrix, uniform float4 pg[66] : register(c30)"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1\r\n          OUT_T2\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xy = IN.TexCoord0.xy;  // diffuse\r\n\r\n        TANG_MATR\r\n        \r\n        float4 vNoise = fNoise * float4(0.5, 0.5, 0.25, 0.25);\r\n        float fX = dot(-vNoise, float4(0.0, 2.0, 0.0, 4.0));\r\n        float fY = dot(-vNoise, float4(2.0, 0.0, 4.0, 0.0));\r\n        float3 normal = IN.TNormal.xyz + (IN.Binormal.xyz*fX + IN.Tangent.xyz*fY)*0.04;\r\n\r\n        normal.x = dot(IN.TNormal.xyz, ObjMatrix._11_12_13);\r\n        normal.y = dot(IN.TNormal.xyz, ObjMatrix._21_22_23);\r\n        normal.z = dot(IN.TNormal.xyz, ObjMatrix._31_32_33);\r\n        normal = normalize(normal);\r\n\r\n        // calculate incident vector\r\n        float3 incidentVec = normalize(vPos.xyz - CameraPos.xyz);\r\n        OUT.Tex1.xyz = reflect(incidentVec, normal);\r\n        OUT.Tex1.w = vPos.w;\r\n\r\n        float VdotN = dot(incidentVec, IN.TNormal.xyz);\r\n        OUT.Tex2.xyz = VdotN;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy  // diffuse",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;  // diffuse",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vNoise",
+      "rhs": "fNoise * float4(0.5, 0.5, 0.25, 0.25)",
+      "textureSample": false,
+      "raw": "float4 vNoise = fNoise * float4(0.5, 0.5, 0.25, 0.25);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fX",
+      "rhs": "dot(-vNoise, float4(0.0, 2.0, 0.0, 4.0))",
+      "textureSample": false,
+      "raw": "float fX = dot(-vNoise, float4(0.0, 2.0, 0.0, 4.0));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fY",
+      "rhs": "dot(-vNoise, float4(2.0, 0.0, 4.0, 0.0))",
+      "textureSample": false,
+      "raw": "float fY = dot(-vNoise, float4(2.0, 0.0, 4.0, 0.0));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 normal",
+      "rhs": "IN.TNormal.xyz + (IN.Binormal.xyz*fX + IN.Tangent.xyz*fY)*0.04",
+      "textureSample": false,
+      "raw": "float3 normal = IN.TNormal.xyz + (IN.Binormal.xyz*fX + IN.Tangent.xyz*fY)*0.04;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "normal.x",
+      "rhs": "dot(IN.TNormal.xyz, ObjMatrix._11_12_13)",
+      "textureSample": false,
+      "raw": "normal.x = dot(IN.TNormal.xyz, ObjMatrix._11_12_13);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "normal.y",
+      "rhs": "dot(IN.TNormal.xyz, ObjMatrix._21_22_23)",
+      "textureSample": false,
+      "raw": "normal.y = dot(IN.TNormal.xyz, ObjMatrix._21_22_23);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "normal.z",
+      "rhs": "dot(IN.TNormal.xyz, ObjMatrix._31_32_33)",
+      "textureSample": false,
+      "raw": "normal.z = dot(IN.TNormal.xyz, ObjMatrix._31_32_33);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "normal",
+      "rhs": "normalize(normal)",
+      "textureSample": false,
+      "raw": "normal = normalize(normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "calculate incident vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 incidentVec",
+      "rhs": "normalize(vPos.xyz - CameraPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 incidentVec = normalize(vPos.xyz - CameraPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xyz",
+      "rhs": "reflect(incidentVec, normal)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xyz = reflect(incidentVec, normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.w",
+      "rhs": "vPos.w",
+      "textureSample": false,
+      "raw": "OUT.Tex1.w = vPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float VdotN",
+      "rhs": "dot(incidentVec, IN.TNormal.xyz)",
+      "textureSample": false,
+      "raw": "float VdotN = dot(incidentVec, IN.TNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "VdotN",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = VdotN;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "derived",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy;  // diffuse",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vNoise = fNoise * float4(0.5, 0.5, 0.25, 0.25)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fX = dot(-vNoise, float4(0.0, 2.0, 0.0, 4.0))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fY = dot(-vNoise, float4(2.0, 0.0, 4.0, 0.0))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 normal = IN.TNormal.xyz + (IN.Binormal.xyz*fX + IN.Tangent.xyz*fY)*0.04",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "normal.x = dot(IN.TNormal.xyz, ObjMatrix._11_12_13)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "normal.y = dot(IN.TNormal.xyz, ObjMatrix._21_22_23)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "normal.z = dot(IN.TNormal.xyz, ObjMatrix._31_32_33)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "normal = normalize(normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 incidentVec = normalize(vPos.xyz - CameraPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xyz = reflect(incidentVec, normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.w = vPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float VdotN = dot(incidentVec, IN.TNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = VdotN",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosWaterDeform_TNorm"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Tex2": "float4"
+  }
+}

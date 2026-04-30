@@ -1,0 +1,158 @@
+{
+  "name": "CGVProg_RainbowShading",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProg_RainbowShading.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, CAMERA_POS"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_T1\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float3 vEyeDir = normalize(CameraPos.xyz - vPos.xyz);\r\n        float3 vHalf = normalize(vEyeDir.xyz + IN.Normal.xyz);\r\n        OUT.Tex0.x = dot(IN.Normal.xyz, vEyeDir);\r\n        OUT.Tex0.y = dot(IN.Normal.xyz, vHalf);\r\n\r\n        OUT.Tex1.x = vEyeDir.x;\r\n        OUT.Tex1.y = vHalf.y;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 vEyeDir",
+      "rhs": "normalize(CameraPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 vEyeDir = normalize(CameraPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vHalf",
+      "rhs": "normalize(vEyeDir.xyz + IN.Normal.xyz)",
+      "textureSample": false,
+      "raw": "float3 vHalf = normalize(vEyeDir.xyz + IN.Normal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "dot(IN.Normal.xyz, vEyeDir)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = dot(IN.Normal.xyz, vEyeDir);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "dot(IN.Normal.xyz, vHalf)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = dot(IN.Normal.xyz, vHalf);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.x",
+      "rhs": "vEyeDir.x",
+      "textureSample": false,
+      "raw": "OUT.Tex1.x = vEyeDir.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.y",
+      "rhs": "vHalf.y",
+      "textureSample": false,
+      "raw": "OUT.Tex1.y = vHalf.y;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "NORMAL_3",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vEyeDir = normalize(CameraPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vHalf = normalize(vEyeDir.xyz + IN.Normal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = dot(IN.Normal.xyz, vEyeDir)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = dot(IN.Normal.xyz, vHalf)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.x = vEyeDir.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.y = vHalf.y",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

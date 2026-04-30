@@ -1,0 +1,1823 @@
+{
+  "name": "CGVProgShadowTempl",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgShadowTempl.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": "\r\n        POSITION_3\r\n        TEXCOORD0_2\r\n#if %ENVCMAMB || %TEMP_ENVLIGHT\r\n        TNORMAL_3\r\n#endif\r\n#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n        TANGENT_3\r\n        BINORMAL_3\r\n#endif"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n        VIEWPROJ_MATRIX,\r\n        uniform float4x4 TexGen0,\r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n        uniform float4x4 TexGen1,\r\n#endif\r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n        uniform float4x4 TexGen2,\r\n#endif\r\n\r\n#if %TEMP_MIXED_MAP  \r\n        uniform float2x4 ShadowModelMatr0,\r\n  #if %TEMP_SHAD_SAMPLEMASK1\r\n        uniform float2x4 ShadowModelMatr1,\r\n  #endif\r\n  #if %TEMP_SHAD_SAMPLEMASK2\r\n        uniform float2x4 ShadowModelMatr2,\r\n  #endif\r\n        uniform float ShadowBias,\r\n        uniform float4 LightPos,\r\n#endif\r\n\r\n#if %TEMP_ENVLIGHT\r\n        uniform float4 EnvColors[6],\r\n        uniform float4x4 TexMatrix,\r\n#elif %ENVCMAMB\r\n        CAMERA_POS,\r\n        uniform float4x4 TexMatrix,\r\n#endif        \r\n\r\n#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n  #if !%ENVCMAMB\r\n        CAMERA_POS,\r\n  #endif\r\n#endif"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n#if %ENVCMAMB || %TEMP_ENVLIGHT || %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n          IN_TANG\r\n#endif\r\n        };\r\n\r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float4 shadTC0     : TEXCOORDN;\r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n          float4 shadTC1     : TEXCOORDN;\r\n#endif\r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n          float4 shadTC2     : TEXCOORDN;\r\n#endif\r\n          float2 baseTC      : TEXCOORDN;\r\n\r\n#if %PERPIXEL_SHADOWMAP\r\n          float4 viewVec     : TEXCOORDN;\r\n          float4 Tangent     : TEXCOORDN;\r\n          float4 Binormal    : TEXCOORDN;\r\n#elif %OFFSETBUMPMAPPING\r\n          float4 viewVec     : TEXCOORDN;\r\n#endif\r\n\r\n#if %TEMP_MIXED_MAP\r\n          float4 depthTC0    : TEXCOORDN;\r\n  #if %TEMP_SHAD_SAMPLEMASK2\r\n          float4 depthTC1    : TEXCOORDN;\r\n  #endif\r\n          float4 lightVec    : TEXCOORDN;\r\n#endif\r\n\r\n#ifdef D3D\r\n  #if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20\r\n          float4 WTC         : TEXCOORDN;\r\n  #endif\r\n#endif\r\n\r\n          float4 Color      : COLOR0;\r\n#if %ENVCMAMB\r\n          float4 envTC      : TEXCOORDN;\r\n#endif\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.baseTC.xy = IN.TexCoord0.xy;\r\n\r\n#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n        TANG_MATR\r\n\r\n        // compute view vector\r\n        float3 vVec = CameraPos.xyz - vPos.xyz;\r\n        float3 viewVec = mul(objToTangentSpace, vVec.xyz);\r\n        OUT.viewVec.xyz = viewVec.xyz;\r\n  #if %PERPIXEL_SHADOWMAP\r\n        OUT.Tangent.xyz = IN.Tangent.xyz;\r\n        OUT.Binormal.xyz = IN.Binormal.xyz;\r\n  #endif\r\n#endif\r\n\r\n        float4 shadTC0 = mul(TexGen0, vPos);          \r\n        OUT.shadTC0 = shadTC0;\r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n        float4 shadTC1 = mul(TexGen1, vPos);\r\n        OUT.shadTC1 = shadTC1;\r\n#endif\r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n        float4 shadTC2 = mul(TexGen2, vPos);\r\n        OUT.shadTC2 = shadTC2;\r\n#endif\r\n\r\n#ifdef D3D\r\n  #if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20\r\n        float4 WTC = (float4)0;\r\n        WTC.w = 1;\r\n        WTC.z = shadTC0.w * 0.5 + 0.5;\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        WTC.y = shadTC1.w * 0.5 + 0.5;\r\n    #endif\r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        WTC.x = shadTC2.w * 0.5 + 0.5;\r\n    #endif\r\n        OUT.WTC = WTC;\r\n  #endif\r\n#endif\r\n\r\n#if %TEMP_MIXED_MAP  \r\n        OUT.lightVec.xyz = LightPos.xyz - vPos.xyz;\r\n        \r\n        float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);\r\n        float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);\r\n        OUT.depthTC0.x = fZ;\r\n        OUT.depthTC0.y = fW;\r\n\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        fZ = dot(ShadowModelMatr1._11_12_13_14, vPos);\r\n        fW = dot(ShadowModelMatr1._21_22_23_24, vPos);\r\n        OUT.depthTC0.z = fZ;\r\n        OUT.depthTC0.w = fW;\r\n    #endif\r\n\r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        fZ = dot(ShadowModelMatr2._11_12_13_14, vPos);\r\n        fW = dot(ShadowModelMatr2._21_22_23_24, vPos);\r\n        OUT.depthTC1.x = fZ;\r\n        OUT.depthTC1.y = fW;\r\n    #endif\r\n#endif\r\n\r\n#if %TEMP_ENVLIGHT\r\n        // Calculate average radiosity color from 6 colors (Cube)\r\n        float3 tNormal;\r\n        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);        \r\n        float3 Compare1 = step(tNormal, 0);\r\n        float3 Compare0 = 1 - Compare1;\r\n        float3 signN = sign(tNormal);\r\n        tNormal = tNormal * tNormal;\r\n        tNormal = tNormal * signN;\r\n        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;\r\n        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;\r\n        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;\r\n        OUT.Color = (ColorX + ColorY + ColorZ) * 2.0;\r\n#elif %ENVCMAMB\r\n  #if !%PERPIXEL_SHADOWMAP && !%OFFSETBUMPMAPPING\r\n        float3 vVec = CameraPos.xyz - vPos.xyz;\r\n  #endif\r\n        float3 tCamVec = normalize(vVec);\r\n        float3 tNormal = IN.TNormal.xyz;\r\n        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;\r\n        float4 tRM;\r\n        tRM.xyz = tRef.xyz;\r\n        tRM.w = vPos.w;\r\n        OUT.envTC = mul(tRM, TexMatrix);\r\n #if %ENVCM_MASKED\r\n        OUT.baseTC.zw = IN.TexCoord0.xy;\r\n #endif  \r\n#endif\r\n\r\n# ifdef _HDR\r\n        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);\r\n        OUT.Color.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);\r\n# endif"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.baseTC.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.baseTC.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "compute view vector",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 vVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "mul(objToTangentSpace, vVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = mul(objToTangentSpace, vVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.viewVec.xyz",
+      "rhs": "viewVec.xyz",
+      "textureSample": false,
+      "raw": "OUT.viewVec.xyz = viewVec.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %PERPIXEL_SHADOWMAP",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tangent.xyz",
+      "rhs": "IN.Tangent.xyz",
+      "textureSample": false,
+      "raw": "OUT.Tangent.xyz = IN.Tangent.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Binormal.xyz",
+      "rhs": "IN.Binormal.xyz",
+      "textureSample": false,
+      "raw": "OUT.Binormal.xyz = IN.Binormal.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadTC0",
+      "rhs": "mul(TexGen0, vPos)",
+      "textureSample": false,
+      "raw": "float4 shadTC0 = mul(TexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.shadTC0",
+      "rhs": "shadTC0",
+      "textureSample": false,
+      "raw": "OUT.shadTC0 = shadTC0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadTC1",
+      "rhs": "mul(TexGen1, vPos)",
+      "textureSample": false,
+      "raw": "float4 shadTC1 = mul(TexGen1, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.shadTC1",
+      "rhs": "shadTC1",
+      "textureSample": false,
+      "raw": "OUT.shadTC1 = shadTC1;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadTC2",
+      "rhs": "mul(TexGen2, vPos)",
+      "textureSample": false,
+      "raw": "float4 shadTC2 = mul(TexGen2, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.shadTC2",
+      "rhs": "shadTC2",
+      "textureSample": false,
+      "raw": "OUT.shadTC2 = shadTC2;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 WTC",
+      "rhs": "(float4)0",
+      "textureSample": false,
+      "raw": "float4 WTC = (float4)0;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "WTC.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "WTC.w = 1;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "WTC.z",
+      "rhs": "shadTC0.w * 0.5 + 0.5",
+      "textureSample": false,
+      "raw": "WTC.z = shadTC0.w * 0.5 + 0.5;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "WTC.y",
+      "rhs": "shadTC1.w * 0.5 + 0.5",
+      "textureSample": false,
+      "raw": "WTC.y = shadTC1.w * 0.5 + 0.5;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "WTC.x",
+      "rhs": "shadTC2.w * 0.5 + 0.5",
+      "textureSample": false,
+      "raw": "WTC.x = shadTC2.w * 0.5 + 0.5;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.WTC",
+      "rhs": "WTC",
+      "textureSample": false,
+      "raw": "OUT.WTC = WTC;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_MIXED_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.lightVec.xyz",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "OUT.lightVec.xyz = LightPos.xyz - vPos.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fZ",
+      "rhs": "dot(ShadowModelMatr0._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fW",
+      "rhs": "dot(ShadowModelMatr0._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.depthTC0.x",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.depthTC0.x = fZ;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.depthTC0.y",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.depthTC0.y = fW;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fZ",
+      "rhs": "dot(ShadowModelMatr1._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "fZ = dot(ShadowModelMatr1._11_12_13_14, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fW",
+      "rhs": "dot(ShadowModelMatr1._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "fW = dot(ShadowModelMatr1._21_22_23_24, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.depthTC0.z",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.depthTC0.z = fZ;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.depthTC0.w",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.depthTC0.w = fW;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fZ",
+      "rhs": "dot(ShadowModelMatr2._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "fZ = dot(ShadowModelMatr2._11_12_13_14, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fW",
+      "rhs": "dot(ShadowModelMatr2._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "fW = dot(ShadowModelMatr2._21_22_23_24, vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.depthTC1.x",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.depthTC1.x = fZ;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.depthTC1.y",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.depthTC1.y = fW;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_ENVLIGHT",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calculate average radiosity color from 6 colors (Cube)",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "statement",
+      "raw": "float3 tNormal;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tNormal",
+      "rhs": "mul((float3x3)TexMatrix, IN.TNormal.xyz)",
+      "textureSample": false,
+      "raw": "tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 Compare1",
+      "rhs": "step(tNormal, 0)",
+      "textureSample": false,
+      "raw": "float3 Compare1 = step(tNormal, 0);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 Compare0",
+      "rhs": "1 - Compare1",
+      "textureSample": false,
+      "raw": "float3 Compare0 = 1 - Compare1;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 signN",
+      "rhs": "sign(tNormal)",
+      "textureSample": false,
+      "raw": "float3 signN = sign(tNormal);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tNormal",
+      "rhs": "tNormal * tNormal",
+      "textureSample": false,
+      "raw": "tNormal = tNormal * tNormal;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tNormal",
+      "rhs": "tNormal * signN",
+      "textureSample": false,
+      "raw": "tNormal = tNormal * signN;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 ColorX",
+      "rhs": "EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x",
+      "textureSample": false,
+      "raw": "float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 ColorY",
+      "rhs": "EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y",
+      "textureSample": false,
+      "raw": "float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 ColorZ",
+      "rhs": "EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z",
+      "textureSample": false,
+      "raw": "float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "(ColorX + ColorY + ColorZ) * 2.0",
+      "textureSample": false,
+      "raw": "OUT.Color = (ColorX + ColorY + ColorZ) * 2.0;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %ENVCMAMB",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%PERPIXEL_SHADOWMAP && !%OFFSETBUMPMAPPING",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 vVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%PERPIXEL_SHADOWMAP && !%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tCamVec",
+      "rhs": "normalize(vVec)",
+      "textureSample": false,
+      "raw": "float3 tCamVec = normalize(vVec);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tNormal",
+      "rhs": "IN.TNormal.xyz",
+      "textureSample": false,
+      "raw": "float3 tNormal = IN.TNormal.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tRef",
+      "rhs": "dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz",
+      "textureSample": false,
+      "raw": "float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "statement",
+      "raw": "float4 tRM;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tRM.xyz",
+      "rhs": "tRef.xyz",
+      "textureSample": false,
+      "raw": "tRM.xyz = tRef.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tRM.w",
+      "rhs": "vPos.w",
+      "textureSample": false,
+      "raw": "tRM.w = vPos.w;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.envTC",
+      "rhs": "mul(tRM, TexMatrix)",
+      "textureSample": false,
+      "raw": "OUT.envTC = mul(tRM, TexMatrix);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ENVCM_MASKED",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.baseTC.zw",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.baseTC.zw = IN.TexCoord0.xy;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _HDR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float ffCameraSpacePosZ",
+      "rhs": "dot(ModelViewProj._31_32_33_34, vPos)",
+      "textureSample": false,
+      "raw": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_HDR",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "textureSample": false,
+      "raw": "OUT.Color.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_HDR",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "explicit",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.baseTC.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = mul(objToTangentSpace, vVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.viewVec.xyz = viewVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %PERPIXEL_SHADOWMAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tangent.xyz = IN.Tangent.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Binormal.xyz = IN.Binormal.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadTC0 = mul(TexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.shadTC0 = shadTC0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadTC1 = mul(TexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.shadTC1 = shadTC1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadTC2 = mul(TexGen2, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.shadTC2 = shadTC2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 WTC = (float4)0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "WTC.w = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "WTC.z = shadTC0.w * 0.5 + 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "WTC.y = shadTC1.w * 0.5 + 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "WTC.x = shadTC2.w * 0.5 + 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.WTC = WTC",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_MIXED_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.lightVec.xyz = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fW = dot(ShadowModelMatr0._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.depthTC0.x = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.depthTC0.y = fW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fZ = dot(ShadowModelMatr1._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fW = dot(ShadowModelMatr1._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.depthTC0.z = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.depthTC0.w = fW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fZ = dot(ShadowModelMatr2._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fW = dot(ShadowModelMatr2._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.depthTC1.x = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.depthTC1.y = fW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_ENVLIGHT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 Compare1 = step(tNormal, 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 Compare0 = 1 - Compare1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 signN = sign(tNormal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tNormal = tNormal * tNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tNormal = tNormal * signN",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = (ColorX + ColorY + ColorZ) * 2.0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMAMB",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%PERPIXEL_SHADOWMAP && !%OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tCamVec = normalize(vVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tNormal = IN.TNormal.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 tRM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tRM.xyz = tRef.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tRM.w = vPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.envTC = mul(tRM, TexMatrix)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ENVCM_MASKED",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.baseTC.zw = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _HDR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "ENVCMAMB",
+    "ENVCM_MASKED",
+    "OFFSETBUMPMAPPING",
+    "PERPIXEL_SHADOWMAP",
+    "TEMP_DEPTH_MAP",
+    "TEMP_DEPTH_MAP_PS20",
+    "TEMP_ENVLIGHT",
+    "TEMP_MIXED_MAP",
+    "TEMP_SHAD_SAMPLEMASK1",
+    "TEMP_SHAD_SAMPLEMASK2",
+    "_HDR"
+  ],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "shadTC0": "float4",
+    "shadTC1": "float4",
+    "shadTC2": "float4",
+    "baseTC": "float2",
+    "viewVec": "float4",
+    "Tangent": "float4",
+    "Binormal": "float4",
+    "depthTC0": "float4",
+    "depthTC1": "float4",
+    "lightVec": "float4",
+    "WTC": "float4",
+    "Color": "float4",
+    "envTC": "float4"
+  }
+}

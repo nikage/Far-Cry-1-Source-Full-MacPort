@@ -1,0 +1,149 @@
+{
+  "name": "CGVProgWater_Beach",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgWater_Beach.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 PRIM_COLOR"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 NoisePos, CAMERA_POS, uniform float4 TexShift, uniform float4 pg[66] : register(c30)"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float4 vTex = IN.TexCoord0;\r\n        vTex.y = (vTex.y * TexShift.y + TexShift.x * TexShift.y) + (fNoise * TexShift.z);\r\n        vTex.x = vTex.x * TexShift.w;\r\n        OUT.Tex0 = vTex;\r\n        OUT.Color = IN.Color;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 vTex",
+      "rhs": "IN.TexCoord0",
+      "textureSample": false,
+      "raw": "float4 vTex = IN.TexCoord0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.y",
+      "rhs": "(vTex.y * TexShift.y + TexShift.x * TexShift.y) + (fNoise * TexShift.z)",
+      "textureSample": false,
+      "raw": "vTex.y = (vTex.y * TexShift.y + TexShift.x * TexShift.y) + (fNoise * TexShift.z);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.x",
+      "rhs": "vTex.x * TexShift.w",
+      "textureSample": false,
+      "raw": "vTex.x = vTex.x * TexShift.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0",
+      "rhs": "vTex",
+      "textureSample": false,
+      "raw": "OUT.Tex0 = vTex;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "IN.Color",
+      "textureSample": false,
+      "raw": "OUT.Color = IN.Color;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vTex = IN.TexCoord0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.y = (vTex.y * TexShift.y + TexShift.x * TexShift.y) + (fNoise * TexShift.z)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.x = vTex.x * TexShift.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0 = vTex",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = IN.Color",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosWaterDeform"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

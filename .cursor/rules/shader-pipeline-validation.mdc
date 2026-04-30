@@ -1,0 +1,80 @@
+---
+description: Workflow rules for the CryCG→Metal shader port pipeline (generator, validator, compile-check)
+alwaysApply: true
+---
+
+# Shader Pipeline Migration — Validation Rules
+
+## Single validation command
+
+Run the unified validator after every shader-related change:
+
+```
+dart tools/shader_port/bin/validate_migration.dart .
+```
+
+This executes all three pipeline stages in sequence and exits on the first failure.
+
+### Flags
+
+| Flag | Description |
+|---|---|
+| `[root]` | Project root directory (default: `.`) |
+| `--skip-generate` | Skip Stage 1 (re-use already-generated `.metal` files) |
+| `--verbose` / `-v` | Print the full command for each stage and all compile errors |
+| `--strict` | Treat pair-validator warnings as errors |
+| `--metal-std <version>` | Override Metal standard (default: `metal3.0`) |
+| `--overrides <path>` | Override the shader pair overrides JSON path |
+
+## Pipeline stages (run in order)
+
+```
+Stage 1 — generate:       dart tools/shader_port/lib/metal_generator.dart .
+Stage 2 — compile-check:  dart tools/shader_port/bin/compile_check.dart .
+Stage 3 — validate-pairs: dart tools/shader_port/bin/validate_pairs.dart RenderDll/XRenderMetal/Generated/generated_manifest.json
+```
+
+Never skip stages manually. The manifest is only valid after the generator runs.
+
+## compile_check is the compilation gate
+
+- `compile_check.dart` compiles every `.metal` file individually; it never stops at first error.
+- The target is **0 failed shaders**. Any non-zero count is a blocker.
+- `build_metal.dart` stops at the first error — do not use it for discovery.
+
+## Fixing generator bugs
+
+Fixes go in the Dart generator layer, never in the generated `.metal` files directly:
+
+| Bug category | File to fix |
+|---|---|
+| Missing uniform in struct | `metal_fragment_builder.dart` → `_macroUniformTypes` or `_ensureModelViewProjForHPosition` |
+| Untranslated HLSL function | `expression_translator.dart` → add a `LineTransformer` |
+| Wrong type emitted | `metal_fragment_builder.dart` → `translateType` / `_outputType` |
+| Shader IR not parsed correctly | `shader_ir_parser.dart` |
+| Unpaired fragment shader | `tools/shader_port/config/shader_pair_overrides.json` → add explicit entry |
+
+After any fix: re-run `dart tools/shader_port/bin/validate_migration.dart .` to confirm all stages pass.
+
+## Every generator fix needs a regression test
+
+```dart
+// ✅ GOOD — fix + test
+// test/metal_generator_test.dart or test/compile_check_test.dart
+test('ModelViewProj is injected via HPosition fallback path', () {
+  final String metal = buildMetal(data);
+  expect(metal, contains('ModelViewProj'));
+});
+```
+
+Tests live in `tools/shader_port/test/` and must not require the Metal compiler.
+
+## Synthetic uniforms
+
+If the generator body writes `uniforms.X` but `X` is not declared in the IR's `MainInput`, add it to `MetalFragmentBuilder._macroUniformTypes`. The `_computeSyntheticUniforms` method injects it only when `_translator.usesIdentifier('X')` is true.
+
+For uniforms needed by fallback code (written after the translator runs), add a dedicated `_ensureXxx()` method called at the end of `_computeSyntheticUniforms`.
+
+## Automated hook
+
+A Cursor `stop` hook at `tools/shader_port/bin/hook_validate_migration.dart` runs automatically after every agent session that modifies shader-port files. If validation fails the hook re-engages the agent with the failure output (up to 3 retries via `loop_limit`).

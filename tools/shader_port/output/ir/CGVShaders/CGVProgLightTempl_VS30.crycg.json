@@ -1,0 +1,1964 @@
+{
+  "name": "CGVProgLightTempl_VS30",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgLightTempl_VS30.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": "\r\n        POSITION_3\r\n        TANG_3X3\r\n        TEXCOORD0_2\r\n#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP\r\n        TEXCOORD1_2\r\n#endif"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n        VIEWPROJ_MATRIX,\r\n    # ifdef _LIGHT0_TYPE\r\n        uniform float4 LightsPos[ _NUM_LIGHTS ] : register(c4),\r\n        uniform float4x4 LightMatrix : register(c10),\r\n    # endif\r\n\r\n#if %TEMP_AMBIENT\r\n  #if %ENVCMAMB\r\n        uniform float4x4 TexMatrix : register(c14),\r\n  #elif %TEMP_ENVLIGHT\r\n        uniform float4 EnvColors[6] : register(c14),\r\n        uniform float4x4 TexMatrix : register(c20),\r\n  #elif %ENVCMSPEC\r\n        uniform float4x4 ModelMatrix : register(c14),\r\n  #endif\r\n#endif  \r\n        uniform float4 CameraPos : register(c8),"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          float4 Position  : POSITION;\r\n          float4 baseTC    : TEXCOORD0;\r\n#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP\r\n          float4 lmTC      : TEXCOORD1;\r\n#endif\r\n          IN_TANGVECS\r\n        };\r\n        \r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float2 baseTC     : TEXCOORDN;\r\n#if %BUMP_MAP          \r\n  #if !%TEMP_AMBIENT || !%ENVCMSPEC\r\n          float2 bumpTC     : TEXCOORDN;\r\n  #endif\r\n#endif\r\n            \r\n#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED\r\n          float2 glossTC    : TEXCOORDN;\r\n#elif !%TEMP_AMBIENT || !%ENVCMSPEC\r\n  #if %SPECULAR\r\n    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA\r\n          float2 glossTC    : TEXCOORDN;\r\n    #endif\r\n  #endif\r\n#endif          \r\n\r\n#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP || %BUMP_ZCORRECT\r\n          float4 lmTC_ZW    : TEXCOORDN;\r\n#endif\r\n          float4 viewVec    : COLOR0;\r\n\r\n#if %TEMP_AMBIENT\r\n  #if %ENVCMAMB\r\n          float4 envTC      : TEXCOORDN;\r\n  #elif %ENVCMSPEC\r\n          float4 tangVec    : TEXCOORDN;\r\n          float4 binormVec  : TEXCOORDN;\r\n          float4 normVec    : TEXCOORDN;\r\n  #endif\r\n#endif\r\n\r\n    # ifdef _LIGHT0_TYPE\r\n          float4 lightVec[ _NUM_LIGHTS ] : TEXCOORDN;          \r\n          float4 projTC      : COLOR1;          \r\n    # endif\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.baseTC.xy = IN.baseTC.xy;\r\n#if %BUMP_MAP\r\n  #if !%TEMP_AMBIENT || !%ENVCMSPEC\r\n        OUT.bumpTC.xy = IN.baseTC.xy;\r\n  #endif\r\n#endif\r\n  \r\n#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP\r\n        OUT.lmTC_ZW.xy = IN.lmTC.xy;\r\n#endif\r\n#if %BUMP_ZCORRECT\r\n        OUT.lmTC_ZW.z = dot(ModelViewProj[2], vPos);\r\n        OUT.lmTC_ZW.w = dot(ModelViewProj[3], vPos);\r\n#endif\r\n\r\n#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED\r\n        OUT.glossTC.xy = IN.baseTC.xy;\r\n#elif !%TEMP_AMBIENT || !%ENVCMSPEC\r\n  #if %SPECULAR\r\n    #if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA\r\n        OUT.glossTC.xy = IN.baseTC.xy;\r\n    #endif\r\n  #endif\r\n#endif          \r\n\r\n        TANG_MATR\r\n        \r\n        // 0 type = directional light source (no attenuation)\r\n        // 1 type = omni light source\r\n        // 2 type = projected light source\r\n    # ifdef _LIGHT0_TYPE\r\n        int aLType[ _NUM_LIGHTS ];\r\n        aLType[0] = _LIGHT0_TYPE;\r\n      # ifdef _LIGHT1_TYPE\r\n        aLType[1] = _LIGHT1_TYPE;\r\n      # endif\r\n      # ifdef _LIGHT2_TYPE\r\n        aLType[2] = _LIGHT2_TYPE;\r\n      # endif\r\n      # ifdef _LIGHT3_TYPE\r\n        aLType[3] = _LIGHT3_TYPE;\r\n      # endif\r\n        for (int i=0; i<_NUM_LIGHTS; i++)\r\n        {\r\n          float3 lVec = LightsPos[i].xyz - vPos.xyz;\r\n          float3 lightVec = mul(objToTangentSpace, lVec);          \r\n          float3 lVecO = lightVec.xyz;\r\n#ifdef RADEON\r\n#endif\r\n#ifdef OTHER\r\n          if (!aLType[i])\r\n            lVecO = lVecO * LightsPos[i].w;\r\n#endif          \r\n          OUT.lightVec[i].xyz = lVecO;\r\n          if (aLType[i] == 2)\r\n            OUT.projTC = mul(LightMatrix, vPos);\r\n        }\r\n    # endif\r\n          \r\n        // compute view vector\r\n        float3 vVec = CameraPos.xyz - vPos.xyz;\r\n        float3 viewVec = mul(objToTangentSpace, vVec.xyz);\r\n#ifdef RADEON\r\n#endif\r\n#ifdef OTHER\r\n        viewVec.xyz = viewVec.xyz * CameraPos.w;\r\n#endif        \r\n        OUT.viewVec.xyz = viewVec.xyz;\r\n\r\n#if %TEMP_AMBIENT\r\n  #if %TEMP_ENVLIGHT\r\n        // Calculate average radiosity color from 6 colors (Cube)\r\n        float3 tNormal;\r\n        tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);\r\n        float3 Compare1 = step(tNormal, 0);\r\n        float3 Compare0 = 1 - Compare1;\r\n        float3 signN = sign(tNormal);\r\n        tNormal = tNormal * tNormal;\r\n        tNormal = tNormal * signN;\r\n        float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;\r\n        float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;\r\n        float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;\r\n        OUT.Color1 = (ColorX + ColorY + ColorZ) * 2.0;\r\n  #elif %ENVCMAMB\r\n        float3 tCamVec = normalize(vVec);\r\n        float3 tNormal = IN.TNormal.xyz;\r\n        float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;\r\n        float4 tRM;\r\n        tRM.xyz = tRef.xyz;\r\n        tRM.w = vPos.w;\r\n        OUT.envTC = mul(tRM, TexMatrix);\r\n  #elif %ENVCMSPEC    \r\n        float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);\r\n        float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);\r\n        float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);\r\n\r\n\t      OUT.tangVec.xyz = worldTangentS;\r\n\t      OUT.binormVec.xyz = worldTangentT;\r\n\t      OUT.normVec.xyz = worldNormal;\r\n  #endif\r\n#endif\r\n\r\n        float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);\r\n        OUT.viewVec.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.baseTC.xy",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "OUT.baseTC.xy = IN.baseTC.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if !%TEMP_AMBIENT || !%ENVCMSPEC",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.bumpTC.xy",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "OUT.bumpTC.xy = IN.baseTC.xy;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "!%TEMP_AMBIENT || !%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.lmTC_ZW.xy",
+      "rhs": "IN.lmTC.xy",
+      "textureSample": false,
+      "raw": "OUT.lmTC_ZW.xy = IN.lmTC.xy;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %BUMP_ZCORRECT",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.lmTC_ZW.z",
+      "rhs": "dot(ModelViewProj[2], vPos)",
+      "textureSample": false,
+      "raw": "OUT.lmTC_ZW.z = dot(ModelViewProj[2], vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.lmTC_ZW.w",
+      "rhs": "dot(ModelViewProj[3], vPos)",
+      "textureSample": false,
+      "raw": "OUT.lmTC_ZW.w = dot(ModelViewProj[3], vPos);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%BUMP_ZCORRECT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.glossTC.xy",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "OUT.glossTC.xy = IN.baseTC.xy;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif !%TEMP_AMBIENT || !%ENVCMSPEC",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %SPECULAR",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "!%TEMP_AMBIENT || !%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "!%TEMP_AMBIENT || !%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.glossTC.xy",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "OUT.glossTC.xy = IN.baseTC.xy;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "!%TEMP_AMBIENT || !%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%GLOSS_MAP || %SPECULARPOW_GLOSSALPHA",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "!%TEMP_AMBIENT || !%ENVCMSPEC",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%SPECULAR",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "!%TEMP_AMBIENT || !%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "0 type = directional light source (no attenuation)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "1 type = omni light source",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "2 type = projected light source",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _LIGHT0_TYPE",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "int aLType[ _NUM_LIGHTS ];",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "aLType[0]",
+      "rhs": "_LIGHT0_TYPE",
+      "textureSample": false,
+      "raw": "aLType[0] = _LIGHT0_TYPE;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _LIGHT1_TYPE",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "aLType[1]",
+      "rhs": "_LIGHT1_TYPE",
+      "textureSample": false,
+      "raw": "aLType[1] = _LIGHT1_TYPE;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT1_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _LIGHT2_TYPE",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "aLType[2]",
+      "rhs": "_LIGHT2_TYPE",
+      "textureSample": false,
+      "raw": "aLType[2] = _LIGHT2_TYPE;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT2_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "# ifdef _LIGHT3_TYPE",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "aLType[3]",
+      "rhs": "_LIGHT3_TYPE",
+      "textureSample": false,
+      "raw": "aLType[3] = _LIGHT3_TYPE;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT3_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "for (int i",
+      "rhs": "0 i<_NUM_LIGHTS i++)",
+      "textureSample": false,
+      "raw": "for (int i=0; i<_NUM_LIGHTS; i++)",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lVec",
+      "rhs": "LightsPos[i].xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lVec = LightsPos[i].xyz - vPos.xyz;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "mul(objToTangentSpace, lVec)",
+      "textureSample": false,
+      "raw": "float3 lightVec = mul(objToTangentSpace, lVec);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lVecO",
+      "rhs": "lightVec.xyz",
+      "textureSample": false,
+      "raw": "float3 lVecO = lightVec.xyz;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef RADEON",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef OTHER",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "if (!aLType[i])",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "lVecO",
+      "rhs": "lVecO * LightsPos[i].w",
+      "textureSample": false,
+      "raw": "lVecO = lVecO * LightsPos[i].w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.lightVec[i].xyz",
+      "rhs": "lVecO",
+      "textureSample": false,
+      "raw": "OUT.lightVec[i].xyz = lVecO;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "if (aLType[i]",
+      "rhs": "= 2)",
+      "textureSample": false,
+      "raw": "if (aLType[i] == 2)",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.projTC",
+      "rhs": "mul(LightMatrix, vPos)",
+      "textureSample": false,
+      "raw": "OUT.projTC = mul(LightMatrix, vPos);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_LIGHT0_TYPE",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "# endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 vVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "mul(objToTangentSpace, vVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 viewVec = mul(objToTangentSpace, vVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef RADEON",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef OTHER",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "viewVec.xyz",
+      "rhs": "viewVec.xyz * CameraPos.w",
+      "textureSample": false,
+      "raw": "viewVec.xyz = viewVec.xyz * CameraPos.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.viewVec.xyz",
+      "rhs": "viewVec.xyz",
+      "textureSample": false,
+      "raw": "OUT.viewVec.xyz = viewVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_AMBIENT",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_ENVLIGHT",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Calculate average radiosity color from 6 colors (Cube)",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "statement",
+      "raw": "float3 tNormal;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tNormal",
+      "rhs": "mul((float3x3)TexMatrix, IN.TNormal.xyz)",
+      "textureSample": false,
+      "raw": "tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 Compare1",
+      "rhs": "step(tNormal, 0)",
+      "textureSample": false,
+      "raw": "float3 Compare1 = step(tNormal, 0);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 Compare0",
+      "rhs": "1 - Compare1",
+      "textureSample": false,
+      "raw": "float3 Compare0 = 1 - Compare1;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 signN",
+      "rhs": "sign(tNormal)",
+      "textureSample": false,
+      "raw": "float3 signN = sign(tNormal);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tNormal",
+      "rhs": "tNormal * tNormal",
+      "textureSample": false,
+      "raw": "tNormal = tNormal * tNormal;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tNormal",
+      "rhs": "tNormal * signN",
+      "textureSample": false,
+      "raw": "tNormal = tNormal * signN;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 ColorX",
+      "rhs": "EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x",
+      "textureSample": false,
+      "raw": "float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 ColorY",
+      "rhs": "EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y",
+      "textureSample": false,
+      "raw": "float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 ColorZ",
+      "rhs": "EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z",
+      "textureSample": false,
+      "raw": "float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color1",
+      "rhs": "(ColorX + ColorY + ColorZ) * 2.0",
+      "textureSample": false,
+      "raw": "OUT.Color1 = (ColorX + ColorY + ColorZ) * 2.0;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %ENVCMAMB",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tCamVec",
+      "rhs": "normalize(vVec)",
+      "textureSample": false,
+      "raw": "float3 tCamVec = normalize(vVec);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tNormal",
+      "rhs": "IN.TNormal.xyz",
+      "textureSample": false,
+      "raw": "float3 tNormal = IN.TNormal.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 tRef",
+      "rhs": "dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz",
+      "textureSample": false,
+      "raw": "float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "statement",
+      "raw": "float4 tRM;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tRM.xyz",
+      "rhs": "tRef.xyz",
+      "textureSample": false,
+      "raw": "tRM.xyz = tRef.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tRM.w",
+      "rhs": "vPos.w",
+      "textureSample": false,
+      "raw": "tRM.w = vPos.w;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.envTC",
+      "rhs": "mul(tRM, TexMatrix)",
+      "textureSample": false,
+      "raw": "OUT.envTC = mul(tRM, TexMatrix);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %ENVCMSPEC",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldTangentS",
+      "rhs": "mul((const float3x3)ModelMatrix, objToTangentSpace[0])",
+      "textureSample": false,
+      "raw": "float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0]);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldTangentT",
+      "rhs": "mul((const float3x3)ModelMatrix, objToTangentSpace[1])",
+      "textureSample": false,
+      "raw": "float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1]);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 worldNormal",
+      "rhs": "mul((const float3x3)ModelMatrix, objToTangentSpace[2])",
+      "textureSample": false,
+      "raw": "float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2]);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.tangVec.xyz",
+      "rhs": "worldTangentS",
+      "textureSample": false,
+      "raw": "OUT.tangVec.xyz = worldTangentS;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.binormVec.xyz",
+      "rhs": "worldTangentT",
+      "textureSample": false,
+      "raw": "OUT.binormVec.xyz = worldTangentT;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.normVec.xyz",
+      "rhs": "worldNormal",
+      "textureSample": false,
+      "raw": "OUT.normVec.xyz = worldNormal;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        },
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMSPEC",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_AMBIENT",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float ffCameraSpacePosZ",
+      "rhs": "dot(ModelViewProj._31_32_33_34, vPos)",
+      "textureSample": false,
+      "raw": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.viewVec.w",
+      "rhs": "clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "textureSample": false,
+      "raw": "OUT.viewVec.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "explicit",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "explicit",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "TexCoord1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "explicit",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "TNORMAL_3"
+    },
+    {
+      "token": "baseTC",
+      "semantic": "TEXCOORD0",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "lmTC",
+      "semantic": "TEXCOORD1",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 1
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.baseTC.xy = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if !%TEMP_AMBIENT || !%ENVCMSPEC",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.bumpTC.xy = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_LM || %TEMP_DOT3LM || %TEMP_SPECULAR_OCCLUSIONMAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.lmTC_ZW.xy = IN.lmTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %BUMP_ZCORRECT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.lmTC_ZW.z = dot(ModelViewProj[2], vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.lmTC_ZW.w = dot(ModelViewProj[3], vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_AMBIENT && %ENVCMAMB && %ENVCM_MASKED",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.glossTC.xy = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif !%TEMP_AMBIENT || !%ENVCMSPEC",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %SPECULAR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %GLOSS_MAP || %SPECULARPOW_GLOSSALPHA",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.glossTC.xy = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _LIGHT0_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "int aLType[ _NUM_LIGHTS ]",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "aLType[0] = _LIGHT0_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _LIGHT1_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "aLType[1] = _LIGHT1_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _LIGHT2_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "aLType[2] = _LIGHT2_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _LIGHT3_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "aLType[3] = _LIGHT3_TYPE",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "for",
+      "content": "for (int i=0; i<_NUM_LIGHTS; i++)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "",
+      "opensBlock": true
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float3 lVec = LightsPos[i].xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float3 lightVec = mul(objToTangentSpace, lVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float3 lVecO = lightVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "directive",
+      "content": "#ifdef RADEON",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "directive",
+      "content": "#ifdef OTHER",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "if",
+      "content": "if (!aLType[i])",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "lVecO = lVecO * LightsPos[i].w",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "OUT.lightVec[i].xyz = lVecO",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "if",
+      "content": "if (aLType[i] == 2)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "OUT.projTC = mul(LightMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = mul(objToTangentSpace, vVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef RADEON",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OTHER",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "viewVec.xyz = viewVec.xyz * CameraPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.viewVec.xyz = viewVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_AMBIENT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_ENVLIGHT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tNormal = mul((float3x3)TexMatrix, IN.TNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 Compare1 = step(tNormal, 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 Compare0 = 1 - Compare1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 signN = sign(tNormal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tNormal = tNormal * tNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tNormal = tNormal * signN",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 ColorX = EnvColors[0]*tNormal.x*Compare0.x + EnvColors[1]*(-tNormal.x)*Compare1.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 ColorY = EnvColors[2]*tNormal.y*Compare0.y + EnvColors[3]*(-tNormal.y)*Compare1.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 ColorZ = EnvColors[4]*tNormal.z*Compare0.z + EnvColors[5]*(-tNormal.z)*Compare1.z",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color1 = (ColorX + ColorY + ColorZ) * 2.0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMAMB",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tCamVec = normalize(vVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tNormal = IN.TNormal.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 tRef = dot(tNormal.xyz, tCamVec.xyz) * tNormal.xyz * 2 - tCamVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 tRM",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tRM.xyz = tRef.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tRM.w = vPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.envTC = mul(tRM, TexMatrix)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMSPEC",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldTangentS = mul((const float3x3)ModelMatrix, objToTangentSpace[0])",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldTangentT = mul((const float3x3)ModelMatrix, objToTangentSpace[1])",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 worldNormal   = mul((const float3x3)ModelMatrix, objToTangentSpace[2])",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.tangVec.xyz = worldTangentS",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.binormVec.xyz = worldTangentT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.normVec.xyz = worldNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float ffCameraSpacePosZ = dot(ModelViewProj._31_32_33_34, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.viewVec.w = clamp((Fog.y - Fog.x*ffCameraSpacePosZ), g_VSCONST_0_025_05_1.x, g_VSCONST_0_025_05_1.w)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "BUMP_MAP",
+    "BUMP_ZCORRECT",
+    "ENVCMAMB",
+    "ENVCMSPEC",
+    "ENVCM_MASKED",
+    "GLOSS_MAP",
+    "OTHER",
+    "RADEON",
+    "SPECULAR",
+    "SPECULARPOW_GLOSSALPHA",
+    "TEMP_AMBIENT",
+    "TEMP_DOT3LM",
+    "TEMP_ENVLIGHT",
+    "TEMP_LM",
+    "TEMP_SPECULAR_OCCLUSIONMAP",
+    "_LIGHT0_TYPE",
+    "_LIGHT1_TYPE",
+    "_LIGHT2_TYPE",
+    "_LIGHT3_TYPE"
+  ],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "baseTC": "float2",
+    "bumpTC": "float2",
+    "glossTC": "float2",
+    "lmTC_ZW": "float4",
+    "viewVec": "float4",
+    "envTC": "float4",
+    "tangVec": "float4",
+    "binormVec": "float4",
+    "normVec": "float4",
+    "lightVec": "float4",
+    "projTC": "float4"
+  }
+}

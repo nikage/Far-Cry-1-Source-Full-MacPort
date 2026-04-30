@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      {
+        "command": "dart run tools/shader_port/bin/hook_validate_migration.dart",
+        "timeout": 180,
+        "loop_limit": 3
+      }
+    ]
+  }
+}

@@ -72265,7 +72265,7 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
-    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex",
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_vertex",
     "pipelineCategory": "terrain"
   },
   {
@@ -80500,7 +80500,7 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
-    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex",
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_vertex",
     "pipelineCategory": "terrain"
   },
   {
@@ -81707,7 +81707,7 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
-    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex",
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcm_vertex",
     "pipelineCategory": "terrain"
   },
   {
@@ -108300,7 +108300,7 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
-    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcmspec_vs20_vertex",
+    "vertexEntryPoint": "generated_cgvprogsimple_texdot3lm_envcm_vertex",
     "pipelineCategory": "terrain"
   },
   {
@@ -108740,7 +108740,7 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
-    "vertexEntryPoint": "generated_cgvprogsimple_tex_envcmspec_vs20_vertex",
+    "vertexEntryPoint": "generated_cgvprogsimple_tex_envcmap_vertex",
     "pipelineCategory": "mesh"
   },
   {
@@ -122115,7 +122115,7 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
-    "vertexEntryPoint": "generated_cgvprogbump_diffpass_atten_plants_bump_vertex",
+    "vertexEntryPoint": "generated_cgvprogsimple_plant_bump_vertex",
     "pipelineCategory": "plant"
   },
   {

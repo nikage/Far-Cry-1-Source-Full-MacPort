@@ -1,0 +1,33 @@
+---
+description: Run all relevant tests before creating any git commit
+alwaysApply: true
+---
+
+# Run Tests Before Every Commit
+
+Before creating any `git commit`, always run the full test suite for every component that has changes staged.
+
+## Test commands by component
+
+| Changed files | Command | Working directory |
+|---|---|---|
+| `tools/shader_port/**` | `dart test` | `tools/shader_port/` |
+| `RenderDll/XRenderMetal/test/*.cpp` | `clang++ -std=c++17 -o <name> <file>.cpp && ./<name>` | `RenderDll/XRenderMetal/test/` |
+
+## Rules
+
+- All tests must pass (exit code 0) before the commit is created.
+- If any test fails, fix the failure first, then re-run the suite, then commit.
+- Never use `--no-verify` to skip hooks unless the user explicitly requests it.
+
+## Examples
+
+```bash
+# Dart shader toolchain changes
+cd tools/shader_port && dart test
+
+# C++ renderer logic changes
+cd RenderDll/XRenderMetal/test
+clang++ -std=c++17 -o renderer_logic_tests RendererLogicTests.cpp && ./renderer_logic_tests
+clang++ -std=c++17 -o shader_pair_validation_tests ShaderPairValidationTests.cpp && ./shader_pair_validation_tests
+```

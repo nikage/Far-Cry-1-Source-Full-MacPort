@@ -1,0 +1,154 @@
+{
+  "name": "CGVProgShadowGen_Depth_Extrude_Bended",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgShadowGen_Depth_Extrude_Bended.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TNORMAL_3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, BEND, uniform float4 Offset"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        vPos.xyz = vPos.xyz + IN.TNormal.xyz*Offset.x;\r\n        OUT.HPosition = mul(ModelViewProj, vPos);\r\n        float fZ = dot(ModelViewProj._31_32_33_34, vPos);\r\n        float fW = dot(ModelViewProj._41_42_43_44, vPos);\r\n        OUT.Tex0.xy = fZ;\r\n        OUT.Tex0.zw = fW;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "vPos.xyz",
+      "rhs": "vPos.xyz + IN.TNormal.xyz*Offset.x",
+      "textureSample": false,
+      "raw": "vPos.xyz = vPos.xyz + IN.TNormal.xyz*Offset.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.HPosition",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "OUT.HPosition = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fZ",
+      "rhs": "dot(ModelViewProj._31_32_33_34, vPos)",
+      "textureSample": false,
+      "raw": "float fZ = dot(ModelViewProj._31_32_33_34, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fW",
+      "rhs": "dot(ModelViewProj._41_42_43_44, vPos)",
+      "textureSample": false,
+      "raw": "float fW = dot(ModelViewProj._41_42_43_44, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = fZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.zw",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.Tex0.zw = fW;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPos.xyz = vPos.xyz + IN.TNormal.xyz*Offset.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.HPosition = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fZ = dot(ModelViewProj._31_32_33_34, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fW = dot(ModelViewProj._41_42_43_44, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.zw = fW",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosBending"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4"
+  }
+}

@@ -1,0 +1,315 @@
+{
+  "name": "CGVProgLowMedWater",
+  "extension": "crycg",
+  "path": "CGVShaders/CGVProgLowMedWater.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 PRIM_COLOR"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  VIEWPROJ_MATRIX,\r\n  uniform float4   CameraPos,  \r\n  uniform float4   Constants,\r\n  uniform float4   NoisePos,\r\n  uniform float4   TexGenRipple0,\r\n  uniform float4   TexGenRipple1,\r\n  uniform float4   TexShiftRipple,\r\n  uniform float4   TexDetailScale,\r\n  uniform float4   BumpMatrix"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_C0\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1_2\r\n    OUT_C0\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float4 vHPos = mul(ModelViewProj, vPos);                \r\n  float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);  \r\n\r\n  float3 fNormal=float3(0,0,1);\r\n  float fDot= dot(eyeVec, fNormal);  \r\n  // output color and fresnel term hack           \r\n  OUT.Color.xyz=IN.Color.xyz;\r\n  OUT.Color.w =max(0, IN.Color.w*1.8-(1/(vHPos.w*vHPos.w)));     \r\n        \r\n  float2 vTex;\r\n  vTex.x = dot(vPos, TexGenRipple0);\r\n  vTex.y = dot(vPos, TexGenRipple1);   \r\n  \r\n  float3 vNPos=normalize(vPos.xyz);\r\n  vTex.xy= (vTex.xy+TexShiftRipple.zw*TexShiftRipple.xy);\r\n\r\n  // output texture coordinates  \r\n  OUT.Tex0.xy = vTex.xy;      \r\n  \r\n  //vTex.x = dot(vPos, TexGenRipple0);\r\n  //vTex.y = dot(vPos, TexGenRipple1);   \r\n  //OUT.Tex1.xy = (vTex.xy-TexShiftRipple.zw*TexShiftRipple.xy)*0.01; \r\n  \r\n  float3 fReflVec=normalize(2*fDot*fNormal-eyeVec);     \r\n  OUT.Tex1.xy = ((fReflVec.xy+1.0)*0.5-TexShiftRipple.zw*TexShiftRipple.xy*0.2)*0.4; \r\n       \r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 vHPos",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "float4 vHPos = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 eyeVec",
+      "rhs": "normalize(CameraPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fNormal",
+      "rhs": "float3(0,0,1)",
+      "textureSample": false,
+      "raw": "float3 fNormal=float3(0,0,1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDot",
+      "rhs": "dot(eyeVec, fNormal)",
+      "textureSample": false,
+      "raw": "float fDot= dot(eyeVec, fNormal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output color and fresnel term hack",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz=IN.Color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "max(0, IN.Color.w*1.8-(1/(vHPos.w*vHPos.w)))",
+      "textureSample": false,
+      "raw": "OUT.Color.w =max(0, IN.Color.w*1.8-(1/(vHPos.w*vHPos.w)));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2 vTex;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.x",
+      "rhs": "dot(vPos, TexGenRipple0)",
+      "textureSample": false,
+      "raw": "vTex.x = dot(vPos, TexGenRipple0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.y",
+      "rhs": "dot(vPos, TexGenRipple1)",
+      "textureSample": false,
+      "raw": "vTex.y = dot(vPos, TexGenRipple1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vNPos",
+      "rhs": "normalize(vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 vNPos=normalize(vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.xy",
+      "rhs": "(vTex.xy+TexShiftRipple.zw*TexShiftRipple.xy)",
+      "textureSample": false,
+      "raw": "vTex.xy= (vTex.xy+TexShiftRipple.zw*TexShiftRipple.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "vTex.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = vTex.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "vTex.x = dot(vPos, TexGenRipple0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "vTex.y = dot(vPos, TexGenRipple1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "OUT.Tex1.xy = (vTex.xy-TexShiftRipple.zw*TexShiftRipple.xy)*0.01;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fReflVec",
+      "rhs": "normalize(2*fDot*fNormal-eyeVec)",
+      "textureSample": false,
+      "raw": "float3 fReflVec=normalize(2*fDot*fNormal-eyeVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "((fReflVec.xy+1.0)*0.5-TexShiftRipple.zw*TexShiftRipple.xy*0.2)*0.4",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = ((fReflVec.xy+1.0)*0.5-TexShiftRipple.zw*TexShiftRipple.xy*0.2)*0.4;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHPos = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 eyeVec = normalize(CameraPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fNormal=float3(0,0,1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDot= dot(eyeVec, fNormal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz=IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w =max(0, IN.Color.w*1.8-(1/(vHPos.w*vHPos.w)))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTex",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.x = dot(vPos, TexGenRipple0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.y = dot(vPos, TexGenRipple1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vNPos=normalize(vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.xy= (vTex.xy+TexShiftRipple.zw*TexShiftRipple.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = vTex.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fReflVec=normalize(2*fDot*fNormal-eyeVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = ((fReflVec.xy+1.0)*0.5-TexShiftRipple.zw*TexShiftRipple.xy*0.2)*0.4",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Color": "float4"
+  }
+}
