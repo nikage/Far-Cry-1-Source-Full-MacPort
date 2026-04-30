@@ -6,7 +6,8 @@ bool isRelevantChange(List<String> changedFiles) {
     (String f) =>
         f.contains('tools/shader_port') ||
         f.contains('RenderDll/XRenderMetal') ||
-        f.contains('shader_pair_overrides'),
+        f.contains('shader_pair_overrides') ||
+        f.contains('output/ir'),
   );
 }
 
@@ -14,13 +15,11 @@ String buildFollowupJson(String output) {
   final List<String> lines = output.split('\n');
   final String truncated =
       lines.length > 50 ? lines.sublist(lines.length - 50).join('\n') : output;
-  final String escaped =
-      truncated.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
   return jsonEncode(<String, String>{
     'followup_message':
         'Shader migration validation failed after your changes. '
         'Fix all reported issues before finishing.\n\n'
-        '```\n$escaped\n```',
+        '```\n$truncated\n```',
   });
 }
 
@@ -56,7 +55,7 @@ Future<String?> _findDartBin() async {
   return null;
 }
 
-List<String> _buildDartArgs(String dartBin, String validatorScript, String projectRoot) {
+List<String> buildDartArgs(String dartBin, String validatorScript, String projectRoot) {
   final List<String> parts = dartBin.split(' ');
   return [
     if (parts.length > 1) parts[1],
@@ -88,7 +87,7 @@ Future<void> main() async {
       .resolve('validate_migration.dart')
       .toFilePath();
   final List<String> dartArgs =
-      _buildDartArgs(dartBin, validatorScript, projectRoot);
+      buildDartArgs(dartBin, validatorScript, projectRoot);
 
   final Process process = await Process.start(executable, dartArgs);
 

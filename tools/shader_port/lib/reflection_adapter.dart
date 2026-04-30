@@ -1,3 +1,5 @@
+import 'dart:io';
+
 class ReflectionInfo {
   ReflectionInfo({
     required this.uniforms,
@@ -16,6 +18,10 @@ class ReflectionAdapter {
   ReflectionAdapter(this.raw);
 
   final Map<String, dynamic> raw;
+
+  static void _warnSkip(String context, String reason) {
+    stderr.writeln('WARN: reflection_adapter: skipping $context — $reason');
+  }
 
   ReflectionInfo toInfo() {
     final List<Map<String, dynamic>> uniforms = <Map<String, dynamic>>[];
@@ -50,8 +56,14 @@ class ReflectionAdapter {
           final String type =
               _stringValue(entry['type']) ?? _stringValue(entry['Type']) ?? '';
           if (type.toUpperCase() == 'CBV') {
+            final String name =
+                _stringValue(entry['name']) ?? _stringValue(entry['Name']) ?? '';
+            if (name.isEmpty) {
+              _warnSkip('CBV uniform entry', 'missing name field');
+              continue;
+            }
             yield <String, dynamic>{
-              'name': entry['name'] ?? entry['Name'] ?? '',
+              'name': name,
               'type': entry['elementType'] ?? entry['ElementType'] ?? '',
               'slot': entry['slot'] ?? entry['Slot'],
             };
@@ -69,8 +81,14 @@ class ReflectionAdapter {
           final String type =
               _stringValue(entry['type']) ?? _stringValue(entry['Type']) ?? '';
           if (type.toUpperCase() == 'SRV') {
+            final String name =
+                _stringValue(entry['name']) ?? _stringValue(entry['Name']) ?? '';
+            if (name.isEmpty) {
+              _warnSkip('SRV texture entry', 'missing name field');
+              continue;
+            }
             yield <String, dynamic>{
-              'name': entry['name'] ?? entry['Name'] ?? '',
+              'name': name,
               'slot': entry['slot'] ?? entry['Slot'],
               'space': entry['space'] ?? entry['Space'],
             };

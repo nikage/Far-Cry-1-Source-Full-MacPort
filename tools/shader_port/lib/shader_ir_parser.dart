@@ -77,47 +77,13 @@ class ShaderIrParser {
         _castPositionScriptBlocks(
           ir['positionScriptBlocks'] as List<dynamic>?,
         );
-    if (!uniformNames.contains('LightPos') &&
-        _irReferencesIdentifier(ir, 'LightPos')) {
-      uniforms.add(UniformBinding('float4', 'LightPos', ''));
-      uniformNames.add('LightPos');
-    }
-    if (!uniformNames.contains('Layer2TexGen0') &&
-        _irReferencesIdentifier(ir, 'Layer2TexGen0')) {
-      uniforms.add(UniformBinding('float4', 'Layer2TexGen0', ''));
-      uniformNames.add('Layer2TexGen0');
-    }
-    if (!uniformNames.contains('Layer2TexGen1') &&
-        _irReferencesIdentifier(ir, 'Layer2TexGen1')) {
-      uniforms.add(UniformBinding('float4', 'Layer2TexGen1', ''));
-      uniformNames.add('Layer2TexGen1');
-    }
-    if (!uniformNames.contains('AlphaGlowTexGen0') &&
-        _irReferencesIdentifier(ir, 'AlphaGlowTexGen0')) {
-      uniforms.add(UniformBinding('float4', 'AlphaGlowTexGen0', ''));
-      uniformNames.add('AlphaGlowTexGen0');
-    }
-    if (!uniformNames.contains('AlphaGlowTexGen1') &&
-        _irReferencesIdentifier(ir, 'AlphaGlowTexGen1')) {
-      uniforms.add(UniformBinding('float4', 'AlphaGlowTexGen1', ''));
-      uniformNames.add('AlphaGlowTexGen1');
-    }
-    if (!uniformNames.contains('Fog') &&
-        _irReferencesIdentifier(ir, 'Fog')) {
-      uniforms.add(UniformBinding('float4', 'Fog', ''));
-      uniformNames.add('Fog');
-    }
-    if (!uniformNames.contains('g_VSCONST_0_025_05_1') &&
-        _irReferencesIdentifier(ir, 'g_VSCONST_0_025_05_1')) {
-      uniforms.add(
-        UniformBinding('float4', 'g_VSCONST_0_025_05_1', ''),
-      );
-      uniformNames.add('g_VSCONST_0_025_05_1');
-    }
-    if (!uniformNames.contains('GlobalFogColor') &&
-        _irReferencesIdentifier(ir, 'GlobalFogColor')) {
-      uniforms.add(UniformBinding('float4', 'GlobalFogColor', ''));
-      uniformNames.add('GlobalFogColor');
+    for (final MapEntry<String, String> entry
+        in _identifierUniformTypes.entries) {
+      if (!uniformNames.contains(entry.key) &&
+          _irReferencesIdentifier(ir, entry.key)) {
+        uniforms.add(UniformBinding(entry.value, entry.key, ''));
+        uniformNames.add(entry.key);
+      }
     }
     if (positionScripts.contains('PosBeam') &&
         !uniformNames.contains('GeomConstants')) {
@@ -184,6 +150,17 @@ class ShaderIrParser {
     return result;
   }
 
+  static const Map<String, String> _identifierUniformTypes = <String, String>{
+    'LightPos': 'float4',
+    'Layer2TexGen0': 'float4',
+    'Layer2TexGen1': 'float4',
+    'AlphaGlowTexGen0': 'float4',
+    'AlphaGlowTexGen1': 'float4',
+    'Fog': 'float4',
+    'g_VSCONST_0_025_05_1': 'float4',
+    'GlobalFogColor': 'float4',
+  };
+
   static final Map<String, UniformBinding> _macroUniformMap =
       <String, UniformBinding>{
         'VIEWPROJ_MATRIX': UniformBinding('float4x4', 'ModelViewProj', ''),
@@ -246,10 +223,14 @@ List<MacroDefinition> _castMacroList(List<dynamic>? source) {
   final List<MacroDefinition> result = <MacroDefinition>[];
   for (final dynamic entry in source) {
     if (entry is! Map<String, dynamic>) {
+      stderr.writeln(
+        'WARN: _castMacroList: skipping non-Map coreMacros entry (${entry.runtimeType})',
+      );
       continue;
     }
     final String? name = entry['name'] as String?;
     if (name == null || name.isEmpty) {
+      stderr.writeln('WARN: _castMacroList: skipping macro entry with missing name');
       continue;
     }
     final String value = (entry['value'] as String?) ?? '';
@@ -344,10 +325,20 @@ void _mergeReflectionUniforms(
 ) {
   for (final Map<String, dynamic> uniform in reflection.uniforms) {
     final String name = (uniform['name'] as String? ?? '').trim();
-    if (name.isEmpty || !uniformNames.add(name)) {
+    if (name.isEmpty) {
+      stderr.writeln('WARN: _mergeReflectionUniforms: skipping uniform with empty name');
       continue;
     }
-    final String type = (uniform['type'] as String?) ?? 'float4';
+    if (!uniformNames.add(name)) {
+      continue;
+    }
+    String type = (uniform['type'] as String?) ?? '';
+    if (type.isEmpty) {
+      stderr.writeln(
+        'WARN: reflection uniform "$name" has no type field — using float4 fallback',
+      );
+      type = 'float4';
+    }
     final String semantic = (uniform['semantic'] as String?) ?? '';
     final int? arraySize = uniform['arraySize'] is int ? uniform['arraySize'] as int : null;
     uniforms.add(

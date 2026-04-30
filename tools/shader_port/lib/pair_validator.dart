@@ -38,12 +38,14 @@ ValidatorResult validate(List<Map<String, dynamic>> manifest) {
 
   final Set<String> vertexEntryPoints = {
     for (final Map<String, dynamic> e in manifest)
-      if (e['stage'] == 'vertex') e['entryPoint'] as String,
+      if (e['stage'] == 'vertex' && e['entryPoint'] is String)
+        e['entryPoint'] as String,
   };
 
   final Map<String, Map<String, dynamic>> vertexByEntryPoint = {
     for (final Map<String, dynamic> e in manifest)
-      if (e['stage'] == 'vertex') e['entryPoint'] as String: e,
+      if (e['stage'] == 'vertex' && e['entryPoint'] is String)
+        e['entryPoint'] as String: e,
   };
 
   final List<Map<String, dynamic>> fragments = [
@@ -152,6 +154,12 @@ void _checkStructuralCompatibility(
   }
 }
 
+Iterable<Map<String, dynamic>> _warnAndSkip(dynamic entry, int index) sync* {
+  stderr.writeln(
+    'WARN: pair_validator: skipping malformed manifest entry at index $index (${entry.runtimeType})',
+  );
+}
+
 ValidatorResult validateManifestFile(String manifestPath) {
   final File file = File(manifestPath);
   if (!file.existsSync()) {
@@ -175,9 +183,10 @@ ValidatorResult validateManifestFile(String manifestPath) {
       fullscreenFragments: 0,
     );
   }
+  int droppedCount = 0;
   final List<Map<String, dynamic>> manifest = [
     for (final dynamic e in raw)
-      if (e is Map<String, dynamic>) e,
+      if (e is Map<String, dynamic>) e else ..._warnAndSkip(e, ++droppedCount),
   ];
   return validate(manifest);
 }

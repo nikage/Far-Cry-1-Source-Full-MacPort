@@ -157,7 +157,9 @@ class CompilerBackend {
             exitCode: result.exitCode,
           ),
         );
-        output.writeAsStringSync(input.readAsStringSync());
+        // Do not write output on failure; expandedFile absence signals the
+        // preprocessing error to downstream stages.
+        return;
       }
     } on ProcessException catch (error) {
       diagnostics.add(
@@ -168,7 +170,8 @@ class CompilerBackend {
           exitCode: error.errorCode,
         ),
       );
-      output.writeAsStringSync(input.readAsStringSync());
+      // Do not write output on failure.
+      return;
     }
   }
 
@@ -280,14 +283,6 @@ class CompilerBackend {
     }
   }
 
-  String _profileForPath(String relativePath) {
-    final String lower = relativePath.toLowerCase();
-    if (lower.contains('/cgvshaders/') || lower.contains('cgvshader')) {
-      return 'vs_3_0';
-    }
-    return 'ps_3_0';
-  }
-
   Map<String, dynamic>? _readReflection(File file) {
     try {
       final String data = file.readAsStringSync();
@@ -295,7 +290,11 @@ class CompilerBackend {
         return null;
       }
       return jsonDecode(data) as Map<String, dynamic>;
-    } catch (_) {
+    } on FormatException catch (error) {
+      stderr.writeln('WARN: malformed JSON in reflection file ${file.path}: $error');
+      return null;
+    } catch (error) {
+      stderr.writeln('WARN: failed to read reflection file ${file.path}: $error');
       return null;
     }
   }

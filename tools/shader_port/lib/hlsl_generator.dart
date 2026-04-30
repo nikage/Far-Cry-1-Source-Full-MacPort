@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 class UniformBinding {
-  UniformBinding(this.type, this.name, this.semantic);
+  UniformBinding(this.type, this.name, this.semantic, {this.arraySize});
   final String type;
   final String name;
   final String semantic;
+  final int? arraySize;
 }
 
 class TextureBinding {
@@ -154,6 +155,7 @@ String translateType(String type) {
     case 'half4':
       return 'float4';
     default:
+      stderr.writeln('WARN: hlsl_generator: unknown type "$type" in translateType — using float4 fallback');
       return 'float4';
   }
 }

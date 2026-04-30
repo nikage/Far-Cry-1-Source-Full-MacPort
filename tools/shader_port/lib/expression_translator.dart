@@ -1090,6 +1090,11 @@ class ExpressionTranslator {
   String _outputType(String field) {
     final String? declared = data.outputFieldTypes[field];
     if (data.stage != 'vertex') {
+      if (declared == null) {
+        stderr.writeln(
+          'WARN: output field "$field" has no declared type (fragment stage) — using float4',
+        );
+      }
       return declared ?? 'float4';
     }
     final int? resolved = _resolvedOutputComponents[field];
@@ -1109,6 +1114,9 @@ class ExpressionTranslator {
       }
       return _floatTypeForComponents(width);
     }
+    stderr.writeln(
+      'WARN: could not determine output type for vertex field "$field" — using float4',
+    );
     return 'float4';
   }
 
@@ -1134,7 +1142,12 @@ class ExpressionTranslator {
         return 'float2';
       case 3:
         return 'float3';
+      case 4:
+        return 'float4';
       default:
+        stderr.writeln(
+          'WARN: unexpected component count $components in _floatTypeForComponents — using float4',
+        );
         return 'float4';
     }
   }
@@ -1653,8 +1666,12 @@ class ExpressionTranslator {
         return '.xy';
       case 3:
         return '.xyz';
-      default:
+      case 4:
         return '';
+      default:
+        throw StateError(
+          'Invalid component count $components in _swizzleSuffix — expected 1–4',
+        );
     }
   }
 
@@ -1913,118 +1930,6 @@ abstract class LineTransformer {
 
 abstract class DirectiveAwareLineTransformer implements LineTransformer {
   void handleDirective(String directive);
-}
-
-class ComputeLightVectorsTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    if (!line.contains('ComputeLightVectors')) {
-      return line;
-    }
-    return [
-      'float3 _lightVectorTemp = uniforms.LightPos.xyz - vPos.xyz;',
-      'float LightDistance = length(_lightVectorTemp);',
-      'LightDirection = _lightVectorTemp / LightDistance;',
-      'ViewDirection = normalize(uniforms.CameraPos.xyz - vPos.xyz);',
-      'HalfVector = normalize(ViewDirection + LightDirection);'
-    ].join('\n');
-  }
-}
-
-class FloatMacroTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    String result = line;
-    result = result.replaceAllMapped(
-      RegExp(r'\bFLOAT([234])x([234])\b'),
-      (Match match) => 'float${match.group(1)}x${match.group(2)}',
-    );
-    result = result.replaceAllMapped(
-      RegExp(r'\bFLOAT([234])\b'),
-      (Match match) => 'float${match.group(1)}',
-    );
-    result = result.replaceAll(RegExp(r'\bFLOAT\b'), 'float');
-    return result;
-  }
-}
-
-class ZeroCastTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    return line.replaceAllMapped(
-      RegExp(
-        r'(float[234])\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\(float[234]\)\s*0(?:\.0+)?;',
-      ),
-      (Match match) => '${match.group(1)} ${match.group(2)} = ${match.group(1)}(0.0);',
-    );
-  }
-}
-
-class HalfTypeTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    String result = line;
-    result = result.replaceAllMapped(
-      RegExp(r'\bhalf([234])x([234])\b'),
-      (Match match) => 'float${match.group(1)}x${match.group(2)}',
-    );
-    result = result.replaceAllMapped(
-      RegExp(r'\bhalf([234])\b'),
-      (Match match) => 'float${match.group(1)}',
-    );
-    result = result.replaceAll(RegExp(r'\bhalf\b'), 'float');
-    return result;
-  }
-}
-
-class HdrEncodeAmbTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    return line.replaceAllMapped(
-      RegExp(r'HDREncodeAmb\s*\(([^)]+)\)'),
-      (Match match) => match.group(1)!,
-    );
-  }
-}
-
-class HdrEncodeTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    return line.replaceAllMapped(
-      RegExp(r'HDREncode\s*\(([^)]+)\)'),
-      (Match match) => match.group(1)!,
-    );
-  }
-}
-
-class HdrFogBlendTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    return line.replaceAllMapped(
-      RegExp(r'HDRFogBlend\s*\(([^,]+),\s*([^,]+),\s*([^)]+)\)'),
-      (Match match) =>
-          'mix(${match.group(3)}, ${match.group(1)}, clamp(${match.group(2)}, 0.0, 1.0))',
-    );
-  }
-}
-
-class ExpandFunctionTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    String result = line.replaceAllMapped(
-      RegExp(r'EXPAND\s*\(([^)]+)\)'),
-      (Match match) => '(2.0 * (${match.group(1)}) - 1.0)',
-    );
-    result = result.replaceAllMapped(
-      RegExp(r'EXPANDfloat3\s*\(([^)]+)\)'),
-      (Match match) => '(2.0 * (${match.group(1)}) - 1.0).xyz',
-    );
-    result = result.replaceAllMapped(
-      RegExp(r'EXPANDfloat4\s*\(([^)]+)\)'),
-      (Match match) => '(2.0 * (${match.group(1)}) - 1.0)',
-    );
-    return result;
-  }
 }
 
 class Tex2DProjTransformer implements LineTransformer {
@@ -2540,13 +2445,6 @@ class OutColorUniformReducer implements LineTransformer {
         return '${match.group(0)}.xyz';
       },
     );
-  }
-}
-
-class FracFunctionTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    return line.replaceAll('frac(', 'fract(');
   }
 }
 
@@ -3436,6 +3334,9 @@ class TextureFunctionTransformer implements LineTransformer {
 
   String _translateTextureCall(String original, _FunctionCall call) {
     if (call.args.length < 2) {
+      stderr.writeln(
+        'WARN: texture call "${call.name}" has fewer than 2 args — leaving untranslated: $original',
+      );
       return original;
     }
     final String texture = call.args[0].trim();
@@ -3453,6 +3354,9 @@ class TextureFunctionTransformer implements LineTransformer {
         final String projected = '(${coordinate}).xy / (${coordinate}).w';
         return '$texture.sample($sampler, $projected)';
       default:
+        stderr.writeln(
+          'WARN: unhandled texture function "${call.name}" — leaving untranslated: $original',
+        );
         return original;
     }
   }
@@ -3469,271 +3373,6 @@ String _normalizeTextureCoordinate(String function, String coordinate) {
     return 'float3(${coordinate}, 0.0)';
   }
   return coordinate;
-}
-
-class SaturateTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    final StringBuffer buffer = StringBuffer();
-    int index = 0;
-    while (index < line.length) {
-      if (_FunctionCallUtils.matches(line, index, 'saturate')) {
-        final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
-        if (call == null || call.args.isEmpty) {
-          buffer.write(line[index]);
-          index++;
-          continue;
-        }
-        final String argument = call.args.first.trim();
-        buffer.write('clamp($argument, 0.0, 1.0)');
-        index = call.endIndex;
-        continue;
-      }
-      buffer.write(line[index]);
-      index++;
-    }
-    return buffer.toString();
-  }
-}
-
-class ClampTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    if (!line.contains('clamp')) {
-      return line;
-    }
-    final StringBuffer buffer = StringBuffer();
-    int index = 0;
-    while (index < line.length) {
-      if (_FunctionCallUtils.matches(line, index, 'clamp')) {
-        final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
-        if (call == null || call.args.length != 3) {
-          buffer.write(line[index]);
-          index++;
-          continue;
-        }
-        final List<String> normalized = <String>[
-          call.args[0].trim(),
-          _normalizeClampBound(call.args[1]),
-          _normalizeClampBound(call.args[2]),
-        ];
-        buffer.write('clamp(${normalized.join(', ')})');
-        index = call.endIndex;
-        continue;
-      }
-      buffer.write(line[index]);
-      index++;
-    }
-    return buffer.toString();
-  }
-
-  String _normalizeClampBound(String arg) {
-    final String trimmed = arg.trim();
-    if (_integerPattern.hasMatch(trimmed)) {
-      return '${trimmed}.0';
-    }
-    return trimmed;
-  }
-
-  static final RegExp _integerPattern = RegExp(r'^-?\d+$');
-}
-
-class MinMaxTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    if (!line.contains('min') && !line.contains('max')) {
-      return line;
-    }
-    final StringBuffer buffer = StringBuffer();
-    int index = 0;
-    while (index < line.length) {
-      final String? match = _matchFunction(line, index);
-      if (match == null) {
-        buffer.write(line[index]);
-        index++;
-        continue;
-      }
-      final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
-      if (call == null || call.args.length != 2) {
-        buffer.write(line[index]);
-        index++;
-        continue;
-      }
-      final List<String> normalized = call.args.map(_normalizeLiteral).toList();
-      buffer.write('$match(${normalized.join(', ')})');
-      index = call.endIndex;
-    }
-    return buffer.toString();
-  }
-
-  String _normalizeLiteral(String arg) {
-    final String trimmed = arg.trim();
-    if (_integerPattern.hasMatch(trimmed)) {
-      return '${trimmed}.0';
-    }
-    return trimmed;
-  }
-
-  String? _matchFunction(String source, int index) {
-    for (final String name in _functionNames) {
-      if (_FunctionCallUtils.matches(source, index, name)) {
-        return name;
-      }
-    }
-    return null;
-  }
-
-  static const List<String> _functionNames = <String>['min', 'max'];
-  static final RegExp _integerPattern = RegExp(r'^-?\d+$');
-}
-
-class MatrixCastTransformer implements LineTransformer {
-  MatrixCastTransformer()
-    : _pattern = RegExp(
-        r'\(\(\s*(?:const\s+)?float3x3\s*\)\s*([A-Za-z0-9_\.]+)',
-      );
-
-  final RegExp _pattern;
-
-  @override
-  String transform(String line) {
-    if (!line.contains('(float3x3)')) {
-      return line;
-    }
-    return line.replaceAllMapped(_pattern, (Match match) {
-      final String expr = match.group(1)!;
-      return 'float3x3(float3(${expr}[0].xyz), float3(${expr}[1].xyz), float3(${expr}[2].xyz))';
-    });
-  }
-}
-
-class UniformReferenceTransformer implements LineTransformer {
-  UniformReferenceTransformer(Set<String> uniformNames)
-    : _patterns = uniformNames
-          .where((name) => name.isNotEmpty)
-          .map(
-            (name) => MapEntry(
-              name,
-              RegExp(
-                '(?<![A-Za-z0-9_\\.])${RegExp.escape(name)}(?![A-Za-z0-9_])',
-              ),
-            ),
-          )
-          .toList();
-
-  final List<MapEntry<String, RegExp>> _patterns;
-
-  @override
-  String transform(String line) {
-    String result = line;
-    for (final MapEntry<String, RegExp> entry in _patterns) {
-      result = result.replaceAllMapped(entry.value, (Match match) {
-        if (_isDeclaration(result, match.start, entry.key.length)) {
-          return match.group(0)!;
-        }
-        return 'uniforms.${entry.key}';
-      });
-    }
-    return result;
-  }
-
-  bool _isDeclaration(String line, int start, int length) {
-    final int index = start;
-    // Look backwards to find previous non-whitespace character.
-    int prev = index - 1;
-    while (prev >= 0) {
-      final String char = line[prev];
-      if (char.trim().isEmpty) {
-        prev--;
-        continue;
-      }
-      if (char == '.') {
-        return true;
-      }
-      break;
-    }
-    // Check if characters before form a type declaration (float, half, const, etc).
-    const List<String> typePrefixes = <String>[
-      'float',
-      'half',
-      'int',
-      'uint',
-      'bool',
-      'const',
-      'long',
-      'short',
-      'double',
-      'matrix',
-      'struct',
-    ];
-    for (final String prefix in typePrefixes) {
-      final int prefixIndex = index - prefix.length - 1;
-      if (prefixIndex >= 0) {
-        final String snippet = line.substring(prefixIndex, index);
-        if (snippet == '$prefix ') {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-}
-
-class MulFunctionTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    if (!line.contains('mul')) {
-      return line;
-    }
-    final StringBuffer buffer = StringBuffer();
-    int index = 0;
-    while (index < line.length) {
-      if (_FunctionCallUtils.matches(line, index, 'mul')) {
-        final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
-        if (call == null || call.args.length != 2) {
-          buffer.write(line[index]);
-          index++;
-          continue;
-        }
-        final String left = call.args[0].trim();
-        final String right = call.args[1].trim();
-        buffer.write('(${left}) * (${right})');
-        index = call.endIndex;
-        continue;
-      }
-      buffer.write(line[index]);
-      index++;
-    }
-    return buffer.toString();
-  }
-}
-
-class LerpTransformer implements LineTransformer {
-  @override
-  String transform(String line) {
-    if (!line.contains('lerp')) {
-      return line;
-    }
-    final StringBuffer buffer = StringBuffer();
-    int index = 0;
-    while (index < line.length) {
-      if (_FunctionCallUtils.matches(line, index, 'lerp')) {
-        final _FunctionCall? call = _FunctionCallUtils.parse(line, index);
-        if (call == null || call.args.length != 3) {
-          buffer.write(line[index]);
-          index++;
-          continue;
-        }
-        final List<String> args = call.args.map((arg) => arg.trim()).toList();
-        buffer.write('mix(${args.join(', ')})');
-        index = call.endIndex;
-        continue;
-      }
-      buffer.write(line[index]);
-      index++;
-    }
-    return buffer.toString();
-  }
 }
 
 class SwizzleAssignmentTransformer implements LineTransformer {

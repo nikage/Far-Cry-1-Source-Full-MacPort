@@ -9,6 +9,11 @@ import 'reflection_adapter.dart';
 part 'shader_ir_models.dart';
 part 'shader_ir_parser.dart';
 part 'expression_translator.dart';
+part 'transformers/lighting_transformers.dart';
+part 'transformers/type_transformers.dart';
+part 'transformers/hdr_transformers.dart';
+part 'transformers/math_transformers.dart';
+part 'transformers/uniform_transformers.dart';
 part 'emission_strategies.dart';
 part 'metal_fragment_builder.dart';
 void main(List<String> args) {

@@ -146,7 +146,11 @@ String _xcrunMetal(String filePath, List<String> extraFlags) {
     '-o',
     '/dev/null',
   ]);
-  return result.stderr as String;
+  final String stderrText = result.stderr as String;
+  if (result.exitCode != 0 && stderrText.trim().isEmpty) {
+    return '$filePath:0:0: error: xcrun metal exited with code ${result.exitCode} — no diagnostic output';
+  }
+  return stderrText;
 }
 
 String formatReport(CompileCheckResult result) {

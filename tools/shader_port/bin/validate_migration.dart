@@ -37,40 +37,45 @@ Future<int> runStages(
   return 0;
 }
 
-Future<void> main(List<String> args) async {
-  String rootArg = '.';
-  bool skipGenerate = false;
-  bool verbose = false;
-  bool strict = false;
-  String metalStd = 'metal3.0';
-  String? overridesPath;
+class BuildStagesResult {
+  BuildStagesResult({
+    required this.stages,
+    required this.generatorScript,
+    required this.compileCheckScript,
+    required this.validatePairsScript,
+    required this.skipGenerate,
+    required this.verbose,
+    required this.strict,
+    required this.metalStd,
+    this.overridesPath,
+  });
 
-  for (int i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--skip-generate':
-        skipGenerate = true;
-      case '--verbose':
-      case '-v':
-        verbose = true;
-      case '--strict':
-        strict = true;
-      case '--metal-std':
-        if (i + 1 < args.length) metalStd = args[++i];
-      case '--overrides':
-        if (i + 1 < args.length) overridesPath = args[++i];
-      default:
-        if (!args[i].startsWith('--')) rootArg = args[i];
-    }
-  }
+  final List<Stage> stages;
+  final String generatorScript;
+  final String compileCheckScript;
+  final String validatePairsScript;
+  final bool skipGenerate;
+  final bool verbose;
+  final bool strict;
+  final String metalStd;
+  final String? overridesPath;
+}
 
+BuildStagesResult buildStages({
+  bool skipGenerate = false,
+  bool verbose = false,
+  bool strict = false,
+  String metalStd = 'metal3.0',
+  String? overridesPath,
+  required String rootArg,
+}) {
   final Directory root = Directory(rootArg).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath =
       root.path.endsWith(sep) ? root.path : '${root.path}$sep';
   final String generatedPath =
       '${rootPath}RenderDll${sep}XRenderMetal${sep}Generated';
-  final String manifestPath =
-      '$generatedPath${sep}generated_manifest.json';
+  final String manifestPath = '$generatedPath${sep}generated_manifest.json';
 
   final String generatorScript =
       '${rootPath}tools${sep}shader_port${sep}lib${sep}metal_generator.dart';
@@ -103,16 +108,88 @@ Future<void> main(List<String> args) async {
   ];
 
   final List<Stage> stages = <Stage>[
-    if (!skipGenerate)
-      Stage('generate', 'dart', generatorArgs),
+    if (!skipGenerate) Stage('generate', 'dart', generatorArgs),
     Stage('compile-check', 'dart', compileCheckArgs),
     Stage('validate-pairs', 'dart', validatePairsArgs),
   ];
 
-  stdout.writeln('Shader migration validation (${stages.length} stages)');
+  return BuildStagesResult(
+    stages: stages,
+    generatorScript: generatorScript,
+    compileCheckScript: compileCheckScript,
+    validatePairsScript: validatePairsScript,
+    skipGenerate: skipGenerate,
+    verbose: verbose,
+    strict: strict,
+    metalStd: metalStd,
+    overridesPath: overridesPath,
+  );
+}
 
-  final StageRunner runner = _makeProcessRunner(verbose);
-  final int exitCode = await runStages(stages, runner);
+Future<void> main(List<String> args) async {
+  String rootArg = '.';
+  bool skipGenerate = false;
+  bool verbose = false;
+  bool strict = false;
+  String metalStd = 'metal3.0';
+  String? overridesPath;
+
+  for (int i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '--skip-generate':
+        skipGenerate = true;
+      case '--verbose':
+      case '-v':
+        verbose = true;
+      case '--strict':
+        strict = true;
+      case '--metal-std':
+        if (i + 1 < args.length) metalStd = args[++i];
+      case '--overrides':
+        if (i + 1 < args.length) overridesPath = args[++i];
+      default:
+        if (args[i].startsWith('--')) {
+          stderr.writeln('Warning: unknown flag "${args[i]}" — ignored');
+        } else {
+          rootArg = args[i];
+        }
+    }
+  }
+
+  final built = buildStages(
+    rootArg: rootArg,
+    skipGenerate: skipGenerate,
+    verbose: verbose,
+    strict: strict,
+    metalStd: metalStd,
+    overridesPath: overridesPath,
+  );
+
+  if (!built.skipGenerate && !File(built.generatorScript).existsSync()) {
+    stderr.writeln(
+      'Error: generator script not found: ${built.generatorScript}',
+    );
+    exit(1);
+  }
+  if (!File(built.compileCheckScript).existsSync()) {
+    stderr.writeln(
+      'Error: compile-check script not found: ${built.compileCheckScript}',
+    );
+    exit(1);
+  }
+  if (!File(built.validatePairsScript).existsSync()) {
+    stderr.writeln(
+      'Error: validate-pairs script not found: ${built.validatePairsScript}',
+    );
+    exit(1);
+  }
+
+  stdout.writeln(
+    'Shader migration validation (${built.stages.length} stages)',
+  );
+
+  final StageRunner runner = _makeProcessRunner(built.verbose);
+  final int exitCode = await runStages(built.stages, runner);
   if (exitCode != 0) exit(exitCode);
 
   stdout.writeln('\nAll stages passed.');

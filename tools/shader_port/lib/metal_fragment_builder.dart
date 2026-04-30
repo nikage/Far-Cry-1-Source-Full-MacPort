@@ -417,7 +417,12 @@ float3 CMKYToRGB(float4 vColor) {
         return 'float2';
       case 3:
         return 'float3';
+      case 4:
+        return 'float4';
       default:
+        stderr.writeln(
+          'WARN: unexpected attribute component count $components in _attributeTypeForComponents — using float4',
+        );
         return 'float4';
     }
   }
@@ -500,6 +505,11 @@ float3 CMKYToRGB(float4 vColor) {
   String _outputType(String field) {
     final String? declared = data.outputFieldTypes[field];
     if (!_isVertexStage) {
+      if (declared == null) {
+        stderr.writeln(
+          'WARN: output field "$field" has no declared type (fragment stage) — using float4',
+        );
+      }
       return declared ?? 'float4';
     }
     final int? resolved = _resolvedOutputComponents[field];
@@ -519,6 +529,9 @@ float3 CMKYToRGB(float4 vColor) {
       }
       return _attributeTypeForComponents(width);
     }
+    stderr.writeln(
+      'WARN: could not determine output type for vertex field "$field" — using float4',
+    );
     return 'float4';
   }
 
@@ -1003,6 +1016,9 @@ String translateType(String type) {
     case 'bool':
       return 'bool';
     default:
+      stderr.writeln(
+        'WARN: translateType: unknown HLSL type "$type" — using float4 fallback',
+      );
       return 'float4';
   }
 }
@@ -1012,6 +1028,12 @@ String translateTextureType(String type) {
   if (lower.contains('cube')) return 'texturecube<float>';
   if (lower.contains('1d')) return 'texture1d<float>';
   if (lower.contains('3d')) return 'texture3d<float>';
+  if (lower.isEmpty || lower.contains('2d') || lower.startsWith('sampler')) {
+    return 'texture2d<float>';
+  }
+  stderr.writeln(
+    'WARN: translateTextureType: unknown texture type "$type" — using texture2d<float> fallback',
+  );
   return 'texture2d<float>';
 }
 

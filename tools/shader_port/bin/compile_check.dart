@@ -52,7 +52,10 @@ void main(List<String> args) {
 
   final List<String> metalFiles = [];
   for (final dynamic entry in entries) {
-    if (entry is! Map<String, dynamic>) continue;
+    if (entry is! Map<String, dynamic>) {
+      stderr.writeln('WARN: compile_check: skipping malformed manifest entry (${entry.runtimeType})');
+      continue;
+    }
     final String? metalFileName = entry['metal'] as String?;
     if (metalFileName == null || metalFileName.isEmpty) continue;
     final String filePath = '$generatedPath$sep$metalFileName';
@@ -80,6 +83,8 @@ void main(List<String> args) {
   );
 
   stdout.writeln(formatReport(result));
+
+  if (!result.allPassed) exit(1);
 
   if (verbose && !result.allPassed) {
     stdout.writeln('\n--- All errors by file ---');
