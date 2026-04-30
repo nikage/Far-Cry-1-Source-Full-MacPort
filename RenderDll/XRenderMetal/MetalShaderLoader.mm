@@ -1269,7 +1269,8 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
         info.isLoaded = true;
         info.nMaskGen = 0;
         info.shaderWrapper = new CMetalShader(shaderId, this);
-        
+        info.vertexDescriptor = vertexDesc;
+
         m_shaders[shaderId] = info;
         m_shaderNameMap[shader.name] = shaderId;
         
@@ -1287,6 +1288,7 @@ static bool ValidateShaderPairReflection(
     id<MTLDevice> device,
     id<MTLFunction> vertexFn,
     id<MTLFunction> fragmentFn,
+    MTLVertexDescriptor* vertexDescriptor,
     NSString* shaderName)
 {
     if (!device || !vertexFn || !fragmentFn)
@@ -1295,6 +1297,7 @@ static bool ValidateShaderPairReflection(
     MTLRenderPipelineDescriptor* desc = [[MTLRenderPipelineDescriptor alloc] init];
     desc.vertexFunction   = vertexFn;
     desc.fragmentFunction = fragmentFn;
+    desc.vertexDescriptor = vertexDescriptor;
     desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
     desc.depthAttachmentPixelFormat      = MTLPixelFormatDepth32Float_Stencil8;
 
@@ -1354,7 +1357,8 @@ void CMetalShaderManager::ValidateShaderPairs(
                 }
             }
 
-            if (!ValidateShaderPairReflection(device, info.vertexFunction, info.fragmentFunction, nameStr))
+            if (!ValidateShaderPairReflection(device, info.vertexFunction, info.fragmentFunction,
+                                              info.vertexDescriptor, nameStr))
                 validationFailed++;
             totalPaired++;
         }
@@ -1885,6 +1889,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         info.vertexFunction = vertexFunction;
         info.fragmentFunction = fragmentFunction;
         info.pipelineState = pipelineState;
+        info.vertexDescriptor = descriptor;
         if (uniformArray && [uniformArray isKindOfClass:[NSArray class]])
         {
             for (NSDictionary* uniformDict in uniformArray)

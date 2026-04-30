@@ -329,24 +329,6 @@ public:
 ///////////////////////////////////////////////
 bool CFFont::Load(const char *szFile)
 {
-#ifdef __APPLE__
-	// On macOS, skip font file loading to avoid critical section deadlocks
-	// Create a basic font without loading external files
-	GetISystem()->GetILog()->LogToFile("DEBUG: Skipping font file loading on macOS to avoid critical section deadlock: %s", szFile);
-	
-	// Set basic font properties for a working font
-	m_bOK = true;
-	m_vSize.set(16, 16);
-	m_vCharSize.set(16, 16);
-	
-	// Create a simple default effect
-	SEffect *pEffect = NewEffect();
-	pEffect->strName = "default";
-	pEffect->NewPass();
-	SetEffect("default");
-	
-	return true;
-#else
 	ICryPak *pPak = GetISystem()->GetIPak();
 
 	if (!pPak)
@@ -356,10 +338,11 @@ bool CFFont::Load(const char *szFile)
 
 	FILE *fp = pPak->FOpen(szFile, "rb");
 	if(!fp)
+	{
+		GetISystem()->GetILog()->LogToFile("CFFont::Load: could not open font file '%s'", szFile);
 		return false;
-#endif
+	}
 
-#ifndef __APPLE__
 	pPak->FSeek(fp,0,SEEK_END);
 	int size = pPak->FTell(fp);
 
@@ -382,7 +365,6 @@ bool CFFont::Load(const char *szFile)
 
 	SetEffect("default");
 	delete [] buffer;
-#endif
 
 	return m_bOK;
 }

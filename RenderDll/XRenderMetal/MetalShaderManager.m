@@ -166,6 +166,7 @@ public:
         MTLCullMode cullMode;
         uint8_t colorWriteMask = 0xF;
         bool needsTangents = false;
+        MTLVertexDescriptor* vertexDescriptor = nil;
         struct UniformRuntimeBinding
         {
             int paramIndex = -1;
