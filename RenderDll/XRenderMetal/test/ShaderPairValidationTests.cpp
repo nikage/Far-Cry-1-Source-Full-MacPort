@@ -235,6 +235,30 @@ static void testRule3_MissingVaryingWarns() {
     CHECK(r.rule3Warnings > 0);
 }
 
+static void testRule3_Tex1MissingFromVsIsWarned() {
+    SECTION("Rule 3 — Tex1 missing from VS outputs is flagged as a warning");
+    std::vector<ManifestEntry> m = {
+        {"CGVSim", "cgvsim", "vertex", "generated_cgvsim_vertex", "", "mesh", {}, {"Tex0"}},
+        {"CGRCFrag", "cgrcfrag", "fragment", "cgrcfrag_frag",
+         "generated_cgvsim_vertex", "mesh", {"Tex1"}, {}},
+    };
+    ValidationResult r = validateManifest(m);
+    CHECK(r.passed());
+    CHECK(r.rule3Warnings > 0);
+}
+
+static void testRule3_TexPresentInVsNoWarning() {
+    SECTION("Rule 3 — Tex1 present in VS outputs produces no warning");
+    std::vector<ManifestEntry> m = {
+        {"CGVSim", "cgvsim", "vertex", "generated_cgvsim_vertex", "", "mesh", {}, {"Tex0", "Tex1"}},
+        {"CGRCFrag", "cgrcfrag", "fragment", "cgrcfrag_frag",
+         "generated_cgvsim_vertex", "mesh", {"Tex0", "Tex1"}, {}},
+    };
+    ValidationResult r = validateManifest(m);
+    CHECK(r.passed());
+    CHECK_EQ(r.rule3Warnings, 0);
+}
+
 static void testRule3_MismatchedVaryingCaught() {
     SECTION("Rule 3 — FS varying absent from VS outputs produces warning count > 0");
     std::vector<ManifestEntry> m = {
@@ -354,6 +378,8 @@ int main() {
     testRule2_InvalidReferenceFails();
     testRule3_SemanticAttrsIgnored();
     testRule3_MissingVaryingWarns();
+    testRule3_Tex1MissingFromVsIsWarned();
+    testRule3_TexPresentInVsNoWarning();
     testRule3_MismatchedVaryingCaught();
     testRule3_AllMatchedNoWarnings();
     testRule3_ShortVsOutputDoesNotSilenceWarning();

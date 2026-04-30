@@ -136,7 +136,6 @@ void _checkStructuralCompatibility(
     if (_kCgSemanticPattern.hasMatch(trimmed)) continue;
     final String normalized = trimmed.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (normalized.isEmpty) continue;
-    if (RegExp(r'^tex\d+$').hasMatch(normalized)) continue;
     if (normalized == 'hposition' || normalized == 'position') continue;
     if (!vsOutputNames.any((o) =>
         o == normalized ||

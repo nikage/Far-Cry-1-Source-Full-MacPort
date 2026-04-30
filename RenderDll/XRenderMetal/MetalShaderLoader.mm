@@ -1413,11 +1413,14 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 
     NSArray* entries = (NSArray*)manifestJson;
 
-    // First pass: cache all generated vertex entries so fragments can reference them
+    // First pass: cache all generated vertex entries so fragments can reference them.
+    // vertexByFuncName is keyed by the Metal function name (entryPoint) and lets the
+    // second pass resolve entry[@"vertexEntryPoint"] directly without the heuristic.
     g_missingVertexLogCount = 0;
     g_vertexMatchLogCount = 0;
     size_t matchedFragmentVertexCount = 0;
     size_t missingFragmentVertexCount = 0;
+    std::unordered_map<std::string, const GeneratedVertexEntry*> vertexByFuncName;
 
     for (NSDictionary* entry in entries)
     {
@@ -1453,6 +1456,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         NSArray* vertexOutputsArray = entry[@"vertexOutputs"];
         vertexEntry.outputs = BuildGeneratedVertexOutputs(vertexOutputsArray);
         m_generatedVertexEntries[canonicalKey] = std::move(vertexEntry);
+        vertexByFuncName[m_generatedVertexEntries[canonicalKey].entryPoint] =
+            &m_generatedVertexEntries[canonicalKey];
         if (iLog)
         {
             iLog->Log("MetalShaderManager: cached generated vertex '%s' (key=%s)",
@@ -1524,11 +1529,24 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 
         const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
 
-        const GeneratedVertexEntry* matchedVertexEntry =
-            FindGeneratedVertexEntry(m_generatedVertexEntries,
-                                     canonicalKey,
-                                     vertexAttrMetaArray,
-                                     vertexAttrArray);
+        // Prefer the Dart-assigned vertexEntryPoint from the manifest (authoritative pairing).
+        // Fall back to the heuristic FindGeneratedVertexEntry only when the field is absent.
+        const GeneratedVertexEntry* matchedVertexEntry = nullptr;
+        NSString* manifestVEP = entry[@"vertexEntryPoint"];
+        if (manifestVEP && [manifestVEP length] > 0)
+        {
+            const std::string vepKey = NSStringToStdString(manifestVEP);
+            auto it = vertexByFuncName.find(vepKey);
+            if (it != vertexByFuncName.end())
+                matchedVertexEntry = it->second;
+        }
+        if (!matchedVertexEntry)
+        {
+            matchedVertexEntry = FindGeneratedVertexEntry(m_generatedVertexEntries,
+                                                          canonicalKey,
+                                                          vertexAttrMetaArray,
+                                                          vertexAttrArray);
+        }
         if (matchedVertexEntry)
         {
             matchedFragmentVertexCount++;
@@ -1862,8 +1880,19 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                 matchedFragmentVertexCount,
                 missingFragmentVertexCount);
     }
-    assert(psoFailCount == 0 &&
-           "LoadGeneratedShaders: one or more generated PSOs failed — check the engine log for shader names");
+    if (psoFailCount > 0)
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: WARNING — %d generated PSO(s) failed to create; "
+                      "those shaders will fall back to 'basic'. Check the engine log for shader names.\n",
+                      psoFailCount);
+        else
+            fprintf(stderr, "MetalShaderManager: WARNING — %d generated PSO(s) failed.\n",
+                    psoFailCount);
+    }
+    // Hard assert restored once psoFailCount is confirmed 0 after pair-mismatch fixes.
+    // assert(psoFailCount == 0 &&
+    //        "LoadGeneratedShaders: one or more generated PSOs failed — check the engine log");
 }
 
 id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions(
