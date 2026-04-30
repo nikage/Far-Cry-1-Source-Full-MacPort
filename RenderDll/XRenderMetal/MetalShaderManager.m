@@ -320,6 +320,7 @@ protected:
     // Shader caching and management
     std::unordered_map<int, ShaderInfo> m_shaders;
     std::unordered_map<std::string, int> m_shaderNameMap;
+    int m_generatedFallbackCount = 0;
     std::unordered_map<std::string, GeneratedVertexEntry> m_generatedVertexEntries;
     int m_nextShaderId;
     

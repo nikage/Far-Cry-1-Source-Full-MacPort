@@ -12,6 +12,33 @@
 #include "../PixelFormatUtils.h"
 
 // -----------------------------------------------------------------------
+// Portable mirror of UniformBufferData for layout verification.
+// Must stay bit-for-bit identical to the definition in MetalBaseRenderer.m.
+// -----------------------------------------------------------------------
+struct TestUniformBufferData
+{
+    float mvp[16];    // Matrix44 modelViewProjectionMatrix  (64 B)
+    float model[16];  // Matrix44 modelMatrix                (64 B)
+    float view[16];   // Matrix44 viewMatrix                 (64 B)
+    float proj[16];   // Matrix44 projectionMatrix           (64 B)
+    // --- offset 256 ---
+    float cameraPos[4];   // 16 B → 272
+    float time;           //  4 B → 276
+    float _time_pad[3];   // 12 B → 288  (explicit; mirrors MSL implicit alignment gap)
+    float lightPos[4];    // 16 B → 304
+    float lightColor[4];  // 16 B → 320
+    struct LightEntry { float pos[4]; float color[4]; };  // 32 B each
+    LightEntry lights[4]; // 128 B → 448
+    int numLights;        //  4 B → 452
+    float pad3[3];        // 12 B → 464
+    float clipPlane[4];   // 16 B → 480
+    float clipEnabled;    //  4 B → 484
+    float clipRefract;    //  4 B → 488
+    float fogScale;       //  4 B → 492
+    float fogBias;        //  4 B → 496
+};
+
+// -----------------------------------------------------------------------
 // Minimal test harness
 // -----------------------------------------------------------------------
 static int g_passed = 0;
@@ -337,6 +364,21 @@ static FCFlags InferFCFlagsFromName(const char* lowerName) {
     return f;
 }
 
+static void test_uniform_buffer_layout()
+{
+    CHECK_EQ(sizeof(TestUniformBufferData), 496u);
+    CHECK_EQ(offsetof(TestUniformBufferData, time),       272u);
+    CHECK_EQ(offsetof(TestUniformBufferData, _time_pad),  276u);
+    CHECK_EQ(offsetof(TestUniformBufferData, lightPos),   288u);
+    CHECK_EQ(offsetof(TestUniformBufferData, lightColor), 304u);
+    CHECK_EQ(offsetof(TestUniformBufferData, lights),     320u);
+    CHECK_EQ(offsetof(TestUniformBufferData, numLights),  448u);
+    CHECK_EQ(offsetof(TestUniformBufferData, clipPlane),  464u);
+    CHECK_EQ(offsetof(TestUniformBufferData, fogBias),    492u);
+    // LightEntry must be 32 bytes (two float[4] members)
+    CHECK_EQ(sizeof(TestUniformBufferData::LightEntry), 32u);
+}
+
 static void test_function_constant_name_inference()
 {
     {
@@ -399,6 +441,7 @@ int main()
     test_unpack_0565();
     test_unpack_dimensions();
     test_fog_params();
+    test_uniform_buffer_layout();
     test_function_constant_name_inference();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);

@@ -2091,7 +2091,10 @@ void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
   m_fogEnabled = true;
   
   if (m_uniformBufferCPU) {
-    m_uniformBufferCPU->lightColor = Vec3(color[0], color[1], color[2]);
+    m_uniformBufferCPU->lightColor[0] = color[0];
+    m_uniformBufferCPU->lightColor[1] = color[1];
+    m_uniformBufferCPU->lightColor[2] = color[2];
+    m_uniformBufferCPU->lightColor[3] = 0.0f;
   }
 }
 
@@ -2618,6 +2621,18 @@ void CMetalRenderer::BeginFrame() {
 #endif
 
   CMetalBaseRenderer::BeginFrame();
+
+#if defined(DEBUG) || defined(_DEBUG)
+  if (m_nFrameID == 2 && m_shaderManager)
+  {
+      int fallbacks = m_shaderManager->m_generatedFallbackCount;
+      if (fallbacks > 0)
+          iLog->Log("WARNING: Generated shader fallback detected on first frame — "
+                    "%d shader(s) fell back to basic/terrain. Check shader registration.", fallbacks);
+      assert(fallbacks == 0 &&
+             "Generated shader fallback on first frame — shader key missing from m_shaderNameMap");
+  }
+#endif
 }
 
 void CMetalRenderer::Update() {

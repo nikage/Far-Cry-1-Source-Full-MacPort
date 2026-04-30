@@ -1152,7 +1152,10 @@ void CMetalBaseRenderer::UpdateUniformBuffer()
     m_uniformBufferCPU->projectionMatrix = m_projectionMatrix;
     
     Vec3 camPos = m_camera.GetPos();
-    m_uniformBufferCPU->cameraPos = camPos;
+    m_uniformBufferCPU->cameraPos[0] = camPos.x;
+    m_uniformBufferCPU->cameraPos[1] = camPos.y;
+    m_uniformBufferCPU->cameraPos[2] = camPos.z;
+    m_uniformBufferCPU->cameraPos[3] = 0.0f;
     m_uniformBufferCPU->time = iTimer ? iTimer->GetCurrTime() : 0.0f;
     
     // Build light list from active dynamic lights
@@ -1162,22 +1165,29 @@ void CMetalBaseRenderer::UpdateUniformBuffer()
         if (!pL) continue;
         auto& entry = m_uniformBufferCPU->lights[m_uniformBufferCPU->numLights];
         entry.pos[0] = pL->m_Origin.x; entry.pos[1] = pL->m_Origin.y; entry.pos[2] = pL->m_Origin.z;
-        entry.radius = pL->m_fRadius;
+        entry.pos[3] = pL->m_fRadius;    // radius packed into pos.w
         entry.color[0] = pL->m_Color.r; entry.color[1] = pL->m_Color.g; entry.color[2] = pL->m_Color.b;
-        entry.intensity = pL->m_Color.a > 0.f ? pL->m_Color.a : 1.f;
+        entry.color[3] = pL->m_Color.a > 0.f ? pL->m_Color.a : 1.f;  // intensity packed into color.w
         m_uniformBufferCPU->numLights++;
     }
     // Primary light aliases light[0] (or a sun/ambient fallback)
     if (m_uniformBufferCPU->numLights > 0) {
         auto& e0 = m_uniformBufferCPU->lights[0];
-        m_uniformBufferCPU->lightPos   = Vec3(e0.pos[0], e0.pos[1], e0.pos[2]);
-        m_uniformBufferCPU->lightColor = Vec3(e0.color[0] * e0.intensity,
-                                              e0.color[1] * e0.intensity,
-                                              e0.color[2] * e0.intensity);
+        const float intensity = e0.color[3];
+        m_uniformBufferCPU->lightPos[0] = e0.pos[0];
+        m_uniformBufferCPU->lightPos[1] = e0.pos[1];
+        m_uniformBufferCPU->lightPos[2] = e0.pos[2];
+        m_uniformBufferCPU->lightPos[3] = 0.0f;
+        m_uniformBufferCPU->lightColor[0] = e0.color[0] * intensity;
+        m_uniformBufferCPU->lightColor[1] = e0.color[1] * intensity;
+        m_uniformBufferCPU->lightColor[2] = e0.color[2] * intensity;
+        m_uniformBufferCPU->lightColor[3] = 0.0f;
     } else {
         // No dynamic lights — use a high overhead directional fill light so scene isn't black
-        m_uniformBufferCPU->lightPos   = Vec3(0, 500, 0);
-        m_uniformBufferCPU->lightColor = Vec3(0.6f, 0.6f, 0.6f);
+        m_uniformBufferCPU->lightPos[0] = 0.0f; m_uniformBufferCPU->lightPos[1] = 500.0f;
+        m_uniformBufferCPU->lightPos[2] = 0.0f; m_uniformBufferCPU->lightPos[3] = 0.0f;
+        m_uniformBufferCPU->lightColor[0] = 0.6f; m_uniformBufferCPU->lightColor[1] = 0.6f;
+        m_uniformBufferCPU->lightColor[2] = 0.6f; m_uniformBufferCPU->lightColor[3] = 0.0f;
     }
     
     // Initialize clip plane data
@@ -1282,21 +1292,27 @@ Matrix44 CMetalBaseRenderer::GetUniformProjectionMatrix() const
 Vec3 CMetalBaseRenderer::GetUniformCameraPosition() const
 {
     if (m_uniformBufferCPU)
-        return m_uniformBufferCPU->cameraPos;
+        return Vec3(m_uniformBufferCPU->cameraPos[0],
+                    m_uniformBufferCPU->cameraPos[1],
+                    m_uniformBufferCPU->cameraPos[2]);
     return Vec3(0.0f, 0.0f, 0.0f);
 }
 
 Vec3 CMetalBaseRenderer::GetUniformLightPosition() const
 {
     if (m_uniformBufferCPU)
-        return m_uniformBufferCPU->lightPos;
+        return Vec3(m_uniformBufferCPU->lightPos[0],
+                    m_uniformBufferCPU->lightPos[1],
+                    m_uniformBufferCPU->lightPos[2]);
     return Vec3(0.0f, 0.0f, 0.0f);
 }
 
 Vec3 CMetalBaseRenderer::GetUniformLightColor() const
 {
     if (m_uniformBufferCPU)
-        return m_uniformBufferCPU->lightColor;
+        return Vec3(m_uniformBufferCPU->lightColor[0],
+                    m_uniformBufferCPU->lightColor[1],
+                    m_uniformBufferCPU->lightColor[2]);
     return Vec3(1.0f, 1.0f, 1.0f);
 }
 

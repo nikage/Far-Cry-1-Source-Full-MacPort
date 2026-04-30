@@ -34,11 +34,10 @@ struct VertexOut {
 };
 
 // Uniform buffer for transformation matrices - MUST match UniformBufferData in MetalBaseRenderer.h exactly
+// pos.w = radius, color.w = intensity; float4 matches C++ float[4] on both sizes and offsets.
 struct LightEntry {
-    float3 pos;
-    float  radius;
-    float3 color;
-    float  intensity;
+    float4 pos;    // xyz=position, w=radius
+    float4 color;  // xyz=color, w=intensity
 };
 
 struct Uniforms {
@@ -46,20 +45,21 @@ struct Uniforms {
     float4x4 modelMatrix;
     float4x4 viewMatrix;
     float4x4 projectionMatrix;
-    float3 cameraPos;
-    float time;
-    // Primary light alias (mirrors lights[0])
-    float3 lightPos;
-    float padding1;
-    float3 lightColor;
-    float padding2;
+    // float4 fields (not float3) so MSL implicit alignment == C++ explicit float[4] layout.
+    // After the 4 matrices (offset 256):
+    //   float4 cameraPos  → offset 256 (16-aligned ✓)
+    //   float  time       → offset 272
+    //   implicit 12-byte gap (MSL aligns next float4 to 288)
+    //   float4 lightPos   → offset 288
+    //   float4 lightColor → offset 304
+    float4 cameraPos;
+    float  time;
+    float4 lightPos;    // w unused
+    float4 lightColor;  // w unused
     // Full light list (up to 4 dynamic lights)
     LightEntry lights[4];
     int    numLights;
     // Three float scalars (alignof=4) to bridge to the next 16-byte boundary.
-    // Do NOT use float3 here — float3 has alignof=16 in MSL which would insert
-    // 12 bytes of implicit padding before it, shifting clipPlane by 16 bytes vs
-    // the C++ layout (float pad3[3] is 4-byte aligned, no implicit gap).
     float  _pad3_0, _pad3_1, _pad3_2;
     float4 clipPlane;      // Normal.xyz + Distance
     float clipEnabled;
@@ -126,22 +126,22 @@ fragment float4 basic_fragment(VertexOut in [[stage_in]],
     
     // Simple Phong lighting calculation
     float3 normal = normalize(in.normal);
-    float3 lightDir = normalize(uniforms.lightPos - in.worldPos);
-    float3 viewDir = normalize(uniforms.cameraPos - in.worldPos);
+    float3 lightDir = normalize(uniforms.lightPos.xyz - in.worldPos);
+    float3 viewDir = normalize(uniforms.cameraPos.xyz - in.worldPos);
     float3 reflectDir = reflect(-lightDir, normal);
     
     // Ambient
     float ambientStrength = 0.1;
-    float3 ambient = ambientStrength * uniforms.lightColor;
+    float3 ambient = ambientStrength * uniforms.lightColor.xyz;
     
     // Diffuse
     float diff = max(dot(normal, lightDir), 0.0);
-    float3 diffuse = diff * uniforms.lightColor;
+    float3 diffuse = diff * uniforms.lightColor.xyz;
     
     // Specular
     float specularStrength = 0.5;
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
-    float3 specular = specularStrength * spec * uniforms.lightColor;
+    float3 specular = specularStrength * spec * uniforms.lightColor.xyz;
     
     float3 lighting = ambient + diffuse + specular;
     float4 finalColor = float4(lighting, 1.0) * textureColor * in.Color;
@@ -624,10 +624,10 @@ fragment float4 terrain_fragment(VertexOut_Terrain in [[stage_in]],
     float4 detailColor = detailTexture.sample(textureSampler, in.texCoord * 8.0);
     
     float3 normal = normalize(in.normal);
-    float3 lightDir = normalize(uniforms.lightPos - in.worldPos);
+    float3 lightDir = normalize(uniforms.lightPos.xyz - in.worldPos);
     float diff = max(dot(normal, lightDir), 0.0);
     
-    float3 lighting = float3(0.3) + diff * uniforms.lightColor.rgb * 0.7;
+    float3 lighting = float3(0.3) + diff * uniforms.lightColor.xyz * 0.7;
     float4 finalColor = baseColor * detailColor * float4(lighting, 1.0) * in.Color;
     
     return finalColor;

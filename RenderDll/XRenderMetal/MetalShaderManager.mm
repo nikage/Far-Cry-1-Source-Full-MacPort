@@ -1247,6 +1247,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
                 printf("MetalShaderManager::EF_LoadShader created fallback shaderId=%d from base='%s'\n", shaderId, baseInfo.name.c_str());
                 if (iLog)
                     iLog->Log("MetalShaderManager::EF_LoadShader created fallback shaderId=%d from base='%s'", shaderId, baseInfo.name.c_str());
+                m_generatedFallbackCount++;
                 return info.shaderWrapper;
             }
         }

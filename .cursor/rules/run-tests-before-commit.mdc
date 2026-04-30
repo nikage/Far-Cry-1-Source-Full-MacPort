@@ -13,6 +13,7 @@ Before creating any `git commit`, always run the full test suite for every compo
 |---|---|---|
 | `tools/shader_port/**` | `dart test` | `tools/shader_port/` |
 | `RenderDll/XRenderMetal/test/*.cpp` | `clang++ -std=c++17 -o <name> <file>.cpp && ./<name>` | `RenderDll/XRenderMetal/test/` |
+| `RenderDll/XRenderMetal/**` (shader/PSO changes) | `clang++ -std=c++17 -framework Metal -framework Foundation -framework CoreFoundation -o generated_pso_tests GeneratedPSOTests.mm && ./generated_pso_tests` | `RenderDll/XRenderMetal/test/` |
 
 ## Rules
 
@@ -30,4 +31,19 @@ cd tools/shader_port && dart test
 cd RenderDll/XRenderMetal/test
 clang++ -std=c++17 -o renderer_logic_tests RendererLogicTests.cpp && ./renderer_logic_tests
 clang++ -std=c++17 -o shader_pair_validation_tests ShaderPairValidationTests.cpp && ./shader_pair_validation_tests
+
+# Generated PSO dry-run (requires Generated/ artifacts — run dart validate_migration.dart first)
+cd RenderDll/XRenderMetal/test
+clang++ -std=c++17 -framework Metal -framework Foundation -framework CoreFoundation \
+    -o generated_pso_tests GeneratedPSOTests.mm && ./generated_pso_tests
 ```
+
+## Integration smoke checklist (manual gate before shipping)
+
+Run after any change to `RenderDll/XRenderMetal/**` or `Generated/**`:
+
+1. Build the game binary (DEBUG mode) — zero compiler errors.
+2. Launch the game — reaches the main menu without crash or assert.
+3. Load a level — first frame completes; the `assert(fallbacks == 0)` in `CMetalRenderer::BeginFrame` must not fire.
+4. `ValidateShaderPairs` (called once in `#if DEBUG` after `LoadGeneratedShaders`) reports 0 failures.
+5. Visual check — no all-black surfaces, fog gradient visible, lighting responds to moving the light source.

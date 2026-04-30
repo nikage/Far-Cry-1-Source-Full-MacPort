@@ -235,6 +235,32 @@ static void testRule3_MissingVaryingWarns() {
     CHECK(r.rule3Warnings > 0);
 }
 
+static void testRule3_MismatchedVaryingCaught() {
+    SECTION("Rule 3 — FS varying absent from VS outputs produces warning count > 0");
+    std::vector<ManifestEntry> m = {
+        {"CGVSim", "cgvsim", "vertex", "generated_cgvsim_vertex", "", "mesh", {}, {"Tex0"}},
+        {"CGRCFrag", "cgrcfrag", "fragment", "cgrcfrag_frag",
+         "generated_cgvsim_vertex", "mesh",
+         {"ShadowMapTc"}, {}},
+    };
+    ValidationResult r = validateManifest(m);
+    CHECK(r.passed());
+    CHECK_EQ(r.rule3Warnings, 1);
+}
+
+static void testRule3_AllMatchedNoWarnings() {
+    SECTION("Rule 3 — all FS varyings present in VS outputs");
+    std::vector<ManifestEntry> m = {
+        {"CGVSim", "cgvsim", "vertex", "generated_cgvsim_vertex", "", "mesh", {}, {"ShadowMapTc", "Tex0"}},
+        {"CGRCFrag", "cgrcfrag", "fragment", "cgrcfrag_frag",
+         "generated_cgvsim_vertex", "mesh",
+         {"ShadowMapTc", "Tex0"}, {}},
+    };
+    ValidationResult r = validateManifest(m);
+    CHECK(r.passed());
+    CHECK_EQ(r.rule3Warnings, 0);
+}
+
 static void testCoverageRatio_Full() {
     SECTION("Coverage — 100% when all fragments paired or fullscreen");
     std::vector<ManifestEntry> m = {
@@ -328,6 +354,8 @@ int main() {
     testRule2_InvalidReferenceFails();
     testRule3_SemanticAttrsIgnored();
     testRule3_MissingVaryingWarns();
+    testRule3_MismatchedVaryingCaught();
+    testRule3_AllMatchedNoWarnings();
     testRule3_ShortVsOutputDoesNotSilenceWarning();
     testRule3_LongExactMatchNoWarning();
     testRule3_LongSubstringMatchNoWarning();

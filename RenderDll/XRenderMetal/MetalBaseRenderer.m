@@ -503,15 +503,13 @@ public:
         Matrix44 modelMatrix;
         Matrix44 viewMatrix;
         Matrix44 projectionMatrix;
-        Vec3 cameraPos;
+        float cameraPos[4];   // xyz + w=0; float[4] matches MSL float4 (16 B, w is unused)
         float time;
-        // Primary light (kept for shader compatibility)
-        Vec3 lightPos;
-        float padding1;
-        Vec3 lightColor;
-        float padding2;
-        // Additional lights (up to kMaxLights total, index 0 mirrors lightPos/lightColor)
-        struct LightEntry { float pos[3]; float radius; float color[3]; float intensity; };
+        float _time_pad[3];   // explicit 12-byte pad; MSL float4 lightPos needs align=16 at offset 288
+        float lightPos[4];    // xyz + w=0
+        float lightColor[4];  // xyz + w=0
+        // Additional lights; float[4] pos/color match MSL float4 (no float3 alignment gap)
+        struct LightEntry { float pos[4]; float color[4]; }; // pos[3]=radius, color[3]=intensity
         LightEntry lights[kMaxLights];
         int numLights;
         float pad3[3];
@@ -521,18 +519,19 @@ public:
         float fogScale;
         float fogBias;
     };
-    // Layout contract: UniformBufferData must match the MSL `Uniforms` struct in UtilShaders.metal.
-    // KNOWN MISMATCH: Vec3 (12 bytes, align=4) vs MSL float3 (16 bytes, align=16).
-    // Fields after the 4 matrices (offset 256) diverge: cameraPos/lightPos/lightColor and
-    // LightEntry.pos/color are all wrong. Fix: replace Vec3/float[3] with float[4] pads
-    // in both structs, then update the asserts below to reflect the corrected layout.
-    static_assert(sizeof(UniformBufferData) == 480,
+    // Layout contract: UniformBufferData must exactly match the MSL Uniforms struct in UtilShaders.metal.
+    // Both use float[4] / float4 for all vector fields so C++ (alignof=4) and MSL (alignof=16)
+    // agree on field offsets. The explicit _time_pad[3] replicates the 12-byte implicit gap
+    // that MSL inserts before float4 lightPos (after a single float time at offset 272+4=276).
+    static_assert(sizeof(UniformBufferData) == 496,
                   "UniformBufferData size changed — update UtilShaders.metal Uniforms and this assert");
-    static_assert(offsetof(UniformBufferData, time) == 268,
+    static_assert(offsetof(UniformBufferData, time) == 272,
                   "time field moved — C++/MSL layout divergence detected");
-    static_assert(offsetof(UniformBufferData, clipPlane) == 448,
+    static_assert(offsetof(UniformBufferData, lightPos) == 288,
+                  "lightPos field moved — C++/MSL layout divergence detected");
+    static_assert(offsetof(UniformBufferData, clipPlane) == 464,
                   "clipPlane field moved — C++/MSL layout divergence detected");
-    static_assert(offsetof(UniformBufferData, fogBias) == 476,
+    static_assert(offsetof(UniformBufferData, fogBias) == 492,
                   "fogBias field moved — C++/MSL layout divergence detected");
     id<MTLBuffer> m_uniformBuffer;
     UniformBufferData* m_uniformBufferCPU;
