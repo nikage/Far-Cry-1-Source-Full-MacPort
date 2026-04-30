@@ -521,6 +521,19 @@ public:
         float fogScale;
         float fogBias;
     };
+    // Layout contract: UniformBufferData must match the MSL `Uniforms` struct in UtilShaders.metal.
+    // KNOWN MISMATCH: Vec3 (12 bytes, align=4) vs MSL float3 (16 bytes, align=16).
+    // Fields after the 4 matrices (offset 256) diverge: cameraPos/lightPos/lightColor and
+    // LightEntry.pos/color are all wrong. Fix: replace Vec3/float[3] with float[4] pads
+    // in both structs, then update the asserts below to reflect the corrected layout.
+    static_assert(sizeof(UniformBufferData) == 480,
+                  "UniformBufferData size changed — update UtilShaders.metal Uniforms and this assert");
+    static_assert(offsetof(UniformBufferData, time) == 268,
+                  "time field moved — C++/MSL layout divergence detected");
+    static_assert(offsetof(UniformBufferData, clipPlane) == 448,
+                  "clipPlane field moved — C++/MSL layout divergence detected");
+    static_assert(offsetof(UniformBufferData, fogBias) == 476,
+                  "fogBias field moved — C++/MSL layout divergence detected");
     id<MTLBuffer> m_uniformBuffer;
     UniformBufferData* m_uniformBufferCPU;
 

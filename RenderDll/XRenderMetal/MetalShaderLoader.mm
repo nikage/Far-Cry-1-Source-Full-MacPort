@@ -1311,11 +1311,6 @@ void CMetalShaderManager::ValidateShaderPairs(
             const ShaderInfo& info = kv.second;
             if (!info.isLoaded || !info.vertexFunction || !info.fragmentFunction)
                 continue;
-            if (info.pipelineState != nil)
-            {
-                totalPaired++;
-                continue;
-            }
 
             NSString* nameStr = nil;
             for (const auto& nameKv : m_shaderNameMap)
@@ -1484,6 +1479,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
     }
 
     // Second pass: build fragment pipelines
+    int psoFailCount = 0;
     for (NSDictionary* entry in entries)
     {
         if (![entry isKindOfClass:[NSDictionary class]])
@@ -1761,18 +1757,10 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         }
         if (!pipelineState)
         {
+            psoFailCount++;
             if (iLog)
-            {
-                iLog->Log("MetalShaderManager: Skipping shader '%s' due to pipeline creation failure\n",
+                iLog->Log("MetalShaderManager: PSO creation failed for '%s' — shader will be unavailable at runtime\n",
                           shaderName ? [shaderName UTF8String] : "<unnamed>");
-            }
-            // PSO creation failure: log clearly and skip this shader.
-            // Once the generated metallib is compiled (requires full Xcode + xcrun metal),
-            // PSO creation will succeed and this branch will not be reached.
-            if (iLog)
-            {
-                iLog->Log("MetalShaderManager: continuing despite shader '%s' failure", normalizedKey.c_str());
-            }
             continue;
         }
 
@@ -1864,6 +1852,9 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         iLog->Log("MetalShaderManager: fragments matched to generated vertices=%zu, missing=%zu\n",
                   matchedFragmentVertexCount,
                   missingFragmentVertexCount);
+        if (psoFailCount > 0)
+            iLog->Log("MetalShaderManager: WARNING — %d generated PSO(s) failed to create; those shaders will fall back to 'basic'\n",
+                      psoFailCount);
     }
     else
     {
@@ -1871,6 +1862,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                 matchedFragmentVertexCount,
                 missingFragmentVertexCount);
     }
+    assert(psoFailCount == 0 &&
+           "LoadGeneratedShaders: one or more generated PSOs failed — check the engine log for shader names");
 }
 
 id<MTLRenderPipelineState> CMetalShaderManager::CreatePipelineStateWithFunctions(
