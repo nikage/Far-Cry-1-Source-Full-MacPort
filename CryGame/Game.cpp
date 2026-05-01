@@ -529,24 +529,16 @@ IXSystem *CXGame::GetXSystem(){return m_pServer?m_pServer->m_pISystem:m_pClient?
 bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,const char *szGameMod)
 {	
 	assert(pSystem  && "ISystem must be valid for game initialization");
-	// assert(szGameMod  && "Game mod parameter must not be null");
-	
-	CryLogAlways("CXGame::Init - ENTRY POINT");
-	
+
 	// Setup the system and 3D Engine pointers
 	m_pSystem	= pSystem;
-	CryLogAlways("CXGame::Init - m_pSystem set, creating CGameMods");
 
 	m_pGameMods = new CGameMods(this);
-	assert(m_pGameMods != nullptr && "CGameMods allocation must succeed");
-	CryLogAlways("CXGame::Init - CGameMods created");
 
 	gISystem = pSystem;
 	m_bDedicatedServer=bDedicatedSrv;
 	
-	CryLogAlways("CXGame::Init - About to init XAreaMgr");
 	m_XAreaMgr.Init( pSystem );
-	CryLogAlways("CXGame::Init - XAreaMgr initialized");
 	
 	m_bEditor=bInEditor;
 
@@ -560,100 +552,62 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	m_pClient	= NULL;
 	m_pServer	= NULL;
 
-	CryLogAlways("CXGame::Init - About to log game initialization");
   m_pSystem->GetILog()->Log("Game Initialization");
-	CryLogAlways("CXGame::Init - Game initialization logged");
 	
 #if !defined(LINUX)	
-	CryLogAlways("CXGame::Init - Getting movie system");
 	IMovieSystem *pMovieSystem=m_pSystem->GetIMovieSystem();
 	if (pMovieSystem)
 		pMovieSystem->SetUser(m_pMovieUser);
-	CryLogAlways("CXGame::Init - Movie system setup complete");
 #endif
-	CryLogAlways("CXGame::Init - Creating time demo recorder");
 	if (!m_pTimeDemoRecorder)
 		m_pTimeDemoRecorder = new CTimeDemoRecorder(pSystem);
-	CryLogAlways("CXGame::Init - Time demo recorder created");
   
 	m_pUIHud = NULL;
-	CryLogAlways("CXGame::Init - Getting system interfaces");
 	m_pNetwork= m_pSystem->GetINetwork();
 	m_pLog= m_pSystem->GetILog();
-	CryLogAlways("CXGame::Init - Got network and log");
 	m_p3DEngine	= m_pSystem->GetI3DEngine();
-	CryLogAlways("CXGame::Init - Got 3D engine");
 	m_pRenderer = m_pSystem->GetIRenderer();
-	CryLogAlways("CXGame::Init - Got renderer");
 	m_pScriptSystem=pSystem->GetIScriptSystem();
-	CryLogAlways("CXGame::Init - Got script system");
 	m_pEntitySystem=m_pSystem->GetIEntitySystem();
-	CryLogAlways("CXGame::Init - Got entity system");
 
 	// Register game rendering callback.
 	//[Timur] m_p3DEngine->SetRenderCallback( OnRenderCallback,this );
 	
 	// init subsystems
 #ifndef _XBOX
-	// Networking disabled for macOS - not a priority for initial port
-	CryLogAlways("CXGame::Init - Networking disabled for macOS");
 	m_pServerSnooper = NULL;
 	m_pNETServerSnooper = NULL;
 	m_pRConSystem = NULL;
 #endif
-	CryLogAlways("CXGame::Init - Creating game subsystems");
 	m_pWeaponSystemEx = new CWeaponSystemEx();
-	CryLogAlways("CXGame::Init - Weapon system created");
 	m_pVehicleSystem = new CVehicleSystem();
-	CryLogAlways("CXGame::Init - Vehicle system created");
 	m_pPlayerSystem = new CPlayerSystem();
-	CryLogAlways("CXGame::Init - Player system created");
 	m_pFlockManager = new CFlockManager(m_pSystem);
-	CryLogAlways("CXGame::Init - Flock manager created");
 
-	if (m_pScriptSystem) {
-		CryLogAlways("CXGame::Init - Initializing UI template");
+	if (m_pScriptSystem)
 		CScriptObjectUI::InitializeTemplate(m_pScriptSystem);
-	} else {
-		CryLogAlways("CXGame::Init - ScriptSystem is NULL, skipping ScriptObjectUI");
-	}
 
 		// init is not necessary for now, but add here if it later is
-		CryLogAlways("CXGame::Init - Creating ScriptObjectGame");
 		m_pScriptObjectGame=new CScriptObjectGame;
-		CryLogAlways("CXGame::Init - Initializing Game template");
 		CScriptObjectGame::InitializeTemplate(m_pScriptSystem);
 
-		CryLogAlways("CXGame::Init - Initializing Input template");
 		m_pScriptObjectInput=new CScriptObjectInput;
 		CScriptObjectInput::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Language template");
 		m_pScriptObjectLanguage=new CScriptObjectLanguage;
 		CScriptObjectLanguage::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Boids template");
 		m_pScriptObjectBoids = new CScriptObjectBoids;
 		CScriptObjectBoids::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing AI template");
 		m_pScriptObjectAI = new CScriptObjectAI;
 		CScriptObjectAI::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Server template");
 		CScriptObjectServer::InitializeTemplate(m_pScriptSystem);
 
-		CryLogAlways("CXGame::Init - Initializing Player template");
 		CScriptObjectPlayer::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing FireParam template");
 		CScriptObjectFireParam::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing WeaponClass template");
 		CScriptObjectWeaponClass::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Vehicle template");
 		CScriptObjectVehicle::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Spectator template");
 		CScriptObjectSpectator::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing AdvCamSystem template");
 		CScriptObjectAdvCamSystem::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Synched2DTable template");
 		CScriptObjectSynched2DTable::InitializeTemplate(m_pScriptSystem);
-		CryLogAlways("CXGame::Init - Initializing Renderer template");
 		CScriptObjectRenderer::InitializeTemplate(m_pScriptSystem);
 
 
@@ -757,60 +711,37 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	if(!m_bDedicatedServer)
 	{
 		m_pSystem->GetIConsole()->ShowConsole(0);
+		bool bUISystemReady = false;
 		if (!bInEditor)
 		{
 			//-------------------------------------------------------------------------------------------------
-				// #region agent log
-				m_pLog->Log("[DEBUG_A] Before UISystem: bInEditor=%d, m_bDedicatedServer=%d", (bInEditor?1:0), (m_bDedicatedServer?1:0));
-				// #endregion
-				printf("CXGame::Init - Creating UI System (bInEditor=%d, m_bDedicatedServer=%d)\n", bInEditor ? 1 : 0, m_bDedicatedServer ? 1 : 0);
-				fflush(stdout);
 				m_pUISystem = new CUISystem;
 
 				if (m_pUISystem)
 				{
-					printf("CXGame::Init - UI System object created, calling Create()\n");
-					fflush(stdout);
 					int createResult = m_pUISystem->Create(this, m_pSystem, m_pScriptSystem, "Scripts/MenuScreens/UISystem.lua", 1);
-					// #region agent log
-					m_pLog->Log("[DEBUG_A] UISystem Create result=%d, pUISystem=%p", createResult, (void*)m_pUISystem);
-					// #endregion
-					if (createResult)
+					bUISystemReady = (createResult == 1);
+					if (!bUISystemReady)
 					{
-						printf("CXGame::Init - UI System created successfully\n");
-						fflush(stdout);
-						m_pLog->Log("CXGame::Init - UI System created successfully\n");
-					}
-					else
-					{
-						printf("CXGame::Init - UI System Create() returned 0 (script file may be missing: Scripts/MenuScreens/UISystem.lua)\n");
-						fflush(stdout);
-						m_pLog->Log("CXGame::Init - UI System Create() returned 0 (script file may be missing: Scripts/MenuScreens/UISystem.lua)\n");
-						m_pLog->Log("CXGame::Init - UI System will not function properly without the script file\n");
+						m_pLog->Log("CXGame::Init - UISystem::Create() failed (result=%d). Script file missing or Lua error. Menu will not function.", createResult);
 					}
 				}
 				else
 				{
-					printf("CXGame::Init - Failed to create UI System!\n");
-					fflush(stdout);
-					m_pLog->Log("Failed to create UI System!\n");
+					m_pLog->Log("CXGame::Init - Failed to allocate CUISystem.");
 				}
 			//------------------------------------------------------------------------------------------------- 
 		}
 
 		//------------------------------------------------------------------------------------------------- 
-		if (m_pUISystem)
+		if (m_pUISystem && bUISystemReady)
 		{
 			m_bMenuOverlay = 1;
-			// #region agent log
-			m_pLog->Log("[DEBUG_B] Menu overlay set: m_bMenuOverlay=%d, pUISystem=%p", m_bMenuOverlay, (void*)m_pUISystem);
-			// #endregion
 		}
-		else
+		else if (m_pUISystem)
 		{
-			// #region agent log
-			m_pLog->Log("[DEBUG_B] UISystem is NULL! Menu overlay NOT set!");
-			// #endregion
+			m_pLog->Log("CXGame::Init - UISystem exists but Create() failed; destroying to avoid partial state.");
+			SAFE_DELETE(m_pUISystem);
 		}
 		//------------------------------------------------------------------------------------------------- 
 	}
@@ -824,15 +755,23 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 		pPic=m_pRenderer->EF_LoadTexture("gui/map_player", FT_NOREMOVE, 0, eTT_Base);
 		if (pPic && pPic->IsTextureLoaded())
 			m_nPlayerIconTexId=pPic->GetTextureID();
+		else
+			m_pLog->LogWarning("[Asset] Failed to load minimap icon: gui/map_player");
 		pPic=m_pRenderer->EF_LoadTexture("gui/map_vehicle", FT_NOREMOVE, 0, eTT_Base);
 		if (pPic && pPic->IsTextureLoaded())
 			m_nVehicleIconTexId=pPic->GetTextureID();
+		else
+			m_pLog->LogWarning("[Asset] Failed to load minimap icon: gui/map_vehicle");
 		pPic=m_pRenderer->EF_LoadTexture("gui/map_building", FT_NOREMOVE, 0, eTT_Base);
 		if (pPic && pPic->IsTextureLoaded())
 			m_nBuildingIconTexId=pPic->GetTextureID();
+		else
+			m_pLog->LogWarning("[Asset] Failed to load minimap icon: gui/map_building");
 		pPic=m_pRenderer->EF_LoadTexture("gui/map_unknown", FT_NOREMOVE, 0, eTT_Base);
 		if (pPic && pPic->IsTextureLoaded())
 			m_nUnknownIconTexId=pPic->GetTextureID();
+		else
+			m_pLog->LogWarning("[Asset] Failed to load minimap icon: gui/map_unknown");
 	}
 
 	if(!bInEditor)
@@ -899,16 +838,6 @@ bool CXGame::IsInPause(IProcess *pProcess)
 //! update all game and children
 bool CXGame::Update()
 {
-	static bool firstCall = true;
-	if (firstCall) {
-		CryLogAlways("CXGame::Update - FIRST CALL - entering main game loop");
-		// #region agent log
-		m_pLog->Log("[DEBUG_E] Game loop started: m_bMenuOverlay=%d, pUISystem=%p", m_bMenuOverlay, (void*)m_pUISystem);
-		// #endregion
-		firstCall = false;
-	}
-	
-	CryLogAlways("CXGame::Update - checkpoint 1");
 	
 	if (!m_nDEBUG_TIMING)
 	{
@@ -916,12 +845,10 @@ bool CXGame::Update()
 		m_nDEBUG_TIMING = 1;
 	}
 
-	CryLogAlways("CXGame::Update - checkpoint 2");
-
 	if (!m_bEditor)
 	{
 		assert(m_p3DEngine != NULL && "3D Engine must be initialized");
-		
+
 		bool bCanRender = false;
 		if (!m_bMenuOverlay || !m_pUISystem) {
 			bCanRender = true;
@@ -931,28 +858,13 @@ bool CXGame::Update()
 				bCanRender = true;
 			}
 		}
-		// #region agent log
-		{ static int _logCount = 0; if (_logCount++ < 3) { m_pLog->Log("[DEBUG_D] 3D Engine: bCanRender=%d, m_bMenuOverlay=%d, pUISystem=%p, count=%d", (bCanRender?1:0), m_bMenuOverlay, (void*)m_pUISystem, _logCount); } }
-		// #endregion
-		
 		m_p3DEngine->Enable(bCanRender ? 1 : 0);
 	}
-
-	CryLogAlways("CXGame::Update - checkpoint 3");
 
 	assert(g_Render != NULL && "g_Render console variable must be initialized");
 	
 	bool bRenderFrame = (!m_pSystem->GetViewCamera().GetPos().IsZero() || m_bMenuOverlay || m_bUIOverlay) 
-											&& (g_Render ? g_Render->GetIVal() != 0 : true);
-	// #region agent debug
-	{ static int _logCount = 0; if (_logCount++ < 5) { 
-		Vec3 camPos = m_pSystem->GetViewCamera().GetPos();
-		m_pLog->Log("[DEBUG_F] bRenderFrame=%d camPosZero=%d m_bMenuOverlay=%d m_bUIOverlay=%d g_Render=%d",
-			bRenderFrame, camPos.IsZero(), m_bMenuOverlay, m_bUIOverlay, g_Render ? g_Render->GetIVal() : -1);
-	}}
-	// #endregion
-
-	CryLogAlways("CXGame::Update - checkpoint 4");
+										&& (g_Render ? g_Render->GetIVal() != 0 : true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Start Profiling frame
@@ -1035,11 +947,6 @@ bool CXGame::Update()
 		for(ListOfPlayers::iterator	pl=m_DeadPlayers.begin(); pl!=m_DeadPlayers.end(); pl++)
 			if ((*pl)->GetEntity() && (*pl)->GetEntity()->GetPhysics())
 				(*pl)->GetEntity()->GetPhysics()->SetParams(&pf);
-	}
-	
-	static int updateCallCount = 0;
-	if (++updateCallCount % 100 == 0) {
-		CryLogAlways("CXGame::Update - calling m_pSystem->Update() (%d times)", updateCallCount);
 	}
 	
 	if (!m_pSystem->Update(IsMultiplayer() ? ESYSUPDATE_MULTIPLAYER:0, nPauseMode)) //Update returns false when quitting
@@ -1147,17 +1054,8 @@ bool CXGame::Update()
 
 		if (m_bMenuOverlay || m_bUIOverlay)
 		{
-			// #region agent log
-			{ static int _logCount = 0; if (_logCount++ < 3) { m_pLog->Log("[DEBUG_C] UI Update/Draw called: m_bMenuOverlay=%d, m_bUIOverlay=%d, count=%d", m_bMenuOverlay, m_bUIOverlay, _logCount); } }
-			// #endregion
 			m_pUISystem->Update();			
 			m_pUISystem->Draw();
-		}
-		else
-		{
-			// #region agent log
-			{ static int _logCount = 0; if (_logCount++ < 3) { m_pLog->Log("[DEBUG_C] UI NOT updated: m_bMenuOverlay=%d, m_bUIOverlay=%d, pUISystem=%p", m_bMenuOverlay, m_bUIOverlay, (void*)m_pUISystem); } }
-			// #endregion
 		}
 	}
 

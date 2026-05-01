@@ -689,9 +689,9 @@ void CUISystem::Draw()
 	FUNCTION_PROFILER( m_pSystem, PROFILE_GAME );
 //	m_pRenderer->ClearDepthBuffer();
 
-
 	m_pRenderer->Set2DMode(1, m_pRenderer->GetWidth(), m_pRenderer->GetHeight());
 	m_pRenderer->SetState(GS_BLSRC_SRCALPHA | GS_BLDST_ONEMINUSSRCALPHA | GS_NODEPTHTEST);
+	m_pRenderer->SetCullMode(R_CULL_DISABLE);
 
 	int iCurrentFlags = m_iFlags;
 
@@ -748,6 +748,7 @@ void CUISystem::Draw()
 	}
 
 	m_pRenderer->Set2DMode(0, 0, 0);
+	m_pRenderer->SetCullMode(R_CULL_BACK);
 	m_pRenderer->SetState(GS_DEPTHWRITE);
 	m_bSortZ = 0;
 	m_bSortTabStop = 0;
