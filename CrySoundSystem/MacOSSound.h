@@ -199,6 +199,13 @@ public:
     virtual ~CMacOSSoundSystem();
     
     // ISoundSystem interface
+    virtual void Release() override;
+    virtual IMusicSystem* CreateMusicSystem() override;
+    virtual ISound* GetSound(int nSoundID) override;
+    virtual void PlaySound(int nSoundID) override;
+    virtual int SetMinSoundPriority(int nPriority) override;
+    virtual void LockResources() override;
+    virtual void UnlockResources() override;
     virtual void Update() override;
     virtual void SetListener(const CCamera& camera, const Vec3& vel) override;
     virtual ISound* LoadSound(const char* sFileName, int nFlags = 0) override;
@@ -233,7 +240,8 @@ protected:
     int m_soundVolume;
     int m_musicVolume;
     bool m_isDeaf;
-    
+    int m_minSoundPriority;
+
     // 3D audio settings
     float m_dopplerFactor;
     float m_distanceFactor;

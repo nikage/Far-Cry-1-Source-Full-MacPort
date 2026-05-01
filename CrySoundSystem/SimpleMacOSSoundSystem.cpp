@@ -16,6 +16,7 @@
 
 #include "ISound.h"
 #include "ISystem.h"
+#include "MacOSSound.h"
 #include <iostream>
 #include <map>
 #include <vector>
@@ -283,23 +284,23 @@ private:
     unsigned char m_masterVolume;
 };
 
+// Factory function to create the music sub-system (used by CMacOSSoundSystem)
+IMusicSystem* CreateSimpleMacOSMusicSystem()
+{
+    return new CSimpleMacOSMusicSystem();
+}
+
 // Factory function to create macOS sound system
 extern "C" ISoundSystem* CreateMacOSSoundSystem(ISystem* pSystem)
 {
     if (!pSystem)
         return nullptr;
-    
-    try
-    {
-        CSimpleMacOSSoundSystem* soundSystem = new CSimpleMacOSSoundSystem(pSystem);
-        pSystem->GetILog()->Log("Simple macOS sound system created successfully");
-        return soundSystem;
-    }
-    catch (...)
-    {
-        pSystem->GetILog()->Log("Exception creating macOS sound system");
-        return nullptr;
-    }
+
+    CMacOSSoundSystem* soundSystem = new CMacOSSoundSystem(pSystem);
+    if (!soundSystem)
+        return new CSimpleMacOSSoundSystem(pSystem);
+    pSystem->GetILog()->Log("CMacOSSoundSystem (Core Audio) created successfully");
+    return soundSystem;
 }
 
 // Alternative factory function for compatibility

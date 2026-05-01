@@ -16,10 +16,59 @@
 
 #include "MacOSSound.h"
 #include "ISound.h"
+#include "ISystem.h"
+#include "ICryPak.h"
 #include "SoundBuffer.h"
 #include "SoundSystemCommon.h"
+#include "IConsole.h"
 #include <algorithm>
 #include <iostream>
+#include <vector>
+
+// ---------------------------------------------------------------------------
+// macOS-only stubs for base-class symbols that live in SoundBuffer.cpp /
+// SoundSystemCommon.cpp on Windows (those files pull in StdAfx.h → windows.h
+// so they cannot be compiled on macOS).
+// ---------------------------------------------------------------------------
+CSoundBuffer::CSoundBuffer(CSoundSystem* /*pSoundSystem*/, SSoundBufferProps& Props)
+    : m_Props(Props)
+{
+    m_pSoundSystem = nullptr;
+    m_nRef = 0;
+    m_Type = btNONE;
+    m_Data.m_pData = nullptr;
+    m_pReadStream = nullptr;
+    m_bLoadFailure = false;
+    m_bLooping = false;
+    m_bCallbackIteration = false;
+}
+
+CSoundBuffer::~CSoundBuffer() {}
+
+int CSoundBuffer::AddRef() { return ++m_nRef; }
+
+void CSoundBuffer::StreamOnComplete(IReadStream* /*pStream*/, unsigned int /*nError*/) {}
+
+CSoundSystemCommon::CSoundSystemCommon(ISystem* /*pSystem*/)
+    : m_pCVARSoundEnable(nullptr), m_pCVARDummySound(nullptr)
+    , m_pCVarMaxSoundDist(nullptr), m_pCVarDopplerEnable(nullptr)
+    , m_pCVarDopplerValue(nullptr), m_pCVarSFXVolume(nullptr)
+    , m_pCVarMusicVolume(nullptr), m_pCVarSampleRate(nullptr)
+    , m_pCVarSpeakerConfig(nullptr), m_pCVarEnableSoundFX(nullptr)
+    , m_pCVarDebugSound(nullptr), m_pCVarSoundInfo(nullptr)
+    , m_pCVarInactiveSoundIterationTimeout(nullptr)
+    , m_pCVarMinHWChannels(nullptr), m_pCVarMaxHWChannels(nullptr)
+    , m_pCVarVisAreaProp(nullptr), m_pCVarMaxSoundSpots(nullptr)
+    , m_pCVarMinRepeatSoundTimeout(nullptr)
+    , m_pCVarCompatibleMode(nullptr), m_pCVarCapsCheck(nullptr)
+{}
+
+CSoundSystemCommon::~CSoundSystemCommon() {}
+
+bool CSoundSystemCommon::DebuggingSound()
+{
+    return m_pCVarDebugSound && m_pCVarDebugSound->GetIVal() != 0;
+}
 
 // CMacOSSoundBuffer implementation
 CMacOSSoundBuffer::CMacOSSoundBuffer()
@@ -606,6 +655,9 @@ void CMacOSSound::SetSoundPriority(unsigned char nSoundPriority)
 }
 
 // CMacOSSoundSystem implementation
+// Forward declaration – defined in SimpleMacOSSoundSystem.cpp
+IMusicSystem* CreateSimpleMacOSMusicSystem();
+
 CMacOSSoundSystem::CMacOSSoundSystem(ISystem* pSystem)
     : CSoundSystemCommon(pSystem)
     , m_audioEngine(nil)
@@ -615,6 +667,7 @@ CMacOSSoundSystem::CMacOSSoundSystem(ISystem* pSystem)
     , m_soundVolume(100)
     , m_musicVolume(100)
     , m_isDeaf(false)
+    , m_minSoundPriority(0)
     , m_dopplerFactor(1.0f)
     , m_distanceFactor(1.0f)
     , m_rolloffFactor(1.0f)
@@ -638,37 +691,27 @@ CMacOSSoundSystem::~CMacOSSoundSystem()
 
 bool CMacOSSoundSystem::InitializeAudioEngine()
 {
-    // Create audio engine
-    m_audioEngine = [[AVAudioEngine alloc] init];
-    if (!m_audioEngine)
-        return false;
-    
-    // Get the mixer node
-    m_mixerNode = [m_audioEngine mainMixerNode];
-    
-    // Create reverb unit for environmental effects
-    m_reverbUnit = [[AVAudioUnitReverb alloc] init];
-    if (m_reverbUnit)
-    {
-        [m_audioEngine attachNode:m_reverbUnit];
-        [[m_audioEngine mainMixerNode] connect:m_reverbUnit to:[m_audioEngine outputNode] format:nil];
-    }
-    
-    // Start the engine
-    NSError* error = nil;
-    BOOL success = [m_audioEngine startAndReturnError:&error];
-    
-    if (!success || error)
-    {
-        if (error)
+    @try {
+        m_audioEngine = [[AVAudioEngine alloc] init];
+        if (!m_audioEngine)
+            return false;
+
+        m_mixerNode = [m_audioEngine mainMixerNode];
+
+        NSError* error = nil;
+        BOOL success = [m_audioEngine startAndReturnError:&error];
+        if (!success)
         {
-            NSLog(@"Error starting audio engine: %@", [error localizedDescription]);
+            NSLog(@"AVAudioEngine failed to start: %@", error ? [error localizedDescription] : @"unknown");
+            return false;
         }
+
+        m_isInitialized = true;
+        return true;
+    } @catch (NSException* ex) {
+        NSLog(@"AVAudioEngine init exception: %@ — %@", ex.name, ex.reason);
         return false;
     }
-    
-    m_isInitialized = true;
-    return true;
 }
 
 void CMacOSSoundSystem::ShutdownAudioEngine()
@@ -682,7 +725,7 @@ void CMacOSSoundSystem::ShutdownAudioEngine()
     
     if (m_reverbUnit)
     {
-        [m_reverbUnit release];
+        [m_audioEngine detachNode:m_reverbUnit];
         m_reverbUnit = nil;
     }
     
@@ -726,34 +769,81 @@ ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
 {
     if (!sFileName || !m_isInitialized)
         return nullptr;
-    
-    // Check if already loaded
+
+    // Return cached buffer if already loaded
     auto it = m_loadedSounds.find(sFileName);
     if (it != m_loadedSounds.end())
-    {
         return new CMacOSSound(it->second);
+
+    // Build a local filesystem path to load via AVAudioFile.
+    // Prefer CryPak extraction (handles .pak files); fall back to raw path.
+    std::string localPath;
+    bool usedTempFile = false;
+
+    ICryPak* pak = m_pSystem ? m_pSystem->GetIPak() : nullptr;
+    if (pak)
+    {
+        FILE* f = pak->FOpen(sFileName, "rb");
+        if (f)
+        {
+            pak->FSeek(f, 0, SEEK_END);
+            long size = pak->FTell(f);
+            pak->FSeek(f, 0, SEEK_SET);
+
+            if (size > 0)
+            {
+                std::vector<uint8_t> buf((size_t)size);
+                pak->FRead(buf.data(), 1, (size_t)size, f);
+                pak->FClose(f);
+
+                // Write to a temp file so AVAudioFile can open it by URL
+                NSString* tmpDir = [NSTemporaryDirectory() stringByAppendingPathComponent:@"FarCrySounds"];
+                NSString* relPath = [NSString stringWithUTF8String:sFileName];
+                NSString* tmpPath = [tmpDir stringByAppendingPathComponent:
+                                     [relPath lastPathComponent]];
+
+                [[NSFileManager defaultManager]
+                    createDirectoryAtPath:tmpDir
+                    withIntermediateDirectories:YES
+                    attributes:nil
+                    error:nil];
+
+                NSData* data = [NSData dataWithBytes:buf.data() length:(NSUInteger)size];
+                if ([data writeToFile:tmpPath atomically:YES])
+                {
+                    localPath = [tmpPath UTF8String];
+                    usedTempFile = true;
+                }
+            }
+            else
+            {
+                pak->FClose(f);
+            }
+        }
     }
-    
-    // Create new sound buffer
+
+    if (localPath.empty())
+        localPath = sFileName;   // fallback: raw filesystem path
+
+    // Create buffer and load via AVAudioFile
     CMacOSSoundBuffer* buffer = new CMacOSSoundBuffer();
-    
-    if (!buffer->LoadWave(sFileName, nFlags))
+    if (!buffer->LoadWave(localPath.c_str(), nFlags))
     {
         delete buffer;
+        if (m_pSystem)
+            m_pSystem->GetILog()->LogWarning("Sound: failed to load '%s'", sFileName);
         return nullptr;
     }
-    
-    // Create player node for this buffer
+
+    // Attach player node
     AVAudioPlayerNode* playerNode = [[AVAudioPlayerNode alloc] init];
     [m_audioEngine attachNode:playerNode];
     [m_audioEngine connect:playerNode to:m_mixerNode format:nil];
-    
     buffer->SetPlayerNode(playerNode);
-    
-    // Store in collections
+
     m_soundBuffers.push_back(buffer);
     m_loadedSounds[sFileName] = buffer;
-    
+
     return new CMacOSSound(buffer);
 }
 
@@ -883,6 +973,47 @@ Vec3 CMacOSSoundSystem::GetListenerPos()
 {
     return m_listenerPos;
 }
+
+void CMacOSSoundSystem::Release()
+{
+    delete this;
+}
+
+IMusicSystem* CMacOSSoundSystem::CreateMusicSystem()
+{
+    return CreateSimpleMacOSMusicSystem();
+}
+
+ISound* CMacOSSoundSystem::GetSound(int nSoundID)
+{
+    if (nSoundID > 0 && nSoundID <= (int)m_soundBuffers.size())
+    {
+        CMacOSSoundBuffer* buf = m_soundBuffers[nSoundID - 1];
+        if (buf)
+            return new CMacOSSound(buf);
+    }
+    return nullptr;
+}
+
+void CMacOSSoundSystem::PlaySound(int nSoundID)
+{
+    if (nSoundID > 0 && nSoundID <= (int)m_soundBuffers.size())
+    {
+        CMacOSSoundBuffer* buf = m_soundBuffers[nSoundID - 1];
+        if (buf)
+            buf->Play(false);
+    }
+}
+
+int CMacOSSoundSystem::SetMinSoundPriority(int nPriority)
+{
+    int prev = m_minSoundPriority;
+    m_minSoundPriority = nPriority;
+    return prev;
+}
+
+void CMacOSSoundSystem::LockResources()   {}
+void CMacOSSoundSystem::UnlockResources() {}
 
 void CMacOSSoundSystem::Update3DAudio()
 {

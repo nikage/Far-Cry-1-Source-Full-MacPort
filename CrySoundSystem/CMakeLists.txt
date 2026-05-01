@@ -3,8 +3,9 @@ cmake_minimum_required(VERSION 3.20)
 
 # Platform-specific source selection
 if(APPLE)
-    # macOS-specific sources - only use the simple macOS implementation
+    # macOS-specific sources - full Core Audio implementation + simple music system
     set(CRYSOUND_SOURCES
+        "MacOSSound.cpp"
         "SimpleMacOSSoundSystem.cpp"
     )
     
@@ -50,6 +51,7 @@ if(APPLE)
         ${AUDIO_TOOLBOX_FRAMEWORK}
         "-framework AVFoundation"
         "-framework AudioUnit"
+        "-framework Foundation"
     )
     
     # Add Vorbis if found
@@ -61,6 +63,9 @@ if(APPLE)
     endif()
     
     # Set source files that need Objective-C++ compilation
+    set_source_files_properties(MacOSSound.cpp PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
     set_source_files_properties(SimpleMacOSSoundSystem.cpp PROPERTIES
         COMPILE_FLAGS "-x objective-c++"
     )
@@ -98,3 +103,5 @@ install(TARGETS CrySoundSystem
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+stage_dylib_to_bundle(CrySoundSystem)
