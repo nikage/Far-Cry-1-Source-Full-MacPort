@@ -632,9 +632,7 @@ MTLRenderPassDescriptor* CMetalBaseRenderer::GetOrCreateRenderPassDescriptor(id<
     //     }
     //     return cachedDesc;
     // }
-    // TEMPORARY: Disable caching to avoid ARC memory management issues
-    // MTLRenderPassDescriptor creation is lightweight, so this should be fine for now
-    iLog->Log("GetOrCreateRenderPassDescriptor: Creating new descriptor (caching disabled)\n");
+    // Caching disabled to avoid ARC memory management issues; descriptor creation is lightweight.
     
     MTLRenderPassDescriptor* renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
     if (!renderPassDescriptor)
@@ -872,13 +870,6 @@ bool CMetalBaseRenderer::AcquireDrawableFromView()
 
 void CMetalBaseRenderer::BeginFrame()
 {
-    // #region agent debug
-    static int beginFrameCount = 0;
-    if (beginFrameCount++ < 5)
-        iLog->Log("[DEBUG_RENDERER] BeginFrame called (count=%d) init=%d device=%p queue=%p", 
-                 beginFrameCount, m_isInitialized, (void*)m_device, (void*)m_commandQueue);
-    // #endregion
-    
     if (!m_isInitialized || !m_device || !m_commandQueue)
         return;
     
@@ -923,8 +914,6 @@ void CMetalBaseRenderer::BeginFrame()
 
 void CMetalBaseRenderer::Update()
 {
-    iLog->Log("CMetalBaseRenderer::Update ENTRY - calling EndFrame\n");
-
     
     // Update() in CryEngine is called at the end of each frame
     // It should swap buffers and present the frame
@@ -1689,22 +1678,11 @@ void CMetalBaseRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
     if (!m_renderEncoder || nVerts <= 0 || Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
         return;
     
-    // #region agent debug - check for valid pipeline state
     if (!m_currentPipelineState)
-    {
-        static int warnCount = 0;
-        if (warnCount++ < 3 && iLog)
-            iLog->Log("MetalRenderer: Skipping dynamic VB draw - no valid pipeline state (shaders may be missing)");
         return;
-    }
-    // #endregion
-    
+
     if (m_shaderNeedsTangents)
-    {
-        if (iLog)
-            iLog->Log("MetalRenderer: Skipping dynamic VB draw because shader requires tangents");
         return;
-    }
     
     DynamicVBPool& pool = m_dynamicVBPools[Pool];
     int vertexSize = sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
@@ -1724,22 +1702,11 @@ void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf,
     if (!m_renderEncoder || !pBuf || nVerts <= 0)
         return;
     
-    // #region agent debug - check for valid pipeline state
     if (!m_currentPipelineState)
-    {
-        static int warnCount = 0;
-        if (warnCount++ < 3 && iLog)
-            iLog->Log("MetalRenderer: Skipping dynamic indexed draw - no valid pipeline state (shaders may be missing)");
         return;
-    }
-    // #endregion
-    
+
     if (m_shaderNeedsTangents)
-    {
-        if (iLog)
-            iLog->Log("MetalRenderer: Skipping dynamic indexed draw because shader requires tangents");
         return;
-    }
     
     int nOffs;
     void* dynPtr = GetDynVBPtr(nVerts, nOffs, 0);
@@ -2909,6 +2876,7 @@ void CMetalBaseRenderer::ReleaseVertexBuffer(int bufferId)
 {
     if (bufferId > 0 && bufferId < (int)m_vertexBuffers.size())
     {
+        [m_vertexBuffers[bufferId] release];
         m_vertexBuffers[bufferId] = nil;
     }
 }
@@ -2917,6 +2885,7 @@ void CMetalBaseRenderer::ReleaseIndexBuffer(int bufferId)
 {
     if (bufferId > 0 && bufferId < (int)m_indexBuffers.size())
     {
+        [m_indexBuffers[bufferId] release];
         m_indexBuffers[bufferId] = nil;
     }
 }

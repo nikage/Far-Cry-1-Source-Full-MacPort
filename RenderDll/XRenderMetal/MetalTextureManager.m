@@ -286,6 +286,7 @@ protected:
     unsigned long m_savedViewportHeight;
     int m_savedBlendSrc;
     int m_savedBlendDst;
+    id<MTLBuffer> m_fontOrthoBuffer;
     
     // Reference to base renderer
     CMetalBaseRenderer* m_renderer;

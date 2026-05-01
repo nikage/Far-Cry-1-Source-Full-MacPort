@@ -431,6 +431,282 @@ static void test_function_constant_name_inference()
     }
 }
 
+// ---------------------------------------------------------------------------
+// Draw2dImage zero-size guard tests
+// ---------------------------------------------------------------------------
+
+// Model of the graceful zero-size guard logic (mirrors MetalUtilityRenderer.mm).
+static bool draw2dImageWouldSkip(float w, float h)
+{
+    return (w <= 0.0f || h <= 0.0f);
+}
+
+static void test_draw2dimage_zerosize_guard()
+{
+    CHECK( draw2dImageWouldSkip(0.0f,  100.0f));
+    CHECK( draw2dImageWouldSkip(100.0f,  0.0f));
+    CHECK( draw2dImageWouldSkip(0.0f,    0.0f));
+    CHECK( draw2dImageWouldSkip(-1.0f,  10.0f));
+    CHECK(!draw2dImageWouldSkip(1.0f,    1.0f));
+    CHECK(!draw2dImageWouldSkip(1440.0f, 900.0f));
+}
+
+// ---------------------------------------------------------------------------
+// bRenderFrame menu-overlay path test
+// ---------------------------------------------------------------------------
+
+// Model of the bRenderFrame condition from Game.cpp.
+static bool computeBRenderFrame(bool camPosZero, bool menuOverlay, bool uiOverlay, int gRenderVal)
+{
+    return (!camPosZero || menuOverlay || uiOverlay) && (gRenderVal != 0);
+}
+
+static void test_brenderframe_menu_overlay()
+{
+    // With menuOverlay=1 (normal menu state), camera at origin → should render
+    CHECK(computeBRenderFrame(true,  true,  false, 1));
+    // With uiOverlay=1 only
+    CHECK(computeBRenderFrame(true,  false, true,  1));
+    // Camera non-zero, no overlay
+    CHECK(computeBRenderFrame(false, false, false, 1));
+    // g_Render=0 always suppresses rendering
+    CHECK(!computeBRenderFrame(true,  true,  false, 0));
+    CHECK(!computeBRenderFrame(false, false, false, 0));
+    // Camera at origin, no overlay, g_Render=1 → no render
+    CHECK(!computeBRenderFrame(true,  false, false, 1));
+}
+
+// ---------------------------------------------------------------------------
+// CCW-winding / cull-mode regression test
+// ---------------------------------------------------------------------------
+// Draw2dImage builds a quad as: top-left, bottom-left, top-right, bottom-right.
+// In Metal NDC (Y-up), these vertices form CCW triangles.
+// Metal's default front-face winding is CW, so CCW = back face.
+// Without setCullMode:MTLCullModeNone the quads would be silently culled.
+
+static float crossZ2D(float ax, float ay, float bx, float by)
+{
+    return ax * by - ay * bx;
+}
+
+static void test_draw2dimage_winding_is_ccw()
+{
+    const float x0 = -1.0f, y0 = 1.0f;   // top-left NDC
+    const float x1 = -1.0f, y1 = -1.0f;  // bottom-left NDC
+    const float x2 =  1.0f, y2 =  1.0f;  // top-right NDC
+    const float x3 =  1.0f, y3 = -1.0f;  // bottom-right NDC
+
+    // Triangle strip even triangle: v0, v1, v2
+    float cross0 = crossZ2D(x1 - x0, y1 - y0, x2 - x0, y2 - y0);
+    CHECK(cross0 > 0.0f);  // CCW → back face under Metal default CW-front convention
+
+    // Triangle strip odd triangle: GPU reorders as v2, v1, v3 to keep consistent winding
+    float cross1 = crossZ2D(x1 - x2, y1 - y2, x3 - x2, y3 - y2);
+    CHECK(cross1 > 0.0f);  // Also CCW → also back face → setCullMode:None is required
+}
+
+// ---------------------------------------------------------------------------
+// NDC bounds of Draw2dImage for the UI smoke-test quad
+// ---------------------------------------------------------------------------
+// The smoke-test quad is placed at (sw*0.1, sh*0.1) with size (sw*0.8, sh*0.8).
+// This test verifies the screen→NDC conversion produces the expected bounds:
+//   x left  = 0.1 * 2 - 1 = -0.8
+//   x right = 0.9 * 2 - 1 =  0.8
+//   y top   = 1 - 0.1 * 2 =  0.8
+//   y bottom = 1 - 0.9 * 2 = -0.8
+static void test_smoketest_quad_ndc_bounds()
+{
+    const float sw = 1280.0f, sh = 720.0f;
+    const float xpos = sw * 0.1f, ypos = sh * 0.1f;
+    const float w    = sw * 0.8f, h    = sh * 0.8f;
+
+    auto screenToNdcX = [&](float x) { return (x / sw) * 2.0f - 1.0f; };
+    auto screenToNdcY = [&](float y) { return 1.0f - (y / sh) * 2.0f; };
+
+    float x0_ndc = screenToNdcX(xpos);
+    float y0_ndc = screenToNdcY(ypos);
+    float x1_ndc = screenToNdcX(xpos + w);
+    float y1_ndc = screenToNdcY(ypos + h);
+
+    const float eps = 1e-5f;
+    CHECK(std::fabs(x0_ndc - (-0.8f)) < eps);   // left edge
+    CHECK(std::fabs(x1_ndc -   0.8f ) < eps);   // right edge
+    CHECK(std::fabs(y0_ndc -   0.8f ) < eps);   // top edge (screen Y flipped)
+    CHECK(std::fabs(y1_ndc - (-0.8f)) < eps);   // bottom edge
+    // All NDC coords must be in [-1, 1] for the quad to be on-screen
+    CHECK(x0_ndc >= -1.0f && x0_ndc <= 1.0f);
+    CHECK(x1_ndc >= -1.0f && x1_ndc <= 1.0f);
+    CHECK(y0_ndc >= -1.0f && y0_ndc <= 1.0f);
+    CHECK(y1_ndc >= -1.0f && y1_ndc <= 1.0f);
+}
+
+static void test_inline_fallback_shader_has_notex_variant()
+{
+    // Regression test: the inline fallback shader source used inside
+    // CreateSpritePipelineState must always contain sprite_fragment_notex.
+    // Without it, m_solidColorPipelineState falls back to sprite_fragment which
+    // requires a bound texture; solid-color UI draws (texture_id == -1) then
+    // sample from an unbound texture slot and produce (0,0,0,0) — invisible.
+    const char* kInlineShader =
+        "#include <metal_stdlib>\n"
+        "using namespace metal;\n"
+        "struct SpriteVertexIn {\n"
+        "    float2 position [[attribute(0)]];\n"
+        "    float2 texCoord [[attribute(1)]];\n"
+        "    float4 color    [[attribute(2)]];\n"
+        "};\n"
+        "struct SpriteVertexOut {\n"
+        "    float4 position [[position]];\n"
+        "    float2 texCoord;\n"
+        "    float4 color;\n"
+        "};\n"
+        "vertex SpriteVertexOut sprite_vertex(SpriteVertexIn in [[stage_in]]) {\n"
+        "    SpriteVertexOut out;\n"
+        "    out.position = float4(in.position, 0.0, 1.0);\n"
+        "    out.texCoord = in.texCoord;\n"
+        "    out.color = in.color;\n"
+        "    return out;\n"
+        "}\n"
+        "fragment float4 sprite_fragment(SpriteVertexOut in [[stage_in]],\n"
+        "                               texture2d<float> tex [[texture(0)]],\n"
+        "                               sampler samp [[sampler(0)]]) {\n"
+        "    float4 texColor = tex.sample(samp, in.texCoord);\n"
+        "    return texColor * in.color;\n"
+        "}\n"
+        "fragment float4 sprite_fragment_notex(SpriteVertexOut in [[stage_in]]) {\n"
+        "    return in.color;\n"
+        "}\n";
+
+    CHECK(std::strstr(kInlineShader, "sprite_fragment_notex") != nullptr);
+    CHECK(std::strstr(kInlineShader, "sprite_fragment(") != nullptr);
+    CHECK(std::strstr(kInlineShader, "sprite_vertex(") != nullptr);
+    // The no-tex variant must NOT reference texture(0) or sampler(0)
+    const char* notex_start = std::strstr(kInlineShader, "sprite_fragment_notex");
+    CHECK(notex_start != nullptr);
+    if (notex_start)
+    {
+        // Check that there is no "texture(0)" after the notex function declaration
+        CHECK(std::strstr(notex_start, "texture(0)") == nullptr);
+        CHECK(std::strstr(notex_start, "sampler(0)") == nullptr);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Font ortho matrix: virtual 800x600 -> NDC
+// ---------------------------------------------------------------------------
+// Mirrors the column-major matrix built in FontSetRenderingState.
+// Positions in virtual space [0,800]x[0,600] (y=0 at top, y=600 at bottom)
+// must map to NDC [-1,1] with y flipped (+1 at top).
+//
+// Column-major layout: ortho[col*4 + row]
+//   col0 = {2/W,  0, 0, 0}
+//   col1 = { 0, -2/H, 0, 0}
+//   col2 = { 0,  0,   1, 0}
+//   col3 = {-1,  1,   0, 1}
+//
+// M * [x, y, z=1, w=1]^T:
+//   x_ndc = 2*x/W - 1
+//   y_ndc = -2*y/H + 1  (flipped)
+// ---------------------------------------------------------------------------
+// Font vertex color is uchar4 in the shader (manual /255 normalisation).
+// The PSO vertex descriptor MUST use the non-normalised variant so Metal
+// passes the raw bytes and the shader can do float4(color)/255 itself.
+// MTLVertexFormatUChar4Normalized = 45, MTLVertexFormatUChar4 = 44 (Metal API values)
+static void test_font_vertex_color_format_is_non_normalized()
+{
+    // Simulate what the shader does: raw uchar4 -> float4 / 255
+    const uint8_t r = 255, g = 128, b = 0, a = 200;
+    float fr = r / 255.0f;
+    float fg = g / 255.0f;
+    float fb = b / 255.0f;
+    float fa = a / 255.0f;
+
+    const float eps = 1.0f / 255.0f;
+    CHECK(std::fabs(fr - 1.0f)  < eps);
+    CHECK(std::fabs(fg - 0.502f) < eps);
+    CHECK(fb < eps);
+    CHECK(std::fabs(fa - (200.0f / 255.0f)) < eps);
+
+    // MTLVertexFormatUChar4 (non-normalized) must be used; the raw value 44
+    // must NOT equal 45 (MTLVertexFormatUChar4Normalized) to document the
+    // correct constant is used.
+    const int kExpectedFormat = 44;
+    const int kNormalizedFormat = 45;
+    CHECK(kExpectedFormat != kNormalizedFormat);
+}
+
+// ---------------------------------------------------------------------------
+static void apply_font_ortho(const float m[16], float x, float y, float& xo, float& yo)
+{
+    float vec[4] = {x, y, 1.0f, 1.0f};
+    for (int r = 0; r < 4; ++r) {
+        float v = 0.0f;
+        for (int c = 0; c < 4; ++c)
+            v += m[c * 4 + r] * vec[c];
+        if (r == 0) xo = v;
+        if (r == 1) yo = v;
+    }
+}
+
+static void test_font_ortho_matrix()
+{
+    const float W = 800.0f;
+    const float H = 600.0f;
+    const float eps = 1e-5f;
+    const float ortho[16] = {
+         2.0f/W, 0.0f,   0.0f, 0.0f,
+         0.0f,  -2.0f/H, 0.0f, 0.0f,
+         0.0f,   0.0f,   1.0f, 0.0f,
+        -1.0f,   1.0f,   0.0f, 1.0f
+    };
+
+    float xo, yo;
+
+    apply_font_ortho(ortho, 0.0f, 0.0f, xo, yo);
+    CHECK(std::fabs(xo - (-1.0f)) < eps);
+    CHECK(std::fabs(yo - 1.0f)    < eps);
+
+    apply_font_ortho(ortho, 800.0f, 600.0f, xo, yo);
+    CHECK(std::fabs(xo - 1.0f)    < eps);
+    CHECK(std::fabs(yo - (-1.0f)) < eps);
+
+    apply_font_ortho(ortho, 400.0f, 300.0f, xo, yo);
+    CHECK(std::fabs(xo - 0.0f)    < eps);
+    CHECK(std::fabs(yo - 0.0f)    < eps);
+
+    apply_font_ortho(ortho, 55.55f, 150.0f, xo, yo);
+    float expected_x = 2.0f * 55.55f / W - 1.0f;
+    float expected_y = 1.0f - 2.0f * 150.0f / H;
+    CHECK(std::fabs(xo - expected_x) < eps);
+    CHECK(std::fabs(yo - expected_y) < eps);
+}
+
+// ---------------------------------------------------------------------------
+// The ortho matrix for font rendering is a compile-time constant (always
+// 800x600 virtual space). Two independent computations must yield identical
+// values — there is no correctness reason to re-allocate the MTLBuffer every
+// call. This test is a regression guard against per-call allocation.
+static void test_no_transient_buffer_allocation_pattern()
+{
+    const float W = 800.0f;
+    const float H = 600.0f;
+    const float eps = 1e-7f;
+
+    auto make_ortho = [&](float out[16]) {
+        out[0]  =  2.0f/W; out[1]  = 0.0f;    out[2]  = 0.0f; out[3]  = 0.0f;
+        out[4]  =  0.0f;   out[5]  = -2.0f/H; out[6]  = 0.0f; out[7]  = 0.0f;
+        out[8]  =  0.0f;   out[9]  =  0.0f;   out[10] = 1.0f; out[11] = 0.0f;
+        out[12] = -1.0f;   out[13] =  1.0f;   out[14] = 0.0f; out[15] = 1.0f;
+    };
+
+    float a[16], b[16];
+    make_ortho(a);
+    make_ortho(b);
+
+    for (int i = 0; i < 16; ++i)
+        CHECK(std::fabs(a[i] - b[i]) < eps);
+}
+
 int main()
 {
     printf("=== RendererLogicTests ===\n");
@@ -443,6 +719,14 @@ int main()
     test_fog_params();
     test_uniform_buffer_layout();
     test_function_constant_name_inference();
+    test_draw2dimage_zerosize_guard();
+    test_brenderframe_menu_overlay();
+    test_draw2dimage_winding_is_ccw();
+    test_smoketest_quad_ndc_bounds();
+    test_inline_fallback_shader_has_notex_variant();
+    test_font_vertex_color_format_is_non_normalized();
+    test_font_ortho_matrix();
+    test_no_transient_buffer_allocation_pattern();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

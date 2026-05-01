@@ -60,3 +60,24 @@ fragment float4 sprite_fragment_notex(SpriteVertexOut in [[stage_in]]) {
     return in.color;
 }
 
+// Font vertex shader - reads struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F (stride 24)
+// and applies the orthographic MVP matrix so screen-space positions map to clip-space.
+struct FontVertexIn {
+    float3 position [[attribute(0)]];  // offset  0, 12 bytes
+    uchar4 color    [[attribute(1)]];  // offset 12,  4 bytes
+    float2 texCoord [[attribute(2)]];  // offset 16,  8 bytes
+};
+
+struct FontUniforms {
+    float4x4 modelViewProjectionMatrix;
+};
+
+vertex SpriteVertexOut font_vertex(FontVertexIn in [[stage_in]],
+                                   constant FontUniforms& uniforms [[buffer(2)]]) {
+    SpriteVertexOut out;
+    out.position = uniforms.modelViewProjectionMatrix * float4(in.position, 1.0);
+    out.texCoord = in.texCoord;
+    out.color    = float4(in.color) / 255.0;
+    return out;
+}
+

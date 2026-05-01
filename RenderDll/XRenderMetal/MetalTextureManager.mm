@@ -911,6 +911,7 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     , m_savedViewportHeight(0)
     , m_savedBlendSrc(0)
     , m_savedBlendDst(0)
+    , m_fontOrthoBuffer(nil)
     , m_lastBoundStage(0)
 {
     for (auto& tex : m_boundFragmentTextures)
@@ -935,6 +936,10 @@ CMetalTextureManager::~CMetalTextureManager()
         ReleaseSamplerState(entry.second);
     }
     m_samplerCache.clear();
+    if (m_fontOrthoBuffer) {
+        [m_fontOrthoBuffer release];
+        m_fontOrthoBuffer = nil;
+    }
 }
 
 void CMetalTextureManager::Update(float fTime)
@@ -2447,6 +2452,7 @@ void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
     if (m_renderer && m_renderer->m_renderEncoder)
     {
         [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:0];
+        BindDefaultSampler(0);
     }
     
     SetTextureParameters(texture, true, nFilterMode);
@@ -2486,12 +2492,39 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
     m_savedViewportWidth = width;
     m_savedViewportHeight = height;
 
-    // Activate the sprite PSO so DrawDynVB doesn't skip font quads
+    // Activate the font PSO so DrawDynVB uses the correct P3F_COL4UB_TEX2F vertex descriptor
     id<MTLRenderPipelineState> fontPSO = m_renderer->GetFontPSO();
-    if (fontPSO) {
+    assert(fontPSO != nil && "FontSetRenderingState: font PSO is nil — CreateFontPipelineState must have failed");
+    assert(m_renderer->m_renderEncoder != nil && "FontSetRenderingState: no active render encoder");
+    if (fontPSO && m_renderer->m_renderEncoder) {
         m_renderer->m_currentPipelineState = fontPSO;
-        if (m_renderer->m_renderEncoder)
-            [m_renderer->m_renderEncoder setRenderPipelineState:fontPSO];
+        [m_renderer->m_renderEncoder setRenderPipelineState:fontPSO];
+
+        // font_vertex reads FontUniforms { float4x4 mvp } from [[buffer(kMetalVertexUniformSlot)]].
+        // Font positions are in virtual 800×600 space: ScaleCoordX/Y are identity so positions
+        // written by CryFont's DrawStringW remain in the virtual coordinate system.
+        // Column-major orthographic matrix: x∈[0,800]→NDC[-1,1], y∈[0,600]→NDC[+1,-1].
+        // The matrix is constant — allocate once and reuse (MRC: no ARC in this target).
+        if (!m_fontOrthoBuffer) {
+            const float W = 800.0f;
+            const float H = 600.0f;
+            const float ortho[16] = {
+                 2.0f/W, 0.0f,   0.0f, 0.0f,
+                 0.0f,  -2.0f/H, 0.0f, 0.0f,
+                 0.0f,   0.0f,   1.0f, 0.0f,
+                -1.0f,   1.0f,   0.0f, 1.0f
+            };
+            m_fontOrthoBuffer = [m_renderer->m_device
+                newBufferWithBytes:ortho
+                            length:sizeof(ortho)
+                           options:MTLResourceStorageModeShared];
+            assert(m_fontOrthoBuffer != nil && "FontSetRenderingState: failed to allocate font ortho buffer");
+        }
+        if (m_fontOrthoBuffer) {
+            [m_renderer->m_renderEncoder setVertexBuffer:m_fontOrthoBuffer
+                                                  offset:0
+                                                 atIndex:kMetalVertexUniformSlot];
+        }
     }
 }
 

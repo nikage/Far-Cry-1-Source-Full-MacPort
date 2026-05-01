@@ -21,9 +21,12 @@
 #include "MetalTextureManager.m"
 #include "MetalShaderManager.m"
 #include "I3DEngine.h"
+#include "IFont.h"
 #include <Cocoa/Cocoa.h>
 #include <limits>
 #include <cstdlib>
+
+extern ISystem* iSystem;
 
 #ifdef max
 #undef max
@@ -81,6 +84,8 @@ CMetalUtilityRenderer::CMetalUtilityRenderer(CMetalBaseRenderer* renderer,
     , m_textPipelineState(nil)
     , m_debugPipelineState(nil)
     , m_spritePipelineState(nil)
+    , m_solidColorPipelineState(nil)
+    , m_fontPipelineState(nil)
     , m_2DMode(false)
     , m_2DOriginX(0)
     , m_2DOriginY(0)
@@ -182,40 +187,31 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
                                        float angle, float r, float g, float b, 
                                        float a, float z)
 {
-    assert(m_renderer != nullptr && "Draw2dImage: renderer cannot be null");
-    assert(w > 0.0f && "Draw2dImage: width must be positive");
-    assert(h > 0.0f && "Draw2dImage: height must be positive");
-    assert(r >= 0.0f && r <= 1.0f && "Draw2dImage: red component must be in range [0,1]");
-    assert(g >= 0.0f && g <= 1.0f && "Draw2dImage: green component must be in range [0,1]");
-    assert(b >= 0.0f && b <= 1.0f && "Draw2dImage: blue component must be in range [0,1]");
-    assert(a >= 0.0f && a <= 1.0f && "Draw2dImage: alpha component must be in range [0,1]");
-    
-    // #region agent debug
-    static int draw2dCount = 0;
-    if (draw2dCount++ < 5)
-    {
-        iLog->Log("Draw2dImage called: renderer=%p, encoder=%p, spriteState=%p", 
-                 (void*)m_renderer, 
-                 m_renderer ? (void*)m_renderer->m_renderEncoder : nullptr,
-                 (void*)m_spritePipelineState);
-    }
-    // #endregion
-    
-    if (!m_renderer || !m_renderer->m_renderEncoder)
+    assert(m_renderer != nullptr && "Draw2dImage: utility renderer has no back-reference to CMetalRenderer");
+    if (!m_renderer)
         return;
+    assert(m_renderer->m_renderEncoder != nil && "Draw2dImage: no active render encoder — BeginFrame must be called before any 2D draw");
+    if (!m_renderer->m_renderEncoder)
+        return;
+
+    if (w <= 0.0f || h <= 0.0f)
+        return;
+
+    r = std::max(0.0f, std::min(1.0f, r));
+    g = std::max(0.0f, std::min(1.0f, g));
+    b = std::max(0.0f, std::min(1.0f, b));
+    a = std::max(0.0f, std::min(1.0f, a));
     
-    // Lazy initialization: create sprite pipeline state on first use
-    if (!m_spritePipelineState)
+    // Lazy initialization: create sprite pipeline states on first use
+    if (!m_spritePipelineState || !m_solidColorPipelineState)
     {
-        iLog->Log("Draw2dImage: Creating sprite pipeline state (lazy init)");
         CreateSpritePipelineState();
-        // If pipeline creation failed, we can't render
+        assert(m_spritePipelineState != nil && "Draw2dImage: sprite pipeline state failed to initialize");
         if (!m_spritePipelineState)
-        {
-            iLog->Log("Draw2dImage: Cannot render - sprite pipeline state not available\n");
             return;
-        }
-        iLog->Log("Draw2dImage: Sprite pipeline state created successfully");
+        assert(m_solidColorPipelineState != nil && "Draw2dImage: solid-color pipeline state failed to initialize");
+        if (!m_solidColorPipelineState)
+            return;
     }
         
     // Get texture from texture manager (only if texture_id is valid)
@@ -238,7 +234,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     
     if (screenWidth <= 0 || screenHeight <= 0)
     {
-        iLog->Log("Draw2dImage: Warning - invalid screen dimensions\n");
+        assert(false && "Draw2dImage: renderer reports zero screen dimensions — window not yet ready");
         return;
     }
     
@@ -295,11 +291,9 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
                                                                     length:sizeof(vertices)
                                                                    options:MTLResourceStorageModeShared];
     
+    assert(vertexBuffer != nil && "Draw2dImage: failed to allocate per-quad vertex buffer");
     if (!vertexBuffer)
-    {
-        iLog->Log("Draw2dImage: Error - failed to create vertex buffer\n");
         return;
-    }
     
     // Set vertex buffer
     [m_renderer->m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:kMetalVertexStream_General];
@@ -321,41 +315,23 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     }
     else
     {
-        // Solid color rendering (no texture)
-        // Use sprite pipeline state with a white texture, or create a solid color pipeline state
-        if (m_spritePipelineState)
-        {
-            [m_renderer->m_renderEncoder setRenderPipelineState:m_spritePipelineState];
-        }
-        
-        // Bind a white 1x1 texture for solid color rendering (shader will use vertex color)
-        // The sprite_fragment shader multiplies texture color by vertex color, so white texture = vertex color
-        assert(m_textureManager != nullptr && "Draw2dImage: texture manager required for solid color rendering");
-        
-        if (m_textureManager)
-        {
-            id<MTLTexture> whiteTexture = m_textureManager->GetWhiteTexture();
-            if (!whiteTexture)
-            {
-                // Ensure white texture exists
-                m_textureManager->SetWhiteTexture();
-                whiteTexture = m_textureManager->GetWhiteTexture();
-            }
-            
-            assert(whiteTexture != nil && "Draw2dImage: white texture creation failed - cannot render solid color quad");
-            
-            if (whiteTexture)
-            {
-                [m_renderer->m_renderEncoder setFragmentTexture:whiteTexture atIndex:0];
-                m_textureManager->BindDefaultSampler(0);
-            }
-        }
+        // Solid color rendering (no texture) — uses sprite_fragment_notex which needs no texture or sampler
+        [m_renderer->m_renderEncoder setRenderPipelineState:m_solidColorPipelineState];
     }
     
-    // Draw triangle strip (4 vertices = 2 triangles)
+    [m_renderer->m_renderEncoder setCullMode:MTLCullModeNone];
+
+    NSUInteger vpW = (NSUInteger)m_renderer->GetWidth();
+    NSUInteger vpH = (NSUInteger)m_renderer->GetHeight();
+    if (vpW > 0 && vpH > 0) {
+        MTLScissorRect fullViewport = {0, 0, vpW, vpH};
+        [m_renderer->m_renderEncoder setScissorRect:fullViewport];
+    }
+
     [m_renderer->m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
                                     vertexStart:0
                                     vertexCount:4];
+    [vertexBuffer release];
 }
 
 void CMetalUtilityRenderer::DrawImage(float xpos, float ypos, float w, float h, int texture_id, 
@@ -1188,121 +1164,151 @@ void CMetalUtilityRenderer::CreateSpritePipelineState()
     
     if (!spriteLibrary)
     {
-        // Try loading from app bundle MacOS directory (where we copy the metallibs)
         NSString* exePath = [[NSBundle mainBundle] executablePath];
         NSString* exeDir = [exePath stringByDeletingLastPathComponent];
         NSString* metallibPath = [exeDir stringByAppendingPathComponent:@"SpriteShaders.metallib"];
-        
         spriteLibrary = [m_renderer->m_device newLibraryWithFile:metallibPath error:&error];
     }
-    
+
     if (!spriteLibrary)
     {
-        // Fallback to default library (may contain sprite shaders if compiled in)
         spriteLibrary = [m_renderer->m_device newDefaultLibrary];
     }
-    
-    // #region agent debug - create inline shader as ultimate fallback
+
+    assert(spriteLibrary != nil && "CreateSpritePipelineState: could not locate SpriteShaders.metallib in any search path");
     if (!spriteLibrary)
-    {
-        // Compile shader from inline source code
-        NSString* shaderSource = @R"(
-#include <metal_stdlib>
-using namespace metal;
-
-struct SpriteVertexIn {
-    float2 position [[attribute(0)]];
-    float2 texCoord [[attribute(1)]];
-    float4 color    [[attribute(2)]];
-};
-
-struct SpriteVertexOut {
-    float4 position [[position]];
-    float2 texCoord;
-    float4 color;
-};
-
-vertex SpriteVertexOut sprite_vertex(SpriteVertexIn in [[stage_in]]) {
-    SpriteVertexOut out;
-    out.position = float4(in.position, 0.0, 1.0);
-    out.texCoord = in.texCoord;
-    out.color = in.color;
-    return out;
-}
-
-fragment float4 sprite_fragment(SpriteVertexOut in [[stage_in]],
-                               texture2d<float> tex [[texture(0)]],
-                               sampler samp [[sampler(0)]]) {
-    float4 texColor = tex.sample(samp, in.texCoord);
-    return texColor * in.color;
-}
-)";
-        
-        MTLCompileOptions* compileOptions = [[MTLCompileOptions alloc] init];
-        compileOptions.languageVersion = MTLLanguageVersion2_0;
-        
-        spriteLibrary = [m_renderer->m_device newLibraryWithSource:shaderSource 
-                                                           options:compileOptions 
-                                                             error:&error];
-        
-        if (spriteLibrary)
-        {
-            iLog->Log("Created sprite shader from inline source code\n");
-        }
-        else
-        {
-            iLog->Log("Error compiling inline sprite shader: %s\n", 
-                   error ? [[error localizedDescription] UTF8String] : "Unknown error");
-        }
-    }
-    // #endregion
-    
-    if (!spriteLibrary)
-    {
-        iLog->Log("Warning: Could not load SpriteShaders library: %s - UI rendering will be disabled\n", 
-               error ? [[error localizedDescription] UTF8String] : "Unknown error");
         return;
-    }
-    
-    id<MTLFunction> vertexFunction = [spriteLibrary newFunctionWithName:@"sprite_vertex"];
+
+    id<MTLFunction> vertexFunction   = [spriteLibrary newFunctionWithName:@"sprite_vertex"];
     id<MTLFunction> fragmentFunction = [spriteLibrary newFunctionWithName:@"sprite_fragment"];
-    
-    // #region agent debug - disabled asserts for missing shaders
-    // assert(vertexFunction != nil && "CreateSpritePipelineState: sprite_vertex function not found in library");
-    // assert(fragmentFunction != nil && "CreateSpritePipelineState: sprite_fragment function not found in library");
-    // #endregion
-    
+    assert(vertexFunction   != nil && "CreateSpritePipelineState: sprite_vertex not found in library");
+    assert(fragmentFunction != nil && "CreateSpritePipelineState: sprite_fragment not found in library");
     if (!vertexFunction || !fragmentFunction)
-    {
-        iLog->Log("Error: Sprite shader functions not found (vertex=%p, fragment=%p)\n", vertexFunction, fragmentFunction);
         return;
-    }
-    
-    descriptor.vertexFunction = vertexFunction;
+
+    descriptor.vertexFunction   = vertexFunction;
     descriptor.fragmentFunction = fragmentFunction;
-    
-    // Double-check that descriptor has valid functions before creating pipeline state
-    // #region agent debug - disabled asserts
-    // assert(descriptor.vertexFunction != nil && "CreateSpritePipelineState: descriptor vertex function cannot be nil");
-    // assert(descriptor.fragmentFunction != nil && "CreateSpritePipelineState: descriptor fragment function cannot be nil");
-    // #endregion
-    
+
     m_spritePipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
-    
-    // #region agent debug - disabled assert
-    // assert(m_spritePipelineState != nil && "CreateSpritePipelineState: pipeline state creation failed - check Metal shader compilation");
-    // #endregion
-    
+    assert(m_spritePipelineState != nil && "CreateSpritePipelineState: textured PSO creation failed");
     if (!m_spritePipelineState)
-    {
-        iLog->Log("Error: Failed to create sprite pipeline state: %s\n", error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        return;
+
+    id<MTLFunction> noTexFragment = [spriteLibrary newFunctionWithName:@"sprite_fragment_notex"];
+    if (!noTexFragment)
+        noTexFragment = fragmentFunction;
+
+    MTLRenderPipelineDescriptor* solidDesc = [[MTLRenderPipelineDescriptor alloc] init];
+    solidDesc.colorAttachments[0].pixelFormat               = MTLPixelFormatBGRA8Unorm;
+    solidDesc.depthAttachmentPixelFormat                    = MTLPixelFormatDepth32Float_Stencil8;
+    solidDesc.stencilAttachmentPixelFormat                  = MTLPixelFormatDepth32Float_Stencil8;
+    solidDesc.colorAttachments[0].blendingEnabled           = YES;
+    solidDesc.colorAttachments[0].sourceRGBBlendFactor      = MTLBlendFactorSourceAlpha;
+    solidDesc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    solidDesc.colorAttachments[0].rgbBlendOperation         = MTLBlendOperationAdd;
+    solidDesc.colorAttachments[0].sourceAlphaBlendFactor    = MTLBlendFactorOne;
+    solidDesc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    solidDesc.colorAttachments[0].alphaBlendOperation       = MTLBlendOperationAdd;
+    solidDesc.vertexDescriptor = vertexDescriptor;
+    solidDesc.vertexFunction   = vertexFunction;
+    solidDesc.fragmentFunction = noTexFragment;
+
+    NSError* solidError = nil;
+    m_solidColorPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:solidDesc error:&solidError];
+    assert(m_solidColorPipelineState != nil && "CreateSpritePipelineState: solid-color PSO creation failed");
+}
+
+void CMetalUtilityRenderer::CreateFontPipelineState()
+{
+    assert(m_renderer != nullptr && "CreateFontPipelineState: renderer cannot be null");
+    assert(m_renderer->m_device != nil && "CreateFontPipelineState: Metal device cannot be nil");
+    if (!m_renderer || !m_renderer->m_device)
+        return;
+
+    NSError* loadError = nil;
+    id<MTLLibrary> spriteLibrary = nil;
+    NSBundle* bundle = [NSBundle mainBundle];
+    NSString* shaderPath = [bundle pathForResource:@"SpriteShaders" ofType:@"metallib"];
+    if (shaderPath)
+        spriteLibrary = [m_renderer->m_device newLibraryWithFile:shaderPath error:&loadError];
+    if (!spriteLibrary) {
+        NSString* exeDir = [[[NSBundle mainBundle] executablePath] stringByDeletingLastPathComponent];
+        spriteLibrary = [m_renderer->m_device newLibraryWithFile:
+            [exeDir stringByAppendingPathComponent:@"SpriteShaders.metallib"] error:&loadError];
+    }
+    if (!spriteLibrary)
+        spriteLibrary = [m_renderer->m_device newDefaultLibrary];
+    assert(spriteLibrary != nil && "CreateFontPipelineState: SpriteShaders.metallib not found");
+    if (!spriteLibrary)
+        return;
+
+    id<MTLFunction> vertexFunction   = [spriteLibrary newFunctionWithName:@"font_vertex"];
+    id<MTLFunction> fragmentFunction = [spriteLibrary newFunctionWithName:@"sprite_fragment"];
+    assert(vertexFunction   != nil && "CreateFontPipelineState: font_vertex not found in library");
+    assert(fragmentFunction != nil && "CreateFontPipelineState: sprite_fragment not found in library");
+    if (!vertexFunction || !fragmentFunction)
+        return;
+
+    // Vertex descriptor matches struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F (stride 24):
+    //   float3 xyz   offset  0  (12 bytes)
+    //   uchar4 color offset 12  ( 4 bytes)
+    //   float2 st    offset 16  ( 8 bytes)
+    MTLVertexDescriptor* fontDesc = [[MTLVertexDescriptor alloc] init];
+    fontDesc.attributes[0].format      = MTLVertexFormatFloat3;
+    fontDesc.attributes[0].offset      = 0;
+    fontDesc.attributes[0].bufferIndex = kMetalVertexStream_General;
+    fontDesc.attributes[1].format      = MTLVertexFormatUChar4;
+    fontDesc.attributes[1].offset      = 12;
+    fontDesc.attributes[1].bufferIndex = kMetalVertexStream_General;
+    fontDesc.attributes[2].format      = MTLVertexFormatFloat2;
+    fontDesc.attributes[2].offset      = 16;
+    fontDesc.attributes[2].bufferIndex = kMetalVertexStream_General;
+    fontDesc.layouts[kMetalVertexStream_General].stride       = 24;
+    fontDesc.layouts[kMetalVertexStream_General].stepFunction = MTLVertexStepFunctionPerVertex;
+
+    MTLRenderPipelineDescriptor* descriptor = [[MTLRenderPipelineDescriptor alloc] init];
+    descriptor.colorAttachments[0].pixelFormat               = MTLPixelFormatBGRA8Unorm;
+    descriptor.depthAttachmentPixelFormat                    = MTLPixelFormatDepth32Float_Stencil8;
+    descriptor.stencilAttachmentPixelFormat                  = MTLPixelFormatDepth32Float_Stencil8;
+    descriptor.colorAttachments[0].blendingEnabled           = YES;
+    descriptor.colorAttachments[0].sourceRGBBlendFactor      = MTLBlendFactorSourceAlpha;
+    descriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    descriptor.colorAttachments[0].rgbBlendOperation         = MTLBlendOperationAdd;
+    descriptor.colorAttachments[0].sourceAlphaBlendFactor    = MTLBlendFactorOne;
+    descriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    descriptor.colorAttachments[0].alphaBlendOperation       = MTLBlendOperationAdd;
+    descriptor.vertexDescriptor = fontDesc;
+    descriptor.vertexFunction   = vertexFunction;
+    descriptor.fragmentFunction = fragmentFunction;
+
+    NSError* error = nil;
+    m_fontPipelineState = [m_renderer->m_device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+    if (!m_fontPipelineState) {
+        const char* desc = error ? [[error localizedDescription] UTF8String] : "(no error object)";
+        fprintf(stderr, "[FONT_PSO_ERROR] CreateFontPipelineState failed: %s\n", desc);
+        if (iLog) iLog->Log("CreateFontPipelineState failed: %s\n", desc);
+        assert(m_fontPipelineState != nil && "CreateFontPipelineState: font PSO creation failed — check log for Metal error");
     }
 }
 
 void CMetalUtilityRenderer::RenderTextMessage(const TextMessage& message)
 {
-    // Render text message
-    // This would queue the text for rendering using the text pipeline state
+    if (message.text.empty())
+        return;
+
+    ICryFont* pCryFont = iSystem ? iSystem->GetICryFont() : nullptr;
+    if (!pCryFont)
+        return;
+
+    IFFont* pFont = pCryFont->GetFont("default");
+    if (!pFont)
+        return;
+
+    const float kBaseSize = 16.0f;
+    float size = kBaseSize * message.fontSize;
+    pFont->SetSize(vector2f(size, size));
+    pFont->SetColor(color4f(message.color[0], message.color[1], message.color[2], message.color[3]));
+    pFont->DrawString(message.position.x, message.position.y, message.text.c_str());
 }
 
 void CMetalUtilityRenderer::CreateTextVertexBuffer(const std::string& text, const Vec3& pos, 
