@@ -17,6 +17,8 @@
 
 #include "MacOSInput.h"
 #include "ISystem.h"
+#include <CoreGraphics/CoreGraphics.h>
+#include <algorithm>
 
 // CMacOSKeyboard implementation - minimal stubs
 CMacOSKeyboard::CMacOSKeyboard()
@@ -131,6 +133,10 @@ CMacOSMouse::CMacOSMouse()
     , m_wheelDelta(0)
     , m_bHidden(false)
     , m_bExclusive(false)
+    , m_fVScreenX(0.f)
+    , m_fVScreenY(0.f)
+    , m_screenWidth(0.f)
+    , m_screenHeight(0.f)
 {
     memset(m_buttonStates, 0, sizeof(m_buttonStates));
     memset(m_prevButtonStates, 0, sizeof(m_prevButtonStates));
@@ -143,20 +149,30 @@ CMacOSMouse::~CMacOSMouse()
 
 bool CMacOSMouse::Init()
 {
-    // Stub implementation
+    m_screenWidth  = (float)CGDisplayPixelsWide(CGMainDisplayID());
+    m_screenHeight = (float)CGDisplayPixelsHigh(CGMainDisplayID());
+    assert(m_screenWidth  > 0 && "CMacOSMouse::Init: could not determine display width");
+    assert(m_screenHeight > 0 && "CMacOSMouse::Init: could not determine display height");
     return true;
 }
 
 void CMacOSMouse::Update()
 {
-    // Update previous button states
     memcpy(m_prevButtonStates, m_buttonStates, sizeof(m_buttonStates));
-    
-    // Update current button states using Core Graphics (if available)
-    // For now, we'll use stub implementations but this could be enhanced
-    // with actual Core Graphics calls to get real mouse state
-    
-    // Reset wheel delta after reading
+
+    m_buttonStates[0] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonLeft)   != 0;
+    m_buttonStates[1] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonRight)  != 0;
+    m_buttonStates[2] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonCenter) != 0;
+
+    CGEventRef ev = CGEventCreate(NULL);
+    CGPoint pt = CGEventGetLocation(ev);
+    CFRelease(ev);
+
+    if (m_screenWidth > 0 && m_screenHeight > 0) {
+        m_fVScreenX = std::max(0.f, std::min(800.f, (float)pt.x / m_screenWidth  * 800.f));
+        m_fVScreenY = std::max(0.f, std::min(600.f, (float)pt.y / m_screenHeight * 600.f));
+    }
+
     m_wheelDelta = 0;
 }
 
@@ -230,24 +246,22 @@ void CMacOSMouse::SetInertia(float)
 
 void CMacOSMouse::SetVScreenX(float fX)
 {
-    // Stub implementation
+    m_fVScreenX = fX;
 }
 
 void CMacOSMouse::SetVScreenY(float fY)
 {
-    // Stub implementation
+    m_fVScreenY = fY;
 }
 
 float CMacOSMouse::GetVScreenX()
 {
-    // Stub implementation - return 0
-    return 0.0f;
+    return m_fVScreenX;
 }
 
 float CMacOSMouse::GetVScreenY()
 {
-    // Stub implementation - return 0
-    return 0.0f;
+    return m_fVScreenY;
 }
 
 void CMacOSMouse::SetSensitvity(float fSensitivity)
@@ -351,6 +365,8 @@ CMacOSInput::CMacOSInput()
 {
     m_pKeyboard = new CMacOSKeyboard();
     m_pMouse = new CMacOSMouse();
+    m_pKeyboard->Init();
+    m_pMouse->Init();
 }
 
 CMacOSInput::~CMacOSInput()
@@ -395,12 +411,15 @@ IMouse* CMacOSInput::GetIMouse()
 
 void CMacOSInput::AddEventListener(IInputEventListener* pListener)
 {
-    // Stub implementation
+    if (std::find(m_listeners.begin(), m_listeners.end(), pListener) == m_listeners.end())
+        m_listeners.push_back(pListener);
 }
 
 void CMacOSInput::RemoveEventListener(IInputEventListener* pListener)
 {
-    // Stub implementation
+    auto it = std::find(m_listeners.begin(), m_listeners.end(), pListener);
+    if (it != m_listeners.end())
+        m_listeners.erase(it);
 }
 
 void CMacOSInput::EnableEventPosting(bool bEnable)
@@ -411,12 +430,15 @@ void CMacOSInput::EnableEventPosting(bool bEnable)
 
 void CMacOSInput::AddConsoleEventListener(IInputEventListener* pListener)
 {
-    // Stub implementation
+    if (std::find(m_consoleListeners.begin(), m_consoleListeners.end(), pListener) == m_consoleListeners.end())
+        m_consoleListeners.push_back(pListener);
 }
 
 void CMacOSInput::RemoveConsoleEventListener(IInputEventListener* pListener)
 {
-    // Stub implementation
+    auto it = std::find(m_consoleListeners.begin(), m_consoleListeners.end(), pListener);
+    if (it != m_consoleListeners.end())
+        m_consoleListeners.erase(it);
 }
 
 void CMacOSInput::SetExclusiveListener(IInputEventListener* pListener)
@@ -626,7 +648,12 @@ unsigned char CMacOSInput::GetKeyState(int nKey)
 
 void CMacOSInput::PostEvent(const SInputEvent& event)
 {
-    // Stub implementation - no actual event posting
+    if (!m_bEventPostingEnabled)
+        return;
+    for (auto* l : m_consoleListeners)
+        if (l->OnInputEvent(event)) return;
+    for (auto* l : m_listeners)
+        if (l->OnInputEvent(event)) return;
 }
 
 #endif // __APPLE__ && __MACH__

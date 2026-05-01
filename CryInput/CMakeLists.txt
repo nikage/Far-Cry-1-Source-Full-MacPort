@@ -109,3 +109,5 @@ install(TARGETS CryInput
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+stage_dylib_to_bundle(CryInput)

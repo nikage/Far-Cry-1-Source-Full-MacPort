@@ -116,6 +116,10 @@ protected:
     int m_wheelDelta;
     bool m_bHidden;
     bool m_bExclusive;
+    float m_fVScreenX;
+    float m_fVScreenY;
+    float m_screenWidth;
+    float m_screenHeight;
     
     void ProcessMouseEvent(void* event);
     int ConvertMacOSButton(int button);
