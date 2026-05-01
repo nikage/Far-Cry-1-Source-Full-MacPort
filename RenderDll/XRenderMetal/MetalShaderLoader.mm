@@ -1174,6 +1174,7 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
     {
         iLog->Log("Error: Failed to create shader library: %s\n",
                error ? [[error localizedDescription] UTF8String] : "Unknown error");
+        assert(!"MetalShaderManager: UtilShaders.metallib not found in bundle or executable directory");
         return false;
     }
     
@@ -1414,7 +1415,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
     if (!generatedLibrary)
     {
         if (iLog)
-            iLog->Log("MetalShaderManager: Generated shader library not found (%s)\n", error ? [[error localizedDescription] UTF8String] : "unknown error");
+            iLog->Log("MetalShaderManager: GeneratedShaders.metallib not found (%s)\n", error ? [[error localizedDescription] UTF8String] : "unknown error");
+        assert(!"MetalShaderManager: GeneratedShaders.metallib not found in bundle or executable directory");
         return;
     }
 

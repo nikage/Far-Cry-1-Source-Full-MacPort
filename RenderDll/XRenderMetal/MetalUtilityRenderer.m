@@ -128,12 +128,17 @@ public:
         if (!m_spritePipelineState) CreateSpritePipelineState();
         return m_spritePipelineState;
     }
+    id<MTLRenderPipelineState> GetFontPipeline() {
+        if (!m_fontPipelineState) CreateFontPipelineState();
+        return m_fontPipelineState;
+    }
 
 protected:
     // Metal-specific utility rendering
     void CreateDebugPipelineState();
     void CreateTextPipelineState();
     void CreateSpritePipelineState();
+    void CreateFontPipelineState();
     
     // Text rendering
     struct TextMessage
@@ -152,6 +157,8 @@ protected:
     id<MTLRenderPipelineState> m_textPipelineState;
     id<MTLRenderPipelineState> m_debugPipelineState;
     id<MTLRenderPipelineState> m_spritePipelineState;
+    id<MTLRenderPipelineState> m_solidColorPipelineState;
+    id<MTLRenderPipelineState> m_fontPipelineState;
     
     // Current rendering state
     bool m_2DMode;

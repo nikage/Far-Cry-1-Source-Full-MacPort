@@ -393,6 +393,27 @@ else()
 endif()
 add_dependencies(MetalShaders GeneratedMetalBundleResources)
 
+add_custom_command(
+    OUTPUT  ${FARCRY_APP_RESOURCES_DIR}/SpriteShaders.metallib
+            ${FARCRY_APP_RESOURCES_DIR}/UtilShaders.metallib
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_APP_RESOURCES_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
+        ${FARCRY_APP_RESOURCES_DIR}/SpriteShaders.metallib
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
+        ${FARCRY_APP_RESOURCES_DIR}/UtilShaders.metallib
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/SpriteShaders.metallib
+            ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
+    COMMENT "Staging SpriteShaders and UtilShaders into FarCry.app resources"
+    VERBATIM
+)
+add_custom_target(StagedMetalShaders ALL
+    DEPENDS ${FARCRY_APP_RESOURCES_DIR}/SpriteShaders.metallib
+            ${FARCRY_APP_RESOURCES_DIR}/UtilShaders.metallib)
+add_dependencies(StagedMetalShaders MetalShaders)
+add_dependencies(XRenderMetal StagedMetalShaders)
+
 # ------------------------------------------------------------------
 # Unit tests — pure-logic renderer functions (no Metal dependency)
 # ------------------------------------------------------------------
@@ -415,3 +436,5 @@ if(BUILD_TESTING OR CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_test(NAME RendererLogicTests COMMAND RendererLogicTests)
 endif()
 
+
+stage_dylib_to_bundle(XRenderMetal)

@@ -429,7 +429,7 @@ private:
         return m_shaderManager ? m_shaderManager->GetDefaultLibrary() : nil;
     }
     virtual id<MTLRenderPipelineState> GetFontPSO() override {
-        return m_utilityRenderer ? m_utilityRenderer->GetSpritePSO() : nil;
+        return m_utilityRenderer ? m_utilityRenderer->GetFontPipeline() : nil;
     }
     
     struct DebugVertex
