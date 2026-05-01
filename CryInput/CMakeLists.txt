@@ -32,6 +32,7 @@ file(GLOB_RECURSE CRYINPUT_HEADERS
 if(APPLE)
     list(APPEND CRYINPUT_SOURCES
         MacOSInput.cpp
+        MacOSMouseHelper.mm
         JoystickMacOS.cpp
         XKeyboardMacOS.cpp
         XMouseMacOS.cpp

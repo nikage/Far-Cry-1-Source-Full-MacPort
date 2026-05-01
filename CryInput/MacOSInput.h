@@ -23,6 +23,13 @@
 #include "Cry_Math.h"  // For Vec3
 #include <cassert>
 
+extern "C" {
+void MacOS_GetMouseVScreenXY(float screenW, float screenH, float* outVX, float* outVY);
+void MacOS_GetMouseButtons(int* left, int* right, int* middle);
+void MacOS_GetScreenDimensions(float* outW, float* outH);
+void MacOS_SetSystemCursorVisible(int visible);
+}
+
 // Forward declarations
 
 // macOS-specific keyboard implementation

@@ -17,7 +17,6 @@
 
 #include "MacOSInput.h"
 #include "ISystem.h"
-#include <CoreGraphics/CoreGraphics.h>
 #include <algorithm>
 
 // CMacOSKeyboard implementation - minimal stubs
@@ -149,10 +148,11 @@ CMacOSMouse::~CMacOSMouse()
 
 bool CMacOSMouse::Init()
 {
-    m_screenWidth  = (float)CGDisplayPixelsWide(CGMainDisplayID());
-    m_screenHeight = (float)CGDisplayPixelsHigh(CGMainDisplayID());
+    MacOS_GetScreenDimensions(&m_screenWidth, &m_screenHeight);
     assert(m_screenWidth  > 0 && "CMacOSMouse::Init: could not determine display width");
     assert(m_screenHeight > 0 && "CMacOSMouse::Init: could not determine display height");
+    MacOS_SetSystemCursorVisible(0);
+    m_bHidden = true;
     return true;
 }
 
@@ -160,25 +160,21 @@ void CMacOSMouse::Update()
 {
     memcpy(m_prevButtonStates, m_buttonStates, sizeof(m_buttonStates));
 
-    m_buttonStates[0] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonLeft)   != 0;
-    m_buttonStates[1] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonRight)  != 0;
-    m_buttonStates[2] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonCenter) != 0;
+    int left = 0, right = 0, middle = 0;
+    MacOS_GetMouseButtons(&left, &right, &middle);
+    m_buttonStates[0] = (left   != 0);
+    m_buttonStates[1] = (right  != 0);
+    m_buttonStates[2] = (middle != 0);
 
-    CGEventRef ev = CGEventCreate(NULL);
-    CGPoint pt = CGEventGetLocation(ev);
-    CFRelease(ev);
-
-    if (m_screenWidth > 0 && m_screenHeight > 0) {
-        m_fVScreenX = std::max(0.f, std::min(800.f, (float)pt.x / m_screenWidth  * 800.f));
-        m_fVScreenY = std::max(0.f, std::min(600.f, (float)pt.y / m_screenHeight * 600.f));
-    }
+    MacOS_GetMouseVScreenXY(m_screenWidth, m_screenHeight, &m_fVScreenX, &m_fVScreenY);
 
     m_wheelDelta = 0;
 }
 
 void CMacOSMouse::Shutdown()
 {
-    // Stub implementation
+    MacOS_SetSystemCursorVisible(1);
+    m_bHidden = false;
 }
 
 bool CMacOSMouse::MouseDown(int p_numButton)
@@ -341,8 +337,10 @@ int CMacOSMouse::GetWheelDelta()
 
 void CMacOSMouse::Hide(bool hide)
 {
-    // Stub implementation
+    if (hide == m_bHidden)
+        return;
     m_bHidden = hide;
+    MacOS_SetSystemCursorVisible(hide ? 0 : 1);
 }
 
 void CMacOSMouse::ProcessMouseEvent(void* event)
