@@ -707,6 +707,50 @@ static void test_no_transient_buffer_allocation_pattern()
         CHECK(std::fabs(a[i] - b[i]) < eps);
 }
 
+// ---------------------------------------------------------------------------
+// Mirrors CMacOSMouse::Update() coordinate mapping: physical → virtual 800×600.
+// m_fVScreenX = clamp(pt.x / screenW * 800, 0, 800)
+// m_fVScreenY = clamp(pt.y / screenH * 600, 0, 600)
+static float mapToVScreenX(float px, float screenW)
+{
+    float v = px / screenW * 800.f;
+    return v < 0.f ? 0.f : (v > 800.f ? 800.f : v);
+}
+static float mapToVScreenY(float py, float screenH)
+{
+    float v = py / screenH * 600.f;
+    return v < 0.f ? 0.f : (v > 600.f ? 600.f : v);
+}
+
+static void test_virtual_screen_coordinate_mapping()
+{
+    const float eps = 1e-4f;
+
+    // Centre of a 2560×1440 display → virtual (400, 300)
+    CHECK(std::fabs(mapToVScreenX(1280.f, 2560.f) - 400.f) < eps);
+    CHECK(std::fabs(mapToVScreenY( 720.f, 1440.f) - 300.f) < eps);
+
+    // Centre of a 1920×1080 display → virtual (400, 300)
+    CHECK(std::fabs(mapToVScreenX(960.f,  1920.f) - 400.f) < eps);
+    CHECK(std::fabs(mapToVScreenY(540.f,  1080.f) - 300.f) < eps);
+
+    // Top-left (0,0) → virtual (0, 0)
+    CHECK(std::fabs(mapToVScreenX(0.f, 1920.f)) < eps);
+    CHECK(std::fabs(mapToVScreenY(0.f, 1080.f)) < eps);
+
+    // Bottom-right (screen edge) → virtual (800, 600)
+    CHECK(std::fabs(mapToVScreenX(1920.f, 1920.f) - 800.f) < eps);
+    CHECK(std::fabs(mapToVScreenY(1080.f, 1080.f) - 600.f) < eps);
+
+    // Clamping: negative coordinate → 0
+    CHECK(std::fabs(mapToVScreenX(-100.f, 1920.f)) < eps);
+    CHECK(std::fabs(mapToVScreenY(-100.f, 1080.f)) < eps);
+
+    // Clamping: beyond edge → 800 / 600
+    CHECK(std::fabs(mapToVScreenX(2000.f, 1920.f) - 800.f) < eps);
+    CHECK(std::fabs(mapToVScreenY(1200.f, 1080.f) - 600.f) < eps);
+}
+
 int main()
 {
     printf("=== RendererLogicTests ===\n");
@@ -727,6 +771,7 @@ int main()
     test_font_vertex_color_format_is_non_normalized();
     test_font_ortho_matrix();
     test_no_transient_buffer_allocation_pattern();
+    test_virtual_screen_coordinate_mapping();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;
