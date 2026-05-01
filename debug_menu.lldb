@@ -1,0 +1,15 @@
+command script import /tmp/farcry_diag3.py
+
+# Confirm CUIButton::Draw fires
+breakpoint set --name "CUIButton::Draw" --shlib libCryGame.dylib --one-shot true
+breakpoint command add --python-function farcry_diag3.diag_drawstring 1
+
+# Confirm font DrawStringW fires with plausible coordinates
+breakpoint set --name "CFFont::DrawStringW" --shlib libCryFont.dylib --one-shot true
+breakpoint command add --python-function farcry_diag3.diag_drawstring 2
+
+# Confirm DrawDynVB submits geometry (font glyphs going to GPU)
+breakpoint set --name "CMetalBaseRenderer::DrawDynVB" --shlib libXRenderMetal.dylib --one-shot true
+breakpoint command add --python-function farcry_diag3.diag_drawdynvb 3
+
+process launch
