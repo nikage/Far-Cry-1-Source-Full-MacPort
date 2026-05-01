@@ -2,11 +2,71 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:intro_video_converter/convert_config.dart';
 import 'package:intro_video_converter/intro_video_converter.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
+  group('buildConfig', () {
+    test('paths are rooted under the given project root', () {
+      final config = buildConfig('/myproject');
+      expect(config.manifestPath, contains('intro_videos.yaml'));
+      expect(config.inputDirectory, endsWith(p.join('Languages', 'Movies')));
+      expect(config.outputDirectory, endsWith(p.join('build', 'converted_videos')));
+      expect(config.pakOutputPath, endsWith('VideoConverted.pak'));
+      expect(config.pakDirectory, 'languages/movies/english');
+    });
+
+    test('crf, preset and audioBitrate are forwarded', () {
+      final config = buildConfig('/r', crf: 23, preset: 'fast', audioBitrate: '128k');
+      expect(config.crf, 23);
+      expect(config.preset, 'fast');
+      expect(config.audioBitrate, '128k');
+    });
+  });
+
+  group('intro_videos.yaml output paths match CMakeLists expectations', () {
+    late List<VideoSpec> specs;
+
+    setUp(() {
+      final yamlPath = p.join(Directory.current.path, 'intro_videos.yaml');
+      specs = VideoSpec.loadFromYaml(File(yamlPath).readAsStringSync());
+    });
+
+    test('all English intro videos output to english/English/', () {
+      final introSpecs = specs.where((s) => s.source.startsWith('English/')).toList();
+      expect(introSpecs, isNotEmpty);
+      for (final spec in introSpecs) {
+        expect(
+          spec.output,
+          startsWith('english/English/'),
+          reason: '${spec.id}: output "${spec.output}" must start with english/English/  '
+              '(CMakeLists copies converted_videos/english/English/ -> Resources/languages/movies/english/)',
+        );
+      }
+    });
+
+    test('demo loop outputs to english/DemoLoops/', () {
+      final demoSpecs = specs.where((s) => s.source.startsWith('DemoLoops/')).toList();
+      expect(demoSpecs, isNotEmpty);
+      for (final spec in demoSpecs) {
+        expect(
+          spec.output,
+          startsWith('english/DemoLoops/'),
+          reason: '${spec.id}: output "${spec.output}" must start with english/DemoLoops/  '
+              '(CMakeLists copies converted_videos/english/DemoLoops/ -> Resources/languages/movies/english/demoloops/)',
+        );
+      }
+    });
+
+    test('all outputs end with .mp4', () {
+      for (final spec in specs) {
+        expect(spec.output, endsWith('.mp4'), reason: '${spec.id} must produce an .mp4');
+      }
+    });
+  });
+
   group('VideoSpec', () {
     test('parses manifest', () {
       const yaml = '''
