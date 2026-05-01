@@ -13,6 +13,7 @@
 
 #include "stdafx.h"
 #include "System.h"
+#include "AssetValidator.h"
 #include <fstream>
 #include <time.h>
 #include <stdarg.h>
@@ -1449,6 +1450,12 @@ void CSystem::OpenBasicPaks()
 	// Open all *.pak files in root folder.
 	m_pIPak->OpenPacks( "*.pak" );
 	m_pIPak->OpenPacks( "",paksFolder.c_str() );
+
+	CAssetValidator validator;
+	if (!validator.ValidateMountedPaks(m_pIPak, GetILog()))
+	{
+		Error("Critical game paks are missing. Ensure FCData/Scripts.pak is present in the app bundle.");
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////

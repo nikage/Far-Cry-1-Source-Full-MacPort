@@ -238,3 +238,5 @@ install(TARGETS CrySystem
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+stage_dylib_to_bundle(CrySystem)

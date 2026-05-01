@@ -2154,6 +2154,8 @@ void CCryPak::OnMissingFile (const char* szPath)
 	// AUTO_LOCK(m_csMain); // REMOVED - causes deadlock since FOpen already holds this lock
 	if (m_pPakVars->nLogMissingFiles)
 	{
+		m_pLog->LogWarning("[Asset] Missing: %s", szPath);
+
 		std::pair<MissingFileMap::iterator, bool> insertion = m_mapMissingFiles.insert (MissingFileMap::value_type(szPath,1));
 		if (m_pPakVars->nLogMissingFiles >= 2 && (insertion.second || m_pPakVars->nLogMissingFiles >= 3))
 		{
