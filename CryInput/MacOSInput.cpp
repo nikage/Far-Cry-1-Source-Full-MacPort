@@ -16,8 +16,10 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "MacOSInput.h"
+#include "MacOSMouseKeyMap.h"
 #include "ISystem.h"
 #include <algorithm>
+#include <cassert>
 
 // CMacOSKeyboard implementation - minimal stubs
 CMacOSKeyboard::CMacOSKeyboard()
@@ -179,29 +181,26 @@ void CMacOSMouse::Shutdown()
 
 bool CMacOSMouse::MouseDown(int p_numButton)
 {
-    // Check if button is currently down
-    if (p_numButton >= 0 && p_numButton < 8) {
-        return m_buttonStates[p_numButton];
-    }
-    return false;
+    const int idx = XKeyToMouseIndex(p_numButton);
+    assert(idx >= 0 && "CMacOSMouse::MouseDown: unknown mouse key");
+    if (idx < 0 || idx >= 8) return false;
+    return m_buttonStates[idx];
 }
 
 bool CMacOSMouse::MousePressed(int p_numButton)
 {
-    // Check if button was just pressed (down this frame but not last frame)
-    if (p_numButton >= 0 && p_numButton < 8) {
-        return m_buttonStates[p_numButton] && !m_prevButtonStates[p_numButton];
-    }
-    return false;
+    const int idx = XKeyToMouseIndex(p_numButton);
+    assert(idx >= 0 && "CMacOSMouse::MousePressed: unknown mouse key");
+    if (idx < 0 || idx >= 8) return false;
+    return m_buttonStates[idx] && !m_prevButtonStates[idx];
 }
 
 bool CMacOSMouse::MouseReleased(int p_numButton)
 {
-    // Check if button was just released (up this frame but down last frame)
-    if (p_numButton >= 0 && p_numButton < 8) {
-        return !m_buttonStates[p_numButton] && m_prevButtonStates[p_numButton];
-    }
-    return false;
+    const int idx = XKeyToMouseIndex(p_numButton);
+    assert(idx >= 0 && "CMacOSMouse::MouseReleased: unknown mouse key");
+    if (idx < 0 || idx >= 8) return false;
+    return !m_buttonStates[idx] && m_prevButtonStates[idx];
 }
 
 void CMacOSMouse::SetMouseWheelRotation(int value)
