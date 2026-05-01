@@ -24,3 +24,5 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 install(TARGETS CryEntitySystem LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+
+stage_dylib_to_bundle(CryEntitySystem)

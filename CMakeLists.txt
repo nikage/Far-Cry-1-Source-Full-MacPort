@@ -102,6 +102,21 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
 endif()
 
+# Helper: copy a single dylib into the app bundle immediately after it is rebuilt.
+# Must be called from the same CMakeLists.txt that defines the target (subdirectory).
+function(stage_dylib_to_bundle tgt)
+    if(APPLE)
+        add_custom_command(TARGET ${tgt} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:${tgt}>"
+                "${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/"
+            COMMENT "Staging ${tgt} to app bundle"
+        )
+    endif()
+endfunction()
+
 # Add CryCommon as interface library
 enable_testing()
 add_subdirectory(CryCommon)
@@ -364,4 +379,5 @@ if(APPLE)
             COMMENT "Copying converted demoloop videos for AVFoundation playback"
         )
     endif()
+
 endif()
