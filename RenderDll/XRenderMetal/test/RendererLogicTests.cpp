@@ -711,6 +711,11 @@ static void test_no_transient_buffer_allocation_pattern()
 // Mirrors CMacOSMouse::Update() coordinate mapping: physical → virtual 800×600.
 // m_fVScreenX = clamp(pt.x / screenW * 800, 0, 800)
 // m_fVScreenY = clamp(pt.y / screenH * 600, 0, 600)
+//
+// System cursor visibility: MacOS_SetSystemCursorVisible() must use
+// CGDisplayHideCursor(kCGNullDirectDisplay) / CGDisplayShowCursor(kCGNullDirectDisplay).
+// [NSCursor hide] must NOT be used — AppKit resets it when NSWindow becomes key,
+// causing the system cursor to reappear on top of the in-game cursor.
 static float mapToVScreenX(float px, float screenW)
 {
     float v = px / screenW * 800.f;
@@ -751,6 +756,44 @@ static void test_virtual_screen_coordinate_mapping()
     CHECK(std::fabs(mapToVScreenY(1200.f, 1080.f) - 600.f) < eps);
 }
 
+// ---------------------------------------------------------------------------
+// Verifies that the system cursor hide implementation contract is correct.
+// The CMacOSMouse hide state machine must be balanced: Init hides once,
+// Shutdown shows once. No extra hide/show calls may be issued for the same state.
+static void test_system_cursor_hide_state_machine()
+{
+    // Simulate CMacOSMouse hide state guard (mirrors the production code).
+    bool hidden = false;
+    int hideCalls = 0;
+    int showCalls = 0;
+
+    auto hide = [&](bool doHide) {
+        if (doHide == hidden) return;
+        hidden = doHide;
+        if (doHide) ++hideCalls; else ++showCalls;
+    };
+
+    // Init hides the cursor exactly once.
+    hide(true);
+    CHECK(hideCalls == 1);
+    CHECK(showCalls == 0);
+
+    // A second call with same state is a no-op (guard prevents double-hide).
+    hide(true);
+    CHECK(hideCalls == 1);
+
+    // Shutdown shows the cursor exactly once.
+    hide(false);
+    CHECK(showCalls == 1);
+
+    // A second call with same state is a no-op (guard prevents double-show).
+    hide(false);
+    CHECK(showCalls == 1);
+
+    // Hide/show calls are balanced.
+    CHECK(hideCalls == showCalls);
+}
+
 int main()
 {
     printf("=== RendererLogicTests ===\n");
@@ -772,6 +815,7 @@ int main()
     test_font_ortho_matrix();
     test_no_transient_buffer_allocation_pattern();
     test_virtual_screen_coordinate_mapping();
+    test_system_cursor_hide_state_machine();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

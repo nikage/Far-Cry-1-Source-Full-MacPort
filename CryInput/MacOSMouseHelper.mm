@@ -7,7 +7,6 @@
 #undef BOOL
 #endif
 #import <CoreGraphics/CoreGraphics.h>
-#import <AppKit/NSCursor.h>
 #include <algorithm>
 
 extern "C" {
@@ -42,9 +41,9 @@ void MacOS_GetScreenDimensions(float* outW, float* outH)
 void MacOS_SetSystemCursorVisible(int visible)
 {
     if (visible)
-        [NSCursor unhide];
+        CGDisplayShowCursor(kCGNullDirectDisplay);
     else
-        [NSCursor hide];
+        CGDisplayHideCursor(kCGNullDirectDisplay);
 }
 
 }
