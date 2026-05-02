@@ -538,11 +538,13 @@ bool CStatObj::CheckValidVegetation()
     strncpy(buff, pTemplateName, sizeof(buff)); buff[sizeof(buff)-1]=0;
     strlwr(buff);
     if( !strstr(buff,"templplants") && 
+        !strstr(buff,"cgrcplants") &&         // Metal renderer plant shader family
+        !strstr(buff,"cgrcambienttempl") &&   // Metal renderer ambient template
         !strstr(buff,"nodraw") &&
 				!strstr(buff,"templdecal_vcolors") &&
 				!strstr(buff,"templdecalalphatest_vcolors"))
     {
-#if !defined(LINUX)//don't worry, we won't render anything under linux
+#if !defined(LINUX) && !defined(__APPLE__)
 			Warning( 0,m_szFileName,"CStatObj::CheckValidVegetation: Shader template is undefined or can not be used for vegetations: %s [%s]", 
         pTemplateName, m_szFileName);
 //      return false;
