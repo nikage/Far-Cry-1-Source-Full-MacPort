@@ -278,6 +278,7 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E remove "${FARCRY_LEVELS_LINK}"
         COMMAND ln -sfn "${STEAM_LEVELS_PATH}" "${FARCRY_LEVELS_LINK}"
         COMMENT "Symlinking CrossOver Steam Levels into FCData"
+        VERBATIM
     )
     
     # Copy FCData directory to Resources (contains all PAK files)

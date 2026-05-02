@@ -96,7 +96,7 @@ static void test_null_network()
     CNullNetwork *net = new CNullNetwork(nullptr);
 
     CHECK(net->GetLocalIP() == 0);
-    CHECK(net->GetCompressionHelper() == nullptr);
+    CHECK(net->GetCompressionHelper() != nullptr);
     CHECK(net->GetClient() == nullptr);
     CHECK(net->GetServerByPort(0) == nullptr);
     CHECK(net->VerifyMultiplayerOverInternet() == false);
@@ -111,12 +111,60 @@ static void test_null_network()
     net->Release();
 }
 
+static void test_null_compression_helper()
+{
+    CNullCompressionHelper helper;
+    CStream stm;
+
+    // round-trip: unsigned char
+    const unsigned char kByte = 0xAB;
+    CHECK(helper.Write(stm, kByte));
+    stm.Seek(0);
+    unsigned char readByte = 0;
+    CHECK(helper.Read(stm, readByte));
+    CHECK(readByte == kByte);
+
+    // round-trip: string
+    stm.Reset();
+    const char* kStr = "TeamAlpha";
+    CHECK(helper.Write(stm, kStr));
+    stm.Seek(0);
+    char outBuf[64] = {};
+    CHECK(helper.Read(stm, outBuf, sizeof(outBuf)));
+    CHECK(strcmp(outBuf, kStr) == 0);
+
+    // round-trip: empty string
+    stm.Reset();
+    CHECK(helper.Write(stm, ""));
+    stm.Seek(0);
+    char emptyBuf[8] = { 'x', 'x', 'x', 0 };
+    CHECK(helper.Read(stm, emptyBuf, sizeof(emptyBuf)));
+    CHECK(emptyBuf[0] == '\0');
+
+    // truncation: buffer smaller than the written string
+    stm.Reset();
+    CHECK(helper.Write(stm, "LongTeamName"));
+    stm.Seek(0);
+    char smallBuf[5] = {};
+    CHECK(helper.Read(stm, smallBuf, sizeof(smallBuf)));
+    CHECK(smallBuf[4] == '\0');
+
+    // nullptr treated as empty string
+    stm.Reset();
+    CHECK(helper.Write(stm, nullptr));
+    stm.Seek(0);
+    char nullBuf[8] = { 'z' };
+    CHECK(helper.Read(stm, nullBuf, sizeof(nullBuf)));
+    CHECK(nullBuf[0] == '\0');
+}
+
 // ---------------------------------------------------------------------------
 int main()
 {
     test_null_server();
     test_null_client();
     test_null_network();
+    test_null_compression_helper();
 
     if (g_failed == 0)
         printf("PASSED  %d/%d checks\n", g_total, g_total);

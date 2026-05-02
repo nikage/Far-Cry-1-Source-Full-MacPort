@@ -13,6 +13,57 @@
 #include <INetwork.h>
 #include <IPAddress.h>
 #include <IBitStream.h>
+#include <ICompressionHelper.h>
+#include <Stream.h>
+
+//////////////////////////////////////////////////////////////////////////////
+// CNullCompressionHelper
+// Writes/reads strings and bytes as raw data in the CStream buffer.
+// Protocol: uint16 length + bytes (including null terminator).
+//////////////////////////////////////////////////////////////////////////////
+class CNullCompressionHelper : public ICompressionHelper
+{
+public:
+    bool Write(CStream& stm, const unsigned char inChar) override
+    {
+        return stm.WriteData(&inChar, sizeof(inChar));
+    }
+
+    bool Read(CStream& stm, unsigned char& outChar) override
+    {
+        return stm.ReadData(&outChar, sizeof(outChar));
+    }
+
+    bool Write(CStream& stm, const char* psz) override
+    {
+        if (!psz) psz = "";
+        uint16_t len = static_cast<uint16_t>(strlen(psz));
+        if (!stm.WriteData(&len, sizeof(len))) return false;
+        return stm.WriteData(const_cast<char*>(psz), len);
+    }
+
+    bool Read(CStream& stm, char* outBuf, const DWORD maxSize) override
+    {
+        uint16_t len = 0;
+        if (!stm.ReadData(&len, sizeof(len))) return false;
+        DWORD readLen = (len < maxSize - 1) ? len : maxSize - 1;
+        if (readLen > 0 && !stm.ReadData(outBuf, readLen)) return false;
+        if (len > readLen)
+        {
+            // skip excess bytes that didn't fit
+            DWORD skip = len - readLen;
+            char tmp[64];
+            while (skip > 0)
+            {
+                DWORD chunk = skip < sizeof(tmp) ? skip : sizeof(tmp);
+                stm.ReadData(tmp, chunk);
+                skip -= chunk;
+            }
+        }
+        outBuf[readLen] = '\0';
+        return true;
+    }
+};
 
 //////////////////////////////////////////////////////////////////////////////
 // CNullServer
@@ -93,7 +144,11 @@ public:
     const char *EnumerateError(NRESULT) override { return ""; }
     void Release() override { delete this; }
     void GetMemoryStatistics(ICrySizer *) override {}
-    ICompressionHelper *GetCompressionHelper() override { return nullptr; }
+    ICompressionHelper *GetCompressionHelper() override
+    {
+        static CNullCompressionHelper s_helper;
+        return &s_helper;
+    }
     void ClearProtectedFiles() override {}
     void AddProtectedFile(const char *) override {}
     IServer *GetServerByPort(const WORD) override { return nullptr; }
