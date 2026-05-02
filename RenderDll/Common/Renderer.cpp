@@ -2738,8 +2738,8 @@ void CCObject::AddWaves(SWaveForm2 **pWF)
   }
   if (pWF)
   {
-    pWF[0] = (n1 < m_Waves.Num()) ? &m_Waves[n1] : nullptr;
-    pWF[1] = (n2 < m_Waves.Num()) ? &m_Waves[n2] : nullptr;
+    pWF[0] = (n1 >= 0 && n1 < m_Waves.Num()) ? &m_Waves[n1] : nullptr;
+    pWF[1] = (n2 >= 0 && n2 < m_Waves.Num()) ? &m_Waves[n2] : nullptr;
   }
 }
 

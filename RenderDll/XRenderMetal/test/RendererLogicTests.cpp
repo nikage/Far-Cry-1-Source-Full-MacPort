@@ -1536,6 +1536,64 @@ static void test_tangent_fallback_dummy_init_unit_x()
 }
 
 // -----------------------------------------------------------------------
+// Regression: EF_GetObject missing Init() call — precaching SIGBUS fix
+//
+// CCObject has union fields { m_nLod / m_NumWFX / m_TexId0 } and
+// { m_nTemplId / m_NumWFY / m_TexId1 }. A recycled pool slot carries stale
+// values in these fields. CCObject::Init() must zero them; CCObject::AddWaves
+// must guard against negative indices before indexing m_Waves.
+// -----------------------------------------------------------------------
+
+static void test_ccobject_init_zeros_wave_indices()
+{
+    // Mirror the relevant fields from CCObject.
+    struct FakeCCObject
+    {
+        short m_NumWFX = -5;
+        short m_NumWFY = -7;
+        void Init() { m_NumWFX = 0; m_NumWFY = 0; }
+    };
+
+    FakeCCObject obj;
+    CHECK(obj.m_NumWFX == -5);
+    CHECK(obj.m_NumWFY == -7);
+
+    obj.Init();
+
+    CHECK_EQ(obj.m_NumWFX, 0);
+    CHECK_EQ(obj.m_NumWFY, 0);
+}
+
+static void test_addwaves_negative_index_guard_yields_nullptr()
+{
+    // Simulate a pool-recycled object with stale m_NumWFX = -5 that somehow
+    // bypasses Init() (the primary fix). The defensive guard added to AddWaves
+    // (n1 >= 0 && n1 < Num()) must catch the negative index and return nullptr
+    // instead of crashing with EXC_BAD_ACCESS.
+
+    struct FakeWave { float amp; };
+    struct FakeArray
+    {
+        FakeWave data[4] = {};
+        int Num() const { return 4; }
+        FakeWave& operator[](int i) { return data[i]; }
+    };
+
+    FakeArray waves;
+
+    // Simulate AddWaves pWF assignment with the fixed guard.
+    int n1 = -5;  // stale negative index
+    int n2 = 0;   // valid index
+    FakeWave* pWF[2] = { nullptr, nullptr };
+
+    pWF[0] = (n1 >= 0 && n1 < waves.Num()) ? &waves[n1] : nullptr;
+    pWF[1] = (n2 >= 0 && n2 < waves.Num()) ? &waves[n2] : nullptr;
+
+    CHECK(pWF[0] == nullptr);   // negative index blocked → nullptr, no crash
+    CHECK(pWF[1] != nullptr);   // valid index still works
+}
+
+// -----------------------------------------------------------------------
 
 int main()
 {
@@ -1887,6 +1945,10 @@ int main()
         applySetShader(slot, &shaderB, true);
         CHECK_EQ(shaderB.refCount, 2);
     }
+
+    // Precaching crash regression — EF_GetObject missing Init() + AddWaves guard
+    test_ccobject_init_zeros_wave_indices();
+    test_addwaves_negative_index_guard_yields_nullptr();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

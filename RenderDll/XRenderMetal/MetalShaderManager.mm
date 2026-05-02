@@ -1583,14 +1583,14 @@ CCObject* CMetalShaderManager::EF_GetObject(bool bTemp, int num)
     static CCObject sPool[256];
     static int sNext = 0;
     CCObject* obj = &sPool[sNext++ & 255];
-    obj->m_ObjFlags = 0;
+    // Clear ShaderParams before Init() so it never attempts to delete a stale
+    // pointer left over from the previous use of this pool slot.
     obj->m_ShaderParams = nullptr;
     obj->m_bShaderParamCreatedInRenderer = false;
-    obj->m_RE = nullptr;
-    obj->m_EF = nullptr;
-    obj->m_CustomData = nullptr;
-    obj->m_DynLMMask = 0;
-    obj->m_RenderState = 0;
+    // Init() zeros m_NumWFX/m_NumWFY (and all other render-state fields) so
+    // AddWaves/SetupBending never indexes CCObject::m_Waves with a stale index.
+    // The D3D CRenderer::EF_GetObject follows the same contract (Renderer.cpp:2832).
+    obj->Init();
     return obj;
 }
 
