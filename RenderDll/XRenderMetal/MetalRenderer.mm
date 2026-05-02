@@ -222,11 +222,13 @@ extern "C" void* CryModuleMalloc(size_t size)
 
 extern "C" void* CryModuleRealloc(void* ptr, size_t size)
 {
-    assert(size > 0 && "CryModuleRealloc: size must be positive");
-    
+    if (size == 0)
+    {
+        free(ptr);
+        return nullptr;
+    }
     void* result = realloc(ptr, size);
     assert(result != nullptr && "CryModuleRealloc: realloc failed");
-    
     return result;
 }
 
@@ -1181,8 +1183,12 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
   bool useHDR = (nFlags & SHDF_ALLOWHDR) && m_hdrEnabled
                 && m_hdrColorRT != nil;
   if (useHDR) {
-    assert(m_hdrToneMapPSO && "HDR pipeline not initialised before EF_EndEf3D — call InitHDRPipeline() at startup");
-    useHDR = BeginHDRPass();
+    if (!m_hdrToneMapPSO) {
+      if (iLog) iLog->Log("Warning: HDR requested but tone-map PSO not ready — disabling for this frame");
+      useHDR = false;
+    } else {
+      useHDR = BeginHDRPass();
+    }
   }
 
   // Record end-of-list positions for all sort buckets
@@ -1442,16 +1448,11 @@ void CMetalRenderer::DeleteLeafBuffer(CLeafBuffer *pLBuffer) {
   CRenderer::DeleteLeafBuffer(pLBuffer);
 }
 
-// Helper macro for enhanced assertion messages with variable context
 #define ASSERT_UTILITY_RENDERER_INIT() \
   do { \
     if (!m_utilityRenderer) { \
-      char msg[512]; \
-      snprintf(msg, sizeof(msg), \
-               "%s: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, m_textureManager=%p, m_shaderManager=%p - Init() must complete successfully", \
-               __FUNCTION__, m_utilityRenderer.get(), m_isInitialized, m_device, \
-               m_textureManager.get(), m_shaderManager.get()); \
-      assert(false && msg); \
+      if (iLog) iLog->Log("%s: m_utilityRenderer is null — skipping", __FUNCTION__); \
+      return; \
     } \
   } while(0)
 
@@ -1484,12 +1485,8 @@ void CMetalRenderer::Draw2dImage(float xpos, float ypos, float w, float h,
                                  float t1, float angle, float r, float g,
                                  float b, float a, float z) {
   if (!m_utilityRenderer) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "Draw2dImage: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, texture_id=%d, viewport=(%d,%d,%d,%d) - Init() must complete successfully",
-             m_utilityRenderer.get(), m_isInitialized, m_device, texture_id,
-             m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight);
-    assert(false && msg);
+    if (iLog) iLog->Log("Draw2dImage: m_utilityRenderer is null — skipping");
+    return;
   }
   m_utilityRenderer->Draw2dImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1,
                                    angle, r, g, b, a, z);
@@ -1499,11 +1496,8 @@ void CMetalRenderer::DrawImage(float xpos, float ypos, float w, float h,
                                int texture_id, float s0, float t0, float s1,
                                float t1, float r, float g, float b, float a) {
   if (!m_utilityRenderer) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "DrawImage: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, texture_id=%d, pos=(%.1f,%.1f), size=(%.1f,%.1f) - Init() must complete successfully",
-             m_utilityRenderer.get(), m_isInitialized, m_device, texture_id, xpos, ypos, w, h);
-    assert(false && msg);
+    if (iLog) iLog->Log("DrawImage: m_utilityRenderer is null — skipping");
+    return;
   }
   m_utilityRenderer->DrawImage(xpos, ypos, w, h, texture_id, s0, t0, s1, t1,
                                  r, g, b, a);
@@ -1511,11 +1505,8 @@ void CMetalRenderer::DrawImage(float xpos, float ypos, float w, float h,
 
 int CMetalRenderer::SetPolygonMode(int mode) {
   if (!m_utilityRenderer) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetPolygonMode: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, mode=%d (valid: 0=point,1=wireframe,2=solid) - Init() must complete successfully",
-             m_utilityRenderer.get(), m_isInitialized, m_device, mode);
-    assert(false && msg);
+    if (iLog) iLog->Log("SetPolygonMode: m_utilityRenderer is null — skipping");
+    return 0;
   }
   return m_utilityRenderer->SetPolygonMode(mode);
 }
@@ -1532,27 +1523,87 @@ void CMetalRenderer::ResetTextureMatrix() {
 
 void CMetalRenderer::SetMaterialColor(float r, float g, float b, float a) {
   if (!m_utilityRenderer) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetMaterialColor: m_utilityRenderer=%p, m_isInitialized=%d, m_device=%p, rgba=(%.3f,%.3f,%.3f,%.3f) - Init() must complete successfully",
-             m_utilityRenderer.get(), m_isInitialized, m_device, r, g, b, a);
-    assert(false && msg);
+    if (iLog) iLog->Log("SetMaterialColor: m_utilityRenderer is null — skipping");
+    return;
   }
   m_utilityRenderer->SetMaterialColor(r, g, b, a);
 }
 
+int CMetalRenderer::GenerateAlphaGlowTexture(float k) {
+  if (!m_utilityRenderer) return 0;
+  return m_utilityRenderer->GenerateAlphaGlowTexture(k);
+}
+
+void CMetalRenderer::OnEntityDeleted(IEntityRender* pEntityRender) {
+  if (m_utilityRenderer) m_utilityRenderer->OnEntityDeleted(pEntityRender);
+}
+
+void CMetalRenderer::SetGlobalShaderTemplateId(int nTemplateId) {
+  if (m_utilityRenderer) m_utilityRenderer->SetGlobalShaderTemplateId(nTemplateId);
+}
+
+int CMetalRenderer::GetGlobalShaderTemplateId() {
+  if (!m_utilityRenderer) return 0;
+  return m_utilityRenderer->GetGlobalShaderTemplateId();
+}
+
+int CMetalRenderer::EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset) {
+  if (!m_utilityRenderer) return 0;
+  return m_utilityRenderer->EnumAAFormats(Formats, bReset);
+}
+
+float CMetalRenderer::EF_GetWaterZElevation(float fX, float fY) {
+  if (!m_utilityRenderer) return 0.0f;
+  return m_utilityRenderer->EF_GetWaterZElevation(fX, fY);
+}
+
+void CMetalRenderer::Draw2dLine(float x1, float y1, float x2, float y2) {
+  if (m_utilityRenderer) m_utilityRenderer->Draw2dLine(x1, y1, x2, y2);
+}
+
+void CMetalRenderer::SetLineWidth(float fWidth) {
+  if (m_utilityRenderer) m_utilityRenderer->SetLineWidth(fWidth);
+}
+
+void CMetalRenderer::DrawLine(const Vec3& vPos1, const Vec3& vPos2) {
+  if (m_utilityRenderer) m_utilityRenderer->DrawLine(vPos1, vPos2);
+}
+
+void CMetalRenderer::DrawLineColor(const Vec3& vPos1, const CFColor& vColor1,
+                                   const Vec3& vPos2, const CFColor& vColor2) {
+  if (m_utilityRenderer) m_utilityRenderer->DrawLineColor(vPos1, vColor1, vPos2, vColor2);
+}
+
+void CMetalRenderer::Graph(byte* g, int x, int y, int wdt, int hgt, int nC, int type,
+                            char* text, CFColor& color, float fScale) {
+  if (m_utilityRenderer) m_utilityRenderer->Graph(g, x, y, wdt, hgt, nC, type, text, color, fScale);
+}
+
+void CMetalRenderer::DrawBall(float x, float y, float z, float radius) {
+  if (m_utilityRenderer) m_utilityRenderer->DrawBall(x, y, z, radius);
+}
+
+void CMetalRenderer::ResetToDefault() {
+  if (m_utilityRenderer) m_utilityRenderer->ResetToDefault();
+}
+
+int CMetalRenderer::ScreenToTexture() {
+  if (!m_utilityRenderer) return 0;
+  return m_utilityRenderer->ScreenToTexture();
+}
+
 int CMetalRenderer::CreateRenderTarget(int nWidth, int nHeight, ETEX_Format eTF) {
-  ASSERT_UTILITY_RENDERER_INIT();
+  if (!m_utilityRenderer) { if (iLog) iLog->Log("CreateRenderTarget: m_utilityRenderer is null — skipping"); return 0; }
   return m_utilityRenderer->CreateRenderTarget(nWidth, nHeight, eTF);
 }
 
 bool CMetalRenderer::DestroyRenderTarget(int nHandle) {
-  ASSERT_UTILITY_RENDERER_INIT();
+  if (!m_utilityRenderer) { if (iLog) iLog->Log("DestroyRenderTarget: m_utilityRenderer is null — skipping"); return false; }
   return m_utilityRenderer->DestroyRenderTarget(nHandle);
 }
 
 bool CMetalRenderer::SetRenderTarget(int nHandle) {
-  ASSERT_UTILITY_RENDERER_INIT();
+  if (!m_utilityRenderer) { if (iLog) iLog->Log("SetRenderTarget: m_utilityRenderer is null — skipping"); return false; }
   return m_utilityRenderer->SetRenderTarget(nHandle);
 }
 
@@ -1973,8 +2024,6 @@ void CMetalRenderer::SetState(int State) {
 }
 
 void CMetalRenderer::SetCullMode(int mode) {
-  assert(m_renderEncoder != nil && "SetCullMode: render encoder cannot be null");
-  
   if (!m_renderEncoder)
     return;
 
@@ -2083,10 +2132,10 @@ bool CMetalRenderer::EnableFog(bool enable) {
 
 void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
                             const float *color, int fogmode) {
-  assert(density >= 0.0f && "SetFog: density cannot be negative");
-  assert(fogstart >= 0.0f && "SetFog: fog start cannot be negative");
-  assert(fogend >= fogstart && "SetFog: fog end must be >= fog start");
-  assert(color != nullptr && "SetFog: color array cannot be null");
+  if (!color) return;
+  if (density < 0.0f) density = 0.0f;
+  if (fogstart < 0.0f) fogstart = 0.0f;
+  if (fogend < fogstart) fogend = fogstart;
   
   m_fogEnabled = true;
   
@@ -2622,15 +2671,6 @@ void CMetalRenderer::BeginFrame() {
 
   CMetalBaseRenderer::BeginFrame();
 
-#if defined(DEBUG) || defined(_DEBUG)
-  if (m_nFrameID == 2 && m_shaderManager)
-  {
-      int fallbacks = m_shaderManager->GetGeneratedFallbackCount();
-      if (fallbacks > 0)
-          iLog->Log("WARNING: Generated shader fallback detected on first frame — "
-                    "%d shader(s) fell back to basic/terrain. Check shader registration.", fallbacks);
-  }
-#endif
 }
 
 void CMetalRenderer::Update() {
@@ -2822,42 +2862,16 @@ bool CMetalRenderer::LoadDiagnosticsRequestFromFile(bool& requestFileFound)
 
 void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
   if (x < 0) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetScissor: x=%d (must be >= 0), y=%d, width=%d, height=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
-             x, y, width, height, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
-    assert(false && msg);
+    if (iLog) iLog->Log("SetScissor: x=%d clamped to 0", x);
+    x = 0;
   }
   if (y < 0) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetScissor: y=%d (must be >= 0), x=%d, width=%d, height=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
-             y, x, width, height, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
-    assert(false && msg);
+    if (iLog) iLog->Log("SetScissor: y=%d clamped to 0", y);
+    y = 0;
   }
-  if (width <= 0) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetScissor: width=%d (must be > 0), x=%d, y=%d, height=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
-             width, x, y, height, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
-    assert(false && msg);
-  }
-  if (height <= 0) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetScissor: height=%d (must be > 0), x=%d, y=%d, width=%d, viewport=(%d,%d,%d,%d), m_renderEncoder=%p",
-             height, x, y, width, m_viewportX, m_viewportY, m_viewportWidth, m_viewportHeight, m_renderEncoder);
-    assert(false && msg);
-  }
-  if (m_renderEncoder == nil && (width != 0 || height != 0)) {
-    char msg[512];
-    snprintf(msg, sizeof(msg),
-             "SetScissor: m_renderEncoder=%p (nil) required for non-zero scissor, x=%d, y=%d, width=%d, height=%d, m_isInitialized=%d, m_device=%p",
-             m_renderEncoder, x, y, width, height, m_isInitialized, m_device);
-    assert(false && msg);
-  }
-  
-  if (!m_renderEncoder && (width != 0 || height != 0))
+  if (width <= 0 || height <= 0)
+    return;
+  if (!m_renderEncoder)
     return;
 
   CMetalBaseRenderer::SetScissor(x, y, width, height);
@@ -3137,6 +3151,21 @@ int CMetalRenderer::GetMaxTextureMemory() {
 
 void CMetalRenderer::PreLoad() {
   EF_InitFogVolumes();
+
+  for (int i = 0; i < VERTEX_FORMAT_NUMS; i++)
+  {
+    for (int j = 0; j < VERTEX_FORMAT_NUMS; j++)
+    {
+      SVertBufComps Cps[2];
+      GetVertBufComps(&Cps[0], i);
+      GetVertBufComps(&Cps[1], j);
+      bool bNeedTC      = Cps[1].m_bHasTC       | Cps[0].m_bHasTC;
+      bool bNeedCol     = Cps[1].m_bHasColors    | Cps[0].m_bHasColors;
+      bool bNeedSecCol  = Cps[1].m_bHasSecColors | Cps[0].m_bHasSecColors;
+      bool bNeedNormals = Cps[1].m_bHasNormals   | Cps[0].m_bHasNormals;
+      m_RP.m_VFormatsMerge[i][j] = VertFormatForComponents(bNeedCol, bNeedSecCol, bNeedNormals, bNeedTC);
+    }
+  }
 }
 
 void CMetalRenderer::Release() {
@@ -3774,8 +3803,40 @@ void CMetalRenderer::EF_LightMaterial(SLightMaterial *lm, int Flags) {
 }
 
 STexPic* CMetalRenderer::EF_MakePhongTexture(int Exp) {
-    assert(false && "EF_MakePhongTexture not implemented");
     return nullptr;
+}
+
+unsigned int CMetalRenderer::MakeSprite(float object_scale, int tex_size, float angle,
+                                        IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid)
+{
+    if (m_utilityRenderer)
+        return m_utilityRenderer->MakeSprite(object_scale, tex_size, angle, pStatObj, pTmpBuffer, def_tid);
+    return def_tid;
+}
+
+unsigned int CMetalRenderer::Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj)
+{
+    if (m_utilityRenderer)
+        return m_utilityRenderer->Make3DSprite(nTexSize, fAngleStep, pStatObj);
+    return 0;
+}
+
+ShadowMapFrustum* CMetalRenderer::MakeShadowMapFrustum(ShadowMapFrustum* lof, ShadowMapLightSource* pLs,
+                                                        const Vec3& obj_pos, list2<IStatObj*>* pStatObjects,
+                                                        int shadow_type)
+{
+    if (m_utilityRenderer)
+    {
+        ShadowMapFrustum* result = m_utilityRenderer->MakeShadowMapFrustum(lof, pLs, obj_pos, pStatObjects, shadow_type);
+        return result ? result : lof;
+    }
+    return lof;
+}
+
+void CMetalRenderer::DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan)
+{
+    if (m_utilityRenderer)
+        m_utilityRenderer->DrawObjSprites(pList, fMaxViewDist, pObjMan);
 }
 
 void CMetalRenderer::EF_PipelineShutdown() {

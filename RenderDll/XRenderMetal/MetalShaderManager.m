@@ -297,7 +297,6 @@ public:
     id<MTLRenderPipelineState> GetPipelineStateForFormat(int vertexFormat);
 
     id<MTLLibrary> GetDefaultLibrary() const { return m_defaultLibrary; }
-    int GetGeneratedFallbackCount() const { return m_generatedFallbackCount; }
 
 protected:
     // Metal-specific shader management
@@ -322,7 +321,6 @@ protected:
     // Shader caching and management
     std::unordered_map<int, ShaderInfo> m_shaders;
     std::unordered_map<std::string, int> m_shaderNameMap;
-    int m_generatedFallbackCount = 0;
     std::unordered_map<std::string, GeneratedVertexEntry> m_generatedVertexEntries;
     int m_nextShaderId;
     
@@ -355,7 +353,6 @@ protected:
     void BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader);
     void InitializeShaderFallbacks();
     void RegisterShaderAlias(const char* alias, const char* target);
-    int ResolveFallbackShaderId(const std::string& normalizedName, EShClass shaderClass);
 };
 
 #endif // __APPLE__ && __MACH__

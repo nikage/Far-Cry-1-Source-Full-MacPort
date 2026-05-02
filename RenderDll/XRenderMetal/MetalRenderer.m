@@ -279,6 +279,20 @@ public:
     bool DestroyRenderTarget(int nHandle) override;
     bool SetRenderTarget(int nHandle) override;
     void FlushTextMessages() override;
+    int GenerateAlphaGlowTexture(float k) override;
+    void OnEntityDeleted(IEntityRender* pEntityRender) override;
+    void SetGlobalShaderTemplateId(int nTemplateId) override;
+    int GetGlobalShaderTemplateId() override;
+    int EnumAAFormats(TArray<SAAFormat>& Formats, bool bReset) override;
+    float EF_GetWaterZElevation(float fX, float fY) override;
+    void Draw2dLine(float x1, float y1, float x2, float y2) override;
+    void SetLineWidth(float fWidth) override;
+    void DrawLine(const Vec3& vPos1, const Vec3& vPos2) override;
+    void DrawLineColor(const Vec3& vPos1, const CFColor& vColor1, const Vec3& vPos2, const CFColor& vColor2) override;
+    void Graph(byte* g, int x, int y, int wdt, int hgt, int nC, int type, char* text, CFColor& color, float fScale) override;
+    void DrawBall(float x, float y, float z, float radius) override;
+    void ResetToDefault() override;
+    int ScreenToTexture() override;
     
     // Vertex/Index buffer management (from CRenderer/IRenderer)
     void* GetDynVBPtr(int nVerts, int &nOffs, int Pool) override;
@@ -402,6 +416,14 @@ public:
     void EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, int nFog, CRendElement *re) override;
     void EF_Start(SShader *ef, SShader *efState, SRenderShaderResources *Res, CRendElement *re) override;
     STexPic* EF_MakePhongTexture(int Exp) override;
+
+    unsigned int MakeSprite(float object_scale, int tex_size, float angle,
+                            IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid) override;
+    unsigned int Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj) override;
+    ShadowMapFrustum* MakeShadowMapFrustum(ShadowMapFrustum* lof, ShadowMapLightSource* pLs,
+                                           const Vec3& obj_pos, list2<IStatObj*>* pStatObjects,
+                                           int shadow_type) override;
+    void DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan) override;
 
     CMetalShaderManager* GetShaderManager() const { return m_shaderManager.get(); }
 

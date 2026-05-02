@@ -594,64 +594,301 @@ void CMetalShaderManager::InitializeShaderFallbacks()
     if (iLog)
         iLog->Log("MetalShaderManager: InitializeShaderFallbacks begin\n");
     struct AliasEntry { const char* alias; const char* target; };
-    const AliasEntry entries[] = {
-        {"<Stencil>", "basic"},
-        {"BinocularDistortMask", "colortex"},
-        {"BumpSunGlow", "basic"},
-        {"ClearStencil", "basic"},
-        {"CryLight", "basic"},
-        {"Decal_2D_VP", "colortex"},
-        {"Decal_VP", "colortex"},
-        {"DecalCharacter", "colortex"},
-        {"Default", "basic"},
-        {"FarTreeSprites", "basic"},
-        {"FogLayer", "basic"},
-        {"FrontCull", "basic"},
-        {"GlowingMonkeyEyes", "basic"},
-        {"InfRedGal", "sky"},
-        {"NoZTestState", "basic"},
-        {"ObjectColor_VP", "colortex"},
-        {"OcclusionTest", "colortex"},
-        {"OutSpace", "sky"},
-        {"ParticleLight", "basic"},
-        {"RainMap", "basic"},
-        {"ScreenDistort", "colortex"},
-        {"ScreenProcess", "colortex"},
-        {"ScreenTexMap", "colortex"},
-        {"ShadowMapGen", "basic"},
-        {"SniperDistortMask", "colortex"},
-        {"StateNoCull", "basic"},
-        {"StencilState", "basic"},
-        {"StencilState_FrontCull", "basic"},
-        {"StencilState_Terrain", "terrain"},
-        {"StencilStateInv", "basic"},
-        {"TemplDecalAdd", "colortex"},
-        {"TerrainCaustics", "terrain"},
-        {"TerrainDetailLayers", "terrain"},
-        {"TerrainDetailObjects", "terrain"},
-        {"TerrainDetailTextureLayers", "terrain"},
-        {"TerrainLayer", "terrain"},
-        {"TerrainLightPass", "terrain"},
-        {"TerrainLowLOD", "terrain"},
-        {"TerrainParticles", "terrain"},
-        {"TerrainShadowPass", "terrain"},
-        {"TerrainVP", "terrain"},
-        {"TerrainWaterBottomSimple", "terrain"},
-        {"TerrainWater_FP", "terrain"},
-        {"TerrainWaterBeach", "terrain"},
+
+    // --- Engine-level names (present in Cry3DEngine / startup calls) ---
+    const AliasEntry engineEntries[] = {
+        {"<Stencil>",                       "basic"},
+        {"BinocularDistortMask",            "colortex"},
+        {"BumpSunGlow",                     "cgrcambienttempl"},
+        {"ClearStencil",                    "basic"},
+        {"CryLight",                        "basic"},
+        {"Decal_2D_VP",                     "colortex"},
+        {"Decal_VP",                        "colortex"},
+        {"DecalCharacter",                  "colortex"},
+        {"Default",                         "cgrcambienttempl"},
+        {"FarTreeSprites",                  "cgrcambienttempl"},
+        {"FogLayer",                        "basic"},
+        {"FrontCull",                       "basic"},
+        {"GlowingMonkeyEyes",               "basic"},
+        {"InfRedGal",                       "sky"},
+        {"NoZTestState",                    "basic"},
+        {"ObjectColor_VP",                  "colortex"},
+        {"OcclusionTest",                   "colortex"},
+        {"OutSpace",                        "sky"},
+        {"ParticleLight",                   "basic"},
+        {"RainMap",                         "basic"},
+        {"ScreenDistort",                   "colortex"},
+        {"ScreenProcess",                   "colortex"},
+        {"ScreenTexMap",                    "colortex"},
+        {"ShadowMapGen",                    "basic"},
+        {"SniperDistortMask",               "colortex"},
+        {"StateNoCull",                     "basic"},
+        {"StencilState",                    "basic"},
+        {"StencilState_FrontCull",          "basic"},
+        {"StencilState_Terrain",            "terrain"},
+        {"StencilStateInv",                 "basic"},
+        {"TerrainCaustics",                 "terrain"},
+        {"TerrainDetailLayers",             "terrain"},
+        {"TerrainDetailObjects",            "terrain"},
+        {"TerrainDetailTextureLayers",      "terrain"},
+        {"TerrainLayer",                    "terrain"},
+        {"TerrainLightPass",                "terrain"},
+        {"TerrainLowLOD",                   "terrain"},
+        {"TerrainParticles",                "terrain"},
+        {"TerrainShadowPass",               "terrain"},
+        {"TerrainVP",                       "terrain"},
+        {"TerrainWaterBottomSimple",        "terrain"},
+        {"TerrainWater_FP",                 "terrain"},
+        {"TerrainWaterBeach",               "terrain"},
+        {"TerrainWaterBeachResearch",       "terrain"},
+        {"TerrainWaterBottom",              "terrain"},
         {"TerrainWithDefaultDetailTexture", "terrain"},
-        {"TerrainWithFog", "terrain"},
-        {"WaterVolume", "terrain"},
-        {"ZBuffPassVP", "basic"},
-        {"ZTestGreaterState", "basic"},
-        {"terrainwater", "terrain"},
-        {"terrainwaterbottom", "terrain"},
-        {"default", "basic"}
+        {"TerrainWithFog",                  "terrain"},
+        {"WaterVolume",                     "terrain"},
+        {"WaterVolumeBumpReflCM",           "terrain"},
+        // Water aliases from CustomAliases.txt (NV1X block → LowSpecWaterOutdoor_FP → terrain)
+        {"TerrainLake",                     "terrain"},
+        {"TerrainLake_NoFresnel",           "terrain"},
+        {"TerrainLake_Deformed",            "terrain"},
+        {"TerrainWater_OnlySky",            "terrain"},
+        {"TerrainDeepWater",               "terrain"},
+        {"TerrainOcean2",                   "terrain"},
+        {"TerrainWater_TempleRiver",        "terrain"},
+        {"TerrainRiver",                    "terrain"},
+        // Level-specific material names (no IR counterpart)
+        {"02_Carrier",                      "basic"},
+        // Flare shader — CGRCFlare is a generated Metal shader
+        {"Flare_training",                  "cgrcflare"},
+        {"ZBuffPassVP",                     "basic"},
+        {"ZTestGreaterState",               "basic"},
+        {"terrainwater",                    "terrain"},
+        {"terrainwaterbottom",              "terrain"},
+        {"default",                         "cgrcambienttempl"},
     };
-    for (const auto& entry : entries)
+
+    // --- Material template names (templName in EF_LoadShaderItem) ---
+    // These come from CustomAliases.txt / Aliases.txt and are the actual technique
+    // selectors embedded in CGF material records.  All map to generated Metal shaders.
+    const AliasEntry templEntries[] = {
+        // Bump-spec family → ambient template (full ambient + per-pixel bump pipeline)
+        {"TemplBumpSpec",                               "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss",                         "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha",                    "cgrcambienttempl"},
+        {"TemplBumpSpec_HP",                            "cgrcambienttempl"},
+        {"TemplBumpSpec_HP_GlossAlpha",                 "cgrcambienttempl"},
+        {"TemplBumpSpec_NOCM",                          "cgrcambienttempl"},
+        {"TemplBumpSpec_PS20",                          "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_PS20",                    "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_PS20",               "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb",                      "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_RT",                   "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb",                "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_RT",             "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb",           "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_RT",        "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_PS20",                 "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_RT_PS20",              "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_PS20",           "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_RT_PS20",        "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_PS20",      "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PS20",   "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMSpec_PS20",                "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMSpec_RT_PS20",             "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMSpec_PS20",          "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMSpec_RT_PS20",       "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMSpec_PS20",     "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMSpec_RT_PS20",  "cgrcambienttempl"},
+        {"TemplBumpSpec_Offset_PS20",                   "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_Offset_PS20",             "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_Offset_PS20",        "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_Offset_PS20",          "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_RT_Offset_PS20",       "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_Offset_PS20",    "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_RT_Offset_PS20", "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_Offset_PS20",   "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_Offset_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMSpec_Offset_PS20",         "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMSpec_RT_Offset_PS20",      "cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMSpec_Offset_PS20",   "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMSpec_Offset_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_PowerGlossAlpha_PS20",          "cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_PowerGlossAlpha_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_PowerGlossAlpha_PS20",    "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_PowerGlossAlpha_PS20", "cgrcambienttempl"},
+        {"TemplBumpSpec_EnvCMAmb_RT_PowerGlossAlpha_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_PowerGlossAlpha_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_GlossAlpha_EnvCMAmb_RT_PowerGlossAlpha_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_PowerGlossAlpha_PS20","cgrcambienttempl"},
+        {"TemplBumpSpec_Gloss_EnvCMAmb_RT_PowerGlossAlpha_PS20","cgrcambienttempl"},
+        // Bump-spec aliases from Aliases.txt
+        {"TBumpSpec",                                   "cgrcambienttempl"},
+        {"TBumpSpec_NOCM",                              "cgrcambienttempl"},
+        {"tbs_HP",                                      "cgrcambienttempl"},
+        {"tbs_GA_CM",                                   "cgrcambienttempl"},
+
+        // Bump-diffuse family
+        {"TemplBumpDiffuse",                            "cgrcambienttempl"},
+        {"TemplBumpDiffuse_AlphaGlow",                  "cgrcambienttempl"},
+        {"TemplBumpDiffuse_SpecHigh",                   "cgrcambienttempl"},
+        {"TemplBumpDiffuse_GlossSpecHigh",              "cgrcambienttempl"},
+        {"TemplBumpDiffuse_GlossAlphaSpecHigh",         "cgrcambienttempl"},
+        {"TemplBumpDiffuse_EnvCMSpec_PS20",             "cgrcambienttempl"},
+        {"TemplBumpDiffuse_EnvCMSpec_RT_PS20",          "cgrcambienttempl"},
+        {"TemplBumpDiffuse_GlossAlpha_EnvCMSpec_PS20",  "cgrcambienttempl"},
+        {"TemplBumpDiffuse_GlossAlpha_EnvCMSpec_RT_PS20","cgrcambienttempl"},
+        {"TemplBumpDiffuse_Gloss_EnvCMSpec_PS20",       "cgrcambienttempl"},
+        {"TemplBumpDiffuse_Gloss_EnvCMSpec_RT_PS20",    "cgrcambienttempl"},
+        {"TemplBumpDiffuse_EnvCMSpec_Offset_PS20",      "cgrcambienttempl"},
+        {"TemplBumpDiffuse_GlossAlpha_EnvCMSpec_Offset_PS20","cgrcambienttempl"},
+        {"TemplBumpDiffuse_Gloss_EnvCMSpec_Offset_PS20","cgrcambienttempl"},
+        {"TemplBumpDiffuse_NOCM",                       "cgrcambienttempl"},
+        // Bump-diffuse aliases from Aliases.txt
+        {"TBD",                                         "cgrcambienttempl"},
+        {"tbd_NOCM",                                    "cgrcambienttempl"},
+        {"TBumpDiffuse_NOCM",                           "cgrcambienttempl"},
+
+        // Bump-offset / bump-reflect family
+        {"TemplBumpOffset",                             "cgrcambienttempl"},
+        {"TemplBumpOffsetEnv",                          "cgrcambienttempl"},
+        {"TemplBumpReflCM",                             "cgrcambienttempl"},
+        {"TemplBumpReflCM_Deform",                      "cgrcambienttempl"},
+        {"TemplBumpReflCM_Light",                       "cgrcambienttempl"},
+        {"TemplBumpReflEnvCM",                          "cgrcambienttempl"},
+        {"TemplBumpRefrCM",                             "cgrcambienttempl"},
+        {"TemplBumpRefrEnvCM",                          "cgrcambienttempl"},
+        {"TemplBumpGlassCM",                            "cgrcambienttempl"},
+        {"TemplBumpGlassEnvCM",                         "cgrcambienttempl"},
+        {"TemplBumpGlassFresnelCM",                     "cgrcambienttempl"},
+        {"TemplBumpGlassFresnelEnvCM",                  "cgrcambienttempl"},
+        {"TemplBumpGlitter_PS20",                       "cgrcambienttempl"},
+
+        // Simple diffuse (fixed-function replacement)
+        {"TemplDiffuse_FP",                             "cgrcambient"},
+
+        // Model / character templates
+        {"TemplModelCommon",                            "cgrcambienttempl"},
+        {"TemplModelCommon_Offset_PS20",                "cgrcambienttempl"},
+        {"templmodelcommon",                            "cgrcambienttempl"},
+        {"TemplModelBumpSpec_hp",                       "cgrcambienttempl"},
+        {"TemplModelBumpSpec_hp_glossalpha",            "cgrcambienttempl"},
+        {"TemplModelBumpSpec_HP",                       "cgrcambienttempl"},
+        {"TemplModelBumpSpec_HP_GlossAlpha",            "cgrcambienttempl"},
+
+        // Special material templates
+        {"TemplBubble_PS20",                            "cgrcambienttempl"},
+        {"TemplMetallic_PS20",                          "cgrcambienttempl"},
+        {"TemplIridescence_PS20",                       "cgrcambienttempl"},
+
+        // Glass / reflection templates
+        {"TemplGlassCM",                                "cgrcambienttempl"},
+        {"TemplGlassCM_PS20",                           "cgrcambienttempl"},
+        {"TemplGlassEnvCM",                             "cgrcambienttempl"},
+        {"TemplGlassEnvTex",                            "cgrcambienttempl"},
+        {"TemplGlassDispersionCM",                      "cgrcambienttempl"},
+        {"TemplGlassDispersionEnvCM",                   "cgrcambienttempl"},
+        {"TemplRefract",                                "cgrcambienttempl"},
+        {"TemplReflCM",                                 "cgrcambienttempl"},
+        {"TemplReflEnvCM",                              "cgrcambienttempl"},
+        {"TemplRefrCM",                                 "cgrcambienttempl"},
+        {"TemplRefrEnvCM",                              "cgrcambienttempl"},
+        {"TemplReflCMDecal_ReflAmountOpacity",          "colortex"},
+
+        // Plant templates → plant shaders
+        {"TemplPlants",                                 "cgrcplants"},
+        {"TemplPlants1",                                "cgrcplants"},
+        {"TemplPlantsBark",                             "cgrcambienttempl"},
+        {"TemplPlantsBark_SunRabbits",                  "cgrcambienttempl"},
+        {"TemplPlantsBark_Bump",                        "cgrcambienttempl"},
+        {"TemplPlantsBark_SunRabbits_Bump",             "cgrcambienttempl"},
+        {"TemplDecalAlphaTest_VColors",                 "cgrcplants"},
+        {"TemplDecal_VColors",                          "cgrcambienttempl"},
+
+        // Decal templates
+        {"TemplDecalOpacityShift",                      "colortex"},
+        {"TemplDecalOpacityShift1",                     "colortex"},
+        {"TemplDecalOpacityShift2",                     "colortex"},
+        {"TemplDecalOpacityShift3",                     "colortex"},
+        {"TemplDecalOpacityShift4",                     "colortex"},
+        {"TemplDecalAdd",                               "colortex"},
+        {"TemplDecalModulate",                          "colortex"},
+        {"TemplDecalAlphaGlowSelfIllum",                "colortex"},
+        {"TemplDecalAlphaBlend",                        "colortex"},
+        {"TemplDecalLight_SpecAdd",                     "colortex"},
+        {"TemplDecalOpacityShift_FP",                   "colortex"},
+        {"TemplDecalOpacityShift1_FP",                  "colortex"},
+        {"TemplDecalOpacityShift2_FP",                  "colortex"},
+        {"TemplDecalOpacityShift3_FP",                  "colortex"},
+        {"TemplDecalOpacityShift4_FP",                  "colortex"},
+        {"TemplDecalModulate_FP",                       "colortex"},
+        {"TemplDecalAlphaBlend_FP",                     "colortex"},
+
+        // Particle / alpha templates
+        {"TemplAlphaBlend",                             "basic"},
+        {"TemplAlphaBlend_FP",                          "basic"},
+        {"TemplMuzzleFlash",                            "basic"},
+        {"TemplMuzzleFlash_FP",                         "basic"},
+        {"TemplMuzzleFlash_Auto",                       "basic"},
+        {"TemplMuzzleFlash_Auto_FP",                    "basic"},
+
+        // Fog / beam
+        {"TemplFog",                                    "basic"},
+        {"TemplFog_FP",                                 "basic"},
+        {"TemplFogCaustics",                            "basic"},
+        {"TemplFogCaustics_FP",                         "basic"},
+        {"TemplFogCaustics_FP_NV1X",                    "basic"},
+        {"TemplBeamProc",                               "basic"},
+        {"TemplBeamProc_FP",                            "basic"},
+        {"TemplLightDiffuse_AlphaGlow",                 "basic"},
+
+        // Water volume / lake
+        {"TemplLake",                                   "terrain"},
+        {"TemplLakeRefr",                               "terrain"},
+        {"LavaVolume",                                  "terrain"},
+        {"LowSpecWaterOutdoor_FP",                      "terrain"},
+        {"LowSpecWaterIndoor_FP",                       "terrain"},
+
+        // FP-suffix terrain variants (NV1X aliases from CustomAliases.txt)
+        {"Terrain_FP",                                  "terrain"},
+        {"TerrainShadowPass_FP",                        "terrain"},
+        {"TerrainLowLod_FP",                            "terrain"},
+        {"TerrainWaterBeach_FP",                        "terrain"},
+        {"TerrainWaterBottom_FP",                       "terrain"},
+        {"TerrainWaterBottomSimple_FP",                 "terrain"},
+        {"TerrainWithDefaultDetailTexture_FP",          "terrain"},
+
+        // Special effect / character
+        {"PlayerMaskModulate",                          "colortex"},
+        {"PlayerMaskModulate_FP",                       "colortex"},
+        {"WhiteShadow",                                 "basic"},
+        {"WhiteShadow_FP",                              "basic"},
+        {"ParticleLight_FP",                            "basic"},
+        {"MutantStealth",                               "colortex"},
+        {"MutantStealth_FP",                            "colortex"},
+        {"MutantMorph",                                 "cgrcambienttempl"},
+        {"MutantMorph_FP",                              "cgrcambienttempl"},
+        {"TemplCryVision",                              "colortex"},
+        {"TemplCryVision_FP",                           "colortex"},
+        {"TemplCryVisionPlayer",                        "colortex"},
+        {"TemplCryVision_Mask",                         "colortex"},
+        {"TemplCryVision_Mask_FP",                      "colortex"},
+        {"TemplHologram",                               "basic"},
+        {"TemplHologram_FP",                            "basic"},
+        {"TemplMutatedArms",                            "cgrcambienttempl"},
+        {"TemplMutatedArms_FP",                         "cgrcambienttempl"},
+        {"CharacterInvulnerability_Metal",              "cgrcambienttempl"},
+        {"CharacterInvulnerability_Metal_FP",           "cgrcambienttempl"},
+    };
+
+    for (const auto& entry : engineEntries)
         RegisterShaderAlias(entry.alias, entry.target);
+    for (const auto& entry : templEntries)
+        RegisterShaderAlias(entry.alias, entry.target);
+
+    const unsigned int totalCount = static_cast<unsigned int>(
+        sizeof(engineEntries)/sizeof(engineEntries[0]) +
+        sizeof(templEntries)/sizeof(templEntries[0]));
     if (iLog)
-        iLog->Log("MetalShaderManager: fallback alias count=%u, shader map size=%zu\n", static_cast<unsigned int>(sizeof(entries) / sizeof(entries[0])), m_shaderNameMap.size());
+        iLog->Log("MetalShaderManager: alias count=%u, shader map size=%zu\n", totalCount, m_shaderNameMap.size());
 }
 
 void CMetalShaderManager::RegisterShaderAlias(const char* alias, const char* target)
@@ -676,35 +913,6 @@ void CMetalShaderManager::RegisterShaderAlias(const char* alias, const char* tar
         iLog->Log("MetalShaderManager: alias '%s' -> '%s' (id=%d)\n", normalizedAlias.c_str(), normalizedTarget.c_str(), targetIt->second);
 }
 
-int CMetalShaderManager::ResolveFallbackShaderId(const std::string& normalizedName, EShClass shaderClass)
-{
-    auto pick = [&](const char* base) -> int
-    {
-        std::string baseKey = NormalizeShaderName(base);
-        auto it = m_shaderNameMap.find(baseKey);
-        if (it == m_shaderNameMap.end())
-            return 0;
-        return it->second;
-    };
-    if (normalizedName.empty())
-        return 0;
-    auto existing = m_shaderNameMap.find(normalizedName);
-    if (existing != m_shaderNameMap.end())
-        return existing->second;
-    if (normalizedName.find("terrain") != std::string::npos || normalizedName.find("water") != std::string::npos)
-        return pick("terrain");
-    if (normalizedName.find("sky") != std::string::npos || normalizedName.find("space") != std::string::npos || normalizedName.find("sun") != std::string::npos)
-        return pick("sky");
-    if (normalizedName.find("screen") != std::string::npos || normalizedName.find("decal") != std::string::npos || normalizedName.find("mask") != std::string::npos || normalizedName.find("state") != std::string::npos || normalizedName.find("stencil") != std::string::npos || normalizedName.find("occlusion") != std::string::npos)
-        return pick("colortex");
-    if (normalizedName.find("light") != std::string::npos || normalizedName.find("glow") != std::string::npos || normalizedName.find("flare") != std::string::npos)
-        return pick("basic");
-    if (shaderClass == eSH_Screen)
-        return pick("colortex");
-    if (shaderClass == eSH_World || shaderClass == eSH_Misc)
-        return pick("basic");
-    return pick("basic");
-}
 
 
 CMetalShader::CMetalShader(int shaderId, CMetalShaderManager* manager)
@@ -782,6 +990,17 @@ void CMetalShader::Release(bool bForce)
     {
         CMetalShaderManager* manager = m_manager;
         int shaderId = m_shaderId;
+        const char* name = "<unknown>";
+        if (manager)
+        {
+            auto it = manager->m_shaders.find(shaderId);
+            if (it != manager->m_shaders.end())
+                name = it->second.name.c_str();
+        }
+        if (iLog)
+            iLog->Log("CMetalShader::Release deleting shader '%s' (id=%d) bForce=%d", name, shaderId, (int)bForce);
+        else
+            printf("CMetalShader::Release deleting shader '%s' (id=%d) bForce=%d\n", name, shaderId, (int)bForce);
         m_manager = nullptr;
         
         if (manager)
@@ -1007,7 +1226,7 @@ unsigned int CMetalShader::GetUsedTextureTypes(void)
 
 int CMetalShader::GetVertexFormat(void)
 {
-    return 0;
+    return VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
 }
 
 int CMetalShader::Size(int Flags)
@@ -1214,49 +1433,9 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
         }
     }
     
-    int fallbackId = ResolveFallbackShaderId(normalizedName, Class);
-    printf("MetalShaderManager::EF_LoadShader fallbackId=%d for '%s'\n", fallbackId, normalizedName.c_str());
+    printf("MetalShaderManager: EF_LoadShader MISSING_ALIAS '%s' (class=%d) — returning nullptr\n", lookupName.c_str(), (int)Class);
     if (iLog)
-        iLog->Log("MetalShaderManager::EF_LoadShader fallbackId=%d for '%s'", fallbackId, normalizedName.c_str());
-    if (fallbackId > 0)
-    {
-        auto fallbackIt = m_shaders.find(fallbackId);
-        if (fallbackIt != m_shaders.end())
-        {
-            ShaderInfo& baseInfo = fallbackIt->second;
-            if (baseInfo.shaderWrapper)
-            {
-                int shaderId = AllocateShaderId();
-                ShaderInfo info = baseInfo;
-                info.name = lookupName;
-                info.shaderClass = Class;
-                info.nMaskGen = nMaskGen;
-                info.shaderWrapper = new CMetalShader(shaderId, this);
-                info.shaderWrapper->m_flags = baseInfo.shaderWrapper->m_flags;
-                info.shaderWrapper->m_flags2 = baseInfo.shaderWrapper->m_flags2;
-                info.shaderWrapper->m_flags3 = baseInfo.shaderWrapper->m_flags3;
-                info.shaderWrapper->m_sort = baseInfo.shaderWrapper->m_sort;
-                info.shaderWrapper->m_cull = baseInfo.shaderWrapper->m_cull;
-                info.shaderWrapper->m_renderFlags = baseInfo.shaderWrapper->m_renderFlags;
-                info.shaderWrapper->m_LMFlags = baseInfo.shaderWrapper->m_LMFlags;
-                ResetRuntimeBindingState(info);
-                m_shaders[shaderId] = info;
-                m_shaderNameMap[lookupName] = shaderId;
-                if (iLog)
-                    iLog->Log("MetalShaderManager: Fallback shader '%s' mapped to '%s'", lookupName.c_str(), baseInfo.name.c_str());
-                printf("MetalShaderManager::EF_LoadShader created fallback shaderId=%d from base='%s'\n", shaderId, baseInfo.name.c_str());
-                if (iLog)
-                    iLog->Log("MetalShaderManager::EF_LoadShader created fallback shaderId=%d from base='%s'", shaderId, baseInfo.name.c_str());
-                m_generatedFallbackCount++;
-                return info.shaderWrapper;
-            }
-        }
-    }
-    if (iLog)
-        iLog->Log("MetalShaderManager: Failed to load shader '%s'", lookupName.c_str());
-    printf("MetalShaderManager::EF_LoadShader FAILED for '%s'\n", lookupName.c_str());
-    if (iLog)
-        iLog->Log("MetalShaderManager::EF_LoadShader FAILED for '%s'", lookupName.c_str());
+        iLog->Log("MetalShaderManager: EF_LoadShader MISSING_ALIAS '%s' — add an explicit alias to InitializeShaderFallbacks.", lookupName.c_str());
     return nullptr;
 }
 
@@ -1264,12 +1443,36 @@ SShaderItem CMetalShaderManager::EF_LoadShaderItem(const char* name, EShClass Cl
 {
     SShaderItem item;
 
-    if (name && name[0])
-        item.m_pShader = EF_LoadShader(name, Class, flags, nMaskGen);
-    if (!item.m_pShader && templName && templName[0])
-        item.m_pShader = EF_LoadShader(templName, Class, flags, nMaskGen);
+    auto lookupDirect = [&](const char* key) -> IShader*
+    {
+        if (!key || !key[0])
+            return nullptr;
+        std::string norm = NormalizeShaderName(key);
+        auto it = m_shaderNameMap.find(norm);
+        if (it == m_shaderNameMap.end())
+            return nullptr;
+        auto shIt = m_shaders.find(it->second);
+        if (shIt == m_shaders.end() || !shIt->second.shaderWrapper)
+            return nullptr;
+        shIt->second.shaderWrapper->AddRef();
+        return shIt->second.shaderWrapper;
+    };
+
+    const bool templIsDefault = !templName || !templName[0]
+        || _stricmp(templName, "nodraw") == 0;
+
+    if (!templIsDefault)
+        item.m_pShader = lookupDirect(templName);
+
     if (!item.m_pShader)
-        item.m_pShader = EF_LoadShader("nodraw", Class, flags, 0);
+        item.m_pShader = lookupDirect(name);
+
+    if (!item.m_pShader)
+    {
+        item.m_pShader = lookupDirect("cgrcambienttempl");
+        if (!item.m_pShader)
+            item.m_pShader = lookupDirect("basic");
+    }
 
     SRenderShaderResources* pRes = Res ? new SRenderShaderResources(Res)
                                        : new SRenderShaderResources();
@@ -1377,8 +1580,18 @@ void CMetalShaderManager::EF_StartEf()
 
 CCObject* CMetalShaderManager::EF_GetObject(bool bTemp, int num)
 {
-    // Get CCObject for rendering
-    return nullptr;
+    static CCObject sPool[256];
+    static int sNext = 0;
+    CCObject* obj = &sPool[sNext++ & 255];
+    obj->m_ObjFlags = 0;
+    obj->m_ShaderParams = nullptr;
+    obj->m_bShaderParamCreatedInRenderer = false;
+    obj->m_RE = nullptr;
+    obj->m_EF = nullptr;
+    obj->m_CustomData = nullptr;
+    obj->m_DynLMMask = 0;
+    obj->m_RenderState = 0;
+    return obj;
 }
 
 void CMetalShaderManager::EF_AddEf(int NumFog, CRendElement* re, IShader* ef, SRenderShaderResources* sr, CCObject* obj, int nTempl, IShader* efState, int nSort)

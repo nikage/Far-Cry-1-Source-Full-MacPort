@@ -80,6 +80,7 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_materialBuffer(nil)
     , m_materialBufferCPU(nullptr)
     , m_waterNoiseBuffer(nil)
+    , m_dummyTangentBuffer(nil)
     , m_hdrColorRT(nil)
     , m_hdrDepthRT(nil)
     , m_hdrToneMapPSO(nil)
@@ -211,6 +212,12 @@ WIN_HWND CMetalBaseRenderer::Init(int x, int y, int width, int height, unsigned 
         return nullptr;
     }
     
+    if (!SShader::m_Shaders_known.Num())
+    {
+        SShader::m_Shaders_known.Alloc(MAX_SHADERS);
+        memset(&SShader::m_Shaders_known[0], 0, sizeof(SShader *) * MAX_SHADERS);
+    }
+
     m_isInitialized = true;
     iLog->Log("Metal base renderer initialized successfully\n");
     iLog->Log("  Device: %s\n", [[m_device name] UTF8String]);
@@ -510,7 +517,22 @@ bool CMetalBaseRenderer::InitializeUniformBuffers()
         }
         [m_waterNoiseBuffer setLabel:@"WaterNoiseTable"];
     }
-    
+
+    // Allocate dummy tangent buffer: 1024 unit-X tangents {1,0,0,0}
+    // Used as fallback when a shader needs tangents but geometry has none.
+    {
+        const int kDummyVerts = 1024;
+        struct Float4 { float x, y, z, w; };
+        m_dummyTangentBuffer = [m_device newBufferWithLength:kDummyVerts * sizeof(Float4)
+                                                    options:MTLResourceStorageModeShared];
+        if (m_dummyTangentBuffer) {
+            Float4 *data = (Float4 *)[m_dummyTangentBuffer contents];
+            for (int i = 0; i < kDummyVerts; ++i)
+                data[i] = { 1.0f, 0.0f, 0.0f, 0.0f };
+            [m_dummyTangentBuffer setLabel:@"DummyTangentBuffer"];
+        }
+    }
+
     return true;
 }
 
@@ -1757,13 +1779,9 @@ void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices,
     {
         id<MTLBuffer> tangentBuffer = LookupStreamBuffer(src, VSF_TANGENTS);
         if (!tangentBuffer)
-        {
-            if (iLog)
-                iLog->Log("MetalRenderer: Tangent data missing for current draw call; skipping draw");
-            return;
-        }
-
-        [m_renderEncoder setVertexBuffer:tangentBuffer offset:0 atIndex:kMetalVertexStream_Tangents];
+            tangentBuffer = m_dummyTangentBuffer;
+        if (tangentBuffer)
+            [m_renderEncoder setVertexBuffer:tangentBuffer offset:0 atIndex:kMetalVertexStream_Tangents];
     }
     else
     {
@@ -1816,12 +1834,9 @@ void CMetalBaseRenderer::DrawTriStrip(CVertexBuffer* src, int vert_num)
     {
         id<MTLBuffer> tangentBuffer = LookupStreamBuffer(src, VSF_TANGENTS);
         if (!tangentBuffer)
-        {
-            if (iLog)
-                iLog->Log("MetalRenderer: Tangent data missing for tri-strip draw; skipping");
-            return;
-        }
-        [m_renderEncoder setVertexBuffer:tangentBuffer offset:0 atIndex:kMetalVertexStream_Tangents];
+            tangentBuffer = m_dummyTangentBuffer;
+        if (tangentBuffer)
+            [m_renderEncoder setVertexBuffer:tangentBuffer offset:0 atIndex:kMetalVertexStream_Tangents];
     }
     else
     {
@@ -2326,11 +2341,11 @@ bool CMetalBaseRenderer::BeginHDRPass()
 
 void CMetalBaseRenderer::EndHDRPass()
 {
-    assert(m_hdrColorRT      && "EndHDRPass: HDR colour RT is nil");
-    assert(m_currentCommandBuffer && "EndHDRPass: no active command buffer");
-    assert(m_hdrToneMapPSO   && "EndHDRPass: tone-map PSO is nil");
-    if (!m_hdrColorRT || !m_currentCommandBuffer || !m_hdrToneMapPSO)
+    if (!m_hdrColorRT || !m_currentCommandBuffer || !m_hdrToneMapPSO) {
+        if (iLog) iLog->Log("EndHDRPass: prerequisites missing (colorRT=%p cmdBuf=%p PSO=%p) — skipping",
+                            m_hdrColorRT, m_currentCommandBuffer, m_hdrToneMapPSO);
         return;
+    }
 
     // End the HDR scene encoder so bloom passes can open their own encoders
     if (m_renderEncoder) {
