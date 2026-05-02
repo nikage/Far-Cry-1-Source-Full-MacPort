@@ -1550,7 +1550,7 @@ void CSystem::CreateSystemVars()
 	// hidden information:
 	// bit 3 (8): cookies removed from network stream 1=on 0=off
 
-	m_PakVar.nPriority  = 1;
+	m_PakVar.nPriority  = 0;
 	m_PakVar.nReadSlice = 0;
 	m_PakVar.nLogMissingFiles = 0;
 	m_cvPakPriority = attachVariable("sys_PakPriority", &m_PakVar.nPriority,"If set to 1, tells CryPak to try to open the file in pak first, then go to file system",VF_READONLY|VF_CHEAT);

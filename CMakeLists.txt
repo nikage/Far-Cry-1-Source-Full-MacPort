@@ -347,14 +347,14 @@ if(APPLE)
     set(SCRIPTS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Scripts)
     if(EXISTS ${SCRIPTS_SOURCE_DIR})
         add_custom_command(TARGET FarCry POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/Scripts
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/FCData/Scripts
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${SCRIPTS_SOURCE_DIR}
-                ${FARCRY_BUNDLE_RESOURCES}/Scripts
-            COMMENT "Copying loose Scripts directory for runtime overrides"
+                ${FARCRY_BUNDLE_RESOURCES}/FCData/Scripts
+            COMMENT "Copying loose Scripts overrides into FCData for runtime shadowing (sys_PakPriority=0)"
         )
     else()
-        message(WARNING "Scripts directory not found at ${SCRIPTS_SOURCE_DIR}; runtime overrides will be unavailable.")
+        message(WARNING "Scripts directory not found at ${SCRIPTS_SOURCE_DIR}; Lua overrides will be unavailable.")
     endif()
 
     set(CONVERTED_VIDEOS_ROOT "${CMAKE_SOURCE_DIR}/build/converted_videos" CACHE PATH "Root directory containing converted intro/demoloop videos")

@@ -446,4 +446,14 @@ void CWeaponSystemEx::RegisterScriptConstants() const
 	SET_GLOBAL(FireMode_EngineerTool);
 
 	#undef SET_GLOBAL
+
+	// Renderer CVars registered before the script system was linked to the
+	// console never get CreateTaggedValue called, so getglobal() returns nil
+	// in weapon scripts.  Inject the current value as a plain Lua global so
+	// rl.lua:275 and sniperrifle.lua:335 get a number rather than nil.
+	if (IConsole* pConsole = m_pGame->GetSystem()->GetIConsole())
+	{
+		if (ICVar* pCVar = pConsole->GetCVar("r_TexResolution"))
+			m_pScriptSystem->SetGlobalValue("r_TexResolution", pCVar->GetIVal());
+	}
 }
