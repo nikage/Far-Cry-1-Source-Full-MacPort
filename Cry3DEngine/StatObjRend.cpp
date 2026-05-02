@@ -120,19 +120,24 @@ void CStatObj::SetupBending(CCObject * pObj, float fBending)
 
 	Vec3d vObjPos = pObj->GetTranslation();
 
-	SWaveForm2 *pWF[2];
+	SWaveForm2 *pWF[2] = { nullptr, nullptr };
 	pObj->AddWaves(pWF);
-	SWaveForm2 *wf = pWF[0];
-	wf->m_Level  = 0.000f; // between 0.001 and 0.1
-	wf->m_Freq   = 1.0f/m_fRadiusVert/8.0f+0.2f; // between 0.001 and 0.1
-	wf->m_Phase  = vObjPos.x/8.0f;
-	wf->m_Amp = 0.002f;
-
-	wf = pWF[1];
-	wf->m_Level  = 0.000f; // between 0.001 and 0.1
-	wf->m_Freq   = 1.0f/m_fRadiusVert/7.0f+0.2f; // between 0.001 and 0.1
-	wf->m_Phase  = vObjPos.y/8.0f;
-	wf->m_Amp = 0.002f;
+	if (pWF[0])
+	{
+		SWaveForm2 *wf = pWF[0];
+		wf->m_Level  = 0.000f;
+		wf->m_Freq   = 1.0f/m_fRadiusVert/8.0f+0.2f;
+		wf->m_Phase  = vObjPos.x/8.0f;
+		wf->m_Amp = 0.002f;
+	}
+	if (pWF[1])
+	{
+		SWaveForm2 *wf = pWF[1];
+		wf->m_Level  = 0.000f;
+		wf->m_Freq   = 1.0f/m_fRadiusVert/7.0f+0.2f;
+		wf->m_Phase  = vObjPos.y/8.0f;
+		wf->m_Amp = 0.002f;
+	}
 
 	pObj->m_ObjFlags |= FOB_BENDED;
 }

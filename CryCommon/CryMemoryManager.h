@@ -258,28 +258,13 @@ struct _CryMemoryManagerPoolHelper
 	//////////////////////////////////////////////////////////////////////////
 	__forceinline void*	Realloc(void *memblock,size_t size)
 	{
-		if (memblock == NULL)
-		{
-			allocatedMemory += size;
-			numAllocations++;
-		}
-		else
-		{
-			numAllocations++;
-			size_t oldsize = ((int*)memblock)[-1];
-			allocatedMemory += size;
-			freedMemory += oldsize;
-		}
+		allocatedMemory += size;
+		numAllocations++;
 		return _CryRealloc( memblock,size );
 	}
 	//////////////////////////////////////////////////////////////////////////
 	__forceinline void Free( void *memblock )
 	{
-		if (memblock != 0)
-		{
-			size_t size = ((int*)memblock)[-1];
-			freedMemory += size;
-		}
 		_CryFree( memblock );
 	}
 	//////////////////////////////////////////////////////////////////////////

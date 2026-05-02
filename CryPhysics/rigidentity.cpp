@@ -1151,7 +1151,15 @@ int CRigidEntity::RegisterConstraint(const vectorf &pt0,const vectorf &pt1, int 
 		if (pConstraints) delete[] pConstraints;
 		if (pInfos) delete[] pInfos;
 	}
-	m_pColliderConstraints[AddCollider(pBuddy)] |= getmask(i);
+	RigidBody *pbody0 = GetRigidBody(ipart0);
+	RigidBody *pbody1 = pBuddy->GetRigidBody(ipart1);
+	if (!pbody0 || !pbody1)
+		return -1;
+
+	int iCollider = AddCollider(pBuddy);
+	if (!m_pColliderConstraints || iCollider < 0 || iCollider >= m_nCollidersAlloc)
+		return -1;
+	m_pColliderConstraints[iCollider] |= getmask(i);
 	pBuddy->AddCollider(this);
 	
 	m_pConstraints[i].pt[0] = pt0;
@@ -1163,11 +1171,11 @@ int CRigidEntity::RegisterConstraint(const vectorf &pt0,const vectorf &pt1, int 
 	m_pConstraints[i].pent[1] = pBuddy;
 	m_pConstraints[i].ipart[0] = ipart0;
 	m_pConstraints[i].ipart[1] = ipart1;
-	m_pConstraints[i].pbody[0] = GetRigidBody(ipart0);
-	m_pConstraints[i].pbody[1] = pBuddy->GetRigidBody(ipart1);
+	m_pConstraints[i].pbody[0] = pbody0;
+	m_pConstraints[i].pbody[1] = pbody1;
 
-	m_pConstraints[i].ptloc[0] = (m_pConstraints[i].pt[0]-m_pConstraints[i].pbody[0]->pos)*m_pConstraints[i].pbody[0]->q;
-	m_pConstraints[i].ptloc[1] = (m_pConstraints[i].pt[1]-m_pConstraints[i].pbody[1]->pos)*m_pConstraints[i].pbody[1]->q;
+	m_pConstraints[i].ptloc[0] = (m_pConstraints[i].pt[0]-pbody0->pos)*pbody0->q;
+	m_pConstraints[i].ptloc[1] = (m_pConstraints[i].pt[1]-pbody1->pos)*pbody1->q;
 
 	m_pConstraints[i].vrel.zero();
 	m_pConstraints[i].friction = 0;
