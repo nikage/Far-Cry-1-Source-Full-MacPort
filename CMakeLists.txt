@@ -270,10 +270,14 @@ if(APPLE)
         )
     endif()
     
-    # Create Levels directory in Resources
+    # Create FCData/Levels symlink pointing at the CrossOver Steam FarCry install.
+    # Using a symlink avoids copying hundreds of MB of level data on every build.
+    set(STEAM_LEVELS_PATH "$ENV{HOME}/Library/Application Support/CrossOver/Bottles/Steam-2/drive_c/Program Files (x86)/Steam/steamapps/common/FarCry/Levels")
+    set(FARCRY_LEVELS_LINK "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels")
     add_custom_command(TARGET FarCry POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/Levels
-        COMMENT "Creating Levels directory in Resources"
+        COMMAND ${CMAKE_COMMAND} -E remove "${FARCRY_LEVELS_LINK}"
+        COMMAND ln -sfn "${STEAM_LEVELS_PATH}" "${FARCRY_LEVELS_LINK}"
+        COMMENT "Symlinking CrossOver Steam Levels into FCData"
     )
     
     # Copy FCData directory to Resources (contains all PAK files)

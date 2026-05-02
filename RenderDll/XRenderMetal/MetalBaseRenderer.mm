@@ -1987,6 +1987,113 @@ void CMetalBaseRenderer::SetFog(float density, float fogstart, float fogend,
     }
 }
 
+void CMetalBaseRenderer::SetClearColor(const Vec3& vColor)
+{
+    m_vClearColor = vColor;
+    if (m_renderPassDescriptor)
+    {
+        m_renderPassDescriptor.colorAttachments[0].clearColor =
+            MTLClearColorMake(vColor.x, vColor.y, vColor.z, 1.0);
+    }
+}
+
+void CMetalBaseRenderer::SetFogColor(float* color)
+{
+    if (!color)
+        return;
+    m_FS.m_FogColor = CFColor(color[0], color[1], color[2], 1.0f);
+    if (m_materialBufferCPU)
+    {
+        m_materialBufferCPU->FogColor[0] = color[0];
+        m_materialBufferCPU->FogColor[1] = color[1];
+        m_materialBufferCPU->FogColor[2] = color[2];
+        m_materialBufferCPU->FogColor[3] = color[3];
+    }
+}
+
+void CMetalBaseRenderer::ClearColorBuffer(const Vec3 vColor)
+{
+    m_bWasCleared = true;
+    if (!m_currentCommandBuffer)
+        return;
+
+    if (m_renderEncoder)
+    {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
+
+    id<MTLTexture> colorTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
+    if (!colorTexture && m_metalView)
+        colorTexture = m_metalView.currentDrawable.texture;
+    if (!colorTexture)
+        return;
+
+    id<MTLTexture> depthTexture = m_depthStencilTextures[m_currentFrameIndex];
+
+    MTLRenderPassDescriptor* rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+    rpd.colorAttachments[0].texture     = colorTexture;
+    rpd.colorAttachments[0].loadAction  = MTLLoadActionClear;
+    rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+    rpd.colorAttachments[0].clearColor  = MTLClearColorMake(vColor.x, vColor.y, vColor.z, 1.0);
+    if (depthTexture)
+    {
+        rpd.depthAttachment.texture     = depthTexture;
+        rpd.depthAttachment.loadAction  = MTLLoadActionLoad;
+        rpd.depthAttachment.storeAction = MTLStoreActionStore;
+        rpd.stencilAttachment.texture   = depthTexture;
+        rpd.stencilAttachment.loadAction  = MTLLoadActionLoad;
+        rpd.stencilAttachment.storeAction = MTLStoreActionStore;
+    }
+
+    m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:rpd] retain];
+    if (m_renderEncoder)
+        ApplyRenderState();
+}
+
+void CMetalBaseRenderer::ClearDepthBuffer()
+{
+    m_bWasCleared = true;
+    if (!m_currentCommandBuffer)
+        return;
+
+    id<MTLTexture> depthTexture = m_depthStencilTextures[m_currentFrameIndex];
+    if (!depthTexture)
+        return;
+
+    if (m_renderEncoder)
+    {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
+
+    id<MTLTexture> colorTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
+    if (!colorTexture && m_metalView)
+        colorTexture = m_metalView.currentDrawable.texture;
+
+    MTLRenderPassDescriptor* rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+    if (colorTexture)
+    {
+        rpd.colorAttachments[0].texture     = colorTexture;
+        rpd.colorAttachments[0].loadAction  = MTLLoadActionLoad;
+        rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+    }
+    rpd.depthAttachment.texture     = depthTexture;
+    rpd.depthAttachment.loadAction  = MTLLoadActionClear;
+    rpd.depthAttachment.storeAction = MTLStoreActionDontCare;
+    rpd.depthAttachment.clearDepth  = 1.0;
+    rpd.stencilAttachment.texture   = depthTexture;
+    rpd.stencilAttachment.loadAction  = MTLLoadActionClear;
+    rpd.stencilAttachment.storeAction = MTLStoreActionDontCare;
+    rpd.stencilAttachment.clearStencil = 0;
+
+    m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:rpd] retain];
+    if (m_renderEncoder)
+        ApplyRenderState();
+}
+
 void CMetalBaseRenderer::EnableTexGen(bool enable)
 {
     m_texGenEnabled = enable;

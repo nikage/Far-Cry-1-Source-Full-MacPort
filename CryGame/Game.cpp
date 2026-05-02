@@ -1562,7 +1562,7 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 		m_pLog->LogToConsole("Unable to load the level %s,%s [startup server failed]", sLevelFolder.c_str(),szMissionName);
 		if(pInput)
 			pInput->SetMouseExclusive(true);
-		LoadingError("@LoadLevelError");
+		LoadingError((string("@LoadLevelError|server|") + sLevelFolder).c_str());
 		return;
 	}
 
@@ -1573,11 +1573,11 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 	{
 		if(!StartupLocalClient())
 		{
-			m_pLog->LogToConsole("Unable to load the level %s,mission %s [startup client failed]", sLevelFolder.c_str(),szMissionName);
-			if(pInput)
-				pInput->SetMouseExclusive(true);
-			LoadingError("@LoadLevelError");
-			return;
+		m_pLog->LogToConsole("Unable to load the level %s,mission %s [startup client failed]", sLevelFolder.c_str(),szMissionName);
+		if(pInput)
+			pInput->SetMouseExclusive(true);
+		LoadingError((string("@LoadLevelError|client|") + sLevelFolder).c_str());
+		return;
 		}
 	}
 
@@ -1597,7 +1597,7 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 		m_pLog->LogToConsole("Unable to load the level %s,mission %s \n", sLevelFolder.c_str(),szMissionName);
 		if (pInput)
 			pInput->SetMouseExclusive(true);
-		LoadingError("@LoadLevelError");
+		LoadingError((string("@LoadLevelError|loadlevel|") + sLevelFolder).c_str());
 		return;
 	}
 
@@ -1940,6 +1940,7 @@ IGameMods* CXGame::GetModsInterface()
 //////////////////////////////////////////////////////////////////////////
 void CXGame::LoadingError(const char *szError)
 {
+	m_pLog->LogError("LoadingError: %s", szError);
 	m_pRenderer->ClearColorBuffer(Vec3(0,0,0));
 	GetSystem()->GetIConsole()->ResetProgressBar(0);
 	m_pSystem->GetIConsole()->ShowConsole(false);

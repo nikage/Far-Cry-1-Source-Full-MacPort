@@ -190,7 +190,7 @@ public:
     virtual void SetType(char type);
     virtual float ScaleCoordX(float value) { return value; }
     virtual float ScaleCoordY(float value) { return value; }
-    virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) { assert(false && "SetColorOp not implemented"); }
+    virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) {}
     virtual void EnableSwapBuffers(bool bEnable) { assert(false && "EnableSwapBuffers not implemented"); }
     virtual WIN_HWND GetHWND() { assert(false && "GetHWND not implemented"); return nullptr; }
     virtual void OnEntityDeleted(IEntityRender* pEntityRender) { assert(false && "OnEntityDeleted not implemented"); }
@@ -205,7 +205,7 @@ public:
     // Statistics
     virtual int GetPolyCount() { assert(false && "GetPolyCount not implemented"); return 0; }
     virtual void GetPolyCount(int& nPolygons, int& nShadowVolPolys) { assert(false && "GetPolyCount not implemented"); nPolygons = 0; nShadowVolPolys = 0; }
-    virtual void SetClearColor(const Vec3& vColor) { assert(false && "SetClearColor not implemented"); }
+    virtual void SetClearColor(const Vec3& vColor);
     virtual int GetFrameID(bool bIncludeRecursiveCalls = true);
     virtual void MakeMatrix(const Vec3& pos, const Vec3& angles, const Vec3& scale, Matrix44* mat) { assert(false && "MakeMatrix not implemented"); }
     
@@ -333,10 +333,10 @@ public:
     virtual void DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan) { assert(false && "DrawObjSprites not implemented"); }
     virtual void DrawQuad(const Vec3& right, const Vec3& up, const Vec3& origin, int nFlipMode = 0) { assert(false && "DrawQuad not implemented"); }
     virtual void DrawQuad(float dy, float dx, float dz, float x, float y, float z) { assert(false && "DrawQuad not implemented"); }
-    virtual void ClearDepthBuffer() { assert(false && "ClearDepthBuffer not implemented"); }
-    virtual void ClearColorBuffer(const Vec3 vColor) { assert(false && "ClearColorBuffer not implemented"); }
-    virtual void ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, bool bBackBuffer, bool bRGBA, int nScaledX = -1, int nScaledY = -1) { assert(false && "ReadFrameBuffer not implemented"); }
-    virtual void SetFogColor(float* color) { assert(false && "SetFogColor not implemented"); }
+    virtual void ClearDepthBuffer();
+    virtual void ClearColorBuffer(const Vec3 vColor);
+    virtual void ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, bool bBackBuffer, bool bRGBA, int nScaledX = -1, int nScaledY = -1) {}
+    virtual void SetFogColor(float* color);
     virtual void TransformTextureMatrix(float x, float y, float angle, float scale) { assert(false && "TransformTextureMatrix not implemented"); }
     virtual void ResetTextureMatrix() { assert(false && "ResetTextureMatrix not implemented"); }
     virtual unsigned int MakeSprite(float object_scale, int tex_size, float angle, IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid) { assert(false && "MakeSprite not implemented"); return 0; }

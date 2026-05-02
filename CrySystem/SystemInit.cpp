@@ -13,6 +13,7 @@
 #include "stdafx.h"
 #include "System.h"
 #include "CryLibrary.h"
+#include "NullNetwork.h"
 
 #ifndef _XBOX
 #ifdef WIN32
@@ -324,9 +325,11 @@ IRenderer* CSystem::CreateRenderer(bool fullscreen, void* hinst, void* hWndAttac
 /////////////////////////////////////////////////////////////////////////////////
 bool CSystem::InitNetwork()
 {
-	// Network functionality disabled for macOS build
-	GetILog()->LogToFile( "Network system disabled for macOS" );
-	return true;
+#if defined(__APPLE__) && defined(__MACH__)
+	GetILog()->LogToFile( "Using null network stub for macOS singleplayer" );
+	m_pNetwork = new CNullNetwork(this);
+	return m_pNetwork != nullptr;
+#endif
 
 #ifndef _XBOX
 	PFNCREATENETWORK pfnCreateNetwork;

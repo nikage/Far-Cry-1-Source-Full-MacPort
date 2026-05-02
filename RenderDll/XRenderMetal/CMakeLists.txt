@@ -64,6 +64,9 @@ target_link_libraries(XRenderMetal PRIVATE
     "-framework Metal"
     "-framework MetalKit"
     "-framework QuartzCore"
+    "-framework CoreGraphics"
+    "-framework CoreFoundation"
+    "-framework ImageIO"
 )
 
 # Compiler settings for Objective-C++

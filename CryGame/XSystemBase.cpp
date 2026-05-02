@@ -1527,6 +1527,8 @@ void CXSystemBase::GetMission( XDOM::IXMLDOMDocument *doc,const char *sRequested
 //////////////////////////////////////////////////////////////////////////
 bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 {
+	m_pLog->LogError("[LoadLevelCommon] ENTER level='%s' mission='%s'",
+		missionInfo.sLevelFolder.c_str(), missionInfo.sMissionName.c_str());
 	// Start time of level loading.
 	CTimeValue time0 = m_pSystem->GetITimer()->GetCurrTimePrecise();
 	AutoSuspendTimeQuota AutoSuspender(m_pSystem->GetStreamEngine());
@@ -1599,8 +1601,10 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	// Open Paks for this level.
 	string sPaks = missionInfo.sLevelFolder + "/*.pak";
 	// Open Pak file for this level. 
-	if (!m_pGame->OpenPacks(sPaks.c_str()))
+	bool bPacksOpened = m_pGame->OpenPacks(sPaks.c_str());
+	m_pLog->LogError("[LoadLevelCommon] OpenPacks('%s') = %d", sPaks.c_str(), bPacksOpened ? 1 : 0);
 	//if (!m_pSystem->GetIPak()->OpenPacks( sPaks.c_str() ))
+	if (!bPacksOpened)
 	{
 		// Pak1 not found.
 		//CryWarning( VALIDATOR_MODULE_GAME,VALIDATOR_WARNING,"Level Packs %s Not Found",sPaks.c_str() );
@@ -1610,9 +1614,14 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	//	m_pSystem->GetISoundSystem()->SetMasterVolume(0);
 	string sEPath = missionInfo.sLevelFolder + "/LevelData.xml";
 	missionInfo.pLevelDataXML = m_pSystem->CreateXMLDocument();
+	if (!missionInfo.pLevelDataXML)
+	{
+		m_pLog->LogError("[LoadLevelCommon] CreateXMLDocument() returned null — XML system unavailable for '%s'", sEPath.c_str());
+		return false;
+	}
 	if(!missionInfo.pLevelDataXML->load(sEPath.c_str()))
 	{
-		m_pLog->Log("[ERROR] Cannot Load %s",sEPath.c_str());
+		m_pLog->LogError("[LoadLevelCommon] Cannot Load %s",sEPath.c_str());
 		return false;
 	}
 	string sMissionName = missionInfo.sMissionName;
@@ -1622,10 +1631,9 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	else
 		GetMission(missionInfo.pLevelDataXML,sMissionName.c_str(),missionInfo);
 
-	// No mission XML.
 	if (!missionInfo.pMissionXML)
 	{
-		GameWarning( "No mission XML File!" );
+		m_pLog->LogError("[LoadLevelCommon] No mission XML found in '%s' for mission '%s'", sEPath.c_str(), missionInfo.sMissionName.c_str());
 		return false;
 	}
 
@@ -1695,6 +1703,8 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	//////////////////////////////////////////////////////////////////////////
 	if (!m_pGame->m_p3DEngine->LoadLevel( missionInfo.sLevelFolder.c_str(),missionInfo.sMissionName.c_str() ))
 	{
+		m_pLog->LogError("[LoadLevelCommon] I3DEngine::LoadLevel failed for '%s' mission '%s'",
+			missionInfo.sLevelFolder.c_str(), missionInfo.sMissionName.c_str());
 		return false;
 	}
 	//////////////////////////////////////////////////////////////////////////
@@ -1738,6 +1748,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	//load the entities from leveldata.xml
 	if (!LoadLevelEntities( missionInfo ))
 	{
+		m_pLog->LogError("[LoadLevelCommon] LoadLevelEntities failed for '%s'", missionInfo.sLevelFolder.c_str());
 		return false;
 	}
 

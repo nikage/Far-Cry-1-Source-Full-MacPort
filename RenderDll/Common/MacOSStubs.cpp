@@ -470,34 +470,100 @@ void WriteTGA(byte* data, int width, int height, char* filename, int bpp)
     assert(false && "macOS: TGA writing not implemented");
 }
 
-// JPEG image loader stub
+// ---------------------------------------------------------------------------
+// JPEG and TGA image loaders using macOS CoreGraphics / ImageIO.
+// Both produce 32-bpp BGRA output matching SRGBPixel{blue,green,red,alpha}.
+// ---------------------------------------------------------------------------
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <ImageIO/ImageIO.h>
+
 class CImageJpgFile : public CImageFile {
+    friend class CImageFile;
 public:
     CImageJpgFile(byte* ptr, long filesize);
-    virtual ~CImageJpgFile();
+    virtual ~CImageJpgFile() {}
 };
 
-CImageJpgFile::CImageJpgFile(byte* ptr, long filesize) {
-    // macOS: JPEG loading not implemented
-    assert(false && "macOS: JPEG loading not implemented");
+CImageJpgFile::CImageJpgFile(byte* ptr, long filesize) : CImageFile()
+{
+    m_eFormat = eIF_Jpg;
+
+    CFDataRef cfData = CFDataCreateWithBytesNoCopy(
+        kCFAllocatorDefault, reinterpret_cast<const UInt8*>(ptr),
+        static_cast<CFIndex>(filesize), kCFAllocatorNull);
+    if (!cfData) { mfSet_error(eIFE_IOerror, const_cast<char*>("JPEG: CFData alloc failed")); return; }
+
+    CGImageSourceRef src = CGImageSourceCreateWithData(cfData, nullptr);
+    CFRelease(cfData);
+    if (!src) { mfSet_error(eIFE_BadFormat, const_cast<char*>("JPEG: ImageSource failed")); return; }
+
+    CGImageRef img = CGImageSourceCreateImageAtIndex(src, 0, nullptr);
+    CFRelease(src);
+    if (!img) { mfSet_error(eIFE_BadFormat, const_cast<char*>("JPEG: decode failed")); return; }
+
+    const int w = static_cast<int>(CGImageGetWidth(img));
+    const int h = static_cast<int>(CGImageGetHeight(img));
+    mfSet_dimensions(w, h);
+    mfSet_ImageSize(w * h * 4);
+    mfSet_bps(32);
+
+    byte* pixels = mfGet_image();
+    if (!pixels) { CGImageRelease(img); mfSet_error(eIFE_OutOfMemory, const_cast<char*>("JPEG: no memory")); return; }
+
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(pixels, w, h, 8, w * 4, cs,
+        kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(cs);
+    if (!ctx) { CGImageRelease(img); mfSet_error(eIFE_BadFormat, const_cast<char*>("JPEG: CGBitmapContext failed")); return; }
+
+    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+    CGContextRelease(ctx);
+    CGImageRelease(img);
 }
 
-CImageJpgFile::~CImageJpgFile() {
-}
-
-// TGA image loader stub
 class CImageTgaFile : public CImageFile {
+    friend class CImageFile;
 public:
     CImageTgaFile(byte* ptr, long filesize);
-    virtual ~CImageTgaFile();
+    virtual ~CImageTgaFile() {}
 };
 
-CImageTgaFile::CImageTgaFile(byte* ptr, long filesize) {
-    // macOS: TGA loading not implemented
-    assert(false && "macOS: TGA loading not implemented");
-}
+CImageTgaFile::CImageTgaFile(byte* ptr, long filesize) : CImageFile()
+{
+    m_eFormat = eIF_Tga;
 
-CImageTgaFile::~CImageTgaFile() {
+    CFDataRef cfData = CFDataCreateWithBytesNoCopy(
+        kCFAllocatorDefault, reinterpret_cast<const UInt8*>(ptr),
+        static_cast<CFIndex>(filesize), kCFAllocatorNull);
+    if (!cfData) { mfSet_error(eIFE_IOerror, const_cast<char*>("TGA: CFData alloc failed")); return; }
+
+    CGImageSourceRef src = CGImageSourceCreateWithData(cfData, nullptr);
+    CFRelease(cfData);
+    if (!src) { mfSet_error(eIFE_BadFormat, const_cast<char*>("TGA: ImageSource failed")); return; }
+
+    CGImageRef img = CGImageSourceCreateImageAtIndex(src, 0, nullptr);
+    CFRelease(src);
+    if (!img) { mfSet_error(eIFE_BadFormat, const_cast<char*>("TGA: decode failed")); return; }
+
+    const int w = static_cast<int>(CGImageGetWidth(img));
+    const int h = static_cast<int>(CGImageGetHeight(img));
+    mfSet_dimensions(w, h);
+    mfSet_ImageSize(w * h * 4);
+    mfSet_bps(32);
+
+    byte* pixels = mfGet_image();
+    if (!pixels) { CGImageRelease(img); mfSet_error(eIFE_OutOfMemory, const_cast<char*>("TGA: no memory")); return; }
+
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(pixels, w, h, 8, w * 4, cs,
+        kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
+    CGColorSpaceRelease(cs);
+    if (!ctx) { CGImageRelease(img); mfSet_error(eIFE_BadFormat, const_cast<char*>("TGA: CGBitmapContext failed")); return; }
+
+    CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
+    CGContextRelease(ctx);
+    CGImageRelease(img);
 }
 
 #endif // __APPLE__ && __MACH__

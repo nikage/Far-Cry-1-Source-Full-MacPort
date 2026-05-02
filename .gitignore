@@ -4233,3 +4233,7 @@ RenderDll/XRenderMetal/Generated
 
 log.txt
 tools/shader_port/.dart_tool/
+
+# Compiled C++ test binaries
+**/test/*_tests
+**/test/*Tests
