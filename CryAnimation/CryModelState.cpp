@@ -1945,13 +1945,15 @@ ICryCharSubmesh* CryModelState::GetSubmesh(unsigned i)
 
 CryModelSubmesh* CryModelState::GetCryModelSubmesh(unsigned i)
 {
-#if defined(LINUX)
-	CryModelSubmesh* pRes( 0 );
-	if( i < m_arrSubmeshes.size() )
-	{
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
+	// Use an explicit raw-pointer local to avoid Clang deducing
+	// _smart_ptr<CryModelSubmesh> as the ternary common type, which would
+	// copy the smart ptr (AddRef) then destroy the copy (Release→0→dtor),
+	// causing infinite recursive destruction during CryModelState teardown.
+	CryModelSubmesh* pRes = nullptr;
+	if (i < m_arrSubmeshes.size())
 		pRes = m_arrSubmeshes[i];
-	}
-	return( pRes );
+	return pRes;
 #else
 	return i < m_arrSubmeshes.size() ? m_arrSubmeshes[i]:nullptr;
 #endif
