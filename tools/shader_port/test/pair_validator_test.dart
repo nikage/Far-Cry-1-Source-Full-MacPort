@@ -222,7 +222,9 @@ void main() {
       expect(r.warnings.where((w) => w.rule == '3c'), isEmpty);
     });
 
-    test('warning when FS metadata has fewer components than VS output', () {
+    test('no warning when VS output exceeds FS metadata component count', () {
+      // VS outputs Tex0=2, FS metadata declares Tex0=1 (VS > FS).
+      // The generator widens the FS stage_in to match VS, so this is safe.
       final List<Map<String, dynamic>> m = _manifest(extras: [
         {
           'shader': 'CGRCTex2Mismatch',
@@ -239,12 +241,7 @@ void main() {
       ]);
       final ValidatorResult r = validate(m);
       expect(r.passed, isTrue);
-      final List<ValidationError> rule3c =
-          r.warnings.where((w) => w.rule == '3c').toList();
-      expect(rule3c, hasLength(1));
-      expect(rule3c.first.message, contains('Tex0'));
-      expect(rule3c.first.message, contains('2'));
-      expect(rule3c.first.message, contains('1'));
+      expect(r.warnings.where((w) => w.rule == '3c'), isEmpty);
     });
 
     test('warning when FS metadata has more components than VS output', () {
@@ -288,7 +285,9 @@ void main() {
       expect(r.warnings.where((w) => w.rule == '3c'), isEmpty);
     });
 
-    test('multiple mismatched fields produce multiple 3c warnings', () {
+    test('no warnings when VS outputs exceed FS metadata in multiple fields', () {
+      // VS outputs Tex0=3, Tex1=4; FS metadata declares Tex0=2, Tex1=2 (VS > FS).
+      // Both are safe — generator widens FS to match VS for each field.
       final List<Map<String, dynamic>> m = [
         {
           'shader': 'CGVMultiOut',
@@ -316,9 +315,33 @@ void main() {
         },
       ];
       final ValidatorResult r = validate(m);
+      expect(r.warnings.where((w) => w.rule == '3c'), isEmpty);
+    });
+
+    test('warning when VS output has fewer components than FS metadata (real blocker)', () {
+      // VS outputs Tex0=2; FS metadata declares Tex0=3 (VS < FS).
+      // Generator cannot widen VS — Metal will reject the PSO at runtime.
+      final List<Map<String, dynamic>> m = _manifest(extras: [
+        {
+          'shader': 'CGRCTex0Undersupply',
+          'normalized': 'cgrctex0undersupply',
+          'stage': 'fragment',
+          'entryPoint': 'cgrctex0undersupply_frag',
+          'pipelineCategory': 'mesh',
+          'vertexEntryPoint': 'generated_cgvprogsimple_vertex',
+          'vertexAttributes': ['Tex0'],
+          'vertexAttributeMetadata': [
+            {'token': 'Tex0', 'components': 3, 'category': 'texcoord'},
+          ],
+        },
+      ]);
+      final ValidatorResult r = validate(m);
       final List<ValidationError> rule3c =
           r.warnings.where((w) => w.rule == '3c').toList();
-      expect(rule3c, hasLength(2));
+      expect(rule3c, hasLength(1));
+      expect(rule3c.first.message, contains('Tex0'));
+      expect(rule3c.first.message, contains('2'));
+      expect(rule3c.first.message, contains('3'));
     });
 
     test('real-world Refractive mismatch: VS Tex1=float2, FS metadata=float4', () {

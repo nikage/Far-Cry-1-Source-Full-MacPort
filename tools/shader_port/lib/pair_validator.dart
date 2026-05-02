@@ -158,10 +158,11 @@ void _checkStructuralCompatibility(
     }
   }
 
-  // Rule 3c: component-count mismatch between VS vertexOutputs and FS
-  // vertexAttributeMetadata for the same field name.  A mismatch means the
-  // generated VS and FS structs will use different widths for the same
-  // [[user(N)]] slot, causing a Metal PSO link failure at runtime.
+  // Rule 3c: VS output provides fewer components than FS vertexAttributeMetadata
+  // declares for the same field name.  The generator widens the FS stage_in to
+  // match VS output width (pairedVertexOutputs), so VS > FS is safe.  Only
+  // VS < FS is a real blocker: the generator cannot invent missing VS components
+  // and Metal will reject the PSO at runtime.
   final dynamic fsMeta = frag['vertexAttributeMetadata'];
   if (fsMeta is! List) return;
   for (final dynamic meta in fsMeta) {
@@ -171,7 +172,7 @@ void _checkStructuralCompatibility(
     if (token == null || fsComponents == null) continue;
     final String tokenLower = token.toLowerCase();
     final int? vsComponents = vsOutputComponents[tokenLower];
-    if (vsComponents != null && vsComponents != fsComponents) {
+    if (vsComponents != null && vsComponents < fsComponents) {
       warnings.add(ValidationError(
         '3c',
         shaderName,
