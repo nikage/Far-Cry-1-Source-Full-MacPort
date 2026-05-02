@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 #include <StlUtils.h>
+#include "StringUtils.h"
 #include <CryCompiledFile.h>
 #include "ControllerManager.h"
 #include "Controller.h"
@@ -76,7 +77,10 @@ CControllerManager::~CControllerManager()
 //   error information (like where the error occured etc.) may be put into the log
 int CControllerManager::StartLoadAnimation (const string& strFileName, float fScale, unsigned nFlags)
 {
-	int nAnimId = FindAnimationByFile (strFileName);
+	string strNormalized = strFileName;
+	CryStringUtils::UnifyFilePath(strNormalized);
+
+	int nAnimId = FindAnimationByFile (strNormalized);
 	bool bRecordExists = (nAnimId >= 0);
 	if (bRecordExists && m_arrAnims[nAnimId].IsLoaded())
 	{
@@ -98,7 +102,7 @@ int CControllerManager::StartLoadAnimation (const string& strFileName, float fSc
 		Anim.nFlags = nFlags;
 
 		if (!bRecordExists)
-			Anim.strFileName = strFileName;
+			Anim.strFileName = strNormalized;
 
 		Anim.fScale = fScale;
 		

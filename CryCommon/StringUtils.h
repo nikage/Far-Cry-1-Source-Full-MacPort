@@ -158,6 +158,16 @@ inline void UnifyFilePath (string& strPath)
 			*itPath = '\\';
 		else
 			*itPath = tolower (*itPath);
+
+	// Collapse redundant current-directory segments (\.\) that the CCG exporter
+	// stores in animation paths on Windows (e.g. Objects\Weapons\RL\.\file.caf).
+	// On Windows the file system resolves \.\ transparently; on macOS CryPak does
+	// not, causing every weapon animation to report "file not found".
+	size_t pos = 0;
+	while ((pos = strPath.find("\\.\\", pos)) != string::npos)
+		strPath.erase(pos, 2); // remove '\.' leaving just the trailing separator
+	if (strPath.size() >= 2 && strPath[0] == '.' && strPath[1] == '\\')
+		strPath.erase(0, 2); // strip leading '.\' prefix
 }
 
 // converts the number to a string
