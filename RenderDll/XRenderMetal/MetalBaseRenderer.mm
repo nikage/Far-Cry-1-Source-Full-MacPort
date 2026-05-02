@@ -2287,11 +2287,21 @@ void CMetalBaseRenderer::DoBloomPass()
     {
         if (m_hdrEnabled)
         {
+#if DEBUG
+            // Bloom PSOs are compiled from UtilShaders.metal, not the generated
+            // manifest. If this fires, check that InitHDRPipeline succeeded and
+            // that UtilShaders.metal was compiled without errors.
+            assert(m_hdrBrightPassPSO && m_hdrBlurHPSO && m_hdrBlurVPSO &&
+                   "DoBloomPass: bloom PSOs are nil — hdr_brightpass_fragment / "
+                   "hdr_blur_h_fragment / hdr_blur_v_fragment must be in the "
+                   "default Metal library compiled from UtilShaders.metal");
+#endif
             static bool s_logged = false;
             if (!s_logged) {
                 s_logged = true;
                 if (iLog)
-                    iLog->Log("DoBloomPass: HDR enabled but bloom PSOs/RTs are nil — skipping bloom (install full Xcode to compile bloom shaders)");
+                    iLog->Log("DoBloomPass: HDR enabled but bloom PSOs/RTs are nil — "
+                              "skipping bloom; check generated_manifest.json for missing HDR PSO entries\n");
             }
         }
         return;
@@ -2314,11 +2324,23 @@ bool CMetalBaseRenderer::BeginHDRPass()
         return false;
 
     // m_hdrColorRT nil means InitHDRPipeline failed (already logged at init
-    // time). Log once so the frame-level fallback is visible without spam.
+    // time). In DEBUG builds this is always a bug, so fire an assert to make
+    // the absence immediately visible. Release keeps the LDR fallback as a
+    // safety net and logs once so the fallback is auditable in log.txt.
+#if DEBUG
+    // HDR PSOs (hdr_tonemap_fragment, hdr_brightpass_fragment, hdr_blur_h/v_fragment)
+    // are compiled from UtilShaders.metal into the default Metal library — they
+    // are NOT in generated_manifest.json (which is for game shaders only).
+    // If this assert fires, check that InitHDRPipeline succeeded and that the
+    // default library was compiled successfully from UtilShaders.metal.
+    assert(m_hdrColorRT && "BeginHDRPass: HDR colour RT is nil — "
+                           "InitHDRPipeline must succeed before BeginHDRPass; "
+                           "check that UtilShaders.metal compiled without errors");
+#endif
     if (!m_hdrColorRT) {
         static bool s_logged = false;
         if (!s_logged) {
-            iLog->Log("BeginHDRPass: HDR colour RT is nil — falling back to LDR\n");
+            if (iLog) iLog->Log("BeginHDRPass: HDR colour RT is nil — falling back to LDR\n");
             s_logged = true;
         }
         return false;
@@ -2643,7 +2665,6 @@ int CMetalBaseRenderer::GetFeatures()
     features |= RFT_MULTITEXTURE;
     features |= RFT_BUMP;
     features |= RFT_HWGAMMA;
-    features |= RFT_ALLOWRECTTEX;
     features |= RFT_COMPRESSTEXTURE;
     features |= RFT_ALLOWANISOTROPIC;
     features |= RFT_SUPPORTZBIAS;

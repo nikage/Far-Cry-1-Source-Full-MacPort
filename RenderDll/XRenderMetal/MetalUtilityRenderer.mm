@@ -1075,8 +1075,7 @@ id<MTLTexture> CMetalUtilityRenderer::GetRenderTargetColorTexture(int nHandle) c
 
 float CMetalUtilityRenderer::EF_GetWaterZElevation(float fX, float fY)
 {
-    // Get water Z elevation
-    return 0.0f;
+    return m_renderer->CRenderer::EF_GetWaterZElevation(fX, fY);
 }
 
 // Protected methods

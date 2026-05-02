@@ -38,7 +38,8 @@ enum eVertexFormat
 	VERTEX_FORMAT_T3F_B3F_N3F=14,        // tangent space (36 bytes)
   VERTEX_FORMAT_TEX2F=15,              // light maps TC (8 bytes)
   VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F=16,  // used for multitextured drawing
-  VERTEX_FORMAT_NUMS=17,              // number of vertex formats
+  VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F=17, // dual-color + dual-texcoord (48 bytes)
+  VERTEX_FORMAT_NUMS=18,              // number of vertex formats
 };
 
 _inline int VertFormatForComponents(bool bNeedCol, bool bNeedSecCol, bool bNeedNormals, bool bHasTC)
@@ -191,6 +192,17 @@ struct struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB
   UCol seccolor;
 };
 
+struct struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F
+{
+  Vec3 xyz;       // 12 B @0
+  Vec3 normal;    // 12 B @12
+  UCol color;     //  4 B @24
+  UCol seccolor;  //  4 B @28
+  float st0[2];   //  8 B @32
+  float st1[2];   //  8 B @40
+                  // total: 48 B
+};
+
 struct SPipTangents
 {
   Vec3 m_Tangent;
@@ -250,6 +262,9 @@ _inline void *CreateVertexBuffer(int nFormat, int nVerts)
     case VERTEX_FORMAT_T3F_B3F_N3F:
       return new SPipTangents[nVerts];
 
+    case VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F:
+      return new struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F[nVerts];
+
     default:
       assert(0);
   }
@@ -284,6 +299,7 @@ const int m_VertexSize[]=
   sizeof(SPipTangents),
   sizeof(struct_VERTEX_FORMAT_TEX2F),
   sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F),
+  sizeof(struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F),
 };
 
 

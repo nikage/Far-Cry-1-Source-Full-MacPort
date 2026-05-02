@@ -2884,22 +2884,12 @@ void CMetalRenderer::SetScissor(int x, int y, int width, int height) {
 }
 
 int CMetalRenderer::GetFeatures() {
-  // Return feature flags based on Metal capabilities
-  // Metal supports most modern graphics features
-  int features = 0;
-  
-  // Basic features supported by Metal
-  features |= RFT_MULTITEXTURE;          // Metal supports multiple textures
-  features |= RFT_BUMP;                  // Bump mapping support
-  features |= RFT_COMPRESSTEXTURE;       // Metal supports compressed textures (BC/DXT)
-  features |= RFT_ALLOWANISOTROPIC;      // Anisotropic filtering support
-  features |= RFT_ALLOWRECTTEX;          // Non-power-of-two textures supported
-  features |= RFT_DETAILTEXTURE;         // Detail textures supported
-  features |= RFT_SUPPORTZBIAS;          // Depth bias support
-  
-  // Metal always supports these features
-  features |= RFT_DIRECTACCESSTOVIDEOMEMORY;  // Direct GPU memory access
-  
+  int features = CMetalBaseRenderer::GetFeatures();
+  features |= RFT_DETAILTEXTURE;
+  features |= RFT_DIRECTACCESSTOVIDEOMEMORY;
+  features |= RFT_OCCLUSIONTEST;
+  features |= RFT_DEPTHMAPS;
+  features |= RFT_SHADOWMAP_SELFSHADOW;
   return features;
 }
 

@@ -195,10 +195,125 @@ MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptor(int ve
             
         case VERTEX_FORMAT_P3F_N_COL4UB:
             return CreateDescriptor_P3F_N_COL4UB();
-            
+
+        case VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F:
+            return CreateDescriptor_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F();
+
+        case VERTEX_FORMAT_TRP3F_COL4UB_TEX2F:
+            return CreateDescriptor_TRP3F_COL4UB_TEX2F();
+
+        case VERTEX_FORMAT_TEX2F:
+            return CreateDescriptor_TEX2F();
+
+        case VERTEX_FORMAT_T3F_B3F_N3F:
+            // This is a secondary tangent-space stream attached via
+            // AttachTangentAttributes — it is never used as a primary
+            // vertex buffer format.  Return nil so the caller can detect
+            // the misuse instead of silently getting a wrong descriptor.
+            if (iLog)
+                iLog->Log("MetalVertexDescriptor: VERTEX_FORMAT_T3F_B3F_N3F (14) is a "
+                          "tangent-stream format; use AttachTangentAttributes instead\n");
+            return nil;
+
         default:
             return CreateDescriptor_P3F_COL4UB_TEX2F();
     }
+}
+
+MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_TRP3F_COL4UB_TEX2F()
+{
+    // struct_VERTEX_FORMAT_TRP3F_COL4UB_TEX2F layout (28 bytes):
+    //   float x,y,z  @0  (12 B) — position
+    //   float rhw    @12 (4 B)  — reciprocal homogeneous W (for projected 2D)
+    //   UCol  color  @16 (4 B)
+    //   float st[2]  @20 (8 B)
+    MTLVertexDescriptor* descriptor = [[MTLVertexDescriptor alloc] init];
+    assert(descriptor != nil);
+
+    descriptor.attributes[0].format      = MTLVertexFormatFloat3;
+    descriptor.attributes[0].offset      = 0;
+    descriptor.attributes[0].bufferIndex = 0;
+
+    descriptor.attributes[1].format      = MTLVertexFormatFloat;
+    descriptor.attributes[1].offset      = 12;
+    descriptor.attributes[1].bufferIndex = 0;
+
+    descriptor.attributes[2].format      = MTLVertexFormatUChar4;
+    descriptor.attributes[2].offset      = 16;
+    descriptor.attributes[2].bufferIndex = 0;
+
+    descriptor.attributes[3].format      = MTLVertexFormatFloat2;
+    descriptor.attributes[3].offset      = 20;
+    descriptor.attributes[3].bufferIndex = 0;
+
+    descriptor.layouts[0].stride        = sizeof(struct_VERTEX_FORMAT_TRP3F_COL4UB_TEX2F);
+    descriptor.layouts[0].stepRate      = 1;
+    descriptor.layouts[0].stepFunction  = MTLVertexStepFunctionPerVertex;
+
+    assert(descriptor.layouts[0].stride == 28);
+    return descriptor;
+}
+
+MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_TEX2F()
+{
+    // struct_VERTEX_FORMAT_TEX2F layout (8 bytes):
+    //   float st[2] @0 — UV coordinates only (secondary lightmap stream)
+    MTLVertexDescriptor* descriptor = [[MTLVertexDescriptor alloc] init];
+    assert(descriptor != nil);
+
+    descriptor.attributes[0].format      = MTLVertexFormatFloat2;
+    descriptor.attributes[0].offset      = 0;
+    descriptor.attributes[0].bufferIndex = 0;
+
+    descriptor.layouts[0].stride        = sizeof(struct_VERTEX_FORMAT_TEX2F);
+    descriptor.layouts[0].stepRate      = 1;
+    descriptor.layouts[0].stepFunction  = MTLVertexStepFunctionPerVertex;
+
+    assert(descriptor.layouts[0].stride == 8);
+    return descriptor;
+}
+
+MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateDescriptor_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F()
+{
+    // struct_VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F layout (48 bytes):
+    //   Vec3  xyz     @0   (12 B)
+    //   Vec3  normal  @12  (12 B)
+    //   UCol  color   @24  (4 B)
+    //   UCol  secclr  @28  (4 B)
+    //   float st0[2]  @32  (8 B)
+    //   float st1[2]  @40  (8 B)
+    MTLVertexDescriptor* descriptor = [[MTLVertexDescriptor alloc] init];
+    assert(descriptor != nil);
+
+    descriptor.attributes[0].format      = MTLVertexFormatFloat3;
+    descriptor.attributes[0].offset      = 0;
+    descriptor.attributes[0].bufferIndex = 0;
+
+    descriptor.attributes[1].format      = MTLVertexFormatFloat3;
+    descriptor.attributes[1].offset      = 12;
+    descriptor.attributes[1].bufferIndex = 0;
+
+    descriptor.attributes[2].format      = MTLVertexFormatUChar4;
+    descriptor.attributes[2].offset      = 24;
+    descriptor.attributes[2].bufferIndex = 0;
+
+    descriptor.attributes[3].format      = MTLVertexFormatUChar4;
+    descriptor.attributes[3].offset      = 28;
+    descriptor.attributes[3].bufferIndex = 0;
+
+    descriptor.attributes[4].format      = MTLVertexFormatFloat2;
+    descriptor.attributes[4].offset      = 32;
+    descriptor.attributes[4].bufferIndex = 0;
+
+    descriptor.attributes[5].format      = MTLVertexFormatFloat2;
+    descriptor.attributes[5].offset      = 40;
+    descriptor.attributes[5].bufferIndex = 0;
+
+    descriptor.layouts[0].stride        = 48;
+    descriptor.layouts[0].stepRate      = 1;
+    descriptor.layouts[0].stepFunction  = MTLVertexStepFunctionPerVertex;
+
+    return descriptor;
 }
 
 MTLVertexDescriptor* CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(

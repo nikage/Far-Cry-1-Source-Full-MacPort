@@ -230,16 +230,26 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
     const bool requiresTangentFrame = summary.hasTangent || summary.hasBinormal || summary.hasTNormal;
     info.needsTangents = requiresTangentFrame;
 
+    // Tangent frame takes highest priority: bump-mapped shaders must use the
+    // tangent vertex path even when they also carry dual vertex colors, so that
+    // the normal-mapping data reaches the fragment stage correctly.
+    if (requiresTangentFrame)
+    {
+        info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+        info.functionName = @"tangent_vertex";
+        return info;
+    }
+
     if (summary.hasColor1)
     {
-        if (summary.texCoordCount > 1 && iLog)
-        {
-            iLog->Log("MetalShaderManager: Shader '%s' requests dual colors with more than one texcoord set; using single texcoord fallback\n",
-                      shaderName ? [shaderName UTF8String] : "<unnamed>");
-        }
         if (summary.hasNormal)
         {
-            if (summary.texCoordCount > 0)
+            if (summary.texCoordCount > 1)
+            {
+                info.format = VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F_TEX2F;
+                info.functionName = @"basic_colordual_tex2_vertex";
+            }
+            else if (summary.texCoordCount > 0)
             {
                 info.format = VERTEX_FORMAT_P3F_N_COL4UB_COL4UB_TEX2F;
                 info.functionName = @"basic_colordual_tex_vertex";
@@ -263,13 +273,6 @@ VertexLayoutInfo InferVertexLayout(const VertexAttributeSummary& summary, NSStri
                 info.functionName = @"colordual_vertex";
             }
         }
-        return info;
-    }
-
-    if (requiresTangentFrame)
-    {
-        info.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-        info.functionName = @"tangent_vertex";
         return info;
     }
 
