@@ -547,22 +547,22 @@ void CScreenVars:: Create(void)
 
     // note: these are used for correct cryvision functioning  
     m_pCVStencilShadows=iConsole->GetCVar("e_stencil_shadows");
-    m_iPrevStencilShadows=m_pCVStencilShadows->GetIVal();
+    m_iPrevStencilShadows=m_pCVStencilShadows ? m_pCVStencilShadows->GetIVal() : 0;
 
     m_pCVShadowMaps=iConsole->GetCVar("e_shadow_maps");
-    m_iPrevShadowMaps=m_pCVShadowMaps->GetIVal();
+    m_iPrevShadowMaps=m_pCVShadowMaps ? m_pCVShadowMaps->GetIVal() : 0;
 
     m_pCVVolFog=iConsole->GetCVar("r_VolumetricFog");
-    m_iPrevVolFog= m_pCVVolFog->GetIVal();
+    m_iPrevVolFog=m_pCVVolFog ? m_pCVVolFog->GetIVal() : 0;
 
     m_pCVFog=iConsole->GetCVar("e_fog");
-    m_iPrevFog=m_pCVFog->GetIVal();
+    m_iPrevFog=m_pCVFog ? m_pCVFog->GetIVal() : 0;
 
     m_pCVMaxTexLodBias=iConsole->GetCVar("r_MaxTexLodBias");
-    m_fPrevMaxTexLodBias=m_pCVMaxTexLodBias->GetFVal();
+    m_fPrevMaxTexLodBias=m_pCVMaxTexLodBias ? m_pCVMaxTexLodBias->GetFVal() : 0.0f;
 
 	  m_pCVHeatVision=iConsole->GetCVar("r_Cryvision");
-	  m_iHeatVisionActive=m_pCVHeatVision->GetIVal();
+	  m_iHeatVisionActive=m_pCVHeatVision ? m_pCVHeatVision->GetIVal() : 0;
 
     // reset fade amount    
     ICVar *pHudFadeAmount=iConsole->GetCVar("hud_fadeamount");

@@ -25,6 +25,7 @@
 #include "ISystem.h"
 #include "LeafBuffer.h"
 #include "CREOcLeaf.h"
+#include "CREScreenProcess.h"
 #include <Metal/Metal.h>
 
 extern ISystem *iSystem;
@@ -1048,8 +1049,7 @@ CRendElement* CreateMetalRenderElement(EDataType edt)
             break;
             
         case eDATA_ScreenProcess:
-            re = new CRendElement();
-            if (re) re->mfSetType(eDATA_ScreenProcess);
+            re = new CREScreenProcess();
             break;
             
         case eDATA_HDRProcess:

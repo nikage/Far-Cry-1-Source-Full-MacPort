@@ -16,6 +16,7 @@ set(XRENDER_METAL_SOURCES
     MetalStateCache.mm
     MetalVertexDescriptor.mm
     MetalRenderElements.mm
+    MetalCREScreenProcess.mm
     # MetalREOcean.mm excluded: has unresolved linker symbols (BoxSides, LinkVisSectors,
     # GenerateIndices, mfFillAdditionalBuffer, m_RS) that are never defined in this port.
     # TODO: port remaining CREOcean methods from XRenderOGL/GLREOcean.cpp
@@ -99,6 +100,10 @@ set_source_files_properties(MetalShaderLoader.mm PROPERTIES
 )
 
 set_source_files_properties(MetalRenderElements.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalCREScreenProcess.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 
