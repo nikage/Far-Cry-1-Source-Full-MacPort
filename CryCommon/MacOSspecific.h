@@ -670,7 +670,7 @@ inline intptr_t _findfirst64(const char* filespec, struct __finddata64_t* filein
 
 inline int _findnext64(intptr_t handle, struct __finddata64_t* fileinfo) {
     FindHandle64* state = (FindHandle64*)handle;
-    if (!state || !fileinfo)
+    if (!state || handle == -1 || !fileinfo)
         return -1;
     if (!FillFindData64(state, fileinfo))
         return -1;
@@ -679,7 +679,7 @@ inline int _findnext64(intptr_t handle, struct __finddata64_t* fileinfo) {
 
 inline int _findclose(intptr_t handle) {
     FindHandle64* state = (FindHandle64*)handle;
-    if (!state)
+    if (!state || handle == -1)
         return -1;
     if (state->dir)
         closedir(state->dir);
