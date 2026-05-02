@@ -86,6 +86,13 @@ bool CLeafBuffer::Serialize(int & nPos, uchar * pSerBuf, bool bSave, char * _szF
   m_bMaterialsWasCreatedInRenderer = true;
   m_pMats->LoadFromBuffer(pSerBuf, nPos);
 
+  // Invalidate saved Windows pointers that are meaningless on this platform.
+  for (i=0; i<m_pMats->Count(); i++)
+  {
+    m_pMats->GetAt(i).shaderItem.m_pShader = nullptr;
+    m_pMats->GetAt(i).shaderItem.m_pShaderResources = nullptr;
+  }
+
   // create materaial
   for (i=0; i<m_pMats->Count(); i++)
   {

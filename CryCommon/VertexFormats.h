@@ -247,6 +247,9 @@ _inline void *CreateVertexBuffer(int nFormat, int nVerts)
     case VERTEX_FORMAT_TEX2F:
       return new struct_VERTEX_FORMAT_TEX2F[nVerts];
 
+    case VERTEX_FORMAT_T3F_B3F_N3F:
+      return new SPipTangents[nVerts];
+
     default:
       assert(0);
   }
@@ -443,6 +446,26 @@ static struct SBufInfoTable gBufInfoTable[] =
     OOFS(color.dcolor),
     OOFS(seccolor.dcolor),
     OOFS(normal.x),
+#undef OOFS
+  },
+  {  //VERTEX_FORMAT_T3F_B3F_N3F (14) - tangent/binormal/normal; no TC, no vertex colour
+#define OOFS(x) (int)offsetof(SPipTangents, x)
+    0,
+    0,
+    0,
+    OOFS(m_TNormal),
+#undef OOFS
+  },
+  {  //VERTEX_FORMAT_TEX2F (15) - UV-only; st is at byte 0 so the non-zero sentinel
+     //cannot represent it — all zeros is safe; this format is never a merge target
+    0,
+  },
+  {  //VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F (16) - pos + colour + two UV sets
+#define OOFS(x) (int)offsetof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F_TEX2F, x)
+    OOFS(st0[0]),
+    OOFS(color.dcolor),
+    0,
+    0,
 #undef OOFS
   },
 };

@@ -33,12 +33,17 @@ SRenderShaderResources::~SRenderShaderResources()
     }
   }
   SAFE_RELEASE(m_LMaterial);
-  SShader::m_ShaderResources_known[m_Id] = NULL;
+  if (m_Id > 0 && m_Id < SShader::m_ShaderResources_known.Num())
+    SShader::m_ShaderResources_known[m_Id] = NULL;
 }
 
 SRenderShaderResources::SRenderShaderResources(SInputShaderResources *pSrc)
 {
   Reset();
+  m_Id = 0;
+  m_nLastTexture = 0;
+  m_nCheckedTemplates = 0;
+  m_bNeedNormals = false;
   if (pSrc)
   {
     m_TexturePath = pSrc->m_TexturePath;

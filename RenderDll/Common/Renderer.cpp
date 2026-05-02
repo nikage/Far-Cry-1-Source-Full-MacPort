@@ -2709,29 +2709,37 @@ void CCObject::AddWaves(SWaveForm2 **pWF)
     n1 = m_Waves.Num();
     m_Waves.AddIndex(1);
     wf = &m_Waves[n1];
-    m_NumWFX = n1;
+    m_NumWFX = (short)n1;
     wf->m_Amp = 0;
     wf->m_Freq = 0;
     wf->m_Level = 0;
     wf->m_Phase = 0;
     wf->m_eWFType = eWF_Sin;
+  }
+  else
+  {
+    n1 = m_NumWFX;
   }
   if (!m_NumWFY)
   {
     n2 = m_Waves.Num();
     m_Waves.AddIndex(1);
     wf = &m_Waves[n2];
-    m_NumWFY = n2;
+    m_NumWFY = (short)n2;
     wf->m_Amp = 0;
     wf->m_Freq = 0;
     wf->m_Level = 0;
     wf->m_Phase = 0;
     wf->m_eWFType = eWF_Sin;
   }
+  else
+  {
+    n2 = m_NumWFY;
+  }
   if (pWF)
   {
-    pWF[0] = &m_Waves[n1];
-    pWF[1] = &m_Waves[n2];
+    pWF[0] = (n1 < m_Waves.Num()) ? &m_Waves[n1] : nullptr;
+    pWF[1] = (n2 < m_Waves.Num()) ? &m_Waves[n2] : nullptr;
   }
 }
 
