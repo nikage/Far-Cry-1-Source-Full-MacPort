@@ -1173,6 +1173,12 @@ void CMetalRenderer::EF_AddEf(int NumFog, CRendElement *re, IShader *ef,
 }
 
 void CMetalRenderer::EF_EndEf3D(int nFlags) {
+#if DEBUG
+  static int s_endEf3DCount = 0;
+  if (++s_endEf3DCount <= 3)
+    iLog->Log("[Renderer] EF_EndEf3D call #%d nFlags=0x%x frame=%d", s_endEf3DCount, nFlags, m_nFrameID);
+#endif
+
   const int recurse = SRendItem::m_RecurseLevel - 1;
   if (recurse < 0) {
     iLog->Log("Error: EF_EndEf3D without EF_StartEf");

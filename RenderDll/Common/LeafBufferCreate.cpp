@@ -1956,7 +1956,18 @@ CLeafBuffer::~CLeafBuffer()
       }
 
       if (mi->shaderItem.m_pShader)
-        mi->shaderItem.m_pShader->Release();
+      {
+        IShader* sh = mi->shaderItem.m_pShader;
+#if defined(__APPLE__) && defined(__aarch64__)
+        if ((uintptr_t)sh >> 47) {
+          sh = nullptr;
+        } else {
+          const uintptr_t vtbl = *reinterpret_cast<const uintptr_t*>(sh);
+          if ((vtbl >> 47) != 0) sh = nullptr;
+        }
+#endif
+        if (sh) sh->Release();
+      }
       if (mi->shaderItem.m_pShaderResources)
         mi->shaderItem.m_pShaderResources->Release();
 
@@ -2131,7 +2142,12 @@ void CLeafBuffer::SetChunk( IShader * pShader,
     }
     else
     {
-      pMat->shaderItem.m_pShader = pShader;//gRenDev->EF_LoadShader((char*)szEfName, -1, eEF_World, 0);
+      if (m_bMaterialsWasCreatedInRenderer)
+      {
+        if (pMat->shaderItem.m_pShader) pMat->shaderItem.m_pShader->Release();
+        if (pShader) pShader->AddRef();
+      }
+      pMat->shaderItem.m_pShader = pShader;
       pMat->pRE = (CREOcLeaf*)gRenDev->EF_CreateRE(eDATA_OcLeaf);
       pMat->pRE->m_CustomTexBind[0] = m_nClientTextureBindID;
     }
@@ -2147,6 +2163,11 @@ void CLeafBuffer::SetChunk( IShader * pShader,
   {
     pMat->pRE->m_pChunk = pMat;
     pMat->pRE->m_pBuffer = this;
+    if (m_bMaterialsWasCreatedInRenderer && pMat->shaderItem.m_pShader != pShader)
+    {
+      if (pMat->shaderItem.m_pShader) pMat->shaderItem.m_pShader->Release();
+      if (pShader) pShader->AddRef();
+    }
     pMat->shaderItem.m_pShader = pShader;
   }
 
@@ -2182,6 +2203,11 @@ void CLeafBuffer::SetShader( IShader * pShader, int nCustomTID )
   for(int i=0; i<m_pMats->Count(); i++)
   {
     CMatInfo *mi = m_pMats->Get(i);
+    if (m_bMaterialsWasCreatedInRenderer && mi->shaderItem.m_pShader != pShader)
+    {
+      if (mi->shaderItem.m_pShader) mi->shaderItem.m_pShader->Release();
+      if (pShader) pShader->AddRef();
+    }
     mi->shaderItem.m_pShader = pShader;
     if(mi->pRE)
       mi->pRE->m_CustomTexBind[0] = nCustomTID;

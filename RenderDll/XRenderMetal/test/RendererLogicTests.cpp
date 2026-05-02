@@ -1786,6 +1786,108 @@ int main()
         CHECK(!isValidUserPtr(firstInvalid));
     }
 
+    // ~CLeafBuffer vtable guard — freed shader with malloc free-list in vtable slot must not crash
+    {
+        // Observed crash pattern: e passes >> 47 check but *e (vtable) is garbage
+        // (malloc writes free-list pointer 0x22c1370800f0c1e8 at start of freed block)
+        // The extended guard in ~CLeafBuffer also validates the vtable pointer.
+        auto isValidShaderPtr = [](const void* p) -> bool {
+            if (!p) return false;
+            if ((uintptr_t)p >> 47) return false;
+            const uintptr_t vtable = *reinterpret_cast<const uintptr_t*>(p);
+            return (vtable >> 47) == 0;
+        };
+
+        // Simulated freed block: vtable = malloc free-list pointer
+        uintptr_t fakeFreedBlock[2];
+        fakeFreedBlock[0] = 0x22c1370800f0c1e8ULL;  // garbage vtable (bit 61 set)
+        fakeFreedBlock[1] = 0;
+        CHECK(!isValidShaderPtr(reinterpret_cast<const void*>(fakeFreedBlock)));
+
+        // Valid object: vtable in library range (upper bits 0)
+        uintptr_t fakeValidBlock[2];
+        fakeValidBlock[0] = 0x000000010f2b0000ULL;  // typical dylib vtable address
+        fakeValidBlock[1] = 0;
+        CHECK(isValidShaderPtr(reinterpret_cast<const void*>(fakeValidBlock)));
+
+        // Null pointer — not valid (no shader, skip)
+        CHECK(!isValidShaderPtr(nullptr));
+    }
+
+    // SetChunk else-branch: replacing a non-null shader slot must release the old ref
+    {
+        struct CountedShader {
+            int refCount = 1;
+            void AddRef() { ++refCount; }
+            void Release() { --refCount; }
+        };
+
+        struct ShaderItem {
+            CountedShader* m_pShader = nullptr;
+        };
+
+        auto applySetChunkElse = [](ShaderItem& slot, CountedShader* pShader, bool createdInRenderer) {
+            if (createdInRenderer)
+            {
+                if (slot.m_pShader) slot.m_pShader->Release();
+                if (pShader) pShader->AddRef();
+            }
+            slot.m_pShader = pShader;
+        };
+
+        CountedShader oldShader;
+        CountedShader newShader;
+        ShaderItem slot;
+        slot.m_pShader = &oldShader;
+
+        applySetChunkElse(slot, &newShader, true);
+
+        CHECK_EQ(oldShader.refCount, 0);
+        CHECK_EQ(newShader.refCount, 2);
+        CHECK(slot.m_pShader == &newShader);
+
+        // Replacing with null must release old, not crash
+        applySetChunkElse(slot, nullptr, true);
+        CHECK_EQ(newShader.refCount, 1);
+        CHECK(slot.m_pShader == nullptr);
+    }
+
+    // SetShader replacement: only releases old when the pointer actually changes
+    {
+        struct CountedShader {
+            int refCount = 1;
+            void AddRef() { ++refCount; }
+            void Release() { --refCount; }
+        };
+
+        struct ShaderItem {
+            CountedShader* m_pShader = nullptr;
+        };
+
+        auto applySetShader = [](ShaderItem& slot, CountedShader* pShader, bool createdInRenderer) {
+            if (createdInRenderer && slot.m_pShader != pShader)
+            {
+                if (slot.m_pShader) slot.m_pShader->Release();
+                if (pShader) pShader->AddRef();
+            }
+            slot.m_pShader = pShader;
+        };
+
+        CountedShader shaderA;
+        CountedShader shaderB;
+        ShaderItem slot;
+        slot.m_pShader = &shaderA;
+
+        // Replace A → B: A released, B addref'd
+        applySetShader(slot, &shaderB, true);
+        CHECK_EQ(shaderA.refCount, 0);
+        CHECK_EQ(shaderB.refCount, 2);
+
+        // Assign same pointer again: no change to ref counts
+        applySetShader(slot, &shaderB, true);
+        CHECK_EQ(shaderB.refCount, 2);
+    }
+
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;
 }

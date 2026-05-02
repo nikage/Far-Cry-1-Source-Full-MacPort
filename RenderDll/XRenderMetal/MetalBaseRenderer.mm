@@ -932,6 +932,14 @@ void CMetalBaseRenderer::BeginFrame()
     
     m_numDrawCalls = 0;
     m_numTriangles = 0;
+
+#if DEBUG
+    if (m_nFrameID <= 5 || (m_nFrameID % 300) == 0)
+        iLog->Log("[Renderer] BeginFrame #%d drawable=%s drawCalls=%d tris=%d",
+                  m_nFrameID,
+                  (m_currentDrawable != nil ? "ok" : "nil"),
+                  m_numDrawCalls, m_numTriangles);
+#endif
 }
 
 void CMetalBaseRenderer::Update()

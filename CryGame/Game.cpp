@@ -864,7 +864,13 @@ bool CXGame::Update()
 	assert(g_Render != NULL && "g_Render console variable must be initialized");
 	
 	bool bRenderFrame = (!m_pSystem->GetViewCamera().GetPos().IsZero() || m_bMenuOverlay || m_bUIOverlay) 
-										&& (g_Render ? g_Render->GetIVal() != 0 : true);
+									&& (g_Render ? g_Render->GetIVal() != 0 : true);
+
+	static bool s_bRenderFrameFirstTime = true;
+	if (bRenderFrame && s_bRenderFrameFirstTime) {
+		s_bRenderFrameFirstTime = false;
+		m_pLog->Log("[Game] bRenderFrame first became true — rendering pipeline active");
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// Start Profiling frame
