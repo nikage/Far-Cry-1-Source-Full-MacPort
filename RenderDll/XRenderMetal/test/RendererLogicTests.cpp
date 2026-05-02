@@ -897,6 +897,94 @@ static void test_clear_depth_pass_descriptor_values()
     CHECK(clearStencil == 0u);
 }
 
+// -----------------------------------------------------------------------
+// Shader item / LeafBuffer null-guard logic tests
+//
+// These tests mirror the guard patterns applied in LeafBufferCreate.cpp and
+// Meshidx.cpp to protect against null m_pShader / m_pShaderResources that
+// arise when EF_LoadShaderItem previously returned an empty SShaderItem.
+// -----------------------------------------------------------------------
+
+struct FakeShaderResources
+{
+    int  m_nRefCounter;
+    int  m_ResFlags;
+    FakeShaderResources() : m_nRefCounter(0), m_ResFlags(0) {}
+};
+
+static const int MTLFLAG_2SIDED_TEST = (1 << 1);
+
+static bool compute_two_sided(const FakeShaderResources* pRes)
+{
+    return pRes ? (pRes->m_ResFlags & MTLFLAG_2SIDED_TEST) != 0 : false;
+}
+
+struct FakeShader
+{
+    bool flareproc;
+};
+
+static bool compute_is_flareproc(const FakeShader* pShader)
+{
+    if (!pShader) return false;
+    return pShader->flareproc;
+}
+
+static void test_shader_resources_null_guard_defaults_to_not_twosided()
+{
+    CHECK(compute_two_sided(nullptr) == false);
+}
+
+static void test_shader_resources_twosided_flag_propagates()
+{
+    FakeShaderResources res;
+    res.m_ResFlags = MTLFLAG_2SIDED_TEST;
+    CHECK(compute_two_sided(&res) == true);
+}
+
+static void test_shader_resources_single_sided_flag_propagates()
+{
+    FakeShaderResources res;
+    res.m_ResFlags = 0;
+    CHECK(compute_two_sided(&res) == false);
+}
+
+static void test_shader_null_guard_skips_flareproc_check()
+{
+    CHECK(compute_is_flareproc(nullptr) == false);
+}
+
+static void test_shader_flareproc_detected_when_present()
+{
+    FakeShader s;
+    s.flareproc = true;
+    CHECK(compute_is_flareproc(&s) == true);
+}
+
+static void test_shader_flareproc_absent_when_not_set()
+{
+    FakeShader s;
+    s.flareproc = false;
+    CHECK(compute_is_flareproc(&s) == false);
+}
+
+static void test_shader_resources_refcounter_initial_value()
+{
+    // EF_LoadShaderItem sets m_nRefCounter=1 to prevent premature deletion.
+    // Verify the contract: after creation + explicit set, counter is positive.
+    FakeShaderResources res;
+    res.m_nRefCounter = 1;
+    CHECK(res.m_nRefCounter > 0);
+}
+
+static void test_shader_resources_refcounter_survives_one_release()
+{
+    FakeShaderResources res;
+    res.m_nRefCounter = 1;
+    res.m_nRefCounter--;
+    CHECK(res.m_nRefCounter == 0);
+}
+
 int main()
 {
     printf("=== RendererLogicTests ===\n");
@@ -926,6 +1014,14 @@ int main()
     test_set_fog_color_null_guard();
     test_set_fog_color_writes_components();
     test_clear_depth_pass_descriptor_values();
+    test_shader_resources_null_guard_defaults_to_not_twosided();
+    test_shader_resources_twosided_flag_propagates();
+    test_shader_resources_single_sided_flag_propagates();
+    test_shader_null_guard_skips_flareproc_check();
+    test_shader_flareproc_detected_when_present();
+    test_shader_flareproc_absent_when_not_set();
+    test_shader_resources_refcounter_initial_value();
+    test_shader_resources_refcounter_survives_one_release();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

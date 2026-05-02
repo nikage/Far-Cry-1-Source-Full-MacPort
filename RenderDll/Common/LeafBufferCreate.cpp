@@ -348,9 +348,11 @@ void CLeafBuffer::CreateBuffer( CIndexedMesh * pTriData, bool bStripifyAndShareV
 		{
 			CObjFace *pFace =  &pTriData->m_pFaces[i];   
 
-      IShader *ef = (m_pMats->GetAt(pFace->shader_id).shaderItem.m_pShader)->GetTemplate(-1);
+      IShader *ef = nullptr;
+      if (m_pMats->GetAt(pFace->shader_id).shaderItem.m_pShader)
+          ef = m_pMats->GetAt(pFace->shader_id).shaderItem.m_pShader->GetTemplate(-1);
       a++;
-      if(ef->GetFlags3() & EF3_NODRAW)
+      if(ef && ef->GetFlags3() & EF3_NODRAW)
       {
         b++;
         if(bRemoveNoDrawFaces)
@@ -470,7 +472,8 @@ void CLeafBuffer::CreateBuffer( CIndexedMesh * pTriData, bool bStripifyAndShareV
 			re->m_pChunk->pRE = re;
 
 			// always enable sharing if there is 'flareproc' in shader/material name
-			if (!bShareVertsArr[i] && (*m_pMats)[i].nNumIndices == 6)
+			if (!bShareVertsArr[i] && (*m_pMats)[i].nNumIndices == 6
+			    && (*m_pMats)[i].shaderItem.m_pShader)
 			{
 				IShader * ef = (*m_pMats)[i].shaderItem.m_pShader->GetTemplate(-1);
 				char nameSh[128];
@@ -481,7 +484,9 @@ void CLeafBuffer::CreateBuffer( CIndexedMesh * pTriData, bool bStripifyAndShareV
 
 //      IShader * ef = (*m_pMats)[i].shaderItem.m_pShader->GetTemplate(-1);
   //    bool bTwoSided =  ef && (ef->GetCull() == eCULL_None);
-			bool bTwoSided =  ((*m_pMats)[i].shaderItem.m_pShaderResources->m_ResFlags & MTLFLAG_2SIDED)!=0;
+			bool bTwoSided = (*m_pMats)[i].shaderItem.m_pShaderResources
+			    ? ((*m_pMats)[i].shaderItem.m_pShaderResources->m_ResFlags & MTLFLAG_2SIDED) != 0
+			    : false;
 
       re->m_SortId = i + 2*(!bTwoSided); // render double sided leafs last
 		}

@@ -1262,9 +1262,20 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
 
 SShaderItem CMetalShaderManager::EF_LoadShaderItem(const char* name, EShClass Class, bool bShare, const char* templName, int flags, SInputShaderResources* Res, uint64 nMaskGen)
 {
-    // Load shader item
     SShaderItem item;
-    // Initialize shader item
+
+    if (name && name[0])
+        item.m_pShader = EF_LoadShader(name, Class, flags, nMaskGen);
+    if (!item.m_pShader && templName && templName[0])
+        item.m_pShader = EF_LoadShader(templName, Class, flags, nMaskGen);
+    if (!item.m_pShader)
+        item.m_pShader = EF_LoadShader("nodraw", Class, flags, 0);
+
+    SRenderShaderResources* pRes = Res ? new SRenderShaderResources(Res)
+                                       : new SRenderShaderResources();
+    pRes->m_nRefCounter = 1;
+    item.m_pShaderResources = pRes;
+
     return item;
 }
 

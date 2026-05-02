@@ -791,6 +791,8 @@ CIndexedMesh::CIndexedMesh(ISystem * pSystem,
 	for(int i=0; i<m_nFaceCount; i++)
 	{
 		CMatInfo * pMatInfo = &m_lstMatTable[m_pFaces[i].shader_id];
+		if (!pMatInfo->shaderItem.m_pShader)
+			continue;
 		IShader * pTemplate = pMatInfo->shaderItem.m_pShader->GetTemplate(-1);
     SRenderShaderResources *sr = pMatInfo->shaderItem.m_pShaderResources;
 

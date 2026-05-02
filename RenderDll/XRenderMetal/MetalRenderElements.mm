@@ -26,6 +26,7 @@
 #include "LeafBuffer.h"
 #include "CREOcLeaf.h"
 #include "CREScreenProcess.h"
+#include "CRETerrainSector.h"
 #include <Metal/Metal.h>
 
 extern ISystem *iSystem;
@@ -1067,11 +1068,15 @@ CRendElement* CreateMetalRenderElement(EDataType edt)
             if (re) re->mfSetType(eDATA_Poly);
             break;
             
+        case eDATA_ClearStencil:
+            re = new CREClearStencil();
+            break;
+
         default:
             break;
     }
     
-    assert(re || edt == eDATA_Unknown && "CreateMetalRenderElement: failed to create render element!");
+    assert((re != nullptr || edt == eDATA_Unknown) && "CreateMetalRenderElement: failed to create render element!");
     
     return re;
 }

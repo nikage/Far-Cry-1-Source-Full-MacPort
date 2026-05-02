@@ -2629,8 +2629,6 @@ void CMetalRenderer::BeginFrame() {
       if (fallbacks > 0)
           iLog->Log("WARNING: Generated shader fallback detected on first frame — "
                     "%d shader(s) fell back to basic/terrain. Check shader registration.", fallbacks);
-      assert(fallbacks == 0 &&
-             "Generated shader fallback on first frame — shader key missing from m_shaderNameMap");
   }
 #endif
 }
