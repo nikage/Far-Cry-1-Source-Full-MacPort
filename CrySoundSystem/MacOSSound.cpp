@@ -220,19 +220,24 @@ void CMacOSSoundBuffer::Play(bool bLoop, bool bLocked)
     m_isLooping = bLoop;
     m_isPlaying = true;
     
-    if (bLoop)
-    {
-        [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil 
-            options:AVAudioPlayerNodeBufferLoops completionHandler:nil];
+    @try {
+        if (bLoop)
+        {
+            [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil 
+                options:AVAudioPlayerNodeBufferLoops completionHandler:nil];
+        }
+        else
+        {
+            [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil options:0 completionHandler:^{
+                this->m_isPlaying = false;
+            }];
+        }
+        
+        [m_playerNode play];
+    } @catch (NSException* ex) {
+        m_isPlaying = false;
+        NSLog(@"CMacOSSoundBuffer::Play exception: %@ — %@", ex.name, ex.reason);
     }
-    else
-    {
-        [m_playerNode scheduleBuffer:m_audioBuffer atTime:nil options:0 completionHandler:^{
-            this->m_isPlaying = false;
-        }];
-    }
-    
-    [m_playerNode play];
 }
 
 void CMacOSSoundBuffer::Stop()
@@ -835,10 +840,12 @@ ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
         return nullptr;
     }
 
-    // Attach player node
+    // Attach player node — connect with the buffer's own format so that
+    // mono and stereo files both pass AVFoundation's channel-count assertion.
     AVAudioPlayerNode* playerNode = [[AVAudioPlayerNode alloc] init];
     [m_audioEngine attachNode:playerNode];
-    [m_audioEngine connect:playerNode to:m_mixerNode format:nil];
+    AVAudioFormat* bufferFormat = buffer->GetAudioBuffer() ? [buffer->GetAudioBuffer() format] : nil;
+    [m_audioEngine connect:playerNode to:m_mixerNode format:bufferFormat];
     buffer->SetPlayerNode(playerNode);
 
     m_soundBuffers.push_back(buffer);

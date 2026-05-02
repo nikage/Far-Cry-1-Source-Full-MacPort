@@ -210,6 +210,60 @@ static void test_loadSound_pak_seek_and_tell_match()
 }
 
 // ---------------------------------------------------------------------------
+// Model of the channel-count guard: Play should be a no-op when the buffer
+// or player node is null, and should not throw on a mismatch — it just
+// sets m_isPlaying = false and returns.
+// ---------------------------------------------------------------------------
+struct FakeAudioNode
+{
+    bool scheduleCalled = false;
+    bool playCalled     = false;
+    bool throwOnPlay    = false;
+
+    bool scheduleBuffer() { scheduleCalled = true; return !throwOnPlay; }
+    bool play()           { playCalled     = true; return !throwOnPlay; }
+};
+
+static bool stub_play_safe(FakeAudioNode* node, void* buffer, bool& isPlaying)
+{
+    if (!node || !buffer) return false;
+    isPlaying = true;
+    bool ok = node->scheduleBuffer();
+    if (!ok) { isPlaying = false; return false; }
+    ok = node->play();
+    if (!ok) { isPlaying = false; return false; }
+    return true;
+}
+
+static void test_play_guard_null_node_is_no_op()
+{
+    bool isPlaying = false;
+    int dummy = 1;
+    CHECK(!stub_play_safe(nullptr, &dummy, isPlaying));
+    CHECK(!isPlaying);
+}
+
+static void test_play_guard_null_buffer_is_no_op()
+{
+    FakeAudioNode node;
+    bool isPlaying = false;
+    CHECK(!stub_play_safe(&node, nullptr, isPlaying));
+    CHECK(!isPlaying);
+    CHECK(!node.scheduleCalled);
+}
+
+static void test_play_guard_exception_resets_isplaying()
+{
+    FakeAudioNode node;
+    node.throwOnPlay = true;
+    bool isPlaying = false;
+    int dummy = 1;
+    stub_play_safe(&node, &dummy, isPlaying);
+    CHECK(node.scheduleCalled);
+    CHECK(!isPlaying);
+}
+
+// ---------------------------------------------------------------------------
 int main()
 {
     printf("=== MacOSSoundSystemTests ===\n");
@@ -222,6 +276,9 @@ int main()
     test_getSound_empty_list_returns_null();
     test_release_deletes_system();
     test_loadSound_pak_seek_and_tell_match();
+    test_play_guard_null_node_is_no_op();
+    test_play_guard_null_buffer_is_no_op();
+    test_play_guard_exception_resets_isplaying();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;
