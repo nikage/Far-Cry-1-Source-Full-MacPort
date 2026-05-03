@@ -2138,19 +2138,8 @@ bool CMetalRenderer::EnableFog(bool enable) {
 
 void CMetalRenderer::SetFog(float density, float fogstart, float fogend,
                             const float *color, int fogmode) {
-  if (!color) return;
-  if (density < 0.0f) density = 0.0f;
-  if (fogstart < 0.0f) fogstart = 0.0f;
-  if (fogend < fogstart) fogend = fogstart;
-  
   m_fogEnabled = true;
-  
-  if (m_uniformBufferCPU) {
-    m_uniformBufferCPU->lightColor[0] = color[0];
-    m_uniformBufferCPU->lightColor[1] = color[1];
-    m_uniformBufferCPU->lightColor[2] = color[2];
-    m_uniformBufferCPU->lightColor[3] = 0.0f;
-  }
+  CMetalBaseRenderer::SetFog(density, fogstart, fogend, color, fogmode);
 }
 
 void CMetalRenderer::EnableTexGen(bool enable) {

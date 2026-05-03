@@ -34,9 +34,9 @@ if(APPLE)
         "${CMAKE_CURRENT_SOURCE_DIR}/XML/Expat/xmltok_ns.c"
     )
     list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX ".*getdxver.*")
-    # Temporarily exclude MacOSFileSystem due to Carbon framework conflicts
-    # TODO: Fix Foundation.h include conflict with GetCurrentThread
-    list(FILTER CRYSYSTEM_SOURCES EXCLUDE REGEX "MacOSFileSystem.cpp$")
+    # MacOSFileSystem.cpp is compiled as Objective-C++ (see set_source_files_properties below).
+    # The GetCurrentThread name conflict with Carbon is resolved in MacOSspecific.h via
+    # the __OBJC__ guard; Foundation.h does not transitively include Carbon on modern SDKs.
     # Exclude legacy zlib 1.1.x sources that have been superseded by their
     # zlib 1.2.x replacements already present in the same directory:
     #   gzio.c      → gzclose.c + gzlib.c + gzread.c + gzwrite.c
@@ -59,19 +59,12 @@ if(NOT UNIX OR APPLE)
 endif()
 
 # Add our macOS-specific files
-# MacOSFileSystem.cpp temporarily disabled due to Carbon framework conflicts
 if(APPLE)
     # Add macOS compatibility stubs
     list(APPEND CRYSYSTEM_SOURCES
         macos_stubs.cpp
         SystemMacOSEvents.mm
     )
-    # list(APPEND CRYSYSTEM_SOURCES
-    #     MacOSFileSystem.cpp
-    # )
-    # list(APPEND CRYSYSTEM_HEADERS
-    #     MacOSFileSystem.h
-    # )
 endif()
 
 # Create the CrySystem library
@@ -187,10 +180,11 @@ if(APPLE)
         "-framework SystemConfiguration"
     )
     
-    # Set source files that need Objective-C++ compilation
-    # set_source_files_properties(MacOSFileSystem.cpp PROPERTIES
-    #     COMPILE_FLAGS "-x objective-c++"
-    # )
+    # MacOSFileSystem.cpp uses Objective-C APIs (NSBundle, NSSearchPath*) so it must be
+    # compiled as Objective-C++.  The glob already includes it; this flag enables ObjC++.
+    set_source_files_properties(MacOSFileSystem.cpp PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
     
 elseif(WIN32)
     target_link_libraries(CrySystem PRIVATE

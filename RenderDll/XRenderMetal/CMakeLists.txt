@@ -17,9 +17,7 @@ set(XRENDER_METAL_SOURCES
     MetalVertexDescriptor.mm
     MetalRenderElements.mm
     MetalCREScreenProcess.mm
-    # MetalREOcean.mm excluded: has unresolved linker symbols (BoxSides, LinkVisSectors,
-    # GenerateIndices, mfFillAdditionalBuffer, m_RS) that are never defined in this port.
-    # TODO: port remaining CREOcean methods from XRenderOGL/GLREOcean.cpp
+    MetalREOcean.mm
     MetalOptimizations.mm
     MetalImageStubs.mm
 )

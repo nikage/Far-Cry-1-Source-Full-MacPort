@@ -93,15 +93,52 @@ int CXKeyboard::GetKeyPressedCode()
     return 0;
 }
 
+static const char* HIDKeyCodeToName(int hidCode)
+{
+    static const struct { int hid; const char* name; } kMap[] = {
+        { 0,  "a" },  { 1,  "s" },  { 2,  "d" },  { 3,  "f" },
+        { 4,  "h" },  { 5,  "g" },  { 6,  "z" },  { 7,  "x" },
+        { 8,  "c" },  { 9,  "v" },  { 11, "b" },  { 12, "q" },
+        { 13, "w" },  { 14, "e" },  { 15, "r" },  { 16, "y" },
+        { 17, "t" },  { 18, "1" },  { 19, "2" },  { 20, "3" },
+        { 21, "4" },  { 22, "6" },  { 23, "5" },  { 24, "equals" },
+        { 25, "9" },  { 26, "7" },  { 27, "minus" }, { 28, "8" },
+        { 29, "0" },  { 30, "rbracket" }, { 31, "o" }, { 32, "u" },
+        { 33, "lbracket" }, { 34, "i" }, { 35, "p" }, { 36, "enter" },
+        { 37, "l" },  { 38, "j" },  { 39, "apostrophe" }, { 40, "k" },
+        { 41, "semicolon" }, { 42, "backslash" }, { 43, "comma" },
+        { 44, "slash" }, { 45, "n" }, { 46, "m" },
+        { 47, "period" }, { 48, "tab" }, { 49, "space" },
+        { 50, "tilde" }, { 51, "backspace" }, { 53, "escape" },
+        { 55, "lwindow" },
+        { 56, "lshift" }, { 57, "capslock" }, { 58, "lalt" },
+        { 59, "lctrl" }, { 60, "rshift" }, { 61, "ralt" },
+        { 62, "rctrl" },
+        { 71, "numlock" }, { 72, "numenter" },
+        { 75, "slash" }, { 76, "numenter" }, { 78, "minus" },
+        { 82, "num0" }, { 83, "num1" }, { 84, "num2" },
+        { 85, "num3" }, { 86, "num4" }, { 87, "num5" },
+        { 88, "num6" }, { 89, "num7" },
+        { 91, "num8" }, { 92, "num9" },
+        { 96,  "f5"  }, { 97,  "f6"  }, { 98,  "f7"  }, { 99,  "f3"  },
+        { 100, "f8"  }, { 101, "f9"  }, { 103, "f11" },
+        { 105, "f13" }, { 107, "f14" }, { 109, "f10" }, { 111, "f12" },
+        { 113, "f15" }, { 114, "insert" }, { 115, "home" },
+        { 116, "pgup" }, { 117, "delete" }, { 118, "f4" },
+        { 119, "end" }, { 120, "f2" }, { 121, "pgdn" },
+        { 122, "f1" }, { 123, "left" }, { 124, "right" },
+        { 125, "down" }, { 126, "up" },
+    };
+    for (int i = 0; i < (int)(sizeof(kMap)/sizeof(kMap[0])); ++i)
+        if (kMap[i].hid == hidCode) return kMap[i].name;
+    return "";
+}
+
 const char* CXKeyboard::GetKeyPressedName()
 {
     int key = GetKeyPressedCode();
     if (key == 0) return "";
-    
-    // Convert key code to name (simplified)
-    static char keyName[32];
-    snprintf(keyName, sizeof(keyName), "Key_%d", key);
-    return keyName;
+    return HIDKeyCodeToName(key);
 }
 
 int CXKeyboard::GetKeyDownCode()
@@ -116,11 +153,7 @@ const char* CXKeyboard::GetKeyDownName()
 {
     int key = GetKeyDownCode();
     if (key == 0) return "";
-    
-    // Convert key code to name (simplified)
-    static char keyName[32];
-    snprintf(keyName, sizeof(keyName), "Key_%d", key);
-    return keyName;
+    return HIDKeyCodeToName(key);
 }
 
 void CXKeyboard::SetExclusive(bool value, void* hwnd)

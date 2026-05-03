@@ -141,11 +141,15 @@ static void EXPAT_XML_CharacterData( void *userData, const char *s, int len )
 //////////////////////////////////////////////////////////////////////////
 void _XMLDOMParserImpl::OnStartElement( const char *name, const char **atts )
 {
-	StartElement( name );
+	const char* localName = strchr(name, ':');
+	if (localName) ++localName; else localName = name;
+	StartElement( localName );
 	int i = 0;
 	while (atts[i] != nullptr)
 	{
-		Attribute( atts[i],atts[i+1] );
+		const char* attrLocal = strchr(atts[i], ':');
+		if (attrLocal) ++attrLocal; else attrLocal = atts[i];
+		Attribute( attrLocal, atts[i+1] );
 		i += 2;
 	}
 }

@@ -42,14 +42,16 @@ void CXGame::EnableUIOverlay(bool bEnable, bool bExclusiveInput)
 
 		if ((bExclusiveInput) && (!m_bUIExclusiveInput))
 		{
-			m_pIActionMapManager->Disable();
+			if (m_pIActionMapManager)
+				m_pIActionMapManager->Disable();
 			m_pSystem->GetIInput()->SetExclusiveListener(m_pUISystem);
 
 			m_bUIExclusiveInput = 1;
 		}
 		else if ((!bExclusiveInput) && (m_bUIExclusiveInput))
 		{
-			m_pIActionMapManager->Enable();
+			if (m_pIActionMapManager)
+				m_pIActionMapManager->Enable();
 			m_pSystem->GetIInput()->SetExclusiveListener(0);
 
 			m_bUIExclusiveInput = 0;

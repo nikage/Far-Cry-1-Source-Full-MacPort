@@ -1186,7 +1186,12 @@ unsigned int CMetalTextureManager::DownLoadToVideoMemory(unsigned char* data, in
     
     MTLPixelFormat metalFormat = ConvertToMetalFormat(eTFDst);
     if (metalFormat == MTLPixelFormatInvalid)
+    {
+        const bool isCompressedSrc = (eTFSrc == eTF_DXT1 || eTFSrc == eTF_DXT3 || eTFSrc == eTF_DXT5);
+        if (isCompressedSrc && iLog)
+            iLog->Log("[Texture] Skipping unsupported compressed format (eTFSrc=%d eTFDst=%d) — white fallback will be used", (int)eTFSrc, (int)eTFDst);
         return 0;
+    }
     
     const bool isCompressed = IsCompressedETEXFormat(eTFDst);
     const int bytesPerPixel = GetBytesPerPixel(eTFDst);

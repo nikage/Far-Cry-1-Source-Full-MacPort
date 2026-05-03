@@ -734,6 +734,7 @@ struct SLightMaterial
     name[0] = 0;
     bNeverReplace = false;
     m_nRefCounter = 0;
+    Id = -1;
   }
 
   int Id;

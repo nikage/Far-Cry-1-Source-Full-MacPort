@@ -87,7 +87,8 @@ int CScriptObjectInput::ResetToDefaults(IFunctionHandler *pH)
 int CScriptObjectInput::ResetAllBindings(IFunctionHandler *pH)
 {
 	if(!m_pInput)return pH->EndFunctionNull();
-	m_pGame->GetActionMapManager()->ResetAllBindings();
+	if (m_pGame->GetActionMapManager())
+		m_pGame->GetActionMapManager()->ResetAllBindings();
 	return pH->EndFunction();
 }
 
@@ -205,7 +206,8 @@ int CScriptObjectInput::SetActionMap(IFunctionHandler *pH)
 	const char *sMapName=NULL;
 	if(pH->GetParam(1,sMapName))
 	{
-		m_pGame->m_pIActionMapManager->SetActionMap(sMapName);
+		if (m_pGame->m_pIActionMapManager)
+			m_pGame->m_pIActionMapManager->SetActionMap(sMapName);
 	}
 	return pH->EndFunction();
 //
@@ -236,7 +238,8 @@ int CScriptObjectInput::GetActionMaps(IFunctionHandler *pH)
 	CHECK_PARAMETERS(0);
 	_SmartScriptObject pObj(m_pScriptSystem);
 	CDumpActions Dumper(pObj);
-	m_pGame->m_pIActionMapManager->GetActionMaps(&Dumper);
+	if (m_pGame->m_pIActionMapManager)
+		m_pGame->m_pIActionMapManager->GetActionMaps(&Dumper);
 	return pH->EndFunction(Dumper.m_pObj);
 }
 
@@ -252,7 +255,8 @@ int CScriptObjectInput::ResetBinding(IFunctionHandler *pH)
 	int nAction;
 	pH->GetParam(1, pszActionMapName);
 	pH->GetParam(2, nAction);
-	IActionMap *pActionMap=m_pGame->m_pIActionMapManager->GetActionMap(pszActionMapName);
+	IActionMap *pActionMap = m_pGame->m_pIActionMapManager
+		? m_pGame->m_pIActionMapManager->GetActionMap(pszActionMapName) : nullptr;
 	if (pActionMap)
 		pActionMap->ResetBinding(nAction);
 	return pH->EndFunction();
@@ -273,7 +277,8 @@ int CScriptObjectInput::GetBinding(IFunctionHandler *pH)
 	int nAction;
 	pH->GetParam(1, pszActionMapName);
 	pH->GetParam(2, nAction);
-	IActionMap *pActionMap=m_pGame->m_pIActionMapManager->GetActionMap(pszActionMapName);
+	IActionMap *pActionMap = m_pGame->m_pIActionMapManager
+		? m_pGame->m_pIActionMapManager->GetActionMap(pszActionMapName) : nullptr;
 	if (!pActionMap)
 		return pH->EndFunctionNull();
 	_SmartScriptObject pObj(m_pScriptSystem);
@@ -418,7 +423,8 @@ int CScriptObjectInput::SetInvertedMouse(IFunctionHandler *pH)
 	CHECK_PARAMETERS(1);
 	bool bEnable=false;
 	pH->GetParam(1,bEnable);
-	m_pGame->m_pIActionMapManager->SetInvertedMouse(bEnable);
+	if (m_pGame->m_pIActionMapManager)
+		m_pGame->m_pIActionMapManager->SetInvertedMouse(bEnable);
 	return pH->EndFunction();
 }
 
@@ -429,5 +435,7 @@ int CScriptObjectInput::GetInvertedMouse(IFunctionHandler *pH)
 {
 	if(!m_pInput)return pH->EndFunctionNull();
 	CHECK_PARAMETERS(0);
+	if (!m_pGame->m_pIActionMapManager)
+		return pH->EndFunction(false);
 	return pH->EndFunction(m_pGame->m_pIActionMapManager->GetInvertedMouse());
 }

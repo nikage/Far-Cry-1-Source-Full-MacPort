@@ -6,6 +6,7 @@ file(GLOB_RECURSE CRYINPUT_SOURCES
     "*.cpp"
     "*.c"
 )
+list(FILTER CRYINPUT_SOURCES EXCLUDE REGEX ".*/test/.*")
 
 # Remove Xbox-specific files for non-Xbox platforms
 if(NOT _XBOX)
@@ -112,3 +113,23 @@ install(TARGETS CryInput
 )
 
 stage_dylib_to_bundle(CryInput)
+
+# --- Standalone unit-test executables ---
+if(APPLE)
+    function(add_cryinput_test TARGET_NAME SOURCE_FILE)
+        add_executable(${TARGET_NAME} ${SOURCE_FILE})
+        target_compile_options(${TARGET_NAME} PRIVATE
+            -std=c++17
+            -Wno-deprecated-declarations -Wno-unused-variable
+            -Wno-unused-function -Wno-macro-redefined
+        )
+        target_include_directories(${TARGET_NAME} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_SOURCE_DIR}/CryCommon
+        )
+        add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+    endfunction()
+
+    add_cryinput_test(macos_mouse_input_tests  test/MacOSMouseInputTests.cpp)
+    add_cryinput_test(macos_keyboard_input_tests test/MacOSKeyboardInputTests.cpp)
+endif()

@@ -37,6 +37,22 @@ static int g_failed = 0;
     } while (0)
 
 // -----------------------------------------------------------------------
+// Mirror of ocean-related constants from CREOcean / RendElement.h
+// -----------------------------------------------------------------------
+#define OCEANGRID  32
+#define NUM_OCEANVBS 3
+#define NUM_LODS   5
+
+// Mirrors the index-generation logic from CREOcean::GenerateIndices.
+static int SimulateOceanIndexCount(int lodCode)
+{
+    const int LOD_MASK = 0x7;
+    int step = 1 << (lodCode & LOD_MASK);
+    int dim  = OCEANGRID / step;
+    return dim * dim * 6;
+}
+
+// -----------------------------------------------------------------------
 // Mirror of RFT_* constants from CryCommon/IRenderer.h
 // -----------------------------------------------------------------------
 #define RFT_MULTITEXTURE             0x00000001
@@ -126,6 +142,32 @@ int main()
     CHECK(!(base & RFT_SHADOWMAP_SELFSHADOW),   "base does not set RFT_SHADOWMAP_SELFSHADOW");
     CHECK(!(base & RFT_DIRECTACCESSTOVIDEOMEMORY), "base does not set RFT_DIRECTACCESSTOVIDEOMEMORY");
     CHECK(!(base & RFT_ALLOWRECTTEX),           "base does not set RFT_ALLOWRECTTEX (removed)");
+
+    printf("\n-- Ocean draw-call contract --\n");
+
+    {
+        // LOD 0 (finest): step=1, dim=32 → 32*32*6 = 6144 indices
+        int idx0 = SimulateOceanIndexCount(0);
+        CHECK(idx0 == OCEANGRID * OCEANGRID * 6,
+              "LOD-0 ocean sector has OCEANGRID^2 * 6 indices");
+
+        // LOD 1: step=2, dim=16 → 1536 indices
+        int idx1 = SimulateOceanIndexCount(1);
+        CHECK(idx1 == (OCEANGRID / 2) * (OCEANGRID / 2) * 6,
+              "LOD-1 ocean sector has (OCEANGRID/2)^2 * 6 indices");
+
+        // LOD-1 has fewer indices than LOD-0 (coarser mesh = fewer draw calls)
+        CHECK(idx1 < idx0,
+              "Coarser LOD produces fewer ocean indices");
+
+        // NUM_OCEANVBS vertex buffer slots are available for ping-pong writes
+        CHECK(NUM_OCEANVBS >= 2,
+              "Ocean VB pool has at least 2 slots for double-buffering");
+
+        // LOD range spans 0 .. NUM_LODS-1
+        CHECK(NUM_LODS >= 4,
+              "Ocean supports at least 4 LOD levels");
+    }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;

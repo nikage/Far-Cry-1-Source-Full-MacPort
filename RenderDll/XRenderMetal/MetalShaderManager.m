@@ -57,7 +57,8 @@ enum class UniformValueSource : uint8_t
     RendererClipPlane,
     RendererClipEnabled,
     RendererClipRefract,
-    RendererTime
+    RendererTime,
+    RendererGlobalFogColor
 };
 
 class CMetalShader : public IShader
@@ -353,6 +354,10 @@ protected:
     void BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader);
     void InitializeShaderFallbacks();
     void RegisterShaderAlias(const char* alias, const char* target);
+
+    int GetStartupMissingShaderCount() const { return m_nStartupMissingShaders; }
+
+    int m_nStartupMissingShaders;
 };
 
 #endif // __APPLE__ && __MACH__

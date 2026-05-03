@@ -192,15 +192,6 @@ CVProgram* CVProgram::mfForName(const char* name, uint64 maskGen)
     return nullptr;
 }
 
-// CREOcean stubs (conditionally excluded from build, but need symbols for linker)
-float CREOcean::GetWaterZElevation(float x, float y)
-{
-    // macOS: CREOcean is not supported
-    return 0.0f;
-}
-
-CREOcean* CREOcean::m_pStaticOcean = nullptr;
-
 // CRETempMesh stub for vtable
 bool CRETempMesh::mfDraw(SShader* ef, SShaderPass* sfm)
 {

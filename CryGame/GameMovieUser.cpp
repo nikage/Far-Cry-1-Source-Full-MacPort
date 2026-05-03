@@ -115,7 +115,8 @@ void CMovieUser::BeginCutScene(unsigned long dwFlags,bool bResetFx)
 	// do not allow the player to mess around with player's keys
 	// during a cutscene	
 	GetISystem()->GetIInput()->GetIKeyboard()->ClearKeyState();
-	m_pGame->m_pIActionMapManager->SetActionMap("player_dead");
+	if (m_pGame->m_pIActionMapManager)
+		m_pGame->m_pIActionMapManager->SetActionMap("player_dead");
 	m_pGame->AllowQuicksave(false);
 
 	// player's weapon might be playing a looping sound ... disable it:
@@ -204,7 +205,8 @@ void CMovieUser::EndCutScene()
 		*/
 	}
   
-	m_pGame->m_pIActionMapManager->SetActionMap("default");
+	if (m_pGame->m_pIActionMapManager)
+		m_pGame->m_pIActionMapManager->SetActionMap("default");
 	GetISystem()->GetIInput()->GetIKeyboard()->ClearKeyState();	
 
 	// we regenerate stamina fpr the local payer on cutsceen end - supposendly he was idle long enough to get it restored

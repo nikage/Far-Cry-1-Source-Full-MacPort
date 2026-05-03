@@ -16,9 +16,17 @@
 #ifndef _CRY_COMMON_MACOS_SPECIFIC_HDR_
 #define _CRY_COMMON_MACOS_SPECIFIC_HDR_
 
-// Define BOOL before any system headers to avoid conflicts
+// Provide BOOL in both C++ and Objective-C++ translation units.
+// In Objective-C++ (__OBJC__ is defined by the compiler) the ObjC runtime
+// header defines BOOL as 'bool'.  Include it early so that every reference to
+// BOOL below resolves correctly.  In plain C++ we define it as int, matching
+// Windows convention (TRUE=1, FALSE=0).
 #ifndef BOOL
-#define BOOL int
+#  if defined(__OBJC__)
+#    include <objc/objc.h>
+#  else
+#    define BOOL int
+#  endif
 #endif
 
 // Define __noop for compatibility
@@ -1968,14 +1976,19 @@ typedef struct {
 #define THREAD_PRIORITY_IDLE          -15
 
 inline void* GetCurrentProcess() {
-    // Return process ID as handle for macOS
     return (void*)(uintptr_t)getpid();
 }
 
-inline void* GetCurrentThread() {
-    // Return current thread handle using pthread
+// In Objective-C++ translation units Carbon may be transitively present and
+// declares its own GetCurrentThread(ThreadID*) with C linkage.  We provide a
+// uniquely-named implementation and redirect the Windows-compat macro to it so
+// both can coexist without a redefinition error.
+static inline void* _Cry_GetCurrentThread_impl() {
     return (void*)pthread_self();
 }
+#ifndef GetCurrentThread
+#define GetCurrentThread _Cry_GetCurrentThread_impl
+#endif
 
 inline int GetThreadPriority(void* hThread) {
     // Get thread priority using pthread scheduling

@@ -28,6 +28,7 @@ void MacOS_GetMouseVScreenXY(float screenW, float screenH, float* outVX, float* 
 void MacOS_GetMouseButtons(int* left, int* right, int* middle);
 void MacOS_GetScreenDimensions(float* outW, float* outH);
 void MacOS_SetSystemCursorVisible(int visible);
+void MacOS_GetRawMouseDelta(float* outDX, float* outDY);
 }
 
 // Forward declarations
@@ -61,6 +62,8 @@ protected:
     bool m_keyStates[256];
     bool m_prevKeyStates[256];
     int m_modifiers;
+    int m_lastPressedKey;
+    int m_lastDownKey;
     
     // Convert macOS key codes to CryEngine key codes
     int ConvertMacOSKeyCode(unsigned short keyCode);
@@ -77,8 +80,11 @@ private:
 };
 
 // macOS-specific mouse implementation  
+class CMacOSInput;
+
 class CMacOSMouse : public IMouse
 {
+    friend class CMacOSInput;
 public:
     CMacOSMouse();
     virtual ~CMacOSMouse();
@@ -118,8 +124,11 @@ public:
 protected:
     int m_x, m_y;
     int m_prevX, m_prevY;
+    float m_dx, m_dy;
     bool m_buttonStates[8];
     bool m_prevButtonStates[8];
+    double m_lastClickTime[8];
+    double m_prevClickTime[8];
     int m_wheelDelta;
     bool m_bHidden;
     bool m_bExclusive;

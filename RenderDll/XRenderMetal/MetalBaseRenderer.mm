@@ -934,6 +934,14 @@ void CMetalBaseRenderer::BeginFrame()
     m_numTriangles = 0;
 
 #if DEBUG
+    extern int g_metalStartupMissingShaders;
+    if (m_nFrameID == 1)
+    {
+        if (g_metalStartupMissingShaders > 0)
+            iLog->Log("[Renderer] WARNING: %d unresolved shader aliases at startup — add them to InitializeShaderFallbacks", g_metalStartupMissingShaders);
+        else
+            iLog->Log("[Renderer] Startup shader check OK: 0 missing aliases (fallbacks == 0)");
+    }
     if (m_nFrameID <= 5 || (m_nFrameID % 300) == 0)
         iLog->Log("[Renderer] BeginFrame #%d drawable=%s drawCalls=%d tris=%d",
                   m_nFrameID,
@@ -1368,6 +1376,22 @@ float CMetalBaseRenderer::GetUniformClipEnabled() const
 float CMetalBaseRenderer::GetUniformClipRefract() const
 {
     return m_uniformBufferCPU ? m_uniformBufferCPU->clipRefract : 0.0f;
+}
+
+void CMetalBaseRenderer::GetUniformGlobalFogColor(float out[4]) const
+{
+    if (!out) return;
+    if (m_materialBufferCPU)
+    {
+        out[0] = m_materialBufferCPU->FogColor[0];
+        out[1] = m_materialBufferCPU->FogColor[1];
+        out[2] = m_materialBufferCPU->FogColor[2];
+        out[3] = m_materialBufferCPU->FogColor[3];
+    }
+    else
+    {
+        out[0] = out[1] = out[2] = out[3] = 0.0f;
+    }
 }
 
 #endif

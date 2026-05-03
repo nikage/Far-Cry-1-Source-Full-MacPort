@@ -105,3 +105,17 @@ install(TARGETS CrySoundSystem
 )
 
 stage_dylib_to_bundle(CrySoundSystem)
+
+# --- Standalone unit-test executable ---
+if(APPLE)
+    add_executable(macos_sound_system_tests test/MacOSSoundSystemTests.cpp)
+    target_compile_options(macos_sound_system_tests PRIVATE
+        -std=c++17
+        -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-function
+    )
+    target_include_directories(macos_sound_system_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/CryCommon
+    )
+    add_test(NAME macos_sound_system_tests COMMAND macos_sound_system_tests)
+endif()

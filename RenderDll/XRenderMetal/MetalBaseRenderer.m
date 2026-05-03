@@ -180,6 +180,7 @@ public:
     void GetUniformClipPlane(float out[4]) const;
     float GetUniformClipEnabled() const;
     float GetUniformClipRefract() const;
+    void GetUniformGlobalFogColor(float out[4]) const;
     virtual Vec3 GetUnProject(const Vec3& WindowCoords, const CCamera& cam);
     virtual void RenderToViewport(const CCamera& cam, float x, float y, float width, float height);
     

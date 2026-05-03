@@ -19,7 +19,7 @@ static char THIS_FILE[] = __FILE__;
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
-CXActionMapManager::CXActionMapManager(CInput *pInput)
+CXActionMapManager::CXActionMapManager(IInput *pInput)
 {
 	m_bEnabled = 1;
 	m_pInput=pInput;

@@ -673,12 +673,8 @@ bool CXGame::Init(struct ISystem *pSystem,bool bDedicatedSrv,bool bInEditor,cons
 	m_pLog->Log("CXGame::Init - Surface manager initialized");
 	
 	// init key-bindings
-	if(!m_bDedicatedServer && m_pIActionMapManager) {
-		m_pLog->Log("CXGame::Init - Calling InitInputMap");
+	if(!m_bDedicatedServer) {
 		InitInputMap();
-		m_pLog->Log("CXGame::Init - InitInputMap done");
-	} else if (!m_pIActionMapManager) {
-		m_pLog->Log("CXGame::Init - Skipping InitInputMap (ActionMapManager not available)");
 	}
 
 	// create various console-commands/variables

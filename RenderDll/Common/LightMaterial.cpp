@@ -23,8 +23,10 @@ void SLightMaterial::Release()
   m_nRefCounter--;
   if (!m_nRefCounter)
   {
-    SLightMaterial::known_materials[Id] = NULL;
-    delete this;
+    if (Id >= 0 && Id < known_materials.Num())
+      SLightMaterial::known_materials[Id] = NULL;
+    if (Id >= 0)
+      delete this;
   }
 }
 

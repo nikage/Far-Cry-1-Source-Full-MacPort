@@ -46,6 +46,35 @@ void MacOS_SetSystemCursorVisible(int visible)
         CGDisplayHideCursor(kCGNullDirectDisplay);
 }
 
+int MacOS_IsKeyDown(unsigned short hidKeyCode)
+{
+    return CGEventSourceKeyState(kCGEventSourceStateHIDSystemState, hidKeyCode) ? 1 : 0;
+}
+
+void MacOS_GetRawMouseDelta(float* outDX, float* outDY)
+{
+    int32_t dx = 0, dy = 0;
+    CGGetLastMouseDelta(&dx, &dy);
+    *outDX = (float)dx;
+    *outDY = (float)dy;
+}
+
+void MacOS_ConfineCursorToRect(float x, float y, float w, float h)
+{
+    CGEventRef ev = CGEventCreate(NULL);
+    CGPoint pt = CGEventGetLocation(ev);
+    CFRelease(ev);
+
+    float nx = pt.x < x ? x : (pt.x > x + w ? x + w : pt.x);
+    float ny = pt.y < y ? y : (pt.y > y + h ? y + h : pt.y);
+    if (nx != pt.x || ny != pt.y)
+        CGWarpMouseCursorPosition(CGPointMake(nx, ny));
+}
+
+void MacOS_ReleaseCursorConfinement(void)
+{
+}
+
 }
 
 #endif // __APPLE__ && __MACH__

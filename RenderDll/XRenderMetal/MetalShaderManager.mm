@@ -18,6 +18,10 @@
 #include "MetalShaderManager.m"
 #include "MetalBaseRenderer.m"
 #include "MetalTextureManager.m"
+
+#if DEBUG
+int g_metalStartupMissingShaders = 0;
+#endif
 #include "MetalRenderElements.m"  // For Metal render element classes
 #include "MetalVertexDescriptor.m"  // For CMetalVertexDescriptorHelper
 #include <Cocoa/Cocoa.h>
@@ -315,6 +319,10 @@ static UniformValueSource EvaluateUniformIdentifier(const std::string& identifie
         return UniformValueSource::RendererClipRefract;
     if (identifier.find("time") != std::string::npos)
         return UniformValueSource::RendererTime;
+    if (identifier.find("globalfogcolor") != std::string::npos
+        || identifier.find("fogcolor") != std::string::npos
+        || identifier.find("fog_color") != std::string::npos)
+        return UniformValueSource::RendererGlobalFogColor;
     return UniformValueSource::ShaderParam;
 }
 
@@ -554,6 +562,14 @@ static void WriteRendererUniform(const CMetalShaderManager::ShaderInfo::UniformR
             float value = renderer->GetUniformTime();
             if (componentCount > 0)
                 out[0] = value;
+            break;
+        }
+        case UniformValueSource::RendererGlobalFogColor:
+        {
+            float fog[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+            renderer->GetUniformGlobalFogColor(fog);
+            for (size_t i = 0; i < componentCount && i < 4; ++i)
+                out[i] = fog[i];
             break;
         }
         default:
@@ -1433,6 +1449,11 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
         }
     }
     
+    ++m_nStartupMissingShaders;
+#if DEBUG
+    extern int g_metalStartupMissingShaders;
+    ++g_metalStartupMissingShaders;
+#endif
     printf("MetalShaderManager: EF_LoadShader MISSING_ALIAS '%s' (class=%d) — returning nullptr\n", lookupName.c_str(), (int)Class);
     if (iLog)
         iLog->Log("MetalShaderManager: EF_LoadShader MISSING_ALIAS '%s' — add an explicit alias to InitializeShaderFallbacks.", lookupName.c_str());
@@ -1476,6 +1497,7 @@ SShaderItem CMetalShaderManager::EF_LoadShaderItem(const char* name, EShClass Cl
 
     SRenderShaderResources* pRes = Res ? new SRenderShaderResources(Res)
                                        : new SRenderShaderResources();
+    pRes->m_LMaterial = nullptr;
     pRes->m_nRefCounter = 1;
     item.m_pShaderResources = pRes;
 

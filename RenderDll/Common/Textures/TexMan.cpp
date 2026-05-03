@@ -3516,5 +3516,7 @@ bool CTexMan::GetCubeColor(Vec3 *Pos, CFColor *cols)
     cols[n].b = cm->m_EnvColors[n].bcolor[2] / 255.0f;
     cols[n].a = cm->m_EnvColors[n].bcolor[3] / 255.0f;
   }
+  gRenDev->m_RP.m_pRE = re;
+  gRenDev->m_RP.m_pCurObject = obj;
   return true;
 }

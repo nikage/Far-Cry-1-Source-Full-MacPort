@@ -187,6 +187,7 @@ public:
     m_NextGlobal = NULL;
     m_PrevGlobal = NULL;
     m_Flags = 0;
+    m_nCountCustomData = 0;
     m_CustomData = NULL;
 		for(int i=0; i<MAX_CUSTOM_TEX_BINDS_NUM; i++)
 	    m_CustomTexBind[i] = -1;
@@ -210,6 +211,46 @@ public:
 			m_CustomData=0;
 		}
     UnlinkGlobal();
+  }
+
+  CRendElement(const CRendElement& other)
+    : m_Type(other.m_Type)
+    , m_Flags(other.m_Flags & ~FCEF_ALLOC_CUST_FLOAT_DATA)
+    , m_nCountCustomData(other.m_nCountCustomData)
+    , m_CustomData(other.m_CustomData)
+    , m_fFogScale(other.m_fFogScale)
+    , m_Color(other.m_Color)
+    , m_SortId(other.m_SortId)
+    , m_NextGlobal(NULL)
+    , m_PrevGlobal(NULL)
+    , m_LastVP(other.m_LastVP)
+  {
+    for (int i = 0; i < MAX_CUSTOM_TEX_BINDS_NUM; i++)
+      m_CustomTexBind[i] = other.m_CustomTexBind[i];
+    if (!m_RootGlobal.m_NextGlobal)
+    {
+      m_RootGlobal.m_NextGlobal = &m_RootGlobal;
+      m_RootGlobal.m_PrevGlobal = &m_RootGlobal;
+    }
+    if (this != &m_RootGlobal)
+      LinkGlobal(&m_RootGlobal);
+  }
+
+  CRendElement& operator=(const CRendElement& other)
+  {
+    if (this == &other)
+      return *this;
+    m_Type             = other.m_Type;
+    m_Flags            = other.m_Flags & ~FCEF_ALLOC_CUST_FLOAT_DATA;
+    m_nCountCustomData = other.m_nCountCustomData;
+    m_CustomData       = other.m_CustomData;
+    m_fFogScale        = other.m_fFogScale;
+    for (int i = 0; i < MAX_CUSTOM_TEX_BINDS_NUM; i++)
+      m_CustomTexBind[i] = other.m_CustomTexBind[i];
+    m_Color   = other.m_Color;
+    m_SortId  = other.m_SortId;
+    m_LastVP  = other.m_LastVP;
+    return *this;
   }
 
   const char *mfTypeString();

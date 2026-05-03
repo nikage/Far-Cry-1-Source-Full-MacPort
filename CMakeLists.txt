@@ -281,67 +281,81 @@ if(APPLE)
         VERBATIM
     )
     
-    # Copy FCData directory to Resources (contains all PAK files)
-    # FCData contains all game assets (textures, sounds, scripts, localized content) in PAK archives
-    # It should be located in the project root directory
+    # ---------------------------------------------------------------------------
+    # FCData staging — required game asset PAK archives
+    # ---------------------------------------------------------------------------
+    # Required PAK files.  The game cannot load any level without these.
+    set(FCDATA_REQUIRED_PAKS
+        FCData/Textures.pak
+        FCData/Shaders.pak
+        FCData/Scripts.pak
+        FCData/Sounds.pak
+        FCData/Objects.pak
+        FCData/GameData.pak
+    )
+
     set(FCData_FOUND FALSE)
     set(FCData_PATH "")
-    
-    # Check primary location: project root
-    if(EXISTS ${CMAKE_SOURCE_DIR}/FCData)
-        set(FCData_FOUND TRUE)
-        set(FCData_PATH ${CMAKE_SOURCE_DIR}/FCData)
-        message(STATUS "Found FCData directory at: ${FCData_PATH}")
-    # Check Assets subdirectory (symlink from Steam install)
-    elseif(EXISTS ${CMAKE_SOURCE_DIR}/Assets/FCData)
-        set(FCData_FOUND TRUE)
-        set(FCData_PATH ${CMAKE_SOURCE_DIR}/Assets/FCData)
-        message(STATUS "Found FCData directory at: ${FCData_PATH}")
-    # Check alternative location: build directory (for development)
-    elseif(EXISTS ${CMAKE_BINARY_DIR}/FCData)
-        set(FCData_FOUND TRUE)
-        set(FCData_PATH ${CMAKE_BINARY_DIR}/FCData)
-        message(STATUS "Found FCData directory at: ${FCData_PATH}")
-    # Check if FCData exists but with different case (macOS case-insensitive filesystem)
-    elseif(EXISTS ${CMAKE_SOURCE_DIR}/fcdata)
-        set(FCData_FOUND TRUE)
-        set(FCData_PATH ${CMAKE_SOURCE_DIR}/fcdata)
-        message(STATUS "Found FCData directory (case variant) at: ${FCData_PATH}")
-    else()
-        message(WARNING "")
-        message(WARNING "================================================================================")
-        message(WARNING "FCData directory not found - Game assets will not be available!")
-        message(WARNING "================================================================================")
-        message(WARNING "")
-        message(WARNING "The FCData directory contains all game assets (textures, sounds, scripts,")
-        message(WARNING "localized content) packaged in PAK archive files.")
-        message(WARNING "")
-        message(WARNING "Expected locations:")
-        message(WARNING "  - ${CMAKE_SOURCE_DIR}/FCData")
-        message(WARNING "  - ${CMAKE_BINARY_DIR}/FCData")
-        message(WARNING "")
-        message(WARNING "To resolve this issue:")
-        message(WARNING "  1. Ensure you have the Far Cry game assets (FCData directory)")
-        message(WARNING "  2. Place the FCData directory in the project root: ${CMAKE_SOURCE_DIR}/")
-        message(WARNING "  3. The FCData directory should contain:")
-        message(WARNING "     - Localized/ (with language PAK files)")
-        message(WARNING "     - *.pak files (Textures.pak, Sounds.pak, Scripts.pak, etc.)")
-        message(WARNING "")
-        message(WARNING "Note: The game will run but will not be able to load textures, sounds,")
-        message(WARNING "scripts, or other assets without the FCData directory.")
-        message(WARNING "")
-        message(WARNING "================================================================================")
-        message(WARNING "")
-    endif()
-    
+
+    foreach(_candidate
+            "${CMAKE_SOURCE_DIR}/FCData"
+            "${CMAKE_SOURCE_DIR}/Assets/FCData"
+            "${CMAKE_BINARY_DIR}/FCData"
+            "${CMAKE_SOURCE_DIR}/fcdata")
+        if(EXISTS "${_candidate}")
+            set(FCData_FOUND TRUE)
+            set(FCData_PATH "${_candidate}")
+            message(STATUS "Found FCData at: ${FCData_PATH}")
+            break()
+        endif()
+    endforeach()
+
     if(FCData_FOUND)
+        # Verify required PAK files are present and report any that are missing.
+        set(_missing_paks "")
+        foreach(_pak ${FCDATA_REQUIRED_PAKS})
+            if(NOT EXISTS "${FCData_PATH}/${_pak}")
+                # Try without the leading FCData/ prefix (in case FCData_PATH already ends in FCData)
+                string(REPLACE "FCData/" "" _pak_short "${_pak}")
+                if(NOT EXISTS "${FCData_PATH}/${_pak_short}")
+                    list(APPEND _missing_paks "  ${_pak_short}")
+                endif()
+            endif()
+        endforeach()
+        if(_missing_paks)
+            message(WARNING
+                "\n=== FCData incomplete — missing required PAK files ===\n"
+                "Directory: ${FCData_PATH}\n"
+                "Missing:\n${_missing_paks}\n"
+                "Copy the missing files from your Far Cry installation:\n"
+                "  cp <FarCry_install>/FCData/<file>.pak ${FCData_PATH}/\n"
+                "Steam (via CrossOver) path:\n"
+                "  $ENV{HOME}/Library/Application Support/CrossOver/Bottles/Steam-2/drive_c/Program Files (x86)/Steam/steamapps/common/FarCry/FCData/\n"
+                "=======================================================")
+        endif()
+
         add_custom_command(TARGET FarCry POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_BUNDLE_RESOURCES}/FCData
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 ${FCData_PATH}
                 ${FARCRY_BUNDLE_RESOURCES}/FCData
-            COMMENT "Copying FCData directory with PAK files to Resources"
+            COMMENT "Staging FCData PAK archives into FarCry.app/Resources"
         )
+    else()
+        message(SEND_ERROR
+            "\n=== FCData directory not found — cannot stage game assets ===\n"
+            "The FCData directory contains all required game assets.\n"
+            "Expected at one of:\n"
+            "  ${CMAKE_SOURCE_DIR}/FCData\n"
+            "  ${CMAKE_SOURCE_DIR}/Assets/FCData\n"
+            "  ${CMAKE_BINARY_DIR}/FCData\n"
+            "To obtain FCData, copy it from your Far Cry installation.\n"
+            "Steam (via CrossOver):\n"
+            "  cp -r \"$ENV{HOME}/Library/Application Support/CrossOver/Bottles/Steam-2/drive_c/Program Files (x86)/Steam/steamapps/common/FarCry/FCData\" ${CMAKE_SOURCE_DIR}/\n"
+            "Required PAK files inside FCData/:\n"
+            "  Textures.pak  Shaders.pak  Scripts.pak\n"
+            "  Sounds.pak    Objects.pak  GameData.pak\n"
+            "=============================================================")
     endif()
 
     set(SCRIPTS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Scripts)

@@ -1104,6 +1104,7 @@ CMetalShaderManager::CMetalShaderManager(CMetalBaseRenderer* renderer,
     , m_heatVisionEnabled(false)
     , m_lastPipelineHadTangentMismatch(false)
     , m_generatedLibrary(nil)
+    , m_nStartupMissingShaders(0)
 {
     assert(renderer != nullptr && "CMetalShaderManager: renderer cannot be null!");
     assert(textureManager != nullptr && "CMetalShaderManager: textureManager cannot be null!");

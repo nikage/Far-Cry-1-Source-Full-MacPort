@@ -49,21 +49,11 @@ void CXMouse::Update(bool bPrevFocus)
     m_Events[1] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonRight) ? 0x80 : 0;
     m_Events[2] = CGEventSourceButtonState(kCGEventSourceStateHIDSystemState, kCGMouseButtonCenter) ? 0x80 : 0;
     
-    // Get current mouse position
-    CGEventRef event = CGEventCreate(NULL);
-    CGPoint point = CGEventGetLocation(event);
-    CFRelease(event);
-    
-    int newX = (int)point.x;
-    int newY = (int)point.y;
-    
-    // Calculate deltas
-    m_Deltas[0] = (float)(newX - m_OldDeltas[0]);
-    m_Deltas[1] = (float)(newY - m_OldDeltas[1]);
-    
-    // Update positions
-    m_OldDeltas[0] = newX;
-    m_OldDeltas[1] = newY;
+    // Use raw HID delta (unaffected by cursor acceleration or confinement)
+    int32_t rawDX = 0, rawDY = 0;
+    CGGetLastMouseDelta(&rawDX, &rawDY);
+    m_Deltas[0] = (float)rawDX;
+    m_Deltas[1] = (float)rawDY;
 }
 
 void CXMouse::Shutdown()
