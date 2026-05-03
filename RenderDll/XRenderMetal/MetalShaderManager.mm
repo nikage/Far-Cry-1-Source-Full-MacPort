@@ -676,10 +676,16 @@ void CMetalShaderManager::InitializeShaderFallbacks()
         // Flare shader — CGRCFlare is a generated Metal shader
         {"Flare_training",                  "cgrcflare"},
         {"ZBuffPassVP",                     "basic"},
-        {"ZTestGreaterState",               "basic"},
-        {"terrainwater",                    "terrain"},
-        {"terrainwaterbottom",              "terrain"},
-        {"default",                         "cgrcambienttempl"},
+        {"ZTestGreaterState",              "basic"},
+        {"terrainwater",                   "terrain"},
+        {"terrainwaterbottom",             "terrain"},
+        {"default",                        "cgrcambienttempl"},
+        // Vehicle/environment light shaders (observed during gameplay run)
+        {"gunship_light",                  "basic"},
+        {"gunship_light_b",                "basic"},
+        {"humvee_backlight",               "basic"},
+        {"humvee_frontlight",              "basic"},
+        {"RedAlarmLight",                  "basic"},
     };
 
     // --- Material template names (templName in EF_LoadShaderItem) ---

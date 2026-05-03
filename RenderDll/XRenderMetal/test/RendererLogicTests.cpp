@@ -1177,6 +1177,35 @@ static void test_alias_table_covers_key_template_names()
 }
 
 // -----------------------------------------------------------------------
+// Regression: vehicle light shaders triggered MISSING_ALIAS during gameplay.
+// Confirmed via live game run (2026-05-03): gunship_light, humvee_backlight,
+// humvee_frontlight, gunship_light_b must resolve via engine alias table.
+// -----------------------------------------------------------------------
+static void test_vehicle_light_shader_aliases_resolve()
+{
+    std::map<std::string,int> m;
+    m["basic"]            = 6;
+    m["cgrcambienttempl"] = 1;
+
+    struct Entry { const char* alias; int expected; };
+    const Entry vehicleEntries[] = {
+        {"gunship_light",    6},
+        {"gunship_light_b",  6},
+        {"humvee_backlight",  6},
+        {"humvee_frontlight", 6},
+    };
+
+    for (const auto& e : vehicleEntries)
+        m[normalize(e.alias)] = e.expected;
+
+    for (const auto& e : vehicleEntries)
+    {
+        int id = lookupShader(m, e.alias);
+        CHECK_EQ(id, e.expected);
+    }
+}
+
+// -----------------------------------------------------------------------
 // Regression: VERTEX_FORMAT_T3F_B3F_N3F (14) was missing from CreateVertexBuffer,
 // triggering assert(0) during CStatObj::LoadUncompiled level loading.
 //
@@ -2071,6 +2100,7 @@ int main()
     test_loadshaderitem_uses_cgrcambienttempl_as_last_resort();
     test_loadshaderitem_no_fallback_counter_incremented();
     test_alias_table_covers_key_template_names();
+    test_vehicle_light_shader_aliases_resolve();
     test_create_vertex_buffer_handles_all_formats();
     test_buf_info_table_covers_all_formats();
     test_buf_info_table_format14_has_normals_no_tc_no_color();
