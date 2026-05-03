@@ -270,17 +270,6 @@ if(APPLE)
         )
     endif()
     
-    # Create FCData/Levels symlink pointing at the CrossOver Steam FarCry install.
-    # Using a symlink avoids copying hundreds of MB of level data on every build.
-    set(STEAM_LEVELS_PATH "$ENV{HOME}/Library/Application Support/CrossOver/Bottles/Steam-2/drive_c/Program Files (x86)/Steam/steamapps/common/FarCry/Levels")
-    set(FARCRY_LEVELS_LINK "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels")
-    add_custom_command(TARGET FarCry POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E remove "${FARCRY_LEVELS_LINK}"
-        COMMAND ln -sfn "${STEAM_LEVELS_PATH}" "${FARCRY_LEVELS_LINK}"
-        COMMENT "Symlinking CrossOver Steam Levels into FCData"
-        VERBATIM
-    )
-    
     # ---------------------------------------------------------------------------
     # FCData staging — required game asset PAK archives
     # ---------------------------------------------------------------------------
@@ -291,7 +280,6 @@ if(APPLE)
         FCData/Scripts.pak
         FCData/Sounds.pak
         FCData/Objects.pak
-        FCData/GameData.pak
     )
 
     set(FCData_FOUND FALSE)
@@ -356,6 +344,33 @@ if(APPLE)
             "  Textures.pak  Shaders.pak  Scripts.pak\n"
             "  Sounds.pak    Objects.pak  GameData.pak\n"
             "=============================================================")
+    endif()
+
+    set(FARCRY_LEVELS_SOURCE "${CMAKE_SOURCE_DIR}/Levels")
+    if(EXISTS "${FARCRY_LEVELS_SOURCE}")
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E remove
+                "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels"
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels"
+            COMMAND rsync -a --delete --no-l
+                "${FARCRY_LEVELS_SOURCE}/"
+                "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels/"
+            COMMENT "Syncing Levels into FarCry.app/Resources/FCData/Levels"
+            VERBATIM
+        )
+        add_custom_command(TARGET FarCry POST_BUILD
+            COMMAND dart
+                "${CMAKE_SOURCE_DIR}/tools/level_validator/bin/validate_levels.dart"
+                "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels"
+            COMMENT "Validating level PAK presence in FCData/Levels"
+            VERBATIM
+        )
+    else()
+        message(WARNING
+            "Levels source not found at ${FARCRY_LEVELS_SOURCE}; "
+            "level loading will fail at runtime. "
+            "Create the symlink: ln -s <CrossOver FarCry>/Levels ${CMAKE_SOURCE_DIR}/Levels")
     endif()
 
     set(SCRIPTS_SOURCE_DIR ${CMAKE_SOURCE_DIR}/Scripts)

@@ -1,0 +1,16 @@
+name: level_validator
+description: >
+  Validates that every level folder under FCData/Levels contains at least one
+  *.pak archive, ensuring no level can silently fail to load at runtime.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  path: ^1.8.3
+
+dev_dependencies:
+  lints: ^2.1.1
+  test: ^1.25.2
