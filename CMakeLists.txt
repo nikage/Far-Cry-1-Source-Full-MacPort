@@ -349,7 +349,7 @@ if(APPLE)
     set(FARCRY_LEVELS_SOURCE "${CMAKE_SOURCE_DIR}/Levels")
     if(EXISTS "${FARCRY_LEVELS_SOURCE}")
         add_custom_command(TARGET FarCry POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E remove
+            COMMAND ${CMAKE_COMMAND} -E rm -Rf
                 "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels"
             COMMAND ${CMAKE_COMMAND} -E make_directory
                 "${FARCRY_BUNDLE_RESOURCES}/FCData/Levels"
