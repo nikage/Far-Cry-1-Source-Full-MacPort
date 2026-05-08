@@ -1378,7 +1378,7 @@ void CMetalShaderManager::ValidateShaderPairs(
         if (iLog)
             iLog->LogError(
                 "[ValidateShaderPairs] %d/%d shader pairs failed pipeline dry-run "
-                "(limit %d) — game continues with fallback shaders\n",
+                "(limit %d) — game continues\n",
                 validationFailed, totalPaired, kMaxFailuresAllowed);
     }
 }
@@ -1959,6 +1959,19 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 
         m_shaders[shaderId] = info;
         m_shaderNameMap[normalizedKey] = shaderId;
+
+        NSArray* lookupAliases = entry[@"lookupAliases"];
+        if (lookupAliases && [lookupAliases isKindOfClass:[NSArray class]])
+        {
+            for (id aliasObj in lookupAliases)
+            {
+                if (![aliasObj isKindOfClass:[NSString class]] || [(NSString*)aliasObj length] == 0)
+                    continue;
+                std::string aliasKey = NormalizeShaderName([(NSString*)aliasObj UTF8String]);
+                if (!aliasKey.empty() && aliasKey != normalizedKey)
+                    m_shaderNameMap[aliasKey] = shaderId;
+            }
+        }
 
         if (iLog)
             iLog->Log("MetalShaderManager: Registered generated shader '%s' (id=%d)\n", [shaderName UTF8String], shaderId);

@@ -1519,6 +1519,9 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 
 	bool bDedicated=GetSystem()->IsDedicated();
 
+	m_pLog->Log("[GameCheckpoint] LoadLevelCS begin folder='%s' mission='%s' listen=%d dedicated=%d keepclient=%d mp=%d",
+		szMapName, szMissionName, listen ? 1 : 0, bDedicated ? 1 : 0, keepclient ? 1 : 0, IsMultiplayer() ? 1 : 0);
+
 	string strGameType = g_GameType->GetString();
 
 	AutoSuspendTimeQuota AutoSuspender(GetSystem()->GetStreamEngine());
@@ -1567,6 +1570,7 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 		LoadingError((string("@LoadLevelError|server|") + sLevelFolder).c_str());
 		return;
 	}
+	m_pLog->Log("[GameCheckpoint] LoadLevelCS server_started listen=%d", listen ? 1 : 0);
 
 	bool bNeedClient = !bDedicated && ((keepclient && !m_pClient) || !keepclient);
 
@@ -1581,6 +1585,7 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 		LoadingError((string("@LoadLevelError|client|") + sLevelFolder).c_str());
 		return;
 		}
+		m_pLog->Log("[GameCheckpoint] LoadLevelCS local_client_started");
 	}
 
 	const char *szMission = szMissionName;
@@ -1593,7 +1598,8 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 	// refresh the current server info for incoming queries during loading
 	m_pServer->GetServerInfo();
 
-	// load the level
+	m_pLog->Log("[GameCheckpoint] LoadLevelCS before_IXSystem_LoadLevel folder='%s' mission='%s'",
+		sLevelFolder.c_str(), szMission);
 	if(!m_pServer->m_pISystem->LoadLevel( sLevelFolder.c_str(),szMission,false))
 	{
 		m_pLog->LogToConsole("Unable to load the level %s,mission %s \n", sLevelFolder.c_str(),szMissionName);
@@ -1602,8 +1608,9 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 		LoadingError((string("@LoadLevelError|loadlevel|") + sLevelFolder).c_str());
 		return;
 	}
+	m_pLog->Log("[GameCheckpoint] LoadLevelCS after_IXSystem_LoadLevel folder='%s' mission='%s'",
+		sLevelFolder.c_str(), szMission);
 
-// start and connect a local client
 	if(bNeedClient)
 	{
 		if(m_pClient)
@@ -1613,6 +1620,7 @@ void CXGame::LoadLevelCS(bool keepclient, const char *szMapName, const char *szM
 			else
 				m_pClient->XConnect("127.0.0.1");
 		}
+		m_pLog->Log("[GameCheckpoint] LoadLevelCS after_local_XConnect");
 	}
 	
 	if(m_pClient)

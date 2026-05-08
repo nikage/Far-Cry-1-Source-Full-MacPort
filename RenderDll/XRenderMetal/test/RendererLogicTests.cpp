@@ -1019,12 +1019,10 @@ static void test_shader_resources_destructor_bounds_check()
 // -----------------------------------------------------------------------
 // EF_LoadShaderItem selection logic
 //
-// Mirrors the new priority order in MetalShaderManager::EF_LoadShaderItem:
-//   1. templName (unless "nodraw" / empty) → direct map lookup
-//   2. mName (shader base name)            → direct map lookup
-//   3. "cgrcambienttempl" / "basic"        → hard fallback (no counter)
-//
-// These tests use a lightweight in-memory map to verify the pure C++ logic.
+// Mirrors MetalShaderManager::EF_LoadShaderItem:
+//   1. templName (unless "nodraw" / empty) → direct manifest/map lookup
+//   2. mName (shader base name)             → direct lookup
+// No silent substitute when both miss.
 // -----------------------------------------------------------------------
 
 #include <map>
@@ -1057,17 +1055,12 @@ static int resolveShaderItem(const std::map<std::string,int>& map,
                              const char* mName, const char* templName,
                              int& fallbackCount)
 {
+    (void)fallbackCount;
     int id = -1;
     if (!templIsDefault(templName))
         id = lookupShader(map, templName);
     if (id == -1)
         id = lookupShader(map, mName);
-    if (id == -1)
-    {
-        id = lookupShader(map, "cgrcambienttempl");
-        if (id == -1)
-            id = lookupShader(map, "basic");
-    }
     return id;
 }
 
@@ -1105,13 +1098,13 @@ static void test_loadshaderitem_falls_back_to_mname_when_templ_empty()
     CHECK_EQ(fc, 0);
 }
 
-static void test_loadshaderitem_uses_cgrcambienttempl_as_last_resort()
+static void test_loadshaderitem_returns_unresolved_when_not_in_map()
 {
     std::map<std::string,int> m;
     m["cgrcambienttempl"] = 99;
     int fc = 0;
     int id = resolveShaderItem(m, "unknownshader", "unknowntempl", fc);
-    CHECK_EQ(id, 99);
+    CHECK_EQ(id, -1);
     CHECK_EQ(fc, 0);
 }
 
@@ -1125,84 +1118,6 @@ static void test_loadshaderitem_no_fallback_counter_incremented()
     resolveShaderItem(m, "bumpground",    "TemplBumpDiffuse", fc);
     resolveShaderItem(m, "terrain_level", "nodraw",           fc);
     CHECK_EQ(fc, 0);
-}
-
-// -----------------------------------------------------------------------
-// Alias coverage: all important Templ* names must be covered
-// -----------------------------------------------------------------------
-static void test_alias_table_covers_key_template_names()
-{
-    std::map<std::string,int> m;
-    m["cgrcambienttempl"] = 1;
-    m["cgrcambient"]      = 2;
-    m["cgrcplants"]       = 3;
-    m["terrain"]          = 4;
-    m["colortex"]         = 5;
-    m["basic"]            = 6;
-    m["sky"]              = 7;
-
-    struct Entry { const char* alias; int expected; };
-    const Entry aliases[] = {
-        {"TemplBumpSpec",           1},
-        {"TemplBumpSpec_PS20",      1},
-        {"TemplBumpDiffuse",        1},
-        {"TemplDiffuse_FP",         2},
-        {"TemplModelCommon",        1},
-        {"TemplPlants",             3},
-        {"TemplPlantsBark",         1},
-        {"TemplDecalOpacityShift",  5},
-        {"TemplGlassCM",            1},
-        {"TemplAlphaBlend",         6},
-        {"TemplFog",                6},
-        {"TemplCryVision",          5},
-        {"TemplHologram",           6},
-        {"TemplMutatedArms",        1},
-        {"Terrain_FP",              4},
-        {"LowSpecWaterOutdoor_FP",  4},
-    };
-
-    // Register aliases into map (mirror InitializeShaderFallbacks logic)
-    auto registerAlias = [&](const char* alias, int targetId)
-    {
-        m[normalize(alias)] = targetId;
-    };
-    for (const auto& e : aliases)
-        registerAlias(e.alias, e.expected);
-
-    for (const auto& e : aliases)
-    {
-        int id = lookupShader(m, e.alias);
-        CHECK_EQ(id, e.expected);
-    }
-}
-
-// -----------------------------------------------------------------------
-// Regression: vehicle light shaders triggered MISSING_ALIAS during gameplay.
-// Confirmed via live game run (2026-05-03): gunship_light, humvee_backlight,
-// humvee_frontlight, gunship_light_b must resolve via engine alias table.
-// -----------------------------------------------------------------------
-static void test_vehicle_light_shader_aliases_resolve()
-{
-    std::map<std::string,int> m;
-    m["basic"]            = 6;
-    m["cgrcambienttempl"] = 1;
-
-    struct Entry { const char* alias; int expected; };
-    const Entry vehicleEntries[] = {
-        {"gunship_light",    6},
-        {"gunship_light_b",  6},
-        {"humvee_backlight",  6},
-        {"humvee_frontlight", 6},
-    };
-
-    for (const auto& e : vehicleEntries)
-        m[normalize(e.alias)] = e.expected;
-
-    for (const auto& e : vehicleEntries)
-    {
-        int id = lookupShader(m, e.alias);
-        CHECK_EQ(id, e.expected);
-    }
 }
 
 // -----------------------------------------------------------------------
@@ -2097,10 +2012,8 @@ int main()
     test_loadshaderitem_prefers_templname();
     test_loadshaderitem_falls_back_to_mname_when_templ_nodraw();
     test_loadshaderitem_falls_back_to_mname_when_templ_empty();
-    test_loadshaderitem_uses_cgrcambienttempl_as_last_resort();
+    test_loadshaderitem_returns_unresolved_when_not_in_map();
     test_loadshaderitem_no_fallback_counter_incremented();
-    test_alias_table_covers_key_template_names();
-    test_vehicle_light_shader_aliases_resolve();
     test_create_vertex_buffer_handles_all_formats();
     test_buf_info_table_covers_all_formats();
     test_buf_info_table_format14_has_normals_no_tc_no_color();

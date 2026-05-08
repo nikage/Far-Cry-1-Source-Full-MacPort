@@ -66,6 +66,10 @@ bool CXSystemServer::LoadLevel(const char *szLevelDir,const char *szMissionName,
 	// [anton] make sure physical world has the most recent IsMultiplayer flag before loading
 	m_pSystem->GetIPhysicalWorld()->GetPhysVars()->bMultiplayer = m_pGame->IsMultiplayer() ? 1:0;
 
+	const char *ms = szMissionName ? szMissionName : "";
+	m_pLog->Log("[GameCheckpoint] IXSystem_Server_LoadLevel enter dir='%s' mission='%s' editor=%d",
+		szLevelDir, ms, bEditor ? 1 : 0);
+
 	StartLoading(bEditor);
 
 	if (m_pGame->IsMultiplayer())
@@ -81,7 +85,9 @@ bool CXSystemServer::LoadLevel(const char *szLevelDir,const char *szMissionName,
 
 	EndLoading(bEditor);
 
+	m_pLog->Log("[GameCheckpoint] server_before_GameRules_OnAfterLoad dir='%s'", szLevelDir);
 	m_pXServer->GetRules()->OnAfterLoad();
+	m_pLog->Log("[GameCheckpoint] server_after_GameRules_OnAfterLoad dir='%s'", szLevelDir);
 
 	if (m_pGame->IsMultiplayer())
 	{
@@ -92,9 +98,13 @@ bool CXSystemServer::LoadLevel(const char *szLevelDir,const char *szMissionName,
 				m_pXServer->sv_name->GetString(),
 				m_pXServer->sv_maxplayers->GetIVal(),
 				m_pXServer->m_ServerInfos.nPort);
+	m_pLog->Log("[GameCheckpoint] server_after_OnAfterServerLoadLevel dir='%s' port=%d",
+		szLevelDir, (int)m_pXServer->m_ServerInfos.nPort);
 
 	m_pGame->m_bMapLoadedFromCheckpoint=false;
 	m_pGame->m_pServer->m_bIsLoadingLevel=false;
+	m_pLog->Log("[GameCheckpoint] IXSystem_Server_LoadLevel exit ok dir='%s' mission='%s'",
+		szLevelDir, ms);
 	return true;
 }
 

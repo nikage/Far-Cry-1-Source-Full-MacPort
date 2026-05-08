@@ -130,7 +130,12 @@ bool CMacOSSoundBuffer::LoadWave(const char* sFileName, int nFlags)
     {
         if (error)
         {
-            NSLog(@"Error loading audio file: %@", [error localizedDescription]);
+            NSLog(@"Error loading audio file path=%@ domain=%@ code=%ld %@",
+                  [fileURL path], [error domain], (long)[error code], [error localizedDescription]);
+        }
+        else
+        {
+            NSLog(@"Error loading audio file path=%@ (nil error)", [fileURL path]);
         }
         return false;
     }
@@ -152,7 +157,10 @@ bool CMacOSSoundBuffer::LoadWave(const char* sFileName, int nFlags)
     
     if (![audioFile readIntoBuffer:buffer error:&error])
     {
-        NSLog(@"Error reading audio file: %@", [error localizedDescription]);
+        NSLog(@"Error reading audio file path=%@ domain=%@ code=%ld %@",
+              [fileURL path], error ? [error domain] : @"(nil)",
+              error ? (long)[error code] : 0L,
+              error ? [error localizedDescription] : @"");
         return false;
     }
     
@@ -836,7 +844,8 @@ ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
     {
         delete buffer;
         if (m_pSystem)
-            m_pSystem->GetILog()->LogWarning("Sound: failed to load '%s'", sFileName);
+            m_pSystem->GetILog()->LogWarning("Sound: failed to load '%s' (path tried: %s)",
+                sFileName, localPath.c_str());
         return nullptr;
     }
 

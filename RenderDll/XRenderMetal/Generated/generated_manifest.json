@@ -72991,6 +72991,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogscopeflare_vertex",
     "pipelineCategory": "fullscreen",
+    "lookupAliases": [
+      "flare_from_light"
+    ],
     "uniforms": [
       {
         "name": "Flare",

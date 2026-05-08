@@ -938,9 +938,9 @@ void CMetalBaseRenderer::BeginFrame()
     if (m_nFrameID == 1)
     {
         if (g_metalStartupMissingShaders > 0)
-            iLog->Log("[Renderer] WARNING: %d unresolved shader aliases at startup — add them to InitializeShaderFallbacks", g_metalStartupMissingShaders);
+            iLog->Log("[Renderer] WARNING: %d unregistered shader lookups at startup (missing from manifest / map)", g_metalStartupMissingShaders);
         else
-            iLog->Log("[Renderer] Startup shader check OK: 0 missing aliases (fallbacks == 0)");
+            iLog->Log("[Renderer] Startup shader check OK: 0 unregistered lookups");
     }
     if (m_nFrameID <= 5 || (m_nFrameID % 300) == 0)
         iLog->Log("[Renderer] BeginFrame #%d drawable=%s drawCalls=%d tris=%d",

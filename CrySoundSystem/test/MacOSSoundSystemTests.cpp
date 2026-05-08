@@ -263,6 +263,19 @@ static void test_play_guard_exception_resets_isplaying()
     CHECK(!isPlaying);
 }
 
+static std::string basename_for_diag(const std::string& path)
+{
+    size_t p = path.find_last_of("/\\");
+    return (p == std::string::npos) ? path : path.substr(p + 1);
+}
+
+static void test_basename_matches_pak_extract_temp_contract()
+{
+    CHECK(basename_for_diag("Mods/FCData/sounds/gun.wav") == "gun.wav");
+    CHECK(basename_for_diag("Sounds\\ambient\\wind.wav") == "wind.wav");
+    CHECK(basename_for_diag("bare.wav") == "bare.wav");
+}
+
 // ---------------------------------------------------------------------------
 int main()
 {
@@ -279,6 +292,7 @@ int main()
     test_play_guard_null_node_is_no_op();
     test_play_guard_null_buffer_is_no_op();
     test_play_guard_exception_resets_isplaying();
+    test_basename_matches_pak_extract_temp_contract();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

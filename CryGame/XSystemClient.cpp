@@ -51,6 +51,10 @@ bool CXSystemClient::LoadLevel(const char *szLevelDir,const char *szMissionName,
 	if (szMissionName)
 		missionInfo.sMissionName = szMissionName;
 
+	const char *ms = szMissionName ? szMissionName : "";
+	m_pLog->Log("[GameCheckpoint] IXSystem_Client_LoadLevel enter dir='%s' mission='%s' editor=%d",
+		szLevelDir, ms, bEditor ? 1 : 0);
+
 	StartLoading(bEditor);
 
 	if (!LoadLevelCommon(missionInfo))
@@ -61,6 +65,9 @@ bool CXSystemClient::LoadLevel(const char *szLevelDir,const char *szMissionName,
 
 	EndLoading(bEditor);
 	m_pGame->m_bMapLoadedFromCheckpoint=false;
+
+	m_pLog->Log("[GameCheckpoint] IXSystem_Client_LoadLevel exit ok dir='%s' mission='%s'",
+		szLevelDir, ms);
 
 	return (true);
 }

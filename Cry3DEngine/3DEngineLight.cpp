@@ -1160,9 +1160,7 @@ bool ReadString(FILE * hFile, char * szBuff, int nMaxChars, ICryPak * pPak)
 	return true;
 }
 
-#ifdef WIN64
 #pragma pack(push,4)
-// dummy structure that's binary compatible with the 32-bit version of CDLight
 struct CDLightDummy32
 {
 	typedef int ptr32;
@@ -1290,10 +1288,11 @@ struct CDLightDummy32
 #undef COPY
 	}
 };
+#pragma pack(pop)
 
 bool C3DEngine::LoadStaticLightSources (const char *pszFileName)
 {
-	LightFileHeader sHeader, sHdrCmp;
+	LightFileHeader sHeader;
 
 	FILE * hFile = GetSystem()->GetIPak()->FOpen(pszFileName, "rb");
 
@@ -1306,13 +1305,24 @@ bool C3DEngine::LoadStaticLightSources (const char *pszFileName)
 		return false;
 	}
 
-	CDLightDummy32 dummy;
-	if (sHeader.iNumDLights == 0 || 
-		sHeader.iVersion != 0 || 
-		sHeader.iSizeOfDLight != sizeof(CDLightDummy32))
+	const UINT nativeLightSize = (UINT)sizeof(CDLight);
+	const UINT dummy32LightSize = (UINT)sizeof(CDLightDummy32);
+	const bool useDummy32Layout =
+		sHeader.iSizeOfDLight == dummy32LightSize;
+	const bool useNativeLayout =
+		sHeader.iSizeOfDLight == nativeLightSize;
+
+	if (sHeader.iNumDLights == 0 ||
+		sHeader.iVersion != 0 ||
+		(!useDummy32Layout && !useNativeLayout))
 	{
-		GetConsole()->Exit ("C3DEngine::LoadStaticLightSources: StatLights.dat version error (%d,%d). Please reexport using latest version of 32-bit editor.",
-			sHeader.iSizeOfDLight, sizeof(dummy));
+		GetConsole()->Exit (
+			"C3DEngine::LoadStaticLightSources: StatLights.dat version/size error (lights=%u version=%u size=%u; expect native=%u or legacy32=%u).",
+			(unsigned)sHeader.iNumDLights,
+			(unsigned)sHeader.iVersion,
+			(unsigned)sHeader.iSizeOfDLight,
+			(unsigned)nativeLightSize,
+			(unsigned)dummy32LightSize);
 		return false;
 	}
 
@@ -1322,85 +1332,24 @@ bool C3DEngine::LoadStaticLightSources (const char *pszFileName)
 	for (UINT iCurLight=0; iCurLight<sHeader.iNumDLights; iCurLight++)
 	{
 		CDLight newLight;
-		CDLightDummy32 dummy32Light;
-		if (GetSystem()->GetIPak()->FRead(&dummy32Light, sizeof(dummy32Light), 1, hFile) != 1)
+
+		if (useDummy32Layout)
 		{
-			GetSystem()->GetIPak()->FClose(hFile);
-			return false;
+			CDLightDummy32 dummy32Light;
+			if (GetSystem()->GetIPak()->FRead(&dummy32Light, sizeof(dummy32Light), 1, hFile) != 1)
+			{
+				GetSystem()->GetIPak()->FClose(hFile);
+				return false;
+			}
+			dummy32Light.copyTo(newLight);
 		}
-		dummy32Light.copyTo(newLight);
-
-		newLight.m_pLightImage = 0;
-		newLight.m_pCharInstance = 0;
-		newLight.m_pOwner = 0;
-		newLight.m_pShader = 0;
-
-		int nTextureFlags2 = 0;
-		if (GetSystem()->GetIPak()->FRead(&nTextureFlags2, sizeof(int), 1, hFile) != 1)
+		else
 		{
-			GetSystem()->GetIPak()->FClose(hFile);
-			return false;
-		}
-
-		char szTextureName[MAX_PATH_LENGTH]="";
-		bool b0 = ReadString(hFile, szTextureName, MAX_PATH_LENGTH, GetSystem()->GetIPak());
-
-		char szShaderName[MAX_PATH_LENGTH]="";
-		bool b1 = ReadString(hFile, szShaderName, MAX_PATH_LENGTH, GetSystem()->GetIPak());
-
-		//    bool b(nTextureFlags2&FT2_FORCECUBEMAP);
-
-		if(szTextureName[0])
-			newLight.m_pLightImage = GetRenderer()->EF_LoadTexture(szTextureName, 0, nTextureFlags2/*FT2_FORCECUBEMAP*/, eTT_Cubemap);
-
-		if(szShaderName[0])
-			newLight.m_pShader = GetRenderer()->EF_LoadShader(szShaderName, eSH_World, EF_SYSTEM);
-
-		AddStaticLightSource(newLight,0,0,0);
-	}
-
-	GetSystem()->GetIPak()->FClose(hFile);
-
-	return true;
-}
-
-#else
-
-bool C3DEngine::LoadStaticLightSources(const char *pszFileName)
-{
-	LightFileHeader sHeader, sHdrCmp;
-
-	FILE * hFile = GetSystem()->GetIPak()->FOpen(pszFileName, "rb");
-
-	if (hFile == NULL)
-		return false;
-
-	if (GetSystem()->GetIPak()->FRead(&sHeader, sizeof(LightFileHeader), 1, hFile) != 1)
-	{
-		GetSystem()->GetIPak()->FClose(hFile);
-		return false;
-	}
-
-	CDLight dummy;
-
-	if (sHeader.iNumDLights == 0 || 
-		sHeader.iVersion != sHdrCmp.iVersion || 
-		sHeader.iSizeOfDLight != sHdrCmp.iSizeOfDLight)
-	{
-		GetConsole()->Exit("C3DEngine::LoadStaticLightSources: StatLights.dat version error, please reexport using latest version of editor.");
-		return false;
-	}
-
-	m_lstStaticLights.Reset();
-	m_lstStaticLights.PreAllocate(sHeader.iNumDLights);
-
-	for (UINT iCurLight=0; iCurLight<sHeader.iNumDLights; iCurLight++)
-	{
-		CDLight newLight;
-		if (GetSystem()->GetIPak()->FRead(&newLight, sizeof(CDLight), 1, hFile) != 1)
-		{
-			GetSystem()->GetIPak()->FClose(hFile);
-			return false;
+			if (GetSystem()->GetIPak()->FRead(&newLight, sizeof(CDLight), 1, hFile) != 1)
+			{
+				GetSystem()->GetIPak()->FClose(hFile);
+				return false;
+			}
 		}
 
 		newLight.m_pLightImage = 0;
@@ -1416,12 +1365,10 @@ bool C3DEngine::LoadStaticLightSources(const char *pszFileName)
 		}
 
 		char szTextureName[MAX_PATH_LENGTH]="";
-		bool b0 = ReadString(hFile, szTextureName, MAX_PATH_LENGTH, GetSystem()->GetIPak());
+		ReadString(hFile, szTextureName, MAX_PATH_LENGTH, GetSystem()->GetIPak());
 
 		char szShaderName[MAX_PATH_LENGTH]="";
-		bool b1 = ReadString(hFile, szShaderName, MAX_PATH_LENGTH, GetSystem()->GetIPak());
-
-		//    bool b(nTextureFlags2&FT2_FORCECUBEMAP);
+		ReadString(hFile, szShaderName, MAX_PATH_LENGTH, GetSystem()->GetIPak());
 
 		if(szTextureName[0])
 			newLight.m_pLightImage = GetRenderer()->EF_LoadTexture(szTextureName, 0, nTextureFlags2/*FT2_FORCECUBEMAP*/, eTT_Cubemap);
@@ -1436,4 +1383,3 @@ bool C3DEngine::LoadStaticLightSources(const char *pszFileName)
 
 	return true;
 }
-#endif
