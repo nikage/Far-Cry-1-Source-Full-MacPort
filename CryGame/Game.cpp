@@ -1842,7 +1842,8 @@ void CXGame::MenuOff()
 {
 	// resume sounds and timers affected by game pause
 	m_pSystem->GetISoundSystem()->Pause(false);
-	m_pSystem->GetIMusicSystem()->Pause(false);
+	if (m_pSystem->GetIMusicSystem())
+		m_pSystem->GetIMusicSystem()->Pause(false);
 	m_pScriptTimerMgr->Pause(false);
 
 

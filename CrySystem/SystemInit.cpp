@@ -589,9 +589,12 @@ bool CSystem::InitSound(WIN_HWND hwnd)
 		return false;
 	}
 	GetILog()->LogToFile("CSystem::InitSound - Sound system created successfully");
-	
-	// Skip music system initialization (not critical for renderer testing)
-	m_pIMusic = nullptr;
+
+	m_pIMusic = m_pISound->CreateMusicSystem();
+	if (!m_pIMusic)
+		GetILog()->LogToFile("CSystem::InitSound - CreateMusicSystem returned null (music disabled)");
+	else
+		GetILog()->LogToFile("CSystem::InitSound - Music system created successfully");
 	
 #endif
 	GetILog()->LogToFile("CSystem::InitSound - About to return from InitSound");
