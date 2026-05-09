@@ -1517,4 +1517,33 @@ void main() {
           reason: 'bare canonical key must also be widened');
     });
   });
+
+  group('duplicate IR paths', () {
+    test('prefers HWScripts over flat CGVShaders path', () {
+      expect(
+        preferDuplicateIrPath(
+          'HWScripts/Declarations/CGVShaders/CGVProgHeatHaze.crycg.json',
+          'CGVShaders/CGVProgHeatHaze.crycg.json',
+        ),
+        isTrue,
+      );
+      expect(
+        preferDuplicateIrPath(
+          'CGVShaders/CGVProgHeatHaze.crycg.json',
+          'HWScripts/Declarations/CGVShaders/CGVProgHeatHaze.crycg.json',
+        ),
+        isFalse,
+      );
+    });
+
+    test('tie-break prefers longer relative path', () {
+      expect(
+        preferDuplicateIrPath(
+          'A/B/C/X.crycg.json',
+          'A/B/X.crycg.json',
+        ),
+        isTrue,
+      );
+    });
+  });
 }

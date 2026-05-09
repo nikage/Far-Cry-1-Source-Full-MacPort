@@ -7,6 +7,7 @@ This document captures practical conclusions from triaging **Cry shader scripts*
 - [shader-pipeline-validation.mdc](../.cursor/rules/shader-pipeline-validation.mdc) — unified `validate_migration.dart` stages
 - [metal_pso_validate.md](metal_pso_validate.md) — CMake PSO / manifest validation
 - [shader-aliases.md](shader-aliases.md) — aliasing fragment names to existing manifests
+- [metal_legacy_shader_parity_tracking.md](metal_legacy_shader_parity_tracking.md) — phased parity workflow notes (usage, pairing, lanes, validation gates)
 
 ---
 

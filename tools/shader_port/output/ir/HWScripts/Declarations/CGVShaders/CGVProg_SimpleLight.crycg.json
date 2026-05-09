@@ -1,0 +1,195 @@
+{
+  "name": "CGVProg_SimpleLight",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProg_SimpleLight.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, LIGHT_POS"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // Ambient color\r\n        float3 cAmbient = float3(0.2, 0.2, 0.2);\r\n        // Diffuse color\r\n        float3 cDiffuse = float3(1, 0.8, 0.2);\r\n        \r\n        float3 vLightDir = normalize(LightPos.xyz - vPos.xyz);\r\n        float fDiffuse = dot(vLightDir, IN.Normal);\r\n        OUT.Color.xyz = cDiffuse * fDiffuse + cAmbient;\r\n        OUT.Color.w = 1;\r\n        OUT.Tex0 = IN.TexCoord;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "Ambient color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 cAmbient",
+      "rhs": "float3(0.2, 0.2, 0.2)",
+      "textureSample": false,
+      "raw": "float3 cAmbient = float3(0.2, 0.2, 0.2);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Diffuse color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 cDiffuse",
+      "rhs": "float3(1, 0.8, 0.2)",
+      "textureSample": false,
+      "raw": "float3 cDiffuse = float3(1, 0.8, 0.2);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vLightDir",
+      "rhs": "normalize(LightPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 vLightDir = normalize(LightPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDiffuse",
+      "rhs": "dot(vLightDir, IN.Normal)",
+      "textureSample": false,
+      "raw": "float fDiffuse = dot(vLightDir, IN.Normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "cDiffuse * fDiffuse + cAmbient",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = cDiffuse * fDiffuse + cAmbient;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w = 1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0",
+      "rhs": "IN.TexCoord",
+      "textureSample": false,
+      "raw": "OUT.Tex0 = IN.TexCoord;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "NORMAL_3",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 cAmbient = float3(0.2, 0.2, 0.2)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 cDiffuse = float3(1, 0.8, 0.2)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vLightDir = normalize(LightPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDiffuse = dot(vLightDir, IN.Normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = cDiffuse * fDiffuse + cAmbient",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0 = IN.TexCoord",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

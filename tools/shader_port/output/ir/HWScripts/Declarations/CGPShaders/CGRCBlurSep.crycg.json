@@ -1,0 +1,148 @@
+{
+  "name": "CGRCBlurSep",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCBlurSep.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n\tuniform sampler2D BlurSampler : texunit0,\r\n  uniform FLOAT4 BlurOffset,\r\n  uniform FLOAT4 vPixelWeights[8]"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\tstruct vertout\r\n\t{\r\n\t  OUT_T0\r\n\t};\r\n\r\n\tFOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\tFLOAT4 color = tex2D( BlurSampler, IN.Tex0.xy );\r\n\r\n\t// Sample pixels on either side\r\n\tfor(int i=0; i<8; i++)\r\n\t{\r\n\t\tcolor += tex2D( BlurSampler, IN.Tex0.xy + ( BlurOffset.xy * i ) ) * vPixelWeights[i];\r\n\t\tcolor += tex2D( BlurSampler, IN.Tex0.xy - ( BlurOffset.xy * i ) ) * vPixelWeights[i];\r\n\t}\r\n\r\n\tOUT.Color = color;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 color",
+      "rhs": "tex2D( BlurSampler, IN.Tex0.xy )",
+      "textureSample": true,
+      "raw": "FLOAT4 color = tex2D( BlurSampler, IN.Tex0.xy );",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Sample pixels on either side",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "for(int i",
+      "rhs": "0 i<8 i++)",
+      "textureSample": false,
+      "raw": "for(int i=0; i<8; i++)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color +",
+      "rhs": "tex2D( BlurSampler, IN.Tex0.xy + ( BlurOffset.xy * i ) ) * vPixelWeights[i]",
+      "textureSample": true,
+      "raw": "color += tex2D( BlurSampler, IN.Tex0.xy + ( BlurOffset.xy * i ) ) * vPixelWeights[i];",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color +",
+      "rhs": "tex2D( BlurSampler, IN.Tex0.xy - ( BlurOffset.xy * i ) ) * vPixelWeights[i]",
+      "textureSample": true,
+      "raw": "color += tex2D( BlurSampler, IN.Tex0.xy - ( BlurOffset.xy * i ) ) * vPixelWeights[i];",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "color",
+      "textureSample": false,
+      "raw": "OUT.Color = color;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 color = tex2D( BlurSampler, IN.Tex0.xy )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "for",
+      "content": "for(int i=0; i<8; i++)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "",
+      "opensBlock": true
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "color += tex2D( BlurSampler, IN.Tex0.xy + ( BlurOffset.xy * i ) ) * vPixelWeights[i]",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "color += tex2D( BlurSampler, IN.Tex0.xy - ( BlurOffset.xy * i ) ) * vPixelWeights[i]",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = color",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4"
+  }
+}

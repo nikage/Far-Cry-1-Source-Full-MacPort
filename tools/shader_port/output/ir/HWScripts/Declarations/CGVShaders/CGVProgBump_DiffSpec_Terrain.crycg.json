@@ -1,0 +1,286 @@
+{
+  "name": "CGVProgBump_DiffSpec_Terrain",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgBump_DiffSpec_Terrain.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, LIGHT_POS, CAMERA_POS, uniform float3 Tangent, uniform float3 Binormal, uniform float3 ScaleBumpTex, uniform float2x4 TexGen"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3_2\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float2 vTex = mul(TexGen, vPos);\r\n        OUT.Tex0.xy = vTex * ScaleBumpTex.xy;\r\n        OUT.Tex3.xy = vTex;\r\n        \r\n        float3 TNormal = cross(Tangent, Binormal);\r\n\r\n        // compute the 3x3 tranform from tangent space to object space\r\n        float3x3 objToTangentSpace;\r\n        objToTangentSpace[0] = Tangent;\r\n        objToTangentSpace[1] = Binormal;\r\n        objToTangentSpace[2] = TNormal;\r\n\r\n        // store normalized light vector\r\n        float3 lightVec = LightPos.xyz - vPos.xyz;\r\n        // transform light vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz);\r\n\r\n        // compute view vector\r\n        float3 viewVec = CameraPos.xyz - vPos.xyz;\r\n\r\n        // compute half angle vector\r\n        float3 halfAngleVector = lightVec.xyz + viewVec;\r\n\r\n        // transform half angle vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex2.xyz = mul(objToTangentSpace, halfAngleVector);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float2 vTex",
+      "rhs": "mul(TexGen, vPos)",
+      "textureSample": false,
+      "raw": "float2 vTex = mul(TexGen, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "vTex * ScaleBumpTex.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = vTex * ScaleBumpTex.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xy",
+      "rhs": "vTex",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xy = vTex;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 TNormal",
+      "rhs": "cross(Tangent, Binormal)",
+      "textureSample": false,
+      "raw": "float3 TNormal = cross(Tangent, Binormal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute the 3x3 tranform from tangent space to object space",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 objToTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[0]",
+      "rhs": "Tangent",
+      "textureSample": false,
+      "raw": "objToTangentSpace[0] = Tangent;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[1]",
+      "rhs": "Binormal",
+      "textureSample": false,
+      "raw": "objToTangentSpace[1] = Binormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[2]",
+      "rhs": "TNormal",
+      "textureSample": false,
+      "raw": "objToTangentSpace[2] = TNormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lightVec = LightPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform light vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xyz",
+      "rhs": "mul(objToTangentSpace, lightVec.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 viewVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute half angle vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 halfAngleVector",
+      "rhs": "lightVec.xyz + viewVec",
+      "textureSample": false,
+      "raw": "float3 halfAngleVector = lightVec.xyz + viewVec;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform half angle vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "mul(objToTangentSpace, halfAngleVector)",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = mul(objToTangentSpace, halfAngleVector);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTex = mul(TexGen, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = vTex * ScaleBumpTex.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xy = vTex",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 TNormal = cross(Tangent, Binormal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 objToTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[0] = Tangent",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[1] = Binormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[2] = TNormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 halfAngleVector = lightVec.xyz + viewVec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = mul(objToTangentSpace, halfAngleVector)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float2"
+  }
+}

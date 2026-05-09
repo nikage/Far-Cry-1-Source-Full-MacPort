@@ -1,0 +1,116 @@
+{
+  "name": "CGRC_HDR_SkyFake_PS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRC_HDR_SkyFake_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D baseMap : texunit0"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_C0\r\n  };\r\n\r\n# ifdef _HDR_MRT\r\n        FOUT_2\r\n# else\r\n        FOUT\r\n# endif"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  float4 vSample = tex2D(baseMap, IN.Tex0.xy) * IN.Color;\r\n  vSample.xyz = HDREncodeAmb(vSample.xyz);\r\n\r\n  HDROutput(OUT, vSample, 1);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float4 vSample",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy) * IN.Color",
+      "textureSample": true,
+      "raw": "float4 vSample = tex2D(baseMap, IN.Tex0.xy) * IN.Color;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample.xyz",
+      "rhs": "HDREncodeAmb(vSample.xyz)",
+      "textureSample": false,
+      "raw": "vSample.xyz = HDREncodeAmb(vSample.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "HDROutput(OUT, vSample, 1);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vSample = tex2D(baseMap, IN.Tex0.xy) * IN.Color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vSample.xyz = HDREncodeAmb(vSample.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "HDROutput(OUT, vSample, 1)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_HDR_MRT"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

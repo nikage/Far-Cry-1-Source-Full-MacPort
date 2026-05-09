@@ -1,0 +1,232 @@
+{
+  "name": "CGRCGlassDiffuse",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCGlassDiffuse.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform samplerCUBE reflMap : texunit1,\r\n                  uniform samplerCUBE refrMap : texunit2,\r\n                  uniform float4 DiffAmount"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the reflection map\r\n        float4 reflColor = texCUBE(reflMap, IN.Tex1.xyz);\r\n        // load the refraction map\r\n        float4 refrColor = texCUBE(refrMap, IN.Tex2.xyz);\r\n        \r\n        float3 env = lerp(reflColor.xyz, refrColor.xyz, IN.Color.xyz);\r\n        float3 vColor = HDREncodeAmb(decalColor.xyz * DiffAmount.xyz + env.xyz);\r\n        // finally add them all together\r\n        OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);\r\n        OUT.Color.w = DiffAmount.a * IN.Color.a * decalColor.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the reflection map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 reflColor",
+      "rhs": "texCUBE(reflMap, IN.Tex1.xyz)",
+      "textureSample": true,
+      "raw": "float4 reflColor = texCUBE(reflMap, IN.Tex1.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the refraction map",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 refrColor",
+      "rhs": "texCUBE(refrMap, IN.Tex2.xyz)",
+      "textureSample": true,
+      "raw": "float4 refrColor = texCUBE(refrMap, IN.Tex2.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 env",
+      "rhs": "lerp(reflColor.xyz, refrColor.xyz, IN.Color.xyz)",
+      "textureSample": false,
+      "raw": "float3 env = lerp(reflColor.xyz, refrColor.xyz, IN.Color.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vColor",
+      "rhs": "HDREncodeAmb(decalColor.xyz * DiffAmount.xyz + env.xyz)",
+      "textureSample": false,
+      "raw": "float3 vColor = HDREncodeAmb(decalColor.xyz * DiffAmount.xyz + env.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "DiffAmount.a * IN.Color.a * decalColor.a",
+      "textureSample": false,
+      "raw": "OUT.Color.w = DiffAmount.a * IN.Color.a * decalColor.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_3",
+    "TEXCOORD2_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_3"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 reflColor = texCUBE(reflMap, IN.Tex1.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 refrColor = texCUBE(refrMap, IN.Tex2.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 env = lerp(reflColor.xyz, refrColor.xyz, IN.Color.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vColor = HDREncodeAmb(decalColor.xyz * DiffAmount.xyz + env.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = DiffAmount.a * IN.Color.a * decalColor.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

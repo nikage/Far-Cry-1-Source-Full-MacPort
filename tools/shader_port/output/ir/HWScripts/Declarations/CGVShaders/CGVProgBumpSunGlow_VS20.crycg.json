@@ -1,0 +1,339 @@
+{
+  "name": "CGVProgBumpSunGlow_VS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgBumpSunGlow_VS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 PRIM_COLOR"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n        VIEWPROJ_MATRIX,\r\n        uniform float4 NoisePos,\r\n        CAMERA_POS,\r\n        LIGHT_POS,\r\n        uniform float4 TexShiftRipple,\r\n        uniform float4 TexGenRipple0,\r\n        uniform float4 TexGenRipple1,\r\n        uniform float3 Normal,\r\n        uniform float3 Tangent,\r\n        uniform float4 WaterLevel,\r\n        uniform float4 pg[66] : register(c30)"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float2 vTex;\r\n        vTex.x = dot(vPos, TexGenRipple0);\r\n        vTex.y = dot(vPos, TexGenRipple1);\r\n        OUT.Tex0.xy = vTex.xy + TexShiftRipple.xy;\r\n        float3 Binormal = cross(Tangent, Normal);\r\n\r\n        // compute the 3x3 tranform from tangent space to object space\r\n        float3x3 objToTangentSpace;\r\n        objToTangentSpace[0] = Tangent;\r\n        objToTangentSpace[1] = Binormal;\r\n        objToTangentSpace[2] = Normal;\r\n\r\n        // store normalized light vector\r\n        float3 lightVec = LightPos.xyz - vPos.xyz;\r\n        // transform light vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz) * LightPos.w;\r\n\r\n        // compute view vector\r\n        float3 viewVec = CameraPos.xyz - vPos.xyz;\r\n\r\n        // transform half angle vector from object space to tangent space and pass it as a tex coords\r\n        OUT.Tex2.xyz = mul(objToTangentSpace, viewVec) * CameraPos.w;\r\n        float fFade = 1-saturate(abs(CameraPos.z - vPos.z) / 12);\r\n\r\n        OUT.Color.xyz = IN.Color.xyz;\r\n        OUT.Color.w = (IN.Color.w+0.25) * fFade;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "statement",
+      "raw": "float2 vTex;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.x",
+      "rhs": "dot(vPos, TexGenRipple0)",
+      "textureSample": false,
+      "raw": "vTex.x = dot(vPos, TexGenRipple0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vTex.y",
+      "rhs": "dot(vPos, TexGenRipple1)",
+      "textureSample": false,
+      "raw": "vTex.y = dot(vPos, TexGenRipple1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "vTex.xy + TexShiftRipple.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = vTex.xy + TexShiftRipple.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 Binormal",
+      "rhs": "cross(Tangent, Normal)",
+      "textureSample": false,
+      "raw": "float3 Binormal = cross(Tangent, Normal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute the 3x3 tranform from tangent space to object space",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3x3 objToTangentSpace;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[0]",
+      "rhs": "Tangent",
+      "textureSample": false,
+      "raw": "objToTangentSpace[0] = Tangent;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[1]",
+      "rhs": "Binormal",
+      "textureSample": false,
+      "raw": "objToTangentSpace[1] = Binormal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "objToTangentSpace[2]",
+      "rhs": "Normal",
+      "textureSample": false,
+      "raw": "objToTangentSpace[2] = Normal;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lightVec = LightPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform light vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xyz",
+      "rhs": "mul(objToTangentSpace, lightVec.xyz) * LightPos.w",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz) * LightPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 viewVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "transform half angle vector from object space to tangent space and pass it as a tex coords",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "mul(objToTangentSpace, viewVec) * CameraPos.w",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = mul(objToTangentSpace, viewVec) * CameraPos.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFade",
+      "rhs": "1-saturate(abs(CameraPos.z - vPos.z) / 12)",
+      "textureSample": false,
+      "raw": "float fFade = 1-saturate(abs(CameraPos.z - vPos.z) / 12);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "IN.Color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = IN.Color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "(IN.Color.w+0.25) * fFade",
+      "textureSample": false,
+      "raw": "OUT.Color.w = (IN.Color.w+0.25) * fFade;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 vTex",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.x = dot(vPos, TexGenRipple0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vTex.y = dot(vPos, TexGenRipple1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = vTex.xy + TexShiftRipple.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 Binormal = cross(Tangent, Normal)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3x3 objToTangentSpace",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[0] = Tangent",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[1] = Binormal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "objToTangentSpace[2] = Normal",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xyz = mul(objToTangentSpace, lightVec.xyz) * LightPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = mul(objToTangentSpace, viewVec) * CameraPos.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFade = 1-saturate(abs(CameraPos.z - vPos.z) / 12)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = (IN.Color.w+0.25) * fFade",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosWaterDeform_PlusWaterLevel"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Color": "float4"
+  }
+}

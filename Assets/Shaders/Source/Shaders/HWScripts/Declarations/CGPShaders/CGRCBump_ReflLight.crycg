@@ -1,53 +1,50 @@
-#ifdef D3D
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_ReflLight.crycg
+//  Version:     v1.00
+// -------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////
 
-      Script
-      (
-        !!RC1.0
-        {
-          rgb
-          {
-            discard = col0 * const0;
-            discard = tex3;
-            spare0 = sum();
-          }
-        }
-        {
-          rgb
-          {
-            discard = spare0;
-            discard = const1;
-            spare0 = sum();
-          }
-        }
-        out.rgb = spare0;
-        out.a = unsigned_invert(zero);
-      )
-    
-#endif
 
-#ifdef OPENGL
+      #include "../CGVPMacro.csi"
 
-      CombinersStat
-      (
-        !!RC1.0
+      PS20Only
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE envMap : texunit3,
+                  uniform float4 Diffuse,
+                  uniform float4 Specular }
+
+      DeclarationsScript
+      {
+        struct vertout
         {
-          rgb
-          {
-            discard = col0 * const0;
-            discard = tex3;
-            spare0 = sum();
-          }
-        }
-        {
-          rgb
-          {
-            discard = spare0;
-            discard = const1;
-            spare0 = sum();
-          }
-        }
-        out.rgb = spare0;
-        out.a = unsigned_invert(zero);
-      )
-    
-#endif
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+        float3 lightVec = normalize(IN.Tex2.xyz);
+        float NdotL = saturate(dot(bumpNormal.xyz, lightVec));
+        float3 reflVec = (2*NdotL*bumpNormal.xyz)-lightVec.xyz;
+        float4 envSpec = texCUBE(envMap, reflVec);
+        float3 lit = IN.Color.xyz * Diffuse.xyz * decalColor.xyz * 2;
+        float3 spec = envSpec.xyz * Specular.xyz * 2;
+        OUT.Color.xyz = lit + spec;
+        OUT.Color.w = decalColor.w * Diffuse.w;
+      }

@@ -1,33 +1,45 @@
-#ifdef D3D
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCBump_ReflLight_Overlay.crycg
+//  Version:     v1.00
+// -------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////
 
-      Script
-      (
-        
-        ps.1.0
 
-        
-        tex t0			
+      #include "../CGVPMacro.csi"
 
-        
-        
-        
-        texm3x3pad t1, t0
-        texm3x3pad t2, t0		
-        texm3x3vspec t3, t0
-        
-        mul r0.rgb, t3, c0;
-        +mov r0.a, c0;
-      )
-    
-#endif
+      PS20Only
 
-#ifdef OPENGL
+      MainInput { uniform sampler2D bumpMap : texunit1,
+                  uniform samplerCUBE envMap : texunit3,
+                  uniform float4 Specular }
 
-      CombinersStat
-      (
-        !!RC1.0
-        out.rgb = tex3 * const0;
-        out.a = unsigned_invert(zero);
-      )
-    
-#endif
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_T1
+          OUT_T2
+          OUT_T3
+          OUT_T4
+          OUT_C0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);
+        bumpNormal.xyz = normalize(bumpNormal.xyz);
+        float3 lightVec = normalize(IN.Tex2.xyz);
+        float NdotL = saturate(dot(bumpNormal.xyz, lightVec));
+        float3 reflVec = (2*NdotL*bumpNormal.xyz)-lightVec.xyz;
+        float4 envSpec = texCUBE(envMap, reflVec);
+        OUT.Color.xyz = envSpec.xyz * Specular.xyz * 2;
+        OUT.Color.w = Specular.w;
+      }

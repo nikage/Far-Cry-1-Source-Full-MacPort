@@ -1,0 +1,121 @@
+{
+  "name": "CGRCAmbient_Decal",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCAmbient_Decal.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform float4 Ambient"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        OUT.Color.xyz = decalColor.xyz * IN.Color.xyz * Ambient.xyz;\r\n        OUT.Color.w = decalColor.w * IN.Color.w * Ambient.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "decalColor.xyz * IN.Color.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = decalColor.xyz * IN.Color.xyz * Ambient.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w * IN.Color.w * Ambient.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w * IN.Color.w * Ambient.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = decalColor.xyz * IN.Color.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w * IN.Color.w * Ambient.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

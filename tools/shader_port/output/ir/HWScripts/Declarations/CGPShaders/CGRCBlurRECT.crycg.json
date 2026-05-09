@@ -1,0 +1,224 @@
+{
+  "name": "CGRCBlurRECT",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCBlurRECT.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n\tuniform samplerRECT baseMap0 : texunit0,\r\n\tuniform samplerRECT baseMap1 : texunit1,\r\n\tuniform samplerRECT baseMap2 : texunit2,\r\n\tuniform samplerRECT baseMap3 : texunit3"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\tstruct vertout\r\n\t{\r\n\t  OUT_T0\r\n\t  OUT_T1\r\n\t  OUT_T2\r\n\t  OUT_T3\r\n\t};\r\n\r\n\tFOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\t// load the decal\r\n\tfloat4 color0 = texRECT(baseMap0, IN.Tex0.xy);\r\n\tfloat4 color1 = texRECT(baseMap1, IN.Tex1.xy);\r\n\tfloat4 color2 = texRECT(baseMap2, IN.Tex2.xy);\r\n\tfloat4 color3 = texRECT(baseMap3, IN.Tex3.xy);\r\n\r\n\tfloat4 avg= float4(0.5, 0.5, 0.5, 0.5);\r\n\tfloat4 colorA = saturate(color0*avg+color1*avg)*0.5;\r\n\tfloat4 colorB = saturate(color2*avg+color3*avg)*0.5;\r\n\t\r\n\t// finally add them all together\r\n\tOUT.Color = saturate(colorA+colorB);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 color0",
+      "rhs": "texRECT(baseMap0, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 color0 = texRECT(baseMap0, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 color1",
+      "rhs": "texRECT(baseMap1, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 color1 = texRECT(baseMap1, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 color2",
+      "rhs": "texRECT(baseMap2, IN.Tex2.xy)",
+      "textureSample": false,
+      "raw": "float4 color2 = texRECT(baseMap2, IN.Tex2.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 color3",
+      "rhs": "texRECT(baseMap3, IN.Tex3.xy)",
+      "textureSample": false,
+      "raw": "float4 color3 = texRECT(baseMap3, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 avg",
+      "rhs": "float4(0.5, 0.5, 0.5, 0.5)",
+      "textureSample": false,
+      "raw": "float4 avg= float4(0.5, 0.5, 0.5, 0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 colorA",
+      "rhs": "saturate(color0*avg+color1*avg)*0.5",
+      "textureSample": false,
+      "raw": "float4 colorA = saturate(color0*avg+color1*avg)*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 colorB",
+      "rhs": "saturate(color2*avg+color3*avg)*0.5",
+      "textureSample": false,
+      "raw": "float4 colorB = saturate(color2*avg+color3*avg)*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "saturate(colorA+colorB)",
+      "textureSample": false,
+      "raw": "OUT.Color = saturate(colorA+colorB);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2",
+    "TEXCOORD3_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 color0 = texRECT(baseMap0, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 color1 = texRECT(baseMap1, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 color2 = texRECT(baseMap2, IN.Tex2.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 color3 = texRECT(baseMap3, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 avg= float4(0.5, 0.5, 0.5, 0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 colorA = saturate(color0*avg+color1*avg)*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 colorB = saturate(color2*avg+color3*avg)*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = saturate(colorA+colorB)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4"
+  }
+}

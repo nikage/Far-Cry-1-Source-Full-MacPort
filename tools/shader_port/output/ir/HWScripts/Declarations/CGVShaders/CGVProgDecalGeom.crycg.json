@@ -1,0 +1,151 @@
+{
+  "name": "CGVProgDecalGeom",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgDecalGeom.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 Offset"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // Offset.x - Bias\r\n        float4 hPos = mul(ModelViewProj, vPos);\r\n        hPos.w = hPos.w + Offset.x;\r\n        OUT.HPosition = hPos;\r\n        OUT.Tex0.xy = IN.TexCoord0.xy;\r\n        OUT.Color = IN.Color;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "Offset.x - Bias",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 hPos",
+      "rhs": "mul(ModelViewProj, vPos)",
+      "textureSample": false,
+      "raw": "float4 hPos = mul(ModelViewProj, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "hPos.w",
+      "rhs": "hPos.w + Offset.x",
+      "textureSample": false,
+      "raw": "hPos.w = hPos.w + Offset.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.HPosition",
+      "rhs": "hPos",
+      "textureSample": false,
+      "raw": "OUT.HPosition = hPos;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "IN.Color",
+      "textureSample": false,
+      "raw": "OUT.Color = IN.Color;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 hPos = mul(ModelViewProj, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "hPos.w = hPos.w + Offset.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.HPosition = hPos",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = IN.Color",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Color": "float4"
+  }
+}

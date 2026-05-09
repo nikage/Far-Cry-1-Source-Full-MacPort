@@ -1,0 +1,350 @@
+{
+  "name": "CGVProgShadow_PartProj_Depth2_3Samples",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgShadow_PartProj_Depth2_3Samples.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4x4 TexGen0, uniform float4x4 TexGen1, uniform float4x4 TexGen2, uniform float2x4 ShadowModelMatr0, uniform float2x4 ShadowModelMatr1, uniform float2x4 ShadowModelMatr2, uniform float ShadowBias, LIGHT_POS, ATTEN, LIGHT_MATRIX"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_C0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3_2\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_T6_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex3.xy = IN.TexCoord0.xy;\r\n        OUT.Tex4 = mul(LightMatrix, vPos);\r\n        OUT.Color = IN.Color;\r\n        \r\n        OUT.Tex0 = mul(TexGen0, vPos);          \r\n        OUT.Tex1 = mul(TexGen1, vPos);          \r\n        OUT.Tex2 = mul(TexGen2, vPos);          \r\n\r\n        float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);\r\n        float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);\r\n        OUT.Tex5.x = fZ;\r\n        OUT.Tex5.y = fW;\r\n\r\n        fZ = dot(ShadowModelMatr1._11_12_13_14, vPos);\r\n        fW = dot(ShadowModelMatr1._21_22_23_24, vPos);\r\n        OUT.Tex5.z = fZ;\r\n        OUT.Tex5.w = fW;\r\n\r\n        fZ = dot(ShadowModelMatr2._11_12_13_14, vPos);\r\n        fW = dot(ShadowModelMatr2._21_22_23_24, vPos);\r\n        OUT.Tex6.x = fZ;\r\n        OUT.Tex6.y = fW;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex4",
+      "rhs": "mul(LightMatrix, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex4 = mul(LightMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "IN.Color",
+      "textureSample": false,
+      "raw": "OUT.Color = IN.Color;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0",
+      "rhs": "mul(TexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0 = mul(TexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1",
+      "rhs": "mul(TexGen1, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex1 = mul(TexGen1, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2",
+      "rhs": "mul(TexGen2, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex2 = mul(TexGen2, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fZ",
+      "rhs": "dot(ShadowModelMatr0._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fW",
+      "rhs": "dot(ShadowModelMatr0._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "float fW = dot(ShadowModelMatr0._21_22_23_24, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5.x",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.Tex5.x = fZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5.y",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.Tex5.y = fW;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fZ",
+      "rhs": "dot(ShadowModelMatr1._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "fZ = dot(ShadowModelMatr1._11_12_13_14, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fW",
+      "rhs": "dot(ShadowModelMatr1._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "fW = dot(ShadowModelMatr1._21_22_23_24, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5.z",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.Tex5.z = fZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex5.w",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.Tex5.w = fW;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fZ",
+      "rhs": "dot(ShadowModelMatr2._11_12_13_14, vPos)",
+      "textureSample": false,
+      "raw": "fZ = dot(ShadowModelMatr2._11_12_13_14, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fW",
+      "rhs": "dot(ShadowModelMatr2._21_22_23_24, vPos)",
+      "textureSample": false,
+      "raw": "fW = dot(ShadowModelMatr2._21_22_23_24, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex6.x",
+      "rhs": "fZ",
+      "textureSample": false,
+      "raw": "OUT.Tex6.x = fZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex6.y",
+      "rhs": "fW",
+      "textureSample": false,
+      "raw": "OUT.Tex6.y = fW;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex4 = mul(LightMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = IN.Color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0 = mul(TexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1 = mul(TexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2 = mul(TexGen2, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fZ = dot(ShadowModelMatr0._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fW = dot(ShadowModelMatr0._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5.x = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5.y = fW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fZ = dot(ShadowModelMatr1._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fW = dot(ShadowModelMatr1._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5.z = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex5.w = fW",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fZ = dot(ShadowModelMatr2._11_12_13_14, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fW = dot(ShadowModelMatr2._21_22_23_24, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex6.x = fZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex6.y = fW",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float2",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Tex6": "float2",
+    "Color": "float4"
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "name": "CGVProgSubSurface_pp",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgSubSurface_pp.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": "\r\n  POSITION_3\r\n  TEXCOORD0_2\r\n  TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n  VIEWPROJ_MATRIX,\r\n  LIGHT_POS,\r\n  CAMERA_POS,\r\n  ATTEN"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n    IN_TANG\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_T2\r\n    OUT_T3\r\n    OUT_C0    \r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  TANG_MATR\r\n  \r\n  // output texture coordinates\r\n  OUT.Tex0.xy = IN.TexCoord0.xy;\r\n  OUT.Tex1.xy = IN.TexCoord0.xy;\r\n  \r\n  // store normalized light vector\r\n  float3 lVec = LightPos.xyz - vPos.xyz;\r\n  float3 lightVec = mul(objToTangentSpace, lVec.xyz);\r\n\r\n  OUT.Tex2.xyz = lightVec;\r\n  \r\n  float fiSqDist = rsqrt(dot(lVec, lVec));\r\n  float fAtten = PROC_ATTENVERT;                        \r\n  // output attenuation\r\n  OUT.Color.xyz=fAtten;\r\n  OUT.Tex3.xyz=mul(objToTangentSpace,IN.TNormal.xyz);\r\n  \r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "statement",
+      "raw": "TANG_MATR",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output texture coordinates",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "store normalized light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lVec",
+      "rhs": "LightPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 lVec = LightPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lightVec",
+      "rhs": "mul(objToTangentSpace, lVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 lightVec = mul(objToTangentSpace, lVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "lightVec",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = lightVec;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fiSqDist",
+      "rhs": "rsqrt(dot(lVec, lVec))",
+      "textureSample": false,
+      "raw": "float fiSqDist = rsqrt(dot(lVec, lVec));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fAtten",
+      "rhs": "PROC_ATTENVERT",
+      "textureSample": false,
+      "raw": "float fAtten = PROC_ATTENVERT;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "output attenuation",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "fAtten",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz=fAtten;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex3.xyz",
+      "rhs": "mul(objToTangentSpace,IN.TNormal.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Tex3.xyz=mul(objToTangentSpace,IN.TNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "explicit",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "TANG_MATR",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lVec = LightPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lightVec = mul(objToTangentSpace, lVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = lightVec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fiSqDist = rsqrt(dot(lVec, lVec))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fAtten = PROC_ATTENVERT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz=fAtten",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex3.xyz=mul(objToTangentSpace,IN.TNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Color": "float4"
+  }
+}

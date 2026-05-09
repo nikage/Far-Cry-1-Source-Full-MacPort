@@ -1,0 +1,506 @@
+{
+  "name": "CGRCHeatSourcePass",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCHeatSourcePass.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "   \r\n#ifdef OPENGL  \r\n  uniform samplerRECT ScreenTexMask : texunit0,\r\n\tuniform samplerRECT ScreenTex : texunit1,\r\n#endif\r\n#ifdef D3D  \r\n  uniform sampler2D ScreenTexMask : texunit0,\r\n\tuniform sampler2D ScreenTex : texunit1,\r\n#endif\t\r\n\tuniform sampler2D HeatPaleteTex : texunit2,\t\r\n\tuniform float4 vHeatConstants"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\tstruct vertout\r\n\t{\r\n\t  OUT_T0\r\n\t  OUT_T1\r\n\t  OUT_T2\r\n\t};\r\n\r\n\tFOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\t// fetch textures\t\r\n#ifdef OPENGL\r\n  float4 vMaskColor = texRECT(ScreenTexMask, IN.Tex0.xy);\r\n\tfloat4 vScreenColor = texRECT(ScreenTex, IN.Tex1.xy);\r\n#endif\r\n#ifdef D3D\r\n  float4 vMaskColor = tex2D(ScreenTexMask, IN.Tex0.xy);\r\n  float4 vScreenColor = tex2D(ScreenTex, IN.Tex1.xy);\r\n#endif\r\n\tfloat4 vHeatColor = tex2D(HeatPaleteTex, vScreenColor.ar); \r\n\t\t\r\n  // heat decoding\r\n\tconst float4 vConstants=float4(0, 0, 0, 1);\t\t\t\t\t\t\t\r\n\t\t\t\t\t\r\n#ifdef OPENGL\r\n\t// 1st test: strong blue is used for main mask color detection\t\t\r\n\tfloat fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) );\r\n\r\n\t// 2nd test: check alpha mask\r\n\tfloat fColorB=4*vMaskColor.w;\r\n\r\n\tfloat3 fFinalMask=(fColorA<0.49)? vConstants.w: vHeatColor.xyz;\r\n\tfFinalMask=(fColorB<0.49)? fFinalMask: vConstants.w;\t\r\n\t\r\n#endif\r\n#ifdef D3D  \t\t\t\r\n\t// 1st test: strong blue is used for main mask color detection\t\t\r\n\tfloat fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) );\r\n\r\n\t// 2nd test: check alpha mask\r\n\tfloat fColorB=4*vMaskColor.w;\r\n\t\r\n\t// 0.49 previous\r\n\tfloat3 fFinalMask=(fColorA<0.48)? vConstants.w: vHeatColor.xyz;\r\n\tfFinalMask=(fColorB<0.48)? fFinalMask: vConstants.w;\t\t\t\t\t\t\r\n\r\n#endif\r\n\t\t\t\t\t\t\t\t\t\t\t\t\r\n\tOUT.Color.xyz =fFinalMask;\r\n\tOUT.Color.w = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "fetch textures",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vMaskColor",
+      "rhs": "texRECT(ScreenTexMask, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 vMaskColor = texRECT(ScreenTexMask, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vScreenColor",
+      "rhs": "texRECT(ScreenTex, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 vScreenColor = texRECT(ScreenTex, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vMaskColor",
+      "rhs": "tex2D(ScreenTexMask, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 vMaskColor = tex2D(ScreenTexMask, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vScreenColor",
+      "rhs": "tex2D(ScreenTex, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 vScreenColor = tex2D(ScreenTex, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vHeatColor",
+      "rhs": "tex2D(HeatPaleteTex, vScreenColor.ar)",
+      "textureSample": true,
+      "raw": "float4 vHeatColor = tex2D(HeatPaleteTex, vScreenColor.ar);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "heat decoding",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "const float4 vConstants",
+      "rhs": "float4(0, 0, 0, 1)",
+      "textureSample": false,
+      "raw": "const float4 vConstants=float4(0, 0, 0, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "1st test: strong blue is used for main mask color detection",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fColorA",
+      "rhs": "saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) )",
+      "textureSample": false,
+      "raw": "float fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) );",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "comment",
+      "value": "2nd test: check alpha mask",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fColorB",
+      "rhs": "4*vMaskColor.w",
+      "textureSample": false,
+      "raw": "float fColorB=4*vMaskColor.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fFinalMask",
+      "rhs": "(fColorA<0.49)? vConstants.w: vHeatColor.xyz",
+      "textureSample": false,
+      "raw": "float3 fFinalMask=(fColorA<0.49)? vConstants.w: vHeatColor.xyz;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "fFinalMask",
+      "rhs": "(fColorB<0.49)? fFinalMask: vConstants.w",
+      "textureSample": false,
+      "raw": "fFinalMask=(fColorB<0.49)? fFinalMask: vConstants.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "comment",
+      "value": "1st test: strong blue is used for main mask color detection",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fColorA",
+      "rhs": "saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) )",
+      "textureSample": false,
+      "raw": "float fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) );",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "2nd test: check alpha mask",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fColorB",
+      "rhs": "4*vMaskColor.w",
+      "textureSample": false,
+      "raw": "float fColorB=4*vMaskColor.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "0.49 previous",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 fFinalMask",
+      "rhs": "(fColorA<0.48)? vConstants.w: vHeatColor.xyz",
+      "textureSample": false,
+      "raw": "float3 fFinalMask=(fColorA<0.48)? vConstants.w: vHeatColor.xyz;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fFinalMask",
+      "rhs": "(fColorB<0.48)? fFinalMask: vConstants.w",
+      "textureSample": false,
+      "raw": "fFinalMask=(fColorB<0.48)? fFinalMask: vConstants.w;",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "fFinalMask",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz =fFinalMask;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vMaskColor = texRECT(ScreenTexMask, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vScreenColor = texRECT(ScreenTex, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vMaskColor = tex2D(ScreenTexMask, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vScreenColor = tex2D(ScreenTex, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vHeatColor = tex2D(HeatPaleteTex, vScreenColor.ar)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "const float4 vConstants=float4(0, 0, 0, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fColorB=4*vMaskColor.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fFinalMask=(fColorA<0.49)? vConstants.w: vHeatColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fFinalMask=(fColorB<0.49)? fFinalMask: vConstants.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fColorA=saturate(dot(vMaskColor.xyz, float3(0, 0.251, 0.251)) )",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fColorB=4*vMaskColor.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 fFinalMask=(fColorA<0.48)? vConstants.w: vHeatColor.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fFinalMask=(fColorB<0.48)? fFinalMask: vConstants.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz =fFinalMask",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4"
+  }
+}

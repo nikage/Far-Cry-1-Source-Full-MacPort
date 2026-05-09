@@ -1,0 +1,466 @@
+{
+  "name": "CGRCShadow_Depth2_3Samples_EnvLight",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCShadow_Depth2_3Samples_EnvLight.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D shadMap0 : register(s0),\r\n                  uniform sampler2D shadMap1 : register(s1),\r\n                  uniform sampler2D shadMap2 : register(s2),\r\n                  uniform sampler2D baseMap : register(s3),\r\n                  uniform float4 Ambient,\r\n                  uniform float4 Fading"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_T4\r\n          OUT_T5\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex3.xy);\r\n        // load the 3 shadow samples\r\n        float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);\r\n        float4 shadColor1 = tex2Dproj(shadMap1, IN.Tex1.xyzw);\r\n        float4 shadColor2 = tex2Dproj(shadMap2, IN.Tex2.xyzw);\r\n        float3 shad = (float3)0;\r\n        shad.x = shadColor0.r/8 + shadColor0.g;\r\n        shad.y = shadColor1.r/8 + shadColor1.g;\r\n        shad.z = shadColor2.r/8 + shadColor2.g;\r\n        float3 vZ;\r\n        vZ.x = IN.Tex4.x / IN.Tex4.y;\r\n        vZ.y = IN.Tex4.z / IN.Tex4.w;\r\n        vZ.z = IN.Tex5.x / IN.Tex5.y;\r\n        shad = shad - vZ;\r\n        float3 compare = step(shad, float3(0.0, 0.0, 0.0));\r\n        compare.xyz = compare.xyz * Fading.xyz;\r\n        compare.x = compare.x * shadColor0.a;\r\n        compare.y = compare.y * shadColor1.a;\r\n        compare.z = compare.z * shadColor2.a;\r\n        float fCompare = dot(compare, float3(1, 1, 1));\r\n        \r\n        float3 color = decalColor.xyz * IN.Color.xyz;\r\n        OUT.Color.xyz = color.xyz;\r\n        OUT.Color.a = fCompare;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex3.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the 3 shadow samples",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadColor0",
+      "rhs": "tex2Dproj(shadMap0, IN.Tex0.xyzw)",
+      "textureSample": true,
+      "raw": "float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadColor1",
+      "rhs": "tex2Dproj(shadMap1, IN.Tex1.xyzw)",
+      "textureSample": true,
+      "raw": "float4 shadColor1 = tex2Dproj(shadMap1, IN.Tex1.xyzw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadColor2",
+      "rhs": "tex2Dproj(shadMap2, IN.Tex2.xyzw)",
+      "textureSample": true,
+      "raw": "float4 shadColor2 = tex2Dproj(shadMap2, IN.Tex2.xyzw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 shad",
+      "rhs": "(float3)0",
+      "textureSample": false,
+      "raw": "float3 shad = (float3)0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad.x",
+      "rhs": "shadColor0.r/8 + shadColor0.g",
+      "textureSample": false,
+      "raw": "shad.x = shadColor0.r/8 + shadColor0.g;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad.y",
+      "rhs": "shadColor1.r/8 + shadColor1.g",
+      "textureSample": false,
+      "raw": "shad.y = shadColor1.r/8 + shadColor1.g;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad.z",
+      "rhs": "shadColor2.r/8 + shadColor2.g",
+      "textureSample": false,
+      "raw": "shad.z = shadColor2.r/8 + shadColor2.g;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float3 vZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vZ.x",
+      "rhs": "IN.Tex4.x / IN.Tex4.y",
+      "textureSample": false,
+      "raw": "vZ.x = IN.Tex4.x / IN.Tex4.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vZ.y",
+      "rhs": "IN.Tex4.z / IN.Tex4.w",
+      "textureSample": false,
+      "raw": "vZ.y = IN.Tex4.z / IN.Tex4.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vZ.z",
+      "rhs": "IN.Tex5.x / IN.Tex5.y",
+      "textureSample": false,
+      "raw": "vZ.z = IN.Tex5.x / IN.Tex5.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad",
+      "rhs": "shad - vZ",
+      "textureSample": false,
+      "raw": "shad = shad - vZ;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 compare",
+      "rhs": "step(shad, float3(0.0, 0.0, 0.0))",
+      "textureSample": false,
+      "raw": "float3 compare = step(shad, float3(0.0, 0.0, 0.0));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.xyz",
+      "rhs": "compare.xyz * Fading.xyz",
+      "textureSample": false,
+      "raw": "compare.xyz = compare.xyz * Fading.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.x",
+      "rhs": "compare.x * shadColor0.a",
+      "textureSample": false,
+      "raw": "compare.x = compare.x * shadColor0.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.y",
+      "rhs": "compare.y * shadColor1.a",
+      "textureSample": false,
+      "raw": "compare.y = compare.y * shadColor1.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.z",
+      "rhs": "compare.z * shadColor2.a",
+      "textureSample": false,
+      "raw": "compare.z = compare.z * shadColor2.a;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fCompare",
+      "rhs": "dot(compare, float3(1, 1, 1))",
+      "textureSample": false,
+      "raw": "float fCompare = dot(compare, float3(1, 1, 1));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 color",
+      "rhs": "decalColor.xyz * IN.Color.xyz",
+      "textureSample": false,
+      "raw": "float3 color = decalColor.xyz * IN.Color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "color.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = color.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "fCompare",
+      "textureSample": false,
+      "raw": "OUT.Color.a = fCompare;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_4",
+    "TEXCOORD1_4",
+    "TEXCOORD2_4",
+    "TEXCOORD3_2",
+    "TEXCOORD4_4",
+    "TEXCOORD5_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_4"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_4"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_4"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    },
+    {
+      "token": "Tex4",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 4,
+      "label": "TEXCOORD4_4"
+    },
+    {
+      "token": "Tex5",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 5,
+      "label": "TEXCOORD5_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadColor1 = tex2Dproj(shadMap1, IN.Tex1.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadColor2 = tex2Dproj(shadMap2, IN.Tex2.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 shad = (float3)0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad.x = shadColor0.r/8 + shadColor0.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad.y = shadColor1.r/8 + shadColor1.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad.z = shadColor2.r/8 + shadColor2.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vZ.x = IN.Tex4.x / IN.Tex4.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vZ.y = IN.Tex4.z / IN.Tex4.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vZ.z = IN.Tex5.x / IN.Tex5.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad = shad - vZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 compare = step(shad, float3(0.0, 0.0, 0.0))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.xyz = compare.xyz * Fading.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.x = compare.x * shadColor0.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.y = compare.y * shadColor1.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.z = compare.z * shadColor2.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fCompare = dot(compare, float3(1, 1, 1))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 color = decalColor.xyz * IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = fCompare",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Tex4": "float4",
+    "Tex5": "float4",
+    "Color": "float4"
+  }
+}

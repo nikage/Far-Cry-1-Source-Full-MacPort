@@ -105,6 +105,15 @@ List<String> findUnmatchedAliasTargets(
   return unmatched;
 }
 
+bool preferDuplicateIrPath(String candidateRelative, String incumbentRelative) {
+  final bool cHw = candidateRelative.contains('HWScripts/');
+  final bool iHw = incumbentRelative.contains('HWScripts/');
+  if (cHw != iHw) return cHw;
+  final int dc = candidateRelative.length.compareTo(incumbentRelative.length);
+  if (dc != 0) return dc > 0;
+  return candidateRelative.compareTo(incumbentRelative) < 0;
+}
+
 void main(List<String> args) {
   String? overridesPath;
   String rootArg = '';
@@ -150,7 +159,7 @@ void main(List<String> args) {
 
   // Pre-parse all IR JSON files so vertex and fragment shaders can be
   // processed in separate passes.
-  final List<({
+  List<({
     String relative,
     ShaderIrParseResult result,
     ShaderIrData data,
@@ -181,6 +190,24 @@ void main(List<String> args) {
       metalFileName: metalFileName,
     ));
   }
+
+  final Map<String, ({
+    String relative,
+    ShaderIrParseResult result,
+    ShaderIrData data,
+    String metalFileName,
+  })> dedupedByStageNorm = {};
+  for (final s in allShaders) {
+    final String key = '${s.data.stage}:${s.data.normalizedName}';
+    final existing = dedupedByStageNorm[key];
+    if (existing == null) {
+      dedupedByStageNorm[key] = s;
+    } else if (preferDuplicateIrPath(s.relative, existing.relative)) {
+      dedupedByStageNorm[key] = s;
+    }
+  }
+  allShaders = dedupedByStageNorm.values.toList()
+    ..sort((a, b) => a.relative.compareTo(b.relative));
 
   final List<Map<String, dynamic>> manifestEntries = [];
   int generated = 0;

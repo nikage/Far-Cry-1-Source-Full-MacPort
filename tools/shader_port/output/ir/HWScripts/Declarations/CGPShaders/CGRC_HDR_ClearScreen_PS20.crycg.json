@@ -1,0 +1,66 @@
+{
+  "name": "CGRC_HDR_ClearScreen_PS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRC_HDR_ClearScreen_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D baseMap : texunit0"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  OUT.Color = float4(0,0,0,1);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "float4(0,0,0,1)",
+      "textureSample": false,
+      "raw": "OUT.Color = float4(0,0,0,1);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = float4(0,0,0,1)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4"
+  }
+}

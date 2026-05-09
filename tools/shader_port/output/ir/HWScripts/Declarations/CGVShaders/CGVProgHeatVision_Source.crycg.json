@@ -1,0 +1,203 @@
+{
+  "name": "CGVProgHeatVision_Source",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgHeatVision_Source.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float3 CameraPos, uniform float4 Constants, uniform float3 Source0, uniform float4 Dist"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_C0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "PositionScript",
+      "content": "\r\n        float4 vNormal = normalize(IN.Normal);\r\n        float4 vPos;\r\n        float fFactor = length(IN.Position.xyz - Source0.xyz) * Dist.x;\r\n        fFactor = (1 / fFactor) / 8;\r\n        //fFactor = 1.5 - clamp(fFactor, 0, 1.5);\r\n        vPos.xyz = IN.Position.xyz + vNormal.xyz * Constants.x * clamp(fFactor, 0, 2);\r\n        vPos.w = IN.Position.w;\r\n        OUT.HPosition = mul(ModelViewProj, vPos);"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        float3 camVec = normalize(CameraPos.xyz - vPos.xyz);\r\n        float4 color = IN.Color;\r\n        float fDot = dot(camVec, vNormal.xyz) * fFactor;\r\n        color.w = fDot * Constants.y;\r\n        color.x = color.x * (fFactor * Constants.z);\r\n        OUT.Color = color;\r\n        OUT.Tex0.x = length(vPos.xyz - Source0.xyz) * Dist.x;\r\n        OUT.Tex0.y = 1.0f;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "float3 camVec",
+      "rhs": "normalize(CameraPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 camVec = normalize(CameraPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 color",
+      "rhs": "IN.Color",
+      "textureSample": false,
+      "raw": "float4 color = IN.Color;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDot",
+      "rhs": "dot(camVec, vNormal.xyz) * fFactor",
+      "textureSample": false,
+      "raw": "float fDot = dot(camVec, vNormal.xyz) * fFactor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.w",
+      "rhs": "fDot * Constants.y",
+      "textureSample": false,
+      "raw": "color.w = fDot * Constants.y;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "color.x",
+      "rhs": "color.x * (fFactor * Constants.z)",
+      "textureSample": false,
+      "raw": "color.x = color.x * (fFactor * Constants.z);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "color",
+      "textureSample": false,
+      "raw": "OUT.Color = color;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "length(vPos.xyz - Source0.xyz) * Dist.x",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = length(vPos.xyz - Source0.xyz) * Dist.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "1.0f",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = 1.0f;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 camVec = normalize(CameraPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 color = IN.Color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDot = dot(camVec, vNormal.xyz) * fFactor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.w = fDot * Constants.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "color.x = color.x * (fFactor * Constants.z)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = color",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = length(vPos.xyz - Source0.xyz) * Dist.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = 1.0f",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [
+    {
+      "name": "",
+      "content": "\r\n        float4 vNormal = normalize(IN.Normal);\r\n        float4 vPos;\r\n        float fFactor = length(IN.Position.xyz - Source0.xyz) * Dist.x;\r\n        fFactor = (1 / fFactor) / 8;\r\n        //fFactor = 1.5 - clamp(fFactor, 0, 1.5);\r\n        vPos.xyz = IN.Position.xyz + vNormal.xyz * Constants.x * clamp(fFactor, 0, 2);\r\n        vPos.w = IN.Position.w;\r\n        OUT.HPosition = mul(ModelViewProj, vPos);"
+    }
+  ],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Color": "float4"
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "name": "CGVProgWater2_VS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgWater2_VS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 NORMAL_3 PRIM_COLOR"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, CAMERA_POS, uniform float4 Scale"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xyz = vPos.xyz * Scale.xyz;\r\n        OUT.Tex1.xyz = IN.Normal.xyz;\r\n        OUT.Tex2.xyz = vPos.xyz - CameraPos.xyz;\r\n        OUT.Color = IN.Color;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xyz",
+      "rhs": "vPos.xyz * Scale.xyz",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xyz = vPos.xyz * Scale.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xyz",
+      "rhs": "IN.Normal.xyz",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xyz = IN.Normal.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xyz",
+      "rhs": "vPos.xyz - CameraPos.xyz",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xyz = vPos.xyz - CameraPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "IN.Color",
+      "textureSample": false,
+      "raw": "OUT.Color = IN.Color;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "NORMAL_3",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "semantic": "COLOR",
+      "components": 4,
+      "category": "color",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xyz = vPos.xyz * Scale.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xyz = IN.Normal.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xyz = vPos.xyz - CameraPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = IN.Color",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Color": "float4"
+  }
+}

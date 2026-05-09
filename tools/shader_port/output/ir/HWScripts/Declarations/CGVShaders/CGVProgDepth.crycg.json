@@ -1,0 +1,94 @@
+{
+  "name": "CGVProgDepth",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgDepth.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TNORMAL_3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 Offset"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_TANG\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        vPos.xyz = vPos.xyz + IN.TNormal.xyz * Offset.x;\r\n        OUT.Tex0.xy = dot(ModelViewProj._31_32_33_34, vPos) / dot(ModelViewProj._41_42_43_44, vPos);"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "vPos.xyz",
+      "rhs": "vPos.xyz + IN.TNormal.xyz * Offset.x",
+      "textureSample": false,
+      "raw": "vPos.xyz = vPos.xyz + IN.TNormal.xyz * Offset.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "dot(ModelViewProj._31_32_33_34, vPos) / dot(ModelViewProj._41_42_43_44, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = dot(ModelViewProj._31_32_33_34, vPos) / dot(ModelViewProj._41_42_43_44, vPos);",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "derived",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vPos.xyz = vPos.xyz + IN.TNormal.xyz * Offset.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = dot(ModelViewProj._31_32_33_34, vPos) / dot(ModelViewProj._41_42_43_44, vPos)",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2"
+  }
+}

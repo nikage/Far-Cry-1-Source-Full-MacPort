@@ -1,0 +1,222 @@
+{
+  "name": "CGRCHologram",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCHologram.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D tableMap : texunit0,\r\n            uniform sampler2D decalMap : texunit1,\r\n            uniform sampler2D noiseMap : texunit2"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1\r\n    OUT_T2\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  // load colors\r\n  float4 tableColor = tex2D(tableMap, IN.Tex0.xy);                \r\n  float4 decalColor = tex2D(decalMap, IN.Tex1.xy);                \r\n  float4 noiseColor = tex2D(noiseMap, IN.Tex2.xy);                \r\n              \r\n  float fLum = 2*dot(float3(0.5, 0.5, 0.5), decalColor.xyz);\r\n  float fNoiseLum= 2*dot(float3(0.33, 0.59, 0.11), noiseColor.xyz);\r\n  fNoiseLum*=fNoiseLum;\r\n  fNoiseLum*=fNoiseLum*0.5;\r\n          \r\n  OUT.Color.xyz = HDREncode(tableColor*fLum*fNoiseLum); \r\n  OUT.Color.w= 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load colors",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 tableColor",
+      "rhs": "tex2D(tableMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 tableColor = tex2D(tableMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(decalMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(decalMap, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 noiseColor",
+      "rhs": "tex2D(noiseMap, IN.Tex2.xy)",
+      "textureSample": true,
+      "raw": "float4 noiseColor = tex2D(noiseMap, IN.Tex2.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fLum",
+      "rhs": "2*dot(float3(0.5, 0.5, 0.5), decalColor.xyz)",
+      "textureSample": false,
+      "raw": "float fLum = 2*dot(float3(0.5, 0.5, 0.5), decalColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fNoiseLum",
+      "rhs": "2*dot(float3(0.33, 0.59, 0.11), noiseColor.xyz)",
+      "textureSample": false,
+      "raw": "float fNoiseLum= 2*dot(float3(0.33, 0.59, 0.11), noiseColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fNoiseLum*",
+      "rhs": "fNoiseLum",
+      "textureSample": false,
+      "raw": "fNoiseLum*=fNoiseLum;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fNoiseLum*",
+      "rhs": "fNoiseLum*0.5",
+      "textureSample": false,
+      "raw": "fNoiseLum*=fNoiseLum*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDREncode(tableColor*fLum*fNoiseLum)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDREncode(tableColor*fLum*fNoiseLum);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w= 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 tableColor = tex2D(tableMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(decalMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 noiseColor = tex2D(noiseMap, IN.Tex2.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fLum = 2*dot(float3(0.5, 0.5, 0.5), decalColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fNoiseLum= 2*dot(float3(0.33, 0.59, 0.11), noiseColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fNoiseLum*=fNoiseLum",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fNoiseLum*=fNoiseLum*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDREncode(tableColor*fLum*fNoiseLum)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w= 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4"
+  }
+}

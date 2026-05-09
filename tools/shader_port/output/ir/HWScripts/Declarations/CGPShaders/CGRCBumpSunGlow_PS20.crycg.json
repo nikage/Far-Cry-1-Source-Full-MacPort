@@ -1,0 +1,305 @@
+{
+  "name": "CGRCBumpSunGlow_PS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCBumpSunGlow_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : texunit0,\r\n\t                uniform float4 Specular,\r\n\t                uniform float4 BumpAmount"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the bump normal\r\n        FLOAT4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);\r\n\r\n        // normalize post-filtered bump normals\r\n        bumpNormal.xyz *= BumpAmount.xyz;\r\n        bumpNormal.xyz = normalize(bumpNormal.xyz);\r\n        \r\n        // normalize light vector\r\n        FLOAT3 lightVec = normalize(IN.Tex1.xyz);\r\n\r\n        // normalize view vector\r\n        FLOAT3 viewVec = normalize(IN.Tex2.xyz);\r\n        FLOAT3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;\r\n        FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));\r\n        FLOAT fSpec = pow(NdotR, Specular.w);\r\n\r\n        FLOAT fFade = IN.Color.w;\r\n        FLOAT3 spec = HDREncode(fSpec * Specular.xyz * fFade) * 2;\r\n        \r\n        // finally add them all together\r\n        OUT.Color.xyz = spec.xyz;\r\n        OUT.Color.w = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex0.xy)-0.5)",
+      "textureSample": true,
+      "raw": "FLOAT4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize post-filtered bump normals",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal.xyz *",
+      "rhs": "BumpAmount.xyz",
+      "textureSample": false,
+      "raw": "bumpNormal.xyz *= BumpAmount.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "bumpNormal.xyz",
+      "rhs": "normalize(bumpNormal.xyz)",
+      "textureSample": false,
+      "raw": "bumpNormal.xyz = normalize(bumpNormal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 lightVec",
+      "rhs": "normalize(IN.Tex1.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 lightVec = normalize(IN.Tex1.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 viewVec",
+      "rhs": "normalize(IN.Tex2.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 viewVec = normalize(IN.Tex2.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 reflVec",
+      "rhs": "(2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT NdotR",
+      "rhs": "saturate(dot(reflVec.xyz, viewVec.xyz))",
+      "textureSample": false,
+      "raw": "FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fSpec",
+      "rhs": "pow(NdotR, Specular.w)",
+      "textureSample": false,
+      "raw": "FLOAT fSpec = pow(NdotR, Specular.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fFade",
+      "rhs": "IN.Color.w",
+      "textureSample": false,
+      "raw": "FLOAT fFade = IN.Color.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 spec",
+      "rhs": "HDREncode(fSpec * Specular.xyz * fFade) * 2",
+      "textureSample": false,
+      "raw": "FLOAT3 spec = HDREncode(fSpec * Specular.xyz * fFade) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "spec.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = spec.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.w = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_3",
+    "TEXCOORD2_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_3"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal.xyz *= BumpAmount.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "bumpNormal.xyz = normalize(bumpNormal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 lightVec = normalize(IN.Tex1.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 viewVec = normalize(IN.Tex2.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 reflVec = (2*dot(lightVec.xyz, bumpNormal.xyz)*bumpNormal.xyz)-lightVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT NdotR = saturate(dot(reflVec.xyz, viewVec.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fSpec = pow(NdotR, Specular.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fFade = IN.Color.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 spec = HDREncode(fSpec * Specular.xyz * fFade) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = spec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Color": "float4"
+  }
+}

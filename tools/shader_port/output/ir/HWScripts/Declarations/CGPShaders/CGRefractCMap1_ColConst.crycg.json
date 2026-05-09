@@ -1,0 +1,299 @@
+{
+  "name": "CGRefractCMap1_ColConst",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRefractCMap1_ColConst.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : register(s0),\r\n                  uniform samplerCUBE envMap : register(s3),\r\n                  uniform float4 RefrAmount,\r\n                  uniform float4 Ambient"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);\r\n# ifdef _PS_1_1\r\n        float4 env = texCUBE_dp3x3(envMap, IN.Tex3.xyz, IN.Tex1, IN.Tex2, bumpColor);\r\n# else\r\n        float3 newst = float3(dot(IN.Tex1.xyz, bumpColor.xyz),\r\n                              dot(IN.Tex2.xyz, bumpColor.xyz),\r\n                              dot(IN.Tex3.xyz, bumpColor.xyz));\r\n        float4 env = texCUBE(envMap, newst);\r\n# endif                \r\n        float3 vColor = HDREncodeAmb(env.xyz * IN.Color.xyz * RefrAmount.a);\r\n        OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);\r\n        OUT.Color.a = IN.Color.a * Ambient.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpColor",
+      "rhs": "tex2D(bumpMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 env",
+      "rhs": "texCUBE_dp3x3(envMap, IN.Tex3.xyz, IN.Tex1, IN.Tex2, bumpColor)",
+      "textureSample": true,
+      "raw": "float4 env = texCUBE_dp3x3(envMap, IN.Tex3.xyz, IN.Tex1, IN.Tex2, bumpColor);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "_PS_1_1",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 newst",
+      "rhs": "float3(dot(IN.Tex1.xyz, bumpColor.xyz),",
+      "textureSample": false,
+      "raw": "float3 newst = float3(dot(IN.Tex1.xyz, bumpColor.xyz),",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "dot(IN.Tex2.xyz, bumpColor.xyz),",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "dot(IN.Tex3.xyz, bumpColor.xyz));",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 env",
+      "rhs": "texCUBE(envMap, newst)",
+      "textureSample": true,
+      "raw": "float4 env = texCUBE(envMap, newst);",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vColor",
+      "rhs": "HDREncodeAmb(env.xyz * IN.Color.xyz * RefrAmount.a)",
+      "textureSample": false,
+      "raw": "float3 vColor = HDREncodeAmb(env.xyz * IN.Color.xyz * RefrAmount.a);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "IN.Color.a * Ambient.a",
+      "textureSample": false,
+      "raw": "OUT.Color.a = IN.Color.a * Ambient.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2",
+    "TEXCOORD2_2",
+    "TEXCOORD3_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_2"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpColor = tex2D(bumpMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# ifdef _PS_1_1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 env = texCUBE_dp3x3(envMap, IN.Tex3.xyz, IN.Tex1, IN.Tex2, bumpColor)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 newst = float3(dot(IN.Tex1.xyz, bumpColor.xyz),",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dot(IN.Tex2.xyz, bumpColor.xyz),",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dot(IN.Tex3.xyz, bumpColor.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 env = texCUBE(envMap, newst)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "# endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vColor = HDREncodeAmb(env.xyz * IN.Color.xyz * RefrAmount.a)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDRFogBlend(vColor.xyz, IN.Color1.w, GlobalFogColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = IN.Color.a * Ambient.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "_PS_1_1"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}

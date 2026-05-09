@@ -1,0 +1,2477 @@
+{
+  "name": "CGRCShadowTempl",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCShadowTempl.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n        uniform sampler2D shadMap0 : register(sn),\r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n        uniform sampler2D shadMap1 : register(sn),\r\n#endif        \r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n        uniform sampler2D shadMap2 : register(sn),\r\n#endif        \r\n        uniform sampler2D baseMap : register(sn),\r\n#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n        uniform sampler2D bumpMap : register(sn),\r\n#endif\r\n        uniform float4 Ambient,\r\n        uniform float4 Fading,\r\n#if %ENVCMAMB\r\n        uniform float4 Reflect,\r\n        uniform samplerCUBE envMap : register(sn),\r\n #if %ENVCM_MASKED\r\n        uniform sampler2D glossMap : register(sn),\r\n #endif  \r\n#endif\r\n#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n        uniform float4 BumpOffset,\r\n#endif"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        // define outputs from vertex shader\r\n        struct vertout\r\n        {\r\n          float4 HPosition  : POSITION;\r\n          float4 shadTC0     : TEXCOORDN;\r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n          float4 shadTC1     : TEXCOORDN;\r\n#endif\r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n          float4 shadTC2     : TEXCOORDN;\r\n#endif\r\n          float4 baseTC      : TEXCOORDN;\r\n\r\n#if %PERPIXEL_SHADOWMAP\r\n          float4 viewVec     : TEXCOORDN;\r\n          float4 Tangent     : TEXCOORDN;\r\n          float4 Binormal    : TEXCOORDN;\r\n#elif %OFFSETBUMPMAPPING\r\n          float4 viewVec     : TEXCOORDN;\r\n#endif\r\n\r\n#if %TEMP_MIXED_MAP\r\n          float4 depthTC0    : TEXCOORDN;\r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n          float4 depthTC1    : TEXCOORDN;\r\n    #endif\r\n          float4 lightVec    : TEXCOORDN;\r\n#endif\r\n\r\n#ifdef D3D\r\n  #if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20\r\n          float4 WTC         : TEXCOORDN;\r\n  #endif\r\n#endif\r\n          float4 Color      : COLOR0;\r\n\r\n#if %ENVCMAMB\r\n          float4 envTC      : TEXCOORDN;\r\n#endif\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        FLOAT3 shad = (float3)0;\r\n        FLOAT3 compare = (float3)0;\r\n   \r\n        float2 baseTC = IN.baseTC.xy;\r\n\r\n      \tfloat4 shadTC0 = IN.shadTC0;\r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n      \tfloat4 shadTC1 = IN.shadTC1;\r\n#endif\r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n      \tfloat4 shadTC2 = IN.shadTC2;\r\n#endif\r\n        \r\n#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING\r\n        // load the bump normals\r\n        FLOAT height = tex2D(bumpMap, IN.baseTC.xy).a * 2 - 1;\r\n        height *= BumpOffset.x;\r\n        FLOAT3 viewVec = normalize(IN.viewVec.xyz);\r\n        FLOAT3 offs = height;\r\n      \tfloat2 tcOffs;\r\n   #if %OFFSETBUMPMAPPING\r\n        baseTC += height * viewVec.xyz;\r\n   #endif\r\n   #if %PERPIXEL_SHADOWMAP\r\n      \ttcOffs.x = dot(offs, IN.Binormal.xyz) * 0.5;\r\n      \ttcOffs.y = dot(offs, IN.Tangent.xyz)  * 0.5;\r\n      \t\r\n        shadTC0.xy += tcOffs.xy * shadTC0.zw; \r\n     #if %TEMP_SHAD_SAMPLEMASK1\r\n        shadTC1.xy += tcOffs.xy * shadTC1.zw; \r\n     #endif\r\n     #if %TEMP_SHAD_SAMPLEMASK2\r\n        shadTC2.xy += tcOffs.xy * shadTC2.zw; \r\n     #endif\r\n   #endif\r\n#endif\r\n        // load the decal\r\n        FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);\r\n\r\n        // load the shadow samples\r\n        FLOAT4 shadColor0 = tex2Dproj(shadMap0, shadTC0.xyzw);\r\n\r\n        FLOAT fFadePerPix = 1;\r\n               \r\n#if %TEMP_MIXED_MAP\r\n        shad.x = shadColor0.r/8 + shadColor0.g;\r\n        fFadePerPix = saturate(2 - 2*saturate(length(IN.lightVec.xyz) * Fading.w));\r\n#endif        \r\n        \r\n#if %TEMP_SHAD_SAMPLEMASK1\r\n        FLOAT4 shadColor1 = tex2Dproj(shadMap1, shadTC1.xyzw);\r\n        shad.y = shadColor1.r/8 + shadColor1.g;\r\n#endif        \r\n#if %TEMP_SHAD_SAMPLEMASK2\r\n        FLOAT4 shadColor2 = tex2Dproj(shadMap2, shadTC2.xyzw);\r\n        shad.z = shadColor2.r/8 + shadColor2.g;\r\n#endif        \r\n#if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20\r\n    // Using NVidia Depth textures\r\n  #ifdef D3D\r\n        compare.x = (IN.WTC.z>0.5)?1-shadColor0.b:0;\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        compare.y = (IN.WTC.y>0.5)?1-shadColor1.b:0;\r\n    #endif        \r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        compare.z = (IN.WTC.x>0.5)?1-shadColor2.b:0;\r\n    #endif        \r\n  #endif\r\n  #ifdef OTHER\r\n        compare.x = 1-shadColor0.b;\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        compare.y = 1-shadColor1.b;\r\n    #endif        \r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        compare.z = 1-shadColor2.b;\r\n    #endif        \r\n  #endif\r\n        compare.xyz = compare.xyz * Fading.xyz;\r\n#elif %TEMP_MIXED_MAP\r\n            \r\n  // Using PS2.0 Z-Comparing (mixed 2D/Depth technique)\r\n        FLOAT3 vZ = (float3)0;\r\n        vZ.x = IN.depthTC0.x / IN.depthTC0.y;\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        vZ.y = IN.depthTC0.z / IN.depthTC0.w;\r\n    #endif        \r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        vZ.z = IN.depthTC1.x / IN.depthTC1.y;\r\n    #endif\r\n        shad = shad - vZ;\r\n        //compare = step(shad, float3(0.0, 0.0, 0.0));\r\n        compare = saturate(-shad*300);\r\n        compare.xyz = compare.xyz * Fading.xyz;\r\n        compare.x = compare.x * shadColor0.a;\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        compare.y = compare.y * shadColor1.a;\r\n    #endif\r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        compare.z = compare.z * shadColor2.a;\r\n    #endif\r\n#else\r\n  // Using 2D shadow maps (simplest technique)\r\n        compare.x = shadColor0.a;\r\n    #if %TEMP_SHAD_SAMPLEMASK1\r\n        compare.y = shadColor1.a;\r\n    #endif\r\n    #if %TEMP_SHAD_SAMPLEMASK2\r\n        compare.z = shadColor2.a;\r\n    #endif\r\n        compare.xyz = compare.xyz * Fading.xyz * fFadePerPix;\r\n#endif\r\n\r\n        FLOAT fCompare = saturate(dot(compare, float3(1, 1, 1)));\r\n\r\n#if %TEMP_MIXED_MAP\r\n        fCompare *= fFadePerPix;\r\n#endif\r\n        \r\n#if %TEMP_ENVLIGHT\r\n        FLOAT3 amb = decalColor.xyz * IN.Color.xyz;\r\n#elif %ENVCMAMB\r\n        // load the environment map\r\n        FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);\r\n        FLOAT fLerp = Reflect.a;\r\n  #if %ENVCM_MASKED\r\n        // load the gloss\r\n        fLerp *= tex2D(glossMap, IN.baseTC.zw).a;\r\n  #endif\r\n        FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);\r\n#else        \r\n        FLOAT3 amb = decalColor.xyz * Ambient.xyz;\r\n#endif        \r\n        amb = HDREncodeAmb(amb);\r\n        \r\n        OUT.Color.xyz = HDRFogBlend(amb.xyz, IN.Color.w, GlobalFogColor.xyz);\r\n        OUT.Color.a = fCompare;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 shad",
+      "rhs": "(float3)0",
+      "textureSample": false,
+      "raw": "FLOAT3 shad = (float3)0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 compare",
+      "rhs": "(float3)0",
+      "textureSample": false,
+      "raw": "FLOAT3 compare = (float3)0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 baseTC",
+      "rhs": "IN.baseTC.xy",
+      "textureSample": false,
+      "raw": "float2 baseTC = IN.baseTC.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadTC0",
+      "rhs": "IN.shadTC0",
+      "textureSample": false,
+      "raw": "float4 shadTC0 = IN.shadTC0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadTC1",
+      "rhs": "IN.shadTC1",
+      "textureSample": false,
+      "raw": "float4 shadTC1 = IN.shadTC1;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 shadTC2",
+      "rhs": "IN.shadTC2",
+      "textureSample": false,
+      "raw": "float4 shadTC2 = IN.shadTC2;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normals",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT height",
+      "rhs": "tex2D(bumpMap, IN.baseTC.xy).a * 2 - 1",
+      "textureSample": true,
+      "raw": "FLOAT height = tex2D(bumpMap, IN.baseTC.xy).a * 2 - 1;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "height *",
+      "rhs": "BumpOffset.x",
+      "textureSample": false,
+      "raw": "height *= BumpOffset.x;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 viewVec",
+      "rhs": "normalize(IN.viewVec.xyz)",
+      "textureSample": false,
+      "raw": "FLOAT3 viewVec = normalize(IN.viewVec.xyz);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 offs",
+      "rhs": "height",
+      "textureSample": false,
+      "raw": "FLOAT3 offs = height;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "statement",
+      "raw": "float2 tcOffs;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %OFFSETBUMPMAPPING",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "baseTC +",
+      "rhs": "height * viewVec.xyz",
+      "textureSample": false,
+      "raw": "baseTC += height * viewVec.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %PERPIXEL_SHADOWMAP",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tcOffs.x",
+      "rhs": "dot(offs, IN.Binormal.xyz) * 0.5",
+      "textureSample": false,
+      "raw": "tcOffs.x = dot(offs, IN.Binormal.xyz) * 0.5;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "tcOffs.y",
+      "rhs": "dot(offs, IN.Tangent.xyz)  * 0.5",
+      "textureSample": false,
+      "raw": "tcOffs.y = dot(offs, IN.Tangent.xyz)  * 0.5;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "shadTC0.xy +",
+      "rhs": "tcOffs.xy * shadTC0.zw",
+      "textureSample": false,
+      "raw": "shadTC0.xy += tcOffs.xy * shadTC0.zw;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shadTC1.xy +",
+      "rhs": "tcOffs.xy * shadTC1.zw",
+      "textureSample": false,
+      "raw": "shadTC1.xy += tcOffs.xy * shadTC1.zw;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shadTC2.xy +",
+      "rhs": "tcOffs.xy * shadTC2.zw",
+      "textureSample": false,
+      "raw": "shadTC2.xy += tcOffs.xy * shadTC2.zw;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 decalColor",
+      "rhs": "tex2D(baseMap, baseTC.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 decalColor = tex2D(baseMap, baseTC.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the shadow samples",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 shadColor0",
+      "rhs": "tex2Dproj(shadMap0, shadTC0.xyzw)",
+      "textureSample": true,
+      "raw": "FLOAT4 shadColor0 = tex2Dproj(shadMap0, shadTC0.xyzw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fFadePerPix",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "FLOAT fFadePerPix = 1;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_MIXED_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad.x",
+      "rhs": "shadColor0.r/8 + shadColor0.g",
+      "textureSample": false,
+      "raw": "shad.x = shadColor0.r/8 + shadColor0.g;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fFadePerPix",
+      "rhs": "saturate(2 - 2*saturate(length(IN.lightVec.xyz) * Fading.w))",
+      "textureSample": false,
+      "raw": "fFadePerPix = saturate(2 - 2*saturate(length(IN.lightVec.xyz) * Fading.w));",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 shadColor1",
+      "rhs": "tex2Dproj(shadMap1, shadTC1.xyzw)",
+      "textureSample": true,
+      "raw": "FLOAT4 shadColor1 = tex2Dproj(shadMap1, shadTC1.xyzw);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad.y",
+      "rhs": "shadColor1.r/8 + shadColor1.g",
+      "textureSample": false,
+      "raw": "shad.y = shadColor1.r/8 + shadColor1.g;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 shadColor2",
+      "rhs": "tex2Dproj(shadMap2, shadTC2.xyzw)",
+      "textureSample": true,
+      "raw": "FLOAT4 shadColor2 = tex2Dproj(shadMap2, shadTC2.xyzw);",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad.z",
+      "rhs": "shadColor2.r/8 + shadColor2.g",
+      "textureSample": false,
+      "raw": "shad.z = shadColor2.r/8 + shadColor2.g;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Using NVidia Depth textures",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.x",
+      "rhs": "(IN.WTC.z>0.5)?1-shadColor0.b:0",
+      "textureSample": false,
+      "raw": "compare.x = (IN.WTC.z>0.5)?1-shadColor0.b:0;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.y",
+      "rhs": "(IN.WTC.y>0.5)?1-shadColor1.b:0",
+      "textureSample": false,
+      "raw": "compare.y = (IN.WTC.y>0.5)?1-shadColor1.b:0;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.z",
+      "rhs": "(IN.WTC.x>0.5)?1-shadColor2.b:0",
+      "textureSample": false,
+      "raw": "compare.z = (IN.WTC.x>0.5)?1-shadColor2.b:0;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#ifdef OTHER",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.x",
+      "rhs": "1-shadColor0.b",
+      "textureSample": false,
+      "raw": "compare.x = 1-shadColor0.b;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.y",
+      "rhs": "1-shadColor1.b",
+      "textureSample": false,
+      "raw": "compare.y = 1-shadColor1.b;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.z",
+      "rhs": "1-shadColor2.b",
+      "textureSample": false,
+      "raw": "compare.z = 1-shadColor2.b;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        },
+        {
+          "directive": "#ifdef",
+          "expression": "OTHER",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.xyz",
+      "rhs": "compare.xyz * Fading.xyz",
+      "textureSample": false,
+      "raw": "compare.xyz = compare.xyz * Fading.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %TEMP_MIXED_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Using PS2.0 Z-Comparing (mixed 2D/Depth technique)",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 vZ",
+      "rhs": "(float3)0",
+      "textureSample": false,
+      "raw": "FLOAT3 vZ = (float3)0;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "vZ.x",
+      "rhs": "IN.depthTC0.x / IN.depthTC0.y",
+      "textureSample": false,
+      "raw": "vZ.x = IN.depthTC0.x / IN.depthTC0.y;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vZ.y",
+      "rhs": "IN.depthTC0.z / IN.depthTC0.w",
+      "textureSample": false,
+      "raw": "vZ.y = IN.depthTC0.z / IN.depthTC0.w;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vZ.z",
+      "rhs": "IN.depthTC1.x / IN.depthTC1.y",
+      "textureSample": false,
+      "raw": "vZ.z = IN.depthTC1.x / IN.depthTC1.y;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "shad",
+      "rhs": "shad - vZ",
+      "textureSample": false,
+      "raw": "shad = shad - vZ;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "comment",
+      "value": "compare = step(shad, float3(0.0, 0.0, 0.0));",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare",
+      "rhs": "saturate(-shad*300)",
+      "textureSample": false,
+      "raw": "compare = saturate(-shad*300);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.xyz",
+      "rhs": "compare.xyz * Fading.xyz",
+      "textureSample": false,
+      "raw": "compare.xyz = compare.xyz * Fading.xyz;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.x",
+      "rhs": "compare.x * shadColor0.a",
+      "textureSample": false,
+      "raw": "compare.x = compare.x * shadColor0.a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.y",
+      "rhs": "compare.y * shadColor1.a",
+      "textureSample": false,
+      "raw": "compare.y = compare.y * shadColor1.a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.z",
+      "rhs": "compare.z * shadColor2.a",
+      "textureSample": false,
+      "raw": "compare.z = compare.z * shadColor2.a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Using 2D shadow maps (simplest technique)",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.x",
+      "rhs": "shadColor0.a",
+      "textureSample": false,
+      "raw": "compare.x = shadColor0.a;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.y",
+      "rhs": "shadColor1.a",
+      "textureSample": false,
+      "raw": "compare.y = shadColor1.a;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK1",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.z",
+      "rhs": "shadColor2.a",
+      "textureSample": false,
+      "raw": "compare.z = shadColor2.a;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%TEMP_SHAD_SAMPLEMASK2",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "compare.xyz",
+      "rhs": "compare.xyz * Fading.xyz * fFadePerPix",
+      "textureSample": false,
+      "raw": "compare.xyz = compare.xyz * Fading.xyz * fFadePerPix;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fCompare",
+      "rhs": "saturate(dot(compare, float3(1, 1, 1)))",
+      "textureSample": false,
+      "raw": "FLOAT fCompare = saturate(dot(compare, float3(1, 1, 1)));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_MIXED_MAP",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fCompare *",
+      "rhs": "fFadePerPix",
+      "textureSample": false,
+      "raw": "fCompare *= fFadePerPix;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_MIXED_MAP",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "directive",
+      "raw": "#if %TEMP_ENVLIGHT",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "decalColor.xyz * IN.Color.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = decalColor.xyz * IN.Color.xyz;",
+      "guards": [
+        {
+          "directive": "#if",
+          "expression": "%TEMP_ENVLIGHT",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#elif %ENVCMAMB",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the environment map",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 envColor",
+      "rhs": "texCUBE(envMap, IN.envTC.xyz)",
+      "textureSample": true,
+      "raw": "FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fLerp",
+      "rhs": "Reflect.a",
+      "textureSample": false,
+      "raw": "FLOAT fLerp = Reflect.a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#if %ENVCM_MASKED",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the gloss",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "assignment",
+      "lhs": "fLerp *",
+      "rhs": "tex2D(glossMap, IN.baseTC.zw).a",
+      "textureSample": true,
+      "raw": "fLerp *= tex2D(glossMap, IN.baseTC.zw).a;",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        },
+        {
+          "directive": "#if",
+          "expression": "%ENVCM_MASKED",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp)",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp);",
+      "guards": [
+        {
+          "directive": "#elif",
+          "expression": "%ENVCMAMB",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#else",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "decalColor.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = decalColor.xyz * Ambient.xyz;",
+      "guards": [
+        {
+          "directive": "#else",
+          "expression": "else",
+          "state": "unknown"
+        }
+      ],
+      "active": null
+    },
+    {
+      "type": "directive",
+      "raw": "#endif",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "amb",
+      "rhs": "HDREncodeAmb(amb)",
+      "textureSample": false,
+      "raw": "amb = HDREncodeAmb(amb);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "HDRFogBlend(amb.xyz, IN.Color.w, GlobalFogColor.xyz)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = HDRFogBlend(amb.xyz, IN.Color.w, GlobalFogColor.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "fCompare",
+      "textureSample": false,
+      "raw": "OUT.Color.a = fCompare;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "COLOR_4",
+    "POSITION_3",
+    "TANGENT_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "Color",
+      "semantic": "COLOR0",
+      "components": 4,
+      "category": "color",
+      "source": "declaration"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tangent",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "WTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "baseTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "depthTC0",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "depthTC1",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "envTC",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "lightVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "shadTC0",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "shadTC1",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "shadTC2",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "viewVec",
+      "semantic": "TEXCOORDN",
+      "components": 4,
+      "category": "texcoord",
+      "source": "declaration",
+      "index": 0
+    },
+    {
+      "token": "HPosition",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "declaration"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 shad = (float3)0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 compare = (float3)0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 baseTC = IN.baseTC.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadTC0 = IN.shadTC0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadTC1 = IN.shadTC1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 shadTC2 = IN.shadTC2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %PERPIXEL_SHADOWMAP || %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT height = tex2D(bumpMap, IN.baseTC.xy).a * 2 - 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "height *= BumpOffset.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 viewVec = normalize(IN.viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 offs = height",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 tcOffs",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %OFFSETBUMPMAPPING",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "baseTC += height * viewVec.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %PERPIXEL_SHADOWMAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tcOffs.x = dot(offs, IN.Binormal.xyz) * 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tcOffs.y = dot(offs, IN.Tangent.xyz)  * 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shadTC0.xy += tcOffs.xy * shadTC0.zw",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shadTC1.xy += tcOffs.xy * shadTC1.zw",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shadTC2.xy += tcOffs.xy * shadTC2.zw",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 decalColor = tex2D(baseMap, baseTC.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 shadColor0 = tex2Dproj(shadMap0, shadTC0.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fFadePerPix = 1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_MIXED_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad.x = shadColor0.r/8 + shadColor0.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fFadePerPix = saturate(2 - 2*saturate(length(IN.lightVec.xyz) * Fading.w))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 shadColor1 = tex2Dproj(shadMap1, shadTC1.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad.y = shadColor1.r/8 + shadColor1.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 shadColor2 = tex2Dproj(shadMap2, shadTC2.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad.z = shadColor2.r/8 + shadColor2.g",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_DEPTH_MAP || %TEMP_DEPTH_MAP_PS20",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.x = (IN.WTC.z>0.5)?1-shadColor0.b:0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.y = (IN.WTC.y>0.5)?1-shadColor1.b:0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.z = (IN.WTC.x>0.5)?1-shadColor2.b:0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OTHER",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.x = 1-shadColor0.b",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.y = 1-shadColor1.b",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.z = 1-shadColor2.b",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.xyz = compare.xyz * Fading.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %TEMP_MIXED_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 vZ = (float3)0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vZ.x = IN.depthTC0.x / IN.depthTC0.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vZ.y = IN.depthTC0.z / IN.depthTC0.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vZ.z = IN.depthTC1.x / IN.depthTC1.y",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "shad = shad - vZ",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare = saturate(-shad*300)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.xyz = compare.xyz * Fading.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.x = compare.x * shadColor0.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.y = compare.y * shadColor1.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.z = compare.z * shadColor2.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.x = shadColor0.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK1",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.y = shadColor1.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_SHAD_SAMPLEMASK2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.z = shadColor2.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "compare.xyz = compare.xyz * Fading.xyz * fFadePerPix",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fCompare = saturate(dot(compare, float3(1, 1, 1)))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_MIXED_MAP",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fCompare *= fFadePerPix",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %TEMP_ENVLIGHT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = decalColor.xyz * IN.Color.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#elif %ENVCMAMB",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 envColor = texCUBE(envMap, IN.envTC.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fLerp = Reflect.a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#if %ENVCM_MASKED",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fLerp *= tex2D(glossMap, IN.baseTC.zw).a",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = lerp(decalColor.xyz*Ambient.xyz, envColor.xyz, fLerp)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#else",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = decalColor.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "amb = HDREncodeAmb(amb)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = HDRFogBlend(amb.xyz, IN.Color.w, GlobalFogColor.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = fCompare",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "ENVCMAMB",
+    "ENVCM_MASKED",
+    "OFFSETBUMPMAPPING",
+    "OTHER",
+    "PERPIXEL_SHADOWMAP",
+    "TEMP_DEPTH_MAP",
+    "TEMP_DEPTH_MAP_PS20",
+    "TEMP_ENVLIGHT",
+    "TEMP_MIXED_MAP",
+    "TEMP_SHAD_SAMPLEMASK1",
+    "TEMP_SHAD_SAMPLEMASK2"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "shadTC0": "float4",
+    "shadTC1": "float4",
+    "shadTC2": "float4",
+    "baseTC": "float4",
+    "viewVec": "float4",
+    "Tangent": "float4",
+    "Binormal": "float4",
+    "depthTC0": "float4",
+    "depthTC1": "float4",
+    "lightVec": "float4",
+    "WTC": "float4",
+    "Color": "float4",
+    "envTC": "float4"
+  }
+}

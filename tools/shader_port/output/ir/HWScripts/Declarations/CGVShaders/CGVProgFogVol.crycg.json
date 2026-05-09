@@ -1,0 +1,211 @@
+{
+  "name": "CGVProgFogVol",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgFogVol.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float2x4 FogMatrix, uniform float2x4 FogEnterMatrix"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n\t      // y\r\n\t      float2 tex0;\r\n\t      tex0.xy = mul(FogEnterMatrix, vPos);\r\n\r\n\t      //x\r\n\t      float2 temp = mul(FogMatrix, vPos);\r\n\t      temp.x -= 0.5f;\r\n\t      temp.x = abs(temp.x);\r\n\t      temp.x = clamp(temp.x,0,.4921875f); //63.f/128.f = .4921875\r\n\r\n\t      if(tex0.x > 0.5)\r\n\t\t      temp.x += 0.5;\r\n\t      tex0.x = temp.x;\r\n\r\n      \tOUT.Tex0.xy = tex0;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "y",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2 tex0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tex0.xy",
+      "rhs": "mul(FogEnterMatrix, vPos)",
+      "textureSample": false,
+      "raw": "tex0.xy = mul(FogEnterMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "x",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 temp",
+      "rhs": "mul(FogMatrix, vPos)",
+      "textureSample": false,
+      "raw": "float2 temp = mul(FogMatrix, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "temp.x -",
+      "rhs": "0.5f",
+      "textureSample": false,
+      "raw": "temp.x -= 0.5f;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "temp.x",
+      "rhs": "abs(temp.x)",
+      "textureSample": false,
+      "raw": "temp.x = abs(temp.x);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "temp.x",
+      "rhs": "clamp(temp.x,0,.4921875f) //63.f/128.f = .4921875",
+      "textureSample": false,
+      "raw": "temp.x = clamp(temp.x,0,.4921875f); //63.f/128.f = .4921875",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "if(tex0.x > 0.5)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "temp.x +",
+      "rhs": "0.5",
+      "textureSample": false,
+      "raw": "temp.x += 0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tex0.x",
+      "rhs": "temp.x",
+      "textureSample": false,
+      "raw": "tex0.x = temp.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "tex0",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = tex0;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 tex0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tex0.xy = mul(FogEnterMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 temp = mul(FogMatrix, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "temp.x -= 0.5f",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "temp.x = abs(temp.x)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "temp.x = clamp(temp.x,0,.4921875f); //63.f/128.f = .4921875",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "if",
+      "content": "if(tex0.x > 0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "temp.x += 0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "tex0.x = temp.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = tex0",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2"
+  }
+}

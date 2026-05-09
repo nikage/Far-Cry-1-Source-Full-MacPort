@@ -1,0 +1,79 @@
+{
+  "name": "CGVProgSimple_Tex_Bended",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgSimple_Tex_Bended.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2"
+    },
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, BEND"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.xy = IN.TexCoord0.xy;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy = IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy = IN.TexCoord0.xy",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosBending"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2"
+  }
+}

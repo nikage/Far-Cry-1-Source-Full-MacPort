@@ -1,0 +1,177 @@
+{
+  "name": "CGVProg_Fur",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProg_Fur.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, LIGHT_POS, uniform float4 Modifiers"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_T0\r\n          IN_N\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0 = IN.TexCoord0;\r\n\r\n        // Simple light calculations (L dot N)\r\n        // Diffuse color\r\n        float3 cDiffuse = float3(1, 1, 1);\r\n        float3 vLightDir = normalize(LightPos.xyz - vPos.xyz);\r\n        float fDiffuse = dot(vLightDir, IN.Normal.xyz);\r\n        OUT.Color.xyz = cDiffuse * fDiffuse;\r\n\r\n        // Here we set the diffuse alpha component\r\n        OUT.Color.w = Modifiers.y;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0",
+      "rhs": "IN.TexCoord0",
+      "textureSample": false,
+      "raw": "OUT.Tex0 = IN.TexCoord0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Simple light calculations (L dot N)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Diffuse color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 cDiffuse",
+      "rhs": "float3(1, 1, 1)",
+      "textureSample": false,
+      "raw": "float3 cDiffuse = float3(1, 1, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vLightDir",
+      "rhs": "normalize(LightPos.xyz - vPos.xyz)",
+      "textureSample": false,
+      "raw": "float3 vLightDir = normalize(LightPos.xyz - vPos.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDiffuse",
+      "rhs": "dot(vLightDir, IN.Normal.xyz)",
+      "textureSample": false,
+      "raw": "float fDiffuse = dot(vLightDir, IN.Normal.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "cDiffuse * fDiffuse",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = cDiffuse * fDiffuse;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Here we set the diffuse alpha component",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "Modifiers.y",
+      "textureSample": false,
+      "raw": "OUT.Color.w = Modifiers.y;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "NORMAL_3",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0 = IN.TexCoord0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 cDiffuse = float3(1, 1, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vLightDir = normalize(LightPos.xyz - vPos.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDiffuse = dot(vLightDir, IN.Normal.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = cDiffuse * fDiffuse",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = Modifiers.y",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosFur"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

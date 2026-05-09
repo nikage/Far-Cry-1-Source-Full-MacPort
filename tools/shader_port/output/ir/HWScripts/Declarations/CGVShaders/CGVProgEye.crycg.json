@@ -1,0 +1,309 @@
+{
+  "name": "CGVProgEye",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgEye.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " POSITION_3 TEXCOORD0_2 NORMAL_3"
+    },
+    {
+      "name": "MainInput",
+      "content": "\r\n  // common model view matrix\r\n  VIEWPROJ_MATRIX,\r\n  LIGHT_POS,\r\n  CAMERA_POS,\r\n  ATTEN,\r\n  uniform float4 Diffuse"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n\r\n  // vertex input\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n    IN_N\r\n  };\r\n  \r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_T0_2\r\n    OUT_T1_2\r\n    OUT_T2_2\r\n    OUT_C0\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "   \r\n  OUT.Tex0.xy =IN.TexCoord0.xy;\r\n  OUT.Tex1.xy =IN.TexCoord0.xy;      \r\n          \r\n  // Compute light vector\r\n  float3 LightVec=LightPos.xyz-IN.Position.xyz;\r\n  // Compute view vector\r\n  float3 ViewVec=CameraPos.xyz-IN.Position.xyz;  \r\n  \r\n  float3 OSLightVec=normalize(LightVec);\r\n  float3 OSViewVec=normalize(ViewVec);    \r\n  float3 NormalVec=IN.Normal.xyz;\r\n    \r\n  float fDot= dot(OSViewVec, NormalVec.xyz);  \r\n  float3 reflVector =(2*NormalVec.xyz*fDot-OSViewVec.xyz);  \r\n  OUT.Tex2.xy = (reflVector.xz+1.0)*0.5;\r\n\r\n  float fDiffuse = max(dot(OSLightVec, NormalVec), 0);\r\n  \r\n  float fiSqDist = rsqrt(dot(LightVec, LightVec));\r\n  float fAtten = PROC_ATTENVERT;\r\n  \r\n  OUT.Color.xyz=fDiffuse*fAtten*Diffuse.xyz;\r\n\r\n  return OUT;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex0.xy =IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex1.xy",
+      "rhs": "IN.TexCoord0.xy",
+      "textureSample": false,
+      "raw": "OUT.Tex1.xy =IN.TexCoord0.xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Compute light vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 LightVec",
+      "rhs": "LightPos.xyz-IN.Position.xyz",
+      "textureSample": false,
+      "raw": "float3 LightVec=LightPos.xyz-IN.Position.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Compute view vector",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 ViewVec",
+      "rhs": "CameraPos.xyz-IN.Position.xyz",
+      "textureSample": false,
+      "raw": "float3 ViewVec=CameraPos.xyz-IN.Position.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 OSLightVec",
+      "rhs": "normalize(LightVec)",
+      "textureSample": false,
+      "raw": "float3 OSLightVec=normalize(LightVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 OSViewVec",
+      "rhs": "normalize(ViewVec)",
+      "textureSample": false,
+      "raw": "float3 OSViewVec=normalize(ViewVec);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 NormalVec",
+      "rhs": "IN.Normal.xyz",
+      "textureSample": false,
+      "raw": "float3 NormalVec=IN.Normal.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDot",
+      "rhs": "dot(OSViewVec, NormalVec.xyz)",
+      "textureSample": false,
+      "raw": "float fDot= dot(OSViewVec, NormalVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 reflVector",
+      "rhs": "(2*NormalVec.xyz*fDot-OSViewVec.xyz)",
+      "textureSample": false,
+      "raw": "float3 reflVector =(2*NormalVec.xyz*fDot-OSViewVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex2.xy",
+      "rhs": "(reflVector.xz+1.0)*0.5",
+      "textureSample": false,
+      "raw": "OUT.Tex2.xy = (reflVector.xz+1.0)*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDiffuse",
+      "rhs": "max(dot(OSLightVec, NormalVec), 0)",
+      "textureSample": false,
+      "raw": "float fDiffuse = max(dot(OSLightVec, NormalVec), 0);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fiSqDist",
+      "rhs": "rsqrt(dot(LightVec, LightVec))",
+      "textureSample": false,
+      "raw": "float fiSqDist = rsqrt(dot(LightVec, LightVec));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fAtten",
+      "rhs": "PROC_ATTENVERT",
+      "textureSample": false,
+      "raw": "float fAtten = PROC_ATTENVERT;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "fDiffuse*fAtten*Diffuse.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz=fDiffuse*fAtten*Diffuse.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "return OUT;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "NORMAL_3",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "category": "normal",
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.xy =IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex1.xy =IN.TexCoord0.xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 LightVec=LightPos.xyz-IN.Position.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 ViewVec=CameraPos.xyz-IN.Position.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 OSLightVec=normalize(LightVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 OSViewVec=normalize(ViewVec)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 NormalVec=IN.Normal.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDot= dot(OSViewVec, NormalVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 reflVector =(2*NormalVec.xyz*fDot-OSViewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex2.xy = (reflVector.xz+1.0)*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDiffuse = max(dot(OSLightVec, NormalVec), 0)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fiSqDist = rsqrt(dot(LightVec, LightVec))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fAtten = PROC_ATTENVERT",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz=fDiffuse*fAtten*Diffuse.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "return",
+      "content": "return OUT",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Tex1": "float2",
+    "Tex2": "float2",
+    "Color": "float4"
+  }
+}

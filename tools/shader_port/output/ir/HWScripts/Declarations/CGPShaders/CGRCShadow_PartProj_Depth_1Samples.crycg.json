@@ -1,0 +1,226 @@
+{
+  "name": "CGRCShadow_PartProj_Depth_1Samples",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCShadow_PartProj_Depth_1Samples.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D shadMap0 : register(s0),\r\n                  uniform sampler2D baseMap : register(s1),\r\n                  uniform samplerCUBE projMap : register(s2),\r\n                  uniform float4 Ambient,\r\n                  uniform float4 Diffuse,\r\n                  uniform float4 Fading"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        FLOAT4 decalColor = tex2D(baseMap, IN.Tex1.xy);\r\n        FLOAT4 projColor = texCUBE(projMap, IN.Tex2.xyz);\r\n\r\n        FLOAT3 dif = (decalColor.xyz * projColor.xyz * Diffuse.xyz * IN.Color.xyz) * 2;\r\n        FLOAT3 amb = decalColor.xyz * Ambient.xyz;\r\n        \r\n        // load the 1 shadow sample\r\n        FLOAT4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);\r\n        FLOAT fShadow = (1-shadColor0.b) * Fading.x;\r\n                \r\n        OUT.Color.xyz = amb + dif * (1-fShadow);\r\n        OUT.Color.w = decalColor.w * Ambient.w * IN.Color.a;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "FLOAT4 decalColor = tex2D(baseMap, IN.Tex1.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 projColor",
+      "rhs": "texCUBE(projMap, IN.Tex2.xyz)",
+      "textureSample": true,
+      "raw": "FLOAT4 projColor = texCUBE(projMap, IN.Tex2.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 dif",
+      "rhs": "(decalColor.xyz * projColor.xyz * Diffuse.xyz * IN.Color.xyz) * 2",
+      "textureSample": false,
+      "raw": "FLOAT3 dif = (decalColor.xyz * projColor.xyz * Diffuse.xyz * IN.Color.xyz) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT3 amb",
+      "rhs": "decalColor.xyz * Ambient.xyz",
+      "textureSample": false,
+      "raw": "FLOAT3 amb = decalColor.xyz * Ambient.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the 1 shadow sample",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 shadColor0",
+      "rhs": "tex2Dproj(shadMap0, IN.Tex0.xyzw)",
+      "textureSample": true,
+      "raw": "FLOAT4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT fShadow",
+      "rhs": "(1-shadColor0.b) * Fading.x",
+      "textureSample": false,
+      "raw": "FLOAT fShadow = (1-shadColor0.b) * Fading.x;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "amb + dif * (1-fShadow)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = amb + dif * (1-fShadow);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w * Ambient.w * IN.Color.a",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w * Ambient.w * IN.Color.a;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_4",
+    "TEXCOORD1_2",
+    "TEXCOORD2_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_4"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 decalColor = tex2D(baseMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 projColor = texCUBE(projMap, IN.Tex2.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 dif = (decalColor.xyz * projColor.xyz * Diffuse.xyz * IN.Color.xyz) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT3 amb = decalColor.xyz * Ambient.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 shadColor0 = tex2Dproj(shadMap0, IN.Tex0.xyzw)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT fShadow = (1-shadColor0.b) * Fading.x",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = amb + dif * (1-fShadow)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w * Ambient.w * IN.Color.a",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Color": "float4"
+  }
+}

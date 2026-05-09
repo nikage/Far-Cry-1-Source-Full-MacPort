@@ -1,0 +1,284 @@
+{
+  "name": "CGRCBump_DiffSpec_MultipleLight_PS",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCBump_DiffSpec_MultipleLight_PS.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D bumpMap : texunit0,\r\n                  uniform sampler2D gradMap : texunit2,\r\n                  uniform sampler2D baseMap : texunit3,\r\n                  uniform float4 Diffuse,\r\n\t                uniform float4 Specular"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_T2\r\n          OUT_T3\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex3.xy);\r\n        // load the bump normal\r\n        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);\r\n        // compute texCoord(NdotH, 0) and use it to look up NdotH^power in the power texture\r\n        // This should create a texm3x2tex instruction for ps_1_1 equivalent to the ps_1_1\r\n        // builtin tex2D_dp3x2 (which is not supported in any other profile):\r\n        //    float4 NdotL_NdotH = tex2D_dp3x2(specPowMap, IN.Tex2, bumpNormal);\r\n        float2 texCoord = float2(\r\n            dot(IN.Tex1.xyz, bumpNormal.xyz),\r\n            dot(IN.Tex2.xyz, bumpNormal.xyz));\r\n        float4 NdotL_NdotH = tex2D(gradMap, texCoord);\r\n\r\n        float3 dif = (Diffuse.rgb * NdotL_NdotH.xyz * decalColor.xyz) * 2;\r\n        // compute the specular color\r\n        float3 spec = (Specular.xyz * NdotL_NdotH.w) * 2;\r\n        \r\n        // finally add them all together\r\n        OUT.Color.xyz = dif + spec;\r\n        OUT.Color.w = Diffuse.w * decalColor.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex3.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex3.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex0.xy)-0.5)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute texCoord(NdotH, 0) and use it to look up NdotH^power in the power texture",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "This should create a texm3x2tex instruction for ps_1_1 equivalent to the ps_1_1",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "builtin tex2D_dp3x2 (which is not supported in any other profile):",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "float4 NdotL_NdotH = tex2D_dp3x2(specPowMap, IN.Tex2, bumpNormal);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 texCoord",
+      "rhs": "float2(",
+      "textureSample": false,
+      "raw": "float2 texCoord = float2(",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "dot(IN.Tex1.xyz, bumpNormal.xyz),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "dot(IN.Tex2.xyz, bumpNormal.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 NdotL_NdotH",
+      "rhs": "tex2D(gradMap, texCoord)",
+      "textureSample": true,
+      "raw": "float4 NdotL_NdotH = tex2D(gradMap, texCoord);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "(Diffuse.rgb * NdotL_NdotH.xyz * decalColor.xyz) * 2",
+      "textureSample": false,
+      "raw": "float3 dif = (Diffuse.rgb * NdotL_NdotH.xyz * decalColor.xyz) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "compute the specular color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 spec",
+      "rhs": "(Specular.xyz * NdotL_NdotH.w) * 2",
+      "textureSample": false,
+      "raw": "float3 spec = (Specular.xyz * NdotL_NdotH.w) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "dif + spec",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = dif + spec;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "Diffuse.w * decalColor.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = Diffuse.w * decalColor.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_3",
+    "TEXCOORD2_3",
+    "TEXCOORD3_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_3"
+    },
+    {
+      "token": "Tex2",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 3,
+      "source": "derived",
+      "index": 2,
+      "label": "TEXCOORD2_3"
+    },
+    {
+      "token": "Tex3",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 3,
+      "label": "TEXCOORD3_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex3.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex0.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float2 texCoord = float2(",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dot(IN.Tex1.xyz, bumpNormal.xyz),",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "dot(IN.Tex2.xyz, bumpNormal.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 NdotL_NdotH = tex2D(gradMap, texCoord)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = (Diffuse.rgb * NdotL_NdotH.xyz * decalColor.xyz) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 spec = (Specular.xyz * NdotL_NdotH.w) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = dif + spec",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = Diffuse.w * decalColor.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Tex2": "float4",
+    "Tex3": "float4"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "name": "CGVProgHeatSourceMask",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgHeatSourceMask.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "VertAttributes",
+      "content": " \r\n  POSITION_3 \r\n  TEXCOORD0_2 \r\n  TANG_3X3"
+    },
+    {
+      "name": "MainInput",
+      "content": " \r\n  VIEWPROJ_MATRIX"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct appin\r\n  {\r\n    IN_P\r\n    IN_T0\r\n    IN_TANG\r\n  };\r\n  struct vertout\r\n  {\r\n    OUT_P\r\n    OUT_C0\r\n  };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  OUT.Color=0;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "0",
+      "textureSample": false,
+      "raw": "OUT.Color=0;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "BINORMAL_3",
+    "POSITION_3",
+    "TANGENT_3",
+    "TEXCOORD0_2",
+    "TNORMAL_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Binormal",
+      "category": "binormal",
+      "semantic": "BINORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "BINORMAL_3"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    },
+    {
+      "token": "Tangent",
+      "category": "tangent",
+      "semantic": "TANGENT",
+      "components": 3,
+      "source": "explicit",
+      "label": "TANGENT_3"
+    },
+    {
+      "token": "TexCoord0",
+      "semantic": "TEXCOORD0",
+      "components": 2,
+      "category": "texcoord",
+      "index": 0,
+      "source": "macro"
+    },
+    {
+      "token": "TNormal",
+      "category": "normal",
+      "semantic": "NORMAL",
+      "components": 3,
+      "source": "explicit",
+      "label": "TNORMAL_3"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color=0",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Color": "float4"
+  }
+}

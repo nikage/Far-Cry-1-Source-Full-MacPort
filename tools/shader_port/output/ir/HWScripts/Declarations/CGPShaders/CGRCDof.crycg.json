@@ -1,0 +1,615 @@
+{
+  "name": "CGRCDof",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCDof.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n#ifdef OPENGL\r\n    uniform samplerRECT ScreenMap : texunit0,\r\n    uniform samplerRECT FocalDistMap : texunit1,\r\n#endif    \r\n#ifdef D3D\r\n    uniform sampler2D ScreenMap : register(s0),\r\n    uniform sampler2D FocalDistMap : register(s1),\r\n#endif    \r\n    uniform float4 vFocalDistance,\r\n    uniform float4 vBlurAmount,\r\n    uniform float4 vPixelSize"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n    OUT_T1 \r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n    // fetch textures\r\n#ifdef OPENGL\r\n    float4 vTapCenterColor = texRECT(ScreenMap, IN.Tex0.xy);\r\n    float4 vTapBluredColor = texRECT(FocalDistMap, IN.Tex1.xy);\r\n#endif    \r\n#ifdef D3D\r\n    float4 vTapCenterColor = tex2D(ScreenMap, IN.Tex0.xy);\r\n    float4 vTapBluredColor = tex2D(FocalDistMap, IN.Tex1.xy);\r\n#endif\t\r\n\r\n\tfloat4 tapCenter=vTapCenterColor;\r\n\tfloat4 tapBlured=vTapBluredColor;\r\n\t\r\n\t/*\r\n\tconst float2 vTaps[10]={\r\n        float2(0.0,0.0),\r\n        float2(0.527837, -0.085868),\r\n        float2(-0.040088, 0.536087),\r\n        float2(-0.670445, -0.179949),\r\n        float2(-0.419418, -0.616039),\r\n        float2(0.440453, -0.639399),\r\n        float2(-0.757088, 0.349334),\r\n        float2(0.574619, 0.685879),\r\n        float2(0.03851, -0.939059),\r\n        float2(-0.341977, 0.939091)\r\n    };\t                        \t                        \t                        \t                        \t                        \t                        \t                  \t\t\t\t\t\t\t\t\t\t\t\r\n    \r\n    float4 vFinalColor=0;    \r\n    for(int t=0;t<4;t++)\r\n    {        \r\n        float2 vLowUv=IN.Tex1.xy+vPixelSize.xy*(vTaps[t].xy);        \r\n        float4 tapLow= tex2D(FocalDistMap, vLowUv.xy);\r\n                \r\n        float2 vHighUv=IN.Tex0.xy+vPixelSize.zw*(vTaps[t].xy);                \r\n        float4 tapHigh= tex2D(ScreenMap, vHighUv.xy);\r\n                \r\n        float4 tap=(tapLow*tapHigh.w+tapHigh*(1.0-tapHigh.w));        \r\n        tap.w=(tapHigh.w-tapCenter.w>=0)? 1.0: tap.w;\r\n        \r\n        vFinalColor.xyz+=tap.xyz*tap.w;\r\n        vFinalColor.w+=tap.w;\r\n    }\r\n    // normalize color\r\n    vFinalColor/=vFinalColor.w;*/\r\n    \r\n    float tapLerp=tapCenter.w*0.5+tapBlured.w*0.5;        \r\n    float3 vFinalColor=tapBlured.xyz*tapCenter.w+tapCenter.xyz*(1-tapCenter.w);\r\n    \r\n    OUT.Color.xyz = vFinalColor.xyz*vBlurAmount.w+tapCenter.xyz*(1-vBlurAmount.w);\r\n    OUT.Color.a = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "fetch textures",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vTapCenterColor",
+      "rhs": "texRECT(ScreenMap, IN.Tex0.xy)",
+      "textureSample": false,
+      "raw": "float4 vTapCenterColor = texRECT(ScreenMap, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vTapBluredColor",
+      "rhs": "texRECT(FocalDistMap, IN.Tex1.xy)",
+      "textureSample": false,
+      "raw": "float4 vTapBluredColor = texRECT(FocalDistMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "OPENGL",
+          "state": "false"
+        }
+      ],
+      "active": false
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vTapCenterColor",
+      "rhs": "tex2D(ScreenMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 vTapCenterColor = tex2D(ScreenMap, IN.Tex0.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vTapBluredColor",
+      "rhs": "tex2D(FocalDistMap, IN.Tex1.xy)",
+      "textureSample": true,
+      "raw": "float4 vTapBluredColor = tex2D(FocalDistMap, IN.Tex1.xy);",
+      "guards": [
+        {
+          "directive": "#ifdef",
+          "expression": "D3D",
+          "state": "true"
+        }
+      ],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 tapCenter",
+      "rhs": "vTapCenterColor",
+      "textureSample": false,
+      "raw": "float4 tapCenter=vTapCenterColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 tapBlured",
+      "rhs": "vTapBluredColor",
+      "textureSample": false,
+      "raw": "float4 tapBlured=vTapBluredColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "/*",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "const float2 vTaps[10]",
+      "rhs": "{",
+      "textureSample": false,
+      "raw": "const float2 vTaps[10]={",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(0.0,0.0),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(0.527837, -0.085868),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(-0.040088, 0.536087),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(-0.670445, -0.179949),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(-0.419418, -0.616039),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(0.440453, -0.639399),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(-0.757088, 0.349334),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(0.574619, 0.685879),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(0.03851, -0.939059),",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "float2(-0.341977, 0.939091)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "};",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 vFinalColor",
+      "rhs": "0",
+      "textureSample": false,
+      "raw": "float4 vFinalColor=0;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "for(int t",
+      "rhs": "0t<4t++)",
+      "textureSample": false,
+      "raw": "for(int t=0;t<4;t++)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vLowUv",
+      "rhs": "IN.Tex1.xy+vPixelSize.xy*(vTaps[t].xy)",
+      "textureSample": false,
+      "raw": "float2 vLowUv=IN.Tex1.xy+vPixelSize.xy*(vTaps[t].xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 tapLow",
+      "rhs": "tex2D(FocalDistMap, vLowUv.xy)",
+      "textureSample": true,
+      "raw": "float4 tapLow= tex2D(FocalDistMap, vLowUv.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float2 vHighUv",
+      "rhs": "IN.Tex0.xy+vPixelSize.zw*(vTaps[t].xy)",
+      "textureSample": false,
+      "raw": "float2 vHighUv=IN.Tex0.xy+vPixelSize.zw*(vTaps[t].xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 tapHigh",
+      "rhs": "tex2D(ScreenMap, vHighUv.xy)",
+      "textureSample": true,
+      "raw": "float4 tapHigh= tex2D(ScreenMap, vHighUv.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 tap",
+      "rhs": "(tapLow*tapHigh.w+tapHigh*(1.0-tapHigh.w))",
+      "textureSample": false,
+      "raw": "float4 tap=(tapLow*tapHigh.w+tapHigh*(1.0-tapHigh.w));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "tap.w",
+      "rhs": "(tapHigh.w-tapCenter.w>=0)? 1.0: tap.w",
+      "textureSample": false,
+      "raw": "tap.w=(tapHigh.w-tapCenter.w>=0)? 1.0: tap.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vFinalColor.xyz+",
+      "rhs": "tap.xyz*tap.w",
+      "textureSample": false,
+      "raw": "vFinalColor.xyz+=tap.xyz*tap.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vFinalColor.w+",
+      "rhs": "tap.w",
+      "textureSample": false,
+      "raw": "vFinalColor.w+=tap.w;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "normalize color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vFinalColor/",
+      "rhs": "vFinalColor.w*/",
+      "textureSample": false,
+      "raw": "vFinalColor/=vFinalColor.w;*/",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float tapLerp",
+      "rhs": "tapCenter.w*0.5+tapBlured.w*0.5",
+      "textureSample": false,
+      "raw": "float tapLerp=tapCenter.w*0.5+tapBlured.w*0.5;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 vFinalColor",
+      "rhs": "tapBlured.xyz*tapCenter.w+tapCenter.xyz*(1-tapCenter.w)",
+      "textureSample": false,
+      "raw": "float3 vFinalColor=tapBlured.xyz*tapCenter.w+tapCenter.xyz*(1-tapCenter.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "vFinalColor.xyz*vBlurAmount.w+tapCenter.xyz*(1-vBlurAmount.w)",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = vFinalColor.xyz*vBlurAmount.w+tapCenter.xyz*(1-vBlurAmount.w);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.a = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef OPENGL",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vTapCenterColor = texRECT(ScreenMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vTapBluredColor = texRECT(FocalDistMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#ifdef D3D",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vTapCenterColor = tex2D(ScreenMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vTapBluredColor = tex2D(FocalDistMap, IN.Tex1.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "directive",
+      "content": "#endif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 tapCenter=vTapCenterColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 tapBlured=vTapBluredColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "/*",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "const float2 vTaps[10]=",
+      "opensBlock": true
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(0.0,0.0),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(0.527837, -0.085868),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(-0.040088, 0.536087),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(-0.670445, -0.179949),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(-0.419418, -0.616039),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(0.440453, -0.639399),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(-0.757088, 0.349334),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(0.574619, 0.685879),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(0.03851, -0.939059),",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2(-0.341977, 0.939091)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 vFinalColor=0",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "for",
+      "content": "for(int t=0;t<4;t++)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "",
+      "opensBlock": true
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2 vLowUv=IN.Tex1.xy+vPixelSize.xy*(vTaps[t].xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float4 tapLow= tex2D(FocalDistMap, vLowUv.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float2 vHighUv=IN.Tex0.xy+vPixelSize.zw*(vTaps[t].xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float4 tapHigh= tex2D(ScreenMap, vHighUv.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "float4 tap=(tapLow*tapHigh.w+tapHigh*(1.0-tapHigh.w))",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "tap.w=(tapHigh.w-tapCenter.w>=0)? 1.0: tap.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "vFinalColor.xyz+=tap.xyz*tap.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "vFinalColor.w+=tap.w",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "vFinalColor/=vFinalColor.w;*/",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float tapLerp=tapCenter.w*0.5+tapBlured.w*0.5",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 vFinalColor=tapBlured.xyz*tapCenter.w+tapCenter.xyz*(1-tapCenter.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = vFinalColor.xyz*vBlurAmount.w+tapCenter.xyz*(1-vBlurAmount.w)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [
+    "D3D",
+    "OPENGL"
+  ],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4"
+  }
+}

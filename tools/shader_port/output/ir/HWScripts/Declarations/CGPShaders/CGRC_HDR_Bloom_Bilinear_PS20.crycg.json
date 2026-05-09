@@ -1,0 +1,190 @@
+{
+  "name": "CGRC_HDR_Bloom_Bilinear_PS20",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRC_HDR_Bloom_Bilinear_PS20.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": "\r\n  uniform sampler2D baseMap : texunit0,\r\n  uniform FLOAT4 vSampleOffsets[8],\r\n  uniform FLOAT4 vSampleWeights[8]"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n  struct vertout\r\n  {\r\n    OUT_T0\r\n  };\r\n\r\n  FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n  FLOAT4 vSample = 0.0f;\r\n  FLOAT4 vColor = 0.0f;\r\n      \r\n  FLOAT2 vSamplePosition;\r\n  \r\n  // Perform a one-directional gaussian blur\r\n  for(int i=0; i<8; i++)\r\n  {\r\n    vSamplePosition = IN.Tex0.xy + vSampleOffsets[i].xy;\r\n    vColor = tex2D(baseMap, vSamplePosition);\r\n    vSample += vSampleWeights[i]*vColor;\r\n  }\r\n    \r\n  OUT.Color = vSample;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 vSample",
+      "rhs": "0.0f",
+      "textureSample": false,
+      "raw": "FLOAT4 vSample = 0.0f;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "FLOAT4 vColor",
+      "rhs": "0.0f",
+      "textureSample": false,
+      "raw": "FLOAT4 vColor = 0.0f;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "statement",
+      "raw": "FLOAT2 vSamplePosition;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Perform a one-directional gaussian blur",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "for(int i",
+      "rhs": "0 i<8 i++)",
+      "textureSample": false,
+      "raw": "for(int i=0; i<8; i++)",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSamplePosition",
+      "rhs": "IN.Tex0.xy + vSampleOffsets[i].xy",
+      "textureSample": false,
+      "raw": "vSamplePosition = IN.Tex0.xy + vSampleOffsets[i].xy;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vColor",
+      "rhs": "tex2D(baseMap, vSamplePosition)",
+      "textureSample": true,
+      "raw": "vColor = tex2D(baseMap, vSamplePosition);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "vSample +",
+      "rhs": "vSampleWeights[i]*vColor",
+      "textureSample": false,
+      "raw": "vSample += vSampleWeights[i]*vColor;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color",
+      "rhs": "vSample",
+      "textureSample": false,
+      "raw": "OUT.Color = vSample;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [
+    "PS20Only"
+  ],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 vSample = 0.0f",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT4 vColor = 0.0f",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "FLOAT2 vSamplePosition",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "for",
+      "content": "for(int i=0; i<8; i++)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "",
+      "opensBlock": true
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "vSamplePosition = IN.Tex0.xy + vSampleOffsets[i].xy",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "vColor = tex2D(baseMap, vSamplePosition)",
+      "opensBlock": false
+    },
+    {
+      "indent": 1,
+      "type": "statement",
+      "content": "vSample += vSampleWeights[i]*vColor",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color = vSample",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4"
+  }
+}

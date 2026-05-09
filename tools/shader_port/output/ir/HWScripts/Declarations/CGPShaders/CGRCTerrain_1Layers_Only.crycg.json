@@ -1,0 +1,136 @@
+{
+  "name": "CGRCTerrain_1Layers_Only",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCTerrain_1Layers_Only.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D detMap0 : texunit0"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_C0\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the detail\r\n        float4 detColor0 = tex2D(detMap0, IN.Tex0.xy);\r\n        \r\n        detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);\r\n        OUT.Color.xyz = detColor0.xyz;\r\n        OUT.Color.a = 1;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the detail",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 detColor0",
+      "rhs": "tex2D(detMap0, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 detColor0 = tex2D(detMap0, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "detColor0.xyz",
+      "rhs": "detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b)",
+      "textureSample": false,
+      "raw": "detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "detColor0.xyz",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = detColor0.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.a",
+      "rhs": "1",
+      "textureSample": false,
+      "raw": "OUT.Color.a = 1;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR_4",
+    "POSITION_3",
+    "TEXCOORD0_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 0,
+      "label": "COLOR_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 detColor0 = tex2D(detMap0, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "detColor0.xyz = detColor0.xyz*IN.Color.b + 0.5*(1-IN.Color.b)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = detColor0.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.a = 1",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Color": "float4"
+  }
+}

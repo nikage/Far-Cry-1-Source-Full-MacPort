@@ -1,0 +1,211 @@
+{
+  "name": "CGVProgTerrain_1Layers_Only",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGVShaders/CGVProgTerrain_1Layers_Only.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " VIEWPROJ_MATRIX, uniform float4 Layer0TexGen0, uniform float4 Layer0TexGen1, CAMERA_POS, uniform float4 FadingDist"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct appin\r\n        {\r\n          IN_P\r\n          IN_C1\r\n        };\r\n        struct vertout\r\n        {\r\n          OUT_P\r\n          OUT_T0_2\r\n          OUT_C0\r\n        };"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        OUT.Tex0.x = dot(Layer0TexGen0, vPos);          \r\n        OUT.Tex0.y = dot(Layer0TexGen1, vPos);    \r\n              \r\n        float3 viewVec = CameraPos.xyz - vPos.xyz;\r\n        float fDist = length(viewVec.xyz);\r\n        float fFade = max(0.001, FadingDist.x);\r\n        fDist = fDist / fFade;\r\n        fDist = min(fDist, 1);\r\n        fDist = fDist * fDist;\r\n        fDist = fDist * fDist;\r\n        \r\n        OUT.Color.b = IN.Color1.x * fDist;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.x",
+      "rhs": "dot(Layer0TexGen0, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.x = dot(Layer0TexGen0, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Tex0.y",
+      "rhs": "dot(Layer0TexGen1, vPos)",
+      "textureSample": false,
+      "raw": "OUT.Tex0.y = dot(Layer0TexGen1, vPos);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 viewVec",
+      "rhs": "CameraPos.xyz - vPos.xyz",
+      "textureSample": false,
+      "raw": "float3 viewVec = CameraPos.xyz - vPos.xyz;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fDist",
+      "rhs": "length(viewVec.xyz)",
+      "textureSample": false,
+      "raw": "float fDist = length(viewVec.xyz);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float fFade",
+      "rhs": "max(0.001, FadingDist.x)",
+      "textureSample": false,
+      "raw": "float fFade = max(0.001, FadingDist.x);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fDist",
+      "rhs": "fDist / fFade",
+      "textureSample": false,
+      "raw": "fDist = fDist / fFade;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fDist",
+      "rhs": "min(fDist, 1)",
+      "textureSample": false,
+      "raw": "fDist = min(fDist, 1);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fDist",
+      "rhs": "fDist * fDist",
+      "textureSample": false,
+      "raw": "fDist = fDist * fDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "fDist",
+      "rhs": "fDist * fDist",
+      "textureSample": false,
+      "raw": "fDist = fDist * fDist;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.b",
+      "rhs": "IN.Color1.x * fDist",
+      "textureSample": false,
+      "raw": "OUT.Color.b = IN.Color1.x * fDist;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "POSITION_3"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "semantic": "COLOR1",
+      "components": 4,
+      "category": "color",
+      "index": 1,
+      "source": "macro"
+    },
+    {
+      "token": "Position",
+      "semantic": "POSITION",
+      "components": 4,
+      "category": "position",
+      "source": "macro"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.x = dot(Layer0TexGen0, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Tex0.y = dot(Layer0TexGen1, vPos)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 viewVec = CameraPos.xyz - vPos.xyz",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fDist = length(viewVec.xyz)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float fFade = max(0.001, FadingDist.x)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fDist = fDist / fFade",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fDist = min(fDist, 1)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fDist = fDist * fDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "fDist = fDist * fDist",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.b = IN.Color1.x * fDist",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [
+    "PosCommon"
+  ],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "HPosition": "float4",
+    "Tex0": "float2",
+    "Color": "float4"
+  }
+}

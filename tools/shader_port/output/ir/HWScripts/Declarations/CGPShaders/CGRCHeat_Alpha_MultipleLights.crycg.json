@@ -1,0 +1,211 @@
+{
+  "name": "CGRCHeat_Alpha_MultipleLights",
+  "extension": "crycg",
+  "path": "HWScripts/Declarations/CGPShaders/CGRCHeat_Alpha_MultipleLights.crycg",
+  "includes": [
+    "../CGVPMacro.csi"
+  ],
+  "blocks": [
+    {
+      "name": "MainInput",
+      "content": " uniform sampler2D baseMap : texunit0,\r\n                  uniform sampler2D bumpMap : texunit1,\r\n                  uniform float4 Heat"
+    },
+    {
+      "name": "DeclarationsScript",
+      "content": "\r\n        struct vertout\r\n        {\r\n          OUT_T0\r\n          OUT_T1\r\n          OUT_C0\r\n          OUT_C1\r\n        };\r\n\r\n        FOUT"
+    },
+    {
+      "name": "CoreScript",
+      "content": "\r\n        // load the decal\r\n        float4 decalColor = tex2D(baseMap, IN.Tex0.xy);\r\n        // load the bump normal\r\n        float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);\r\n\r\n        // Light vector from input color\r\n        float3 lVec = 2 * (IN.Color1.xyz - 0.5);\r\n        float NdotL = saturate(dot(lVec, bumpNormal.xyz));\r\n        float3 dif = (NdotL * Heat.a) * 2;\r\n\r\n        // finally add them all together\r\n        OUT.Color.xyz = Heat.a; //dif;\r\n        OUT.Color.w = decalColor.w;"
+    }
+  ],
+  "textureStages": [],
+  "passStates": [],
+  "coreScriptExpressions": [
+    {
+      "type": "comment",
+      "value": "load the decal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 decalColor",
+      "rhs": "tex2D(baseMap, IN.Tex0.xy)",
+      "textureSample": true,
+      "raw": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "load the bump normal",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float4 bumpNormal",
+      "rhs": "2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "textureSample": true,
+      "raw": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "Light vector from input color",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 lVec",
+      "rhs": "2 * (IN.Color1.xyz - 0.5)",
+      "textureSample": false,
+      "raw": "float3 lVec = 2 * (IN.Color1.xyz - 0.5);",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float NdotL",
+      "rhs": "saturate(dot(lVec, bumpNormal.xyz))",
+      "textureSample": false,
+      "raw": "float NdotL = saturate(dot(lVec, bumpNormal.xyz));",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "float3 dif",
+      "rhs": "(NdotL * Heat.a) * 2",
+      "textureSample": false,
+      "raw": "float3 dif = (NdotL * Heat.a) * 2;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "comment",
+      "value": "finally add them all together",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.xyz",
+      "rhs": "Heat.a //dif",
+      "textureSample": false,
+      "raw": "OUT.Color.xyz = Heat.a; //dif;",
+      "guards": [],
+      "active": true
+    },
+    {
+      "type": "assignment",
+      "lhs": "OUT.Color.w",
+      "rhs": "decalColor.w",
+      "textureSample": false,
+      "raw": "OUT.Color.w = decalColor.w;",
+      "guards": [],
+      "active": true
+    }
+  ],
+  "coreMacros": [],
+  "vertexAttributes": [
+    "COLOR1_4",
+    "POSITION_3",
+    "TEXCOORD0_2",
+    "TEXCOORD1_2"
+  ],
+  "vertexAttributeMetadata": [
+    {
+      "token": "Color1",
+      "category": "color",
+      "semantic": "COLOR",
+      "components": 4,
+      "source": "derived",
+      "index": 1,
+      "label": "COLOR1_4"
+    },
+    {
+      "token": "Position",
+      "category": "position",
+      "semantic": "POSITION",
+      "components": 3,
+      "source": "implicit",
+      "label": "POSITION_3"
+    },
+    {
+      "token": "Tex0",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 0,
+      "label": "TEXCOORD0_2"
+    },
+    {
+      "token": "Tex1",
+      "category": "texcoord",
+      "semantic": "TEXCOORD",
+      "components": 2,
+      "source": "derived",
+      "index": 1,
+      "label": "TEXCOORD1_2"
+    }
+  ],
+  "directives": [],
+  "coreScriptFlow": [
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 decalColor = tex2D(baseMap, IN.Tex0.xy)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float4 bumpNormal = 2*(tex2D(bumpMap, IN.Tex1.xy)-0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 lVec = 2 * (IN.Color1.xyz - 0.5)",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float NdotL = saturate(dot(lVec, bumpNormal.xyz))",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "float3 dif = (NdotL * Heat.a) * 2",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.xyz = Heat.a; //dif",
+      "opensBlock": false
+    },
+    {
+      "indent": 0,
+      "type": "statement",
+      "content": "OUT.Color.w = decalColor.w",
+      "opensBlock": false
+    }
+  ],
+  "maskReferences": [],
+  "positionScripts": [],
+  "positionScriptBlocks": [],
+  "outputFieldTypes": {
+    "Tex0": "float4",
+    "Tex1": "float4",
+    "Color": "float4",
+    "Color1": "float4"
+  }
+}
