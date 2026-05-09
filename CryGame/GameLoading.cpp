@@ -64,6 +64,12 @@
 #define CHUNK_INGAME_SEQUENCE	 0x04
 #define CHUNK_HUD	 0x05
 
+#define FREEZEINV_LOG(phase) \
+	do { \
+		if (m_pSystem && m_pSystem->GetITimer() && m_pLog) \
+			m_pLog->Log("[FreezeInv] %s t=%.3f", (phase), m_pSystem->GetITimer()->GetCurrTime()); \
+	} while (0)
+
 //#define _INTERNET_SIMULATOR
 
 #define SAVEGAME_THUMBNAIL_SIZEX 128
@@ -1390,30 +1396,45 @@ bool CXGame::LoadFromStream(CStream &stm, bool isdemo)
 	}
 
 	pEntitySystem->Update();
+	FREEZEINV_LOG("LoadFromStream after_EntitySystem_Update");
 	if (m_pSystem->GetIMovieSystem())
+	{
+		FREEZEINV_LOG("LoadFromStream before_PlayOnLoadSequences");
 		m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
+		FREEZEINV_LOG("LoadFromStream after_PlayOnLoadSequences");
+	}
+	FREEZEINV_LOG("LoadFromStream before_m_pClient_Reset");
 	m_pClient->Reset();
+	FREEZEINV_LOG("LoadFromStream after_m_pClient_Reset");
 	
 	m_bIsLoadingLevelFromFile = false;
 	m_pSystem->GetISoundSystem()->Mute(false); 
+	FREEZEINV_LOG("LoadFromStream after_Sound_Mute_false");
 
 	m_bMapLoadedFromCheckpoint=true;
 
 	
 	m_pEntitySystem->PauseTimers(false,true);	
+	FREEZEINV_LOG("LoadFromStream after_PauseTimers");
 
 	//	m_pLog->Log("HIDE CONSOLE");
+	FREEZEINV_LOG("LoadFromStream before_ClearColorBuffer");
 	m_pRenderer->ClearColorBuffer(Vec3(0,0,0));
+	FREEZEINV_LOG("LoadFromStream after_ClearColorBuffer");
 	m_pSystem->GetIConsole()->ResetProgressBar(0);
 	m_pSystem->GetIConsole()->ShowConsole(false);
 	m_pSystem->GetIConsole()->SetScrollMax(600/2);
+	FREEZEINV_LOG("LoadFromStream after_console_hide");
 
 	if (nPreset!=-1)
 		m_pSystem->GetISoundSystem()->SetEaxListenerEnvironment(nPreset,NULL);
 	else
 		m_pSystem->GetISoundSystem()->SetEaxListenerEnvironment(nPreset,&tProps);
 
+	m_nFreezeInvPostLoadTicks = 8;
+	FREEZEINV_LOG("LoadFromStream before_GotoGame");
 	GotoGame(1);
+	FREEZEINV_LOG("LoadFromStream after_GotoGame");
 	m_nDEBUG_TIMING = 0;
 
 	return true;
@@ -2340,30 +2361,45 @@ bool CXGame::LoadFromStream_RELEASEVERSION(CStream &stm, bool isdemo, CScriptObj
 	}
 
 	pEntitySystem->Update();
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_EntitySystem_Update");
 	if (m_pSystem->GetIMovieSystem())
+	{
+		FREEZEINV_LOG("LoadFromStream_RELEASEVERSION before_PlayOnLoadSequences");
 		m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
+		FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_PlayOnLoadSequences");
+	}
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION before_m_pClient_Reset");
 	m_pClient->Reset();
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_m_pClient_Reset");
 	
 	m_bIsLoadingLevelFromFile = false;
 	m_pSystem->GetISoundSystem()->Mute(false); 
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_Sound_Mute_false");
 
 	m_bMapLoadedFromCheckpoint=true;
 
 	
 	m_pEntitySystem->PauseTimers(false,true);	
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_PauseTimers");
 
 	//	m_pLog->Log("HIDE CONSOLE");
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION before_ClearColorBuffer");
 	m_pRenderer->ClearColorBuffer(Vec3(0,0,0));
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_ClearColorBuffer");
 	m_pSystem->GetIConsole()->ResetProgressBar(0);
 	m_pSystem->GetIConsole()->ShowConsole(false);
 	m_pSystem->GetIConsole()->SetScrollMax(600/2);
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_console_hide");
 
 	if (nPreset!=-1)
 		m_pSystem->GetISoundSystem()->SetEaxListenerEnvironment(nPreset,NULL);
 	else
 		m_pSystem->GetISoundSystem()->SetEaxListenerEnvironment(nPreset,&tProps);
 
+	m_nFreezeInvPostLoadTicks = 8;
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION before_GotoGame");
 	GotoGame(1);
+	FREEZEINV_LOG("LoadFromStream_RELEASEVERSION after_GotoGame");
 
 	return true;
 }
@@ -2998,29 +3034,45 @@ bool CXGame::LoadFromStream_PATCH_1(CStream &stm, bool isdemo, CScriptObjectStre
 	}
 
 	pEntitySystem->Update();
-	m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_EntitySystem_Update");
+	if (m_pSystem->GetIMovieSystem())
+	{
+		FREEZEINV_LOG("LoadFromStream_PATCH_1 before_PlayOnLoadSequences");
+		m_pSystem->GetIMovieSystem()->PlayOnLoadSequences();	// yes, we reset this twice, the first time to remove all entity-pointers and now to restore them
+		FREEZEINV_LOG("LoadFromStream_PATCH_1 after_PlayOnLoadSequences");
+	}
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 before_m_pClient_Reset");
 	m_pClient->Reset();
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_m_pClient_Reset");
 
 	m_bIsLoadingLevelFromFile = false;
 	m_pSystem->GetISoundSystem()->Mute(false); 
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_Sound_Mute_false");
 
 	m_bMapLoadedFromCheckpoint=true;
 
 
 	m_pEntitySystem->PauseTimers(false,true);	
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_PauseTimers");
 
 	//	m_pLog->Log("HIDE CONSOLE");
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 before_ClearColorBuffer");
 	m_pRenderer->ClearColorBuffer(Vec3(0,0,0));
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_ClearColorBuffer");
 	m_pSystem->GetIConsole()->ResetProgressBar(0);
 	m_pSystem->GetIConsole()->ShowConsole(false);
 	m_pSystem->GetIConsole()->SetScrollMax(600/2);
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_console_hide");
 
 	if (nPreset!=-1)
 		m_pSystem->GetISoundSystem()->SetEaxListenerEnvironment(nPreset,NULL);
 	else
 		m_pSystem->GetISoundSystem()->SetEaxListenerEnvironment(nPreset,&tProps);
 
+	m_nFreezeInvPostLoadTicks = 8;
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 before_GotoGame");
 	GotoGame(1);
+	FREEZEINV_LOG("LoadFromStream_PATCH_1 after_GotoGame");
 	m_nDEBUG_TIMING = 0;
 
 	return true;

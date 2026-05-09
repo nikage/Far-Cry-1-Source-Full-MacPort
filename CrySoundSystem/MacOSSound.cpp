@@ -783,6 +783,18 @@ ISound* CMacOSSoundSystem::LoadSound(const char* sFileName, int nFlags)
     if (!sFileName || !m_isInitialized)
         return nullptr;
 
+    for (const char* p = sFileName; *p; ++p)
+    {
+        if ((unsigned char)*p < 0x20u)
+        {
+            if (m_pSystem && m_pSystem->GetILog())
+                m_pSystem->GetILog()->LogWarning(
+                    "Sound path contains control char 0x%02x (pos %d): %s",
+                    (unsigned char)*p, (int)(p - sFileName), sFileName);
+            break;
+        }
+    }
+
     // Return cached buffer if already loaded
     auto it = m_loadedSounds.find(sFileName);
     if (it != m_loadedSounds.end())

@@ -200,6 +200,7 @@ CXGame::CXGame()
 	assert(m_pTagPointManager != nullptr && "CTagPointManager allocation must succeed");
 	m_nDEBUG_TIMING = 0;
 	m_fDEBUG_STARTTIMER = 0;
+	m_nFreezeInvPostLoadTicks = 0;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -839,6 +840,13 @@ bool CXGame::Update()
 	{
 		m_fDEBUG_STARTTIMER = m_pSystem->GetITimer()->GetAsyncCurTime();
 		m_nDEBUG_TIMING = 1;
+	}
+
+	if (m_nFreezeInvPostLoadTicks > 0)
+	{
+		m_pLog->Log("[FreezeInv] CXGame::Update post_load tick_rem=%d t=%.3f",
+			m_nFreezeInvPostLoadTicks, m_pSystem->GetITimer()->GetCurrTime());
+		m_nFreezeInvPostLoadTicks--;
 	}
 
 	if (!m_bEditor)

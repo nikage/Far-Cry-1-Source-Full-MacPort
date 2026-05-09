@@ -545,6 +545,7 @@ public:
 
 	int m_nDEBUG_TIMING;
 	float m_fDEBUG_STARTTIMER;
+	int m_nFreezeInvPostLoadTicks;
 
 	//!	The dummy client of this computer, required to get the list of servers if
 	//! theres not a real client actually connected and playing

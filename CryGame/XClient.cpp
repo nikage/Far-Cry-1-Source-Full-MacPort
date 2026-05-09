@@ -526,7 +526,8 @@ void CXClient::OnXContextSetup(CStream &stm)
 	m_Snapshot.Reset();
 
 	m_pLog->Log("CXClient::OnXContextSetup - map : %s\n", m_GameContext.strMapFolder.c_str());
-	
+	m_pLog->Log("[FreezeInv] CXClient::OnXContextSetup before m_pISystem->LoadLevel is_server=%d",
+		m_pGame->IsServer() ? 1 : 0);
 	if(!m_pISystem->LoadLevel(m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str(), false))
 	{
 		m_pLog->LogError("CXClient::OnXContextSetup ERROR LOADING LEVEL: %s\n", m_GameContext.strMapFolder.c_str());
