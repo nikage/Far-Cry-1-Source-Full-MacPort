@@ -1,0 +1,40 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCParticleLight.crycg
+//  Version:     v1.00
+// -------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      MainInput { uniform sampler2D baseMap : texunit0,
+                  uniform FLOAT4 Ambient,
+                  uniform FLOAT4 Diffuse }
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+          OUT_C0
+          OUT_C1
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        FLOAT4 decalColor = tex2D(baseMap, IN.Tex0.xy);
+
+        FLOAT3 dif = (decalColor.xyz * Diffuse.xyz * IN.Color1.xyz * IN.Color.xyz);
+        dif = HDREncode(dif);
+
+        FLOAT3 amb = HDREncodeAmb(decalColor.xyz * Ambient.xyz);
+
+        float fOutA = decalColor.w * Ambient.w * IN.Color.a;
+        HDROutput(OUT, FLOAT4 (amb + dif, fOutA), 1, GlobalFogColor.xyz, IN.Color1.w);
+      }

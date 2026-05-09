@@ -153,6 +153,10 @@ void main() {
         manifestLookupAliasesForNormalizedFragment('cgrcscreentexmap'),
         equals(<String>['screentexmap']),
       );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcparticlelight'),
+        equals(<String>['particlelight']),
+      );
       expect(manifestLookupAliasesForNormalizedFragment('other'), isEmpty);
       expect(
         manifestLookupAliasesForNormalizedFragment(

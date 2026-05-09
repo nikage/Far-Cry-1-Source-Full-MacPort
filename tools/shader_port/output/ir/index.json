@@ -4334,6 +4334,17 @@
     ]
   },
   {
+    "name": "CGRCParticleLight",
+    "extension": "crycg",
+    "relative": "CGPShaders/CGRCParticleLight.crycg",
+    "ir": "tools/shader_port/output/ir/CGPShaders/CGRCParticleLight.crycg.json",
+    "blocks": [
+      "MainInput",
+      "DeclarationsScript",
+      "CoreScript"
+    ]
+  },
+  {
     "name": "CGRCPlants",
     "extension": "crycg",
     "relative": "CGPShaders/CGRCPlants.crycg",

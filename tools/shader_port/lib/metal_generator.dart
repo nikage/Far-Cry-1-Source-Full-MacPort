@@ -30,8 +30,13 @@ List<String> manifestLookupAliasesForNormalizedFragment(
   switch (normalized) {
     case 'cgrcflare':
       addUnique('flare_from_light');
+      break;
     case 'cgrcscreentexmap':
       addUnique('screentexmap');
+      break;
+    case 'cgrcparticlelight':
+      addUnique('particlelight');
+      break;
     default:
       break;
   }
@@ -323,6 +328,9 @@ void main(List<String> args) {
         'generated_${data.normalizedName}_vertex';
     final List<Map<String, dynamic>> vertexInputs =
         _summarizeVertexInputs(manifestVertexMetadata);
+    final List<String> vertexLookupAliases =
+        manifestLookupAliasesForNormalizedFragment(data.normalizedName,
+            aliasesTxtByTarget: aliasesTxtByTarget);
     manifestEntries.add({
       'source': s.relative,
       'metal': s.metalFileName,
@@ -357,6 +365,7 @@ void main(List<String> args) {
               })
           .toList(),
       'pipeline': pipeline,
+      if (vertexLookupAliases.isNotEmpty) 'lookupAliases': vertexLookupAliases,
     });
     generated++;
   }

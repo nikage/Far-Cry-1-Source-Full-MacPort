@@ -2535,6 +2535,11 @@ int main()
             // ScreenTexMap — LoadRendererShaderSafe("ScreenTexMap") at
             // Cry3DEngine/3dEngine.cpp:242; Metal fragment CGRCScreenTexMap.
             CHECK(hasLookupAlias("cgrcscreentexmap", "screentexmap"));
+            // ParticleLight — CDecalManager EF_SYSTEM load (DecalManager.cpp).
+            CHECK(hasLookupAlias("cgrcparticlelight", "particlelight"));
+            // Decal_VP / Decal_2D_VP — same ctor EF_SYSTEM vertex shaders.
+            CHECK(hasLookupAlias("cgvprogdecal", "decal_vp"));
+            CHECK(hasLookupAlias("cgvprogdecal_2d_atten", "decal_2d_vp"));
         }
     }
 

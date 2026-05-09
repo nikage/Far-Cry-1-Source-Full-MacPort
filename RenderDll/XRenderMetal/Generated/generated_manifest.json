@@ -31992,6 +31992,9 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
+    "lookupAliases": [
+      "decal_vp"
+    ],
     "pipelineCategory": "decal"
   },
   {
@@ -32206,6 +32209,9 @@
       "depthCompare": "lessEqual",
       "cullMode": "back"
     },
+    "lookupAliases": [
+      "decal_2d_vp"
+    ],
     "pipelineCategory": "decal"
   },
   {
@@ -122295,6 +122301,101 @@
         "type": "samplerRECT",
         "semantic": "texunit1",
         "slot": 1
+      }
+    ],
+    "pipeline": {
+      "blendEnabled": true,
+      "blendMode": "alpha",
+      "depthWrite": false,
+      "depthTest": true,
+      "depthCompare": "lessEqual",
+      "cullMode": "back"
+    }
+  },
+  {
+    "source": "HWScripts/Declarations/CGPShaders/CGRCParticleLight.crycg.json",
+    "metal": "HWScripts_Declarations_CGPShaders_CGRCParticleLight.crycg.json.metal",
+    "shader": "CGRCParticleLight",
+    "normalized": "cgrcparticlelight",
+    "fragment": "generated_cgrcparticlelight_fragment",
+    "entryPoint": "generated_cgrcparticlelight_fragment",
+    "stage": "fragment",
+    "uniformStruct": "cgrcparticlelight_uniforms",
+    "uniformCount": 3,
+    "textureCount": 1,
+    "vertexAttributes": [
+      "COLOR1_4",
+      "COLOR_4",
+      "POSITION_3",
+      "TEXCOORD0_2"
+    ],
+    "vertexAttributeMetadata": [
+      {
+        "token": "Color1",
+        "category": "color",
+        "semantic": "COLOR",
+        "components": 4,
+        "source": "derived",
+        "index": 1,
+        "label": "COLOR1_4"
+      },
+      {
+        "token": "Color",
+        "category": "color",
+        "semantic": "COLOR",
+        "components": 4,
+        "source": "derived",
+        "index": 0,
+        "label": "COLOR_4"
+      },
+      {
+        "token": "Position",
+        "category": "position",
+        "semantic": "POSITION",
+        "components": 3,
+        "source": "implicit",
+        "label": "POSITION_3"
+      },
+      {
+        "token": "Tex0",
+        "category": "texcoord",
+        "semantic": "TEXCOORD",
+        "components": 2,
+        "source": "derived",
+        "index": 0,
+        "label": "TEXCOORD0_2"
+      }
+    ],
+    "directives": [],
+    "maskReferences": [],
+    "vertexEntryPoint": "generated_cgvprog_particle_diffpass_proj_simple_vertex",
+    "pipelineCategory": "particle",
+    "lookupAliases": [
+      "particlelight"
+    ],
+    "uniforms": [
+      {
+        "name": "Ambient",
+        "type": "FLOAT4",
+        "semantic": ""
+      },
+      {
+        "name": "Diffuse",
+        "type": "FLOAT4",
+        "semantic": ""
+      },
+      {
+        "name": "GlobalFogColor",
+        "type": "float4",
+        "semantic": ""
+      }
+    ],
+    "textures": [
+      {
+        "name": "baseMap",
+        "type": "sampler2D",
+        "semantic": "texunit0",
+        "slot": 0
       }
     ],
     "pipeline": {

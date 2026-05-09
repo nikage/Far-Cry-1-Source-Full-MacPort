@@ -254,6 +254,68 @@ no_draw			nodraw
           reason: 'manifest lookupAliases must register normalized engine name');
     });
 
+    test('contains ParticleLight -> CGRCParticleLight (decal particle light)',
+        () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'particlelight')
+          .firstOrNull;
+      expect(row, isNotNull,
+          reason: 'ParticleLight must alias for CDecalManager EF_SYSTEM load');
+      expect(row!.target, equalsIgnoringCase('CGRCParticleLight'),
+          reason: 'Metal port fragment CGRCParticleLight');
+    });
+
+    test('ParticleLight alias produces lookupAliases on cgrcparticlelight',
+        () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgrcparticlelight'], contains('particlelight'));
+    });
+
+    test('contains Decal_VP -> CGVProgDecal', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'decal_vp')
+          .firstOrNull;
+      expect(row, isNotNull);
+      expect(row!.target, equalsIgnoringCase('CGVProgDecal'));
+    });
+
+    test('Decal_VP alias produces lookupAliases on cgvprogdecal', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgvprogdecal'], contains('decal_vp'));
+    });
+
+    test('contains Decal_2D_VP -> CGVProgDecal_2D_Atten', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'decal_2d_vp')
+          .firstOrNull;
+      expect(row, isNotNull);
+      expect(row!.target, equalsIgnoringCase('CGVProgDecal_2D_Atten'));
+    });
+
+    test('Decal_2D_VP alias produces lookupAliases on cgvprogdecal_2d_atten',
+        () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgvprogdecal_2d_atten'], contains('decal_2d_vp'));
+    });
+
     test('Aliases.txt template targets fold onto CGRC manifest keys', () {
       final File aliases = _findAliasesTxt();
       final Map<String, List<String>> byTarget =
