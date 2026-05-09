@@ -359,6 +359,29 @@ no_draw			nodraw
       expect(byTarget['cgrcbumpsunglow'], contains('bumpsunglow'));
     });
 
+    test('contains OcclusionTest -> colortex (ocean occlusion EF_SYSTEM)', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'occlusiontest')
+          .firstOrNull;
+      expect(row, isNotNull,
+          reason: 'OcclusionTest must alias when RFT_OCCLUSIONTEST '
+              '(terrain_water_quad EF_SYSTEM)');
+      expect(row!.target, equalsIgnoringCase('colortex'),
+          reason: 'Metal builtin colortex stand-in; no CGRCOcclusionTest port');
+    });
+
+    test('OcclusionTest alias buckets under colortex for builtin_lookup_aliases',
+        () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['colortex'], contains('occlusiontest'));
+    });
+
     test('contains Decal_VP -> CGVProgDecal', () {
       final File aliases = _findAliasesTxt();
       final List<AliasesTxtEntry> entries =

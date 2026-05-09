@@ -2499,6 +2499,32 @@ int main()
             const std::string manifest = ss.str();
             CHECK(!manifest.empty());
 
+            // builtin_lookup_aliases.json — same Generated/ directory as manifest.
+            auto builtinAliasPath = [&]() -> std::string {
+                const size_t slash = manifestPath.find_last_of('/');
+                if (slash == std::string::npos) return std::string();
+                return manifestPath.substr(0, slash + 1) + "builtin_lookup_aliases.json";
+            };
+            auto builtinArrayContains = [](const std::string& json,
+                                           const std::string& builtinKey,
+                                           const std::string& alias) -> bool {
+                const std::string key = "\"" + builtinKey + "\"";
+                const size_t p = json.find(key);
+                if (p == std::string::npos) return false;
+                const size_t brack = json.find('[', p);
+                if (brack == std::string::npos) return false;
+                int depth = 1;
+                size_t i = brack + 1;
+                for (; i < json.size() && depth > 0; ++i) {
+                    if (json[i] == '[') ++depth;
+                    else if (json[i] == ']') --depth;
+                }
+                if (depth != 0) return false;
+                const std::string arr = json.substr(brack, i - brack);
+                const std::string quoted = "\"" + alias + "\"";
+                return arr.find(quoted) != std::string::npos;
+            };
+
             // Returns true iff `manifest` contains a fragment block whose
             // `"normalized": "<frag>"` is followed (within the same block) by a
             // `"lookupAliases"` array containing `"<alias>"`.
@@ -2539,6 +2565,17 @@ int main()
             CHECK(hasLookupAlias("cgrcparticlelight", "particlelight"));
             // BumpSunGlow — terrain_water_quad.cpp EF_SYSTEM; XML SunWaterRefl default.
             CHECK(hasLookupAlias("cgrcbumpsunglow", "bumpsunglow"));
+            // OcclusionTest — terrain_water_quad.cpp EF_SYSTEM when RFT_OCCLUSIONTEST;
+            // aliases to builtin colortex (no CGRC port).
+            {
+                const std::string bpath = builtinAliasPath();
+                CHECK(!bpath.empty());
+                std::ifstream bf(bpath);
+                std::stringstream bs; bs << bf.rdbuf();
+                const std::string bjson = bs.str();
+                CHECK(!bjson.empty());
+                CHECK(builtinArrayContains(bjson, "colortex", "occlusiontest"));
+            }
             // TerrainWater_OnlySky — CustomAliases.txt NV1X-style row; Metal merges
             // into lookupAliases on CGRCLowMedWater (manifest normalized cgrclowmedwater).
             CHECK(hasLookupAlias("cgrclowmedwater", "terrainwater_onlysky"));

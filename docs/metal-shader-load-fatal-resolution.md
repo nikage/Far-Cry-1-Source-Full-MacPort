@@ -355,7 +355,7 @@ subsystem actually loads. Classify each on demand using §3.
 
 | Module                                           | Names                                                                                |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `Cry3DEngine/terrain_water_quad.cpp`             | `TerrainWaterBottomSimple`, `TerrainWater_FP`, `terrainwater`, `BumpSunGlow` (alias landed §6), `OcclusionTest` |
+| `Cry3DEngine/terrain_water_quad.cpp`             | `TerrainWaterBottomSimple`, `TerrainWater_FP`, `terrainwater`, `BumpSunGlow` (alias landed §6), `OcclusionTest` (builtin alias §6) |
 | `Cry3DEngine/DecalManager.cpp`                   | `ParticleLight`, `Decal_VP`, `Decal_2D_VP`                                            |
 | `Cry3DEngine/3dEngineLoad.cpp`                   | `FogLayer` (×2 via XML), level-XML shore/water/sun/lensflare loaders                  |
 | `Cry3DEngine/3DEngineLight.cpp`                  | `StencilState_Terrain`, `GlowingMonkeyEyes`, dynamic XML light shaders                |
@@ -381,6 +381,7 @@ subsystem actually loads. Classify each on demand using §3.
 | `flare_from_light` | `cgrcflare`       | Pre-existing alias retained from earlier work.                                              |
 | `default`          | `cgrcdefault`     | `CGRCDefault` is the Metal port's authored "default decal" component used by `BrushLM::SetChunk` when material binding is absent. |
 | `bumpsunglow`      | `cgrcbumpsunglow` | `terrain_water_quad.cpp` and level XML `Environment/Shaders/SunWaterRefl` default call `EF_LoadShader("BumpSunGlow", …, EF_SYSTEM)`; logical name normalizes to `bumpsunglow`, manifest key is `cgrcbumpsunglow`. |
+| `occlusiontest`    | `colortex` (builtin) | `terrain_water_quad.cpp` calls `EF_LoadShader("OcclusionTest", …, EF_SYSTEM)` when `RFT_OCCLUSIONTEST`; no `CGRCOcclusionTest` in the Metal port — `colortex` is the registered builtin stand-in via `builtin_lookup_aliases.json`. |
 
 To add a new alias:
 

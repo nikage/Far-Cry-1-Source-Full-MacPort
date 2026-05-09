@@ -11,6 +11,7 @@ Default                    CGRCDefault
 ScreenTexMap               CGRCScreenTexMap
 ParticleLight              CGRCParticleLight
 BumpSunGlow                CGRCBumpSunGlow
+OcclusionTest              colortex
 Decal_VP                   CGVProgDecal
 Decal_2D_VP                CGVProgDecal_2D_Atten
 
