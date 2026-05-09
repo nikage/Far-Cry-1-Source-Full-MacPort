@@ -1,5 +1,7 @@
 # Metal Renderer — MacPort Implementation Plan
 
+**See also:** [Metal renderer production roadmap](metal_renderer_production_roadmap.md) — phased path to shippable confidence (packaging, shader resolution, QA, automation).
+
 > Status key: ✅ Done · 🔶 Partial · ❌ Blocked · 🔲 Pending
 
 ---
@@ -44,8 +46,8 @@ The CPU-side struct and the MSL `Uniforms` struct are independent definitions.
 | ------------------- | ------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | p3-toolchain        | `parser.dart` → `metal_generator.dart` → `.metal` + manifest  | ✅      | 995 Metal files generated under `RenderDll/XRenderMetal/Generated/`                                                                                                                                               |
 | p3-manifest         | `generated_manifest.json` structure & required fields         | ✅      | All entries have `source`, `stage`, `entryPoint`, `normalized`, `uniformStruct`, `pipeline`, `vertexAttributes`                                                                                                   |
-| p3-manifest-pairing      | `vertexEntryPoint` field on fragment entries                  | 🔶     | 340/589 (57%) paired via token-based heuristic in `metal_generator.dart`; remaining 43% are post-process/HDR shaders using a fullscreen-quad vertex not identifiable by name; `MetalShaderLoader` runtime heuristic handles the rest |
-| p3-manifest-pairing-crycg | Parse technique/pass declarations from `.crycg` source to resolve remaining pairings | ✅ | `parseTechniquePairs()` added to `parser.dart`; token-based heuristic in `metal_generator.dart` improved from 23% → 57%; unit tests pass (20 tests) |
+| p3-manifest-pairing      | `vertexEntryPoint` field on fragment entries                  | ✅      | All 589 fragment manifest rows include `vertexEntryPoint`; pairing order is `shader_pair_overrides.json` → technique-file scan (`parseTechniquePairs` over `Assets/.../Shaders/Source` when `Technique` blocks exist) → `_resolveVertexEntryPoint` heuristic; `validate_pairs` reports 100% coverage |
+| p3-manifest-pairing-crycg | Parse technique/pass declarations from `.crycg` source to resolve remaining pairings | ✅ | `parseTechniquePairs()` in `parser.dart`; generator merges technique-derived pairings before the stem heuristic; unit tests cover parser + `loadTechniqueFragmentToVertexShaderMap` |
 | p3-shader-slots     | Per-shader uniform buffer slots                               | ✅      | Fragment `[[buffer(2)]]` = `kMetalPerShaderFragmentUniformSlot`; vertex `[[buffer(5)]]` = `kMetalPerShaderVertexUniformSlot`; global `Uniforms` remains at `[[buffer(0)]]`/`[[buffer(2)]]`; no collision          |
 | p3-shader-ambient   | `CGRCAmbient` / `CGVProgAmbientTempl` MSL translation         | 🔶     | Compiled into `GeneratedShaders.metallib` (5 MB); all 995 shaders include `[[function_constant]]` + `[[user(name)]]` attributes; visual validation pending |
 | p3-shader-bump      | Bump/DiffSpec/EnvLight family                                 | 🔶     | Compiled into metallib; visual validation pending |
@@ -149,7 +151,8 @@ Hot-path guards (called every frame) use `assert`; init-path failures use `iLog-
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Stale `METAL_COMPILER-NOTFOUND` in CMake cache | `METAL_COMPILER_AVAILABLE` may be `FALSE` from a previous configure run                   | Delete `build/CMakeCache.txt` and re-run `cmake`; `xcrun metal` resolves correctly |
 | No GPU frame captured in automated CI          | Cannot validate PSO correctness programmatically                                          | Manual Xcode GPU Frame Capture via `metal_gpucapture 1` CVar                       |
-| ~43% of fragment shaders lack `vertexEntryPoint` | MetalShaderLoader must fall back to runtime heuristic for these entries                  | Post-process / HDR shaders use a generic fullscreen-quad VS; no additional mapping needed |
+| Manifest–vertex drift if generator not re-run | Stale `vertexEntryPoint` vs emitted VS outputs                                                          | After shader changes run `dart tools/shader_port/bin/validate_migration.dart .`; commit regenerated `Generated/` + manifest |
+| `EF_SYSTEM` caller-bug class in legacy engine modules | `ShaderLoadFatal` aborts when modules pass `EF_SYSTEM` for shaders the Metal port does not ship (legacy CryEngine 1 high-level `Shader 'X' ( … )` blocks, never-defined names). Startup path is fixed (4 modules, 20 calls). Subsystems that load only on gameplay (`CryAnimation/*`, `terrain_water_quad`, `DecalManager`, `3DEngineLight` XML lights, etc.) still carry the bug. | Per-module classification using the decision tree in [`metal-shader-load-fatal-resolution.md`](metal-shader-load-fatal-resolution.md). Iterate `lldb --batch` → classify (true-alias / missing-shader / caller-bug) → fix → regress-test → rebuild. |
 
 
 ---
@@ -159,8 +162,9 @@ Hot-path guards (called every frame) use `assert`; init-path failures use `iLog-
 
 | Layer                       | Tool                                   | State                              |
 | --------------------------- | -------------------------------------- | ---------------------------------- |
-| Shader toolchain unit tests | `dart test` (20 manifest tests + others) | ✅ All passing                    |
-| C++ renderer logic tests    | CTest (`RendererLogicTests`)           | ✅ Passing                          |
+| Shader toolchain unit tests | `dart test` (`tools/shader_port/`)     | ✅ 418/418 passing                 |
+| C++ renderer logic tests    | `clang++ -std=c++17 RendererLogicTests.cpp` | ✅ 429/429 passing — anchors caller-bug fixes (`LoadRendererShaderSafe`, `CTerrain::CTerrain`, `CTerrain::LoadTerrain`, `CPartManager::CPartManager`, `Terrain` keeps `EF_SYSTEM`) and manifest `lookupAliases` (`crylight → cgrcflare`, `default → cgrcdefault`) |
+| Shader-fatal runtime gate   | `lldb --batch -s build/shader_abort_session.lldb` | ✅ Startup path reaches `main(): Starting game` with zero `ShaderLoadFatal` aborts |
 | Metal validation layer      | Xcode Metal Validation (runtime)       | Manual only                        |
 | GPU frame capture           | `metal_gpucapture` CVar (DEBUG builds) | Available                          |
 | Screenshot regression       | `ScreenShot` → TGA                     | Implemented; needs manual baseline |

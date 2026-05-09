@@ -7,6 +7,11 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <vector>
 
 #include "../PixelFormatUtils.h"
@@ -2439,6 +2444,258 @@ int main()
 
         // Negative density edge-case: result is same as zero-density no-fog
         CHECK_NEAR(calcFogScale(0.0f, 0.0f), 0.0f, 1e-5f);
+    }
+
+    // --------------------------------------------------------------------------
+    // Generated manifest — strict alias regression
+    // Asserts every name the engine resolves through EF_LoadShader(EF_SYSTEM)
+    // either lands as a manifest fragment (`"normalized"`) or as a registered
+    // `"lookupAliases"` entry. Each row here corresponds to one captured
+    // ShaderLoadFatal stack we have classified and resolved.
+    // --------------------------------------------------------------------------
+    {
+        auto fileExists = [](const std::string& p) -> bool {
+            struct stat st; return ::stat(p.c_str(), &st) == 0;
+        };
+        // Walk up from `dir` until a directory containing BOTH
+        // `tools/shader_port` and `RenderDll/XRenderMetal/Generated` is found.
+        auto walkUpToProjectRoot = [&](std::string dir) -> std::string {
+            for (size_t i = 0; i < 12; ++i) {
+                std::string candidate =
+                    dir + "/RenderDll/XRenderMetal/Generated/generated_manifest.json";
+                if (fileExists(candidate) &&
+                    fileExists(dir + "/tools/shader_port"))
+                    return candidate;
+                size_t slash = dir.find_last_of('/');
+                if (slash == std::string::npos) break;
+                dir = dir.substr(0, slash);
+                if (dir.empty()) break;
+            }
+            return std::string();
+        };
+        auto findManifest = [&]() -> std::string {
+            // 1) Try walk-up from __FILE__ (works when compiled with absolute paths).
+            const std::string fileStr = __FILE__;
+            const size_t fileSlash = fileStr.find_last_of('/');
+            if (fileSlash != std::string::npos) {
+                const std::string fromFile =
+                    walkUpToProjectRoot(fileStr.substr(0, fileSlash));
+                if (!fromFile.empty()) return fromFile;
+            }
+            // 2) Walk up from current working directory.
+            char cwd[4096];
+            if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+                const std::string fromCwd = walkUpToProjectRoot(std::string(cwd));
+                if (!fromCwd.empty()) return fromCwd;
+            }
+            return std::string();
+        };
+
+        const std::string manifestPath = findManifest();
+        CHECK(!manifestPath.empty());
+        if (!manifestPath.empty()) {
+            std::ifstream f(manifestPath);
+            std::stringstream ss; ss << f.rdbuf();
+            const std::string manifest = ss.str();
+            CHECK(!manifest.empty());
+
+            // Returns true iff `manifest` contains a fragment block whose
+            // `"normalized": "<frag>"` is followed (within the same block) by a
+            // `"lookupAliases"` array containing `"<alias>"`.
+            auto hasLookupAlias =
+                [&manifest](const std::string& frag, const std::string& alias) -> bool {
+                const std::string normKey = "\"normalized\": \"" + frag + "\"";
+                size_t pos = 0;
+                while (true) {
+                    size_t k = manifest.find(normKey, pos);
+                    if (k == std::string::npos) return false;
+                    size_t blockEnd = manifest.find("\n  }", k);
+                    if (blockEnd == std::string::npos) blockEnd = manifest.size();
+                    const std::string block = manifest.substr(k, blockEnd - k);
+                    size_t la = block.find("\"lookupAliases\"");
+                    if (la != std::string::npos) {
+                        const std::string aliasQuoted = "\"" + alias + "\"";
+                        if (block.find(aliasQuoted, la) != std::string::npos)
+                            return true;
+                    }
+                    pos = k + normKey.size();
+                }
+            };
+
+            // CryLight — engine LoadRendererShaderSafe("CryLight") at
+            // Cry3DEngine/3dEngine.cpp:184 / 3dEngineLoad.cpp:715. Legacy
+            // CryEngine 1 lens-flare shader; Metal port is CGRCFlare.
+            CHECK(hasLookupAlias("cgrcflare", "crylight"));
+            // flare_from_light — pre-existing hardcoded alias on cgrcflare.
+            CHECK(hasLookupAlias("cgrcflare", "flare_from_light"));
+            // Default — engine LoadRendererShaderSafe("Default") at
+            // Cry3DEngine/3dEngine.cpp:186. Canonical default-material shader;
+            // Metal port is CGRCDefault.
+            CHECK(hasLookupAlias("cgrcdefault", "default"));
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // Caller-bug regression — soft-load engine shaders must NOT pass EF_SYSTEM.
+    //
+    // Two distinct caller-bug fixes are anchored here:
+    //  1. LoadRendererShaderSafe (Cry3DEngine/3dEngine.cpp): the *Safe naming
+    //     and every call site (3dEngine.cpp:184–257) null-checks the result.
+    //  2. CTerrain::CTerrain (Cry3DEngine/terrain_load.cpp:36–38): m_pSHShore,
+    //     m_pLowResTerrainShader, and m_matSecondPass are all soft-feature
+    //     loads. Every render path null-checks (terrain_init.cpp:36,
+    //     terrain.cpp:417, terrain_sector_beach.cpp:801, terrain_render.cpp).
+    //
+    // Passing EF_SYSTEM in either site turns the call into a hard
+    // ShaderLoadFatal abort, contradicting the call-site contract.
+    // Commit d31e143 introduced the bug; this static-text assertion guarantees
+    // we never reintroduce it.
+    //
+    // Cross-referenced against the shipped FCData/Shaders/CustomAliases.txt:
+    // none of the names loaded through these soft-load paths (CryLight,
+    // Default, ScreenTexMap, ScreenProcess, OutSpace, FarTreeSprites,
+    // ClearStencil, ShadowMapGen, BinocularDistortMask, ScreenDistort,
+    // SniperDistortMask, RainMap, <Stencil>, StencilState, StencilStateInv,
+    // TerrainParticles, TerrainWaterBeach, TerrainLowLOD, TerrainDetailLayers)
+    // appear in the shipping CustomAliases.txt or Aliases.txt, confirming
+    // they are caller-side soft loads, not aliases.
+    // --------------------------------------------------------------------------
+    {
+        auto fileExists = [](const std::string& p) -> bool {
+            struct stat st; return ::stat(p.c_str(), &st) == 0;
+        };
+        auto walkUpToProjectRoot = [&](std::string dir,
+                                       const std::string& probe) -> std::string {
+            for (size_t i = 0; i < 12; ++i) {
+                const std::string candidate = dir + "/" + probe;
+                if (fileExists(candidate) && fileExists(dir + "/tools/shader_port"))
+                    return candidate;
+                const size_t slash = dir.find_last_of('/');
+                if (slash == std::string::npos) break;
+                dir = dir.substr(0, slash);
+                if (dir.empty()) break;
+            }
+            return std::string();
+        };
+        auto findSource = [&](const std::string& probe) -> std::string {
+            const std::string fileStr = __FILE__;
+            const size_t fileSlash = fileStr.find_last_of('/');
+            if (fileSlash != std::string::npos) {
+                const std::string fromFile =
+                    walkUpToProjectRoot(fileStr.substr(0, fileSlash), probe);
+                if (!fromFile.empty()) return fromFile;
+            }
+            char cwd[4096];
+            if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+                const std::string fromCwd =
+                    walkUpToProjectRoot(std::string(cwd), probe);
+                if (!fromCwd.empty()) return fromCwd;
+            }
+            return std::string();
+        };
+        auto readFile = [&](const std::string& path) -> std::string {
+            std::ifstream f(path);
+            std::stringstream ss; ss << f.rdbuf();
+            return ss.str();
+        };
+        auto findFunctionBody = [](const std::string& src,
+                                   const std::string& signature) -> std::string {
+            const size_t fnPos = src.find(signature);
+            if (fnPos == std::string::npos) return std::string();
+            const size_t bodyStart = src.find('{', fnPos);
+            if (bodyStart == std::string::npos) return std::string();
+            int depth = 0;
+            for (size_t i = bodyStart; i < src.size(); ++i) {
+                if (src[i] == '{') ++depth;
+                else if (src[i] == '}') { if (--depth == 0)
+                    return src.substr(bodyStart, i - bodyStart); }
+            }
+            return std::string();
+        };
+
+        // 1) LoadRendererShaderSafe (Cry3DEngine/3dEngine.cpp)
+        {
+            const std::string path = findSource("Cry3DEngine/3dEngine.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body = findFunctionBody(
+                    src, "LoadRendererShaderSafe(const char* shaderName)");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    CHECK(body.find("EF_SYSTEM") == std::string::npos);
+                    CHECK(body.find("EF_LoadShader") != std::string::npos);
+                }
+            }
+        }
+
+        // 2) CTerrain::CTerrain (Cry3DEngine/terrain_load.cpp)
+        {
+            const std::string path = findSource("Cry3DEngine/terrain_load.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body = findFunctionBody(
+                    src, "CTerrain::CTerrain( )");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    CHECK(body.find("EF_SYSTEM") == std::string::npos);
+                    CHECK(body.find("\"TerrainWaterBeach\"") != std::string::npos);
+                    CHECK(body.find("\"TerrainLowLOD\"") != std::string::npos);
+                    CHECK(body.find("\"TerrainDetailLayers\"") != std::string::npos);
+                }
+
+                // 3) CPartManager::CPartManager — soft-loaded particle-light
+                //    shader. m_pPartLightShader is forwarded to
+                //    m_pSpriteMan->Render which tolerates a null shader.
+                {
+                    const std::string pmPath = findSource("Cry3DEngine/partman.cpp");
+                    CHECK(!pmPath.empty());
+                    if (!pmPath.empty()) {
+                        const std::string pmSrc = readFile(pmPath);
+                        CHECK(!pmSrc.empty());
+                        const std::string pmBody = findFunctionBody(
+                            pmSrc, "CPartManager::CPartManager( )");
+                        CHECK(!pmBody.empty());
+                        if (!pmBody.empty()) {
+                            CHECK(pmBody.find("\"ParticleLight\"") != std::string::npos);
+                            CHECK(pmBody.find("EF_SYSTEM") == std::string::npos);
+                        }
+                    }
+                }
+
+                // 4) CTerrain::LoadTerrain — soft-loaded helper terrain shaders
+                //    must NOT pass EF_SYSTEM. The only truly required shader
+                //    here is "Terrain" itself (line 180), which is kept with
+                //    EF_SYSTEM so a missing main terrain shader still aborts.
+                const std::string lt = findFunctionBody(
+                    src, "CTerrain::LoadTerrain(bool bEditorMode)");
+                CHECK(!lt.empty());
+                if (!lt.empty()) {
+                    auto loadShaderHasSystemFlag =
+                        [&](const std::string& shaderName) -> bool {
+                        const std::string needle = "\"" + shaderName + "\"";
+                        size_t p = lt.find(needle);
+                        if (p == std::string::npos) return false;
+                        const size_t lineEnd = lt.find('\n', p);
+                        const std::string line = lt.substr(p, lineEnd - p);
+                        return line.find("EF_SYSTEM") != std::string::npos;
+                    };
+                    // soft-loaded helpers — must NOT use EF_SYSTEM
+                    CHECK(!loadShaderHasSystemFlag("TerrainLightPass"));
+                    CHECK(!loadShaderHasSystemFlag("TerrainShadowPass"));
+                    CHECK(!loadShaderHasSystemFlag("TerrainWithDefaultDetailTexture"));
+                    CHECK(!loadShaderHasSystemFlag("TerrainWithFog"));
+                    CHECK(!loadShaderHasSystemFlag("TerrainLayer"));
+                    CHECK(!loadShaderHasSystemFlag("TerrainDetailTextureLayers"));
+                    // main terrain shader — must REMAIN EF_SYSTEM (genuinely
+                    // system-required; manifest-resolved as `cgrcterrain`)
+                    CHECK(loadShaderHasSystemFlag("Terrain"));
+                }
+            }
+        }
     }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);

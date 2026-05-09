@@ -631,9 +631,6 @@ static void WriteUniformElement(const CMetalShaderManager::ShaderInfo::UniformRu
     }
 }
 }
-void CMetalShaderManager::InitializeShaderFallbacks()
-{
-}
 
 void CMetalShaderManager::RegisterShaderAlias(const char* alias, const char* target)
 {

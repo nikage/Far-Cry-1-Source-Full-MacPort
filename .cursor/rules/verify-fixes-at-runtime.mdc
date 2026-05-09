@@ -1,0 +1,32 @@
+---
+description: Always verify fixes at runtime after applying them
+alwaysApply: true
+---
+
+# Verify Fixes at Runtime
+
+After applying any fix, always verify it works at runtime — not just at compile time or via unit tests alone.
+
+## Required verification steps
+
+1. **Build succeeds** — zero compiler errors or warnings introduced by the change.
+2. **Unit tests pass** — run the test suite for every affected component (see `run-tests-before-commit.mdc`).
+3. **Runtime smoke check** — launch the relevant executable or subsystem and confirm the fix holds under real conditions.
+
+## Examples
+
+```
+// ❌ BAD — fix applied, tests green, but never launched
+// "It compiles and tests pass, shipping."
+
+// ✅ GOOD — fix applied, tests green, then runtime verified
+// 1. clang++ ... && ./renderer_logic_tests  → all pass
+// 2. Launch game in DEBUG → reaches main menu, no assert fires
+// 3. Load a level → first frame completes, fix confirmed
+```
+
+## Rules
+
+- Never mark a fix as done until it has been observed working in a running process.
+- If a runtime check is not possible (e.g. hardware not available), state the blocker explicitly and get explicit user sign-off before skipping.
+- For renderer/shader changes, the integration smoke checklist in `run-tests-before-commit.mdc` is the minimum runtime gate.

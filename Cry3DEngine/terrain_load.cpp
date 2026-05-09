@@ -33,9 +33,9 @@ CTerrain::CTerrain( )
   m_nOldSectorsX = 0;
   m_nOldSectorsY =-1;
 
-  m_pSHShore = GetRenderer()->EF_LoadShader("TerrainWaterBeach", eSH_World, EF_SYSTEM);
-	m_pLowResTerrainShader = GetRenderer()->EF_LoadShader("TerrainLowLOD", eSH_World, EF_SYSTEM);
-	m_matSecondPass.shaderItem.m_pShader = GetRenderer()->EF_LoadShader("TerrainDetailLayers", eSH_World, EF_SYSTEM);
+  m_pSHShore = GetRenderer()->EF_LoadShader("TerrainWaterBeach", eSH_World, 0);
+	m_pLowResTerrainShader = GetRenderer()->EF_LoadShader("TerrainLowLOD", eSH_World, 0);
+	m_matSecondPass.shaderItem.m_pShader = GetRenderer()->EF_LoadShader("TerrainDetailLayers", eSH_World, 0);
 
   m_fShoreSize=2;
 
@@ -180,18 +180,18 @@ bool CTerrain::LoadTerrain(bool bEditorMode)
   m_pTerrainEf                          = GetRenderer()->EF_LoadShader("Terrain", eSH_World, EF_SYSTEM);
 //  m_pTerrainZPassEf                     = GetRenderer()->EF_LoadShader("ZBuffPassVP", eSH_World, 0);
 //  m_pTerrainVPEf                        = GetRenderer()->EF_LoadShader("TerrainVP", eSH_World, 0);
-  m_pTerrainLightPassEf                 = GetRenderer()->EF_LoadShader("TerrainLightPass", eSH_World, EF_SYSTEM);
-  m_pTerrainShadowPassEf                = GetRenderer()->EF_LoadShader("TerrainShadowPass", eSH_World, EF_SYSTEM);
-  m_pTerrainEf_WithDefaultDetailTexture = GetRenderer()->EF_LoadShader("TerrainWithDefaultDetailTexture", eSH_World, EF_SYSTEM);
-	m_pTerrainWithFog											=	GetRenderer()->EF_LoadShader("TerrainWithFog", eSH_World, EF_SYSTEM);
-	m_pTerrainLayerEf											= GetRenderer()->EF_LoadShader("TerrainLayer",eSH_World,EF_SYSTEM);
+  m_pTerrainLightPassEf                 = GetRenderer()->EF_LoadShader("TerrainLightPass", eSH_World, 0);
+  m_pTerrainShadowPassEf                = GetRenderer()->EF_LoadShader("TerrainShadowPass", eSH_World, 0);
+  m_pTerrainEf_WithDefaultDetailTexture = GetRenderer()->EF_LoadShader("TerrainWithDefaultDetailTexture", eSH_World, 0);
+	m_pTerrainWithFog											=	GetRenderer()->EF_LoadShader("TerrainWithFog", eSH_World, 0);
+	m_pTerrainLayerEf											= GetRenderer()->EF_LoadShader("TerrainLayer",eSH_World,0);
 
 //  m_pTerrainCausticsEf = GetRenderer()->EF_LoadShader("TerrainCaustics", eSH_World, 0);
 //  if(m_pTerrainCausticsEf->GetFlags() & EF_NOTFOUND)
   //  m_pTerrainCausticsEf=0;
 
   m_pRETerrainDetailTextureLayers  = (CRETerrainDetailTextureLayers*)GetRenderer()->EF_CreateRE(eDATA_TerrainDetailTextureLayers);
-  m_pTerrainDetailTextureLayersEff = GetRenderer()->EF_LoadShader("TerrainDetailTextureLayers", eSH_World, EF_SYSTEM);
+  m_pTerrainDetailTextureLayersEff = GetRenderer()->EF_LoadShader("TerrainDetailTextureLayers", eSH_World, 0);
 
   GetLog()->Log("Terrain was loaded in %.2f sec", GetCurAsyncTimeSec()-fStartTime );
 

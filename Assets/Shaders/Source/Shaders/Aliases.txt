@@ -6,4 +6,6 @@ tbs_HP			templbumpspec_HP
 tbd_NOCM		TemplBumpDiffuse_NOCM
 no_draw			nodraw
 tbs_GA_CM                  TemplBumpSpec_GlossAlpha_EnvCMAmb
+CryLight                   CGRCFlare
+Default                    CGRCDefault
 

@@ -287,6 +287,20 @@ void main() {
       }
     });
 
+    test('every fragment entry includes vertexEntryPoint', () {
+      final List<Map<String, dynamic>> fragments =
+          manifest.where((e) => e['stage'] == 'fragment').toList();
+      final List<Map<String, dynamic>> missing = fragments
+          .where((e) => !e.containsKey('vertexEntryPoint'))
+          .toList();
+      expect(
+        missing,
+        isEmpty,
+        reason: 'Fragments missing vertexEntryPoint:\n'
+            '${missing.map((e) => '  ${e['shader']}').join('\n')}',
+      );
+    });
+
     test('every fragment has vertexEntryPoint or pipelineCategory == fullscreen', () {
       final List<Map<String, dynamic>> fragments =
           manifest.where((e) => e['stage'] == 'fragment').toList();

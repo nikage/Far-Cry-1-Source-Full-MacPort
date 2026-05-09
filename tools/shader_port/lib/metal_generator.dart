@@ -5,6 +5,8 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'reflection_adapter.dart';
+import 'alias_auditor.dart';
+import 'parser.dart' show parseTechniquePairs;
 
 part 'shader_ir_models.dart';
 part 'shader_ir_parser.dart';
@@ -16,6 +18,93 @@ part 'transformers/math_transformers.dart';
 part 'transformers/uniform_transformers.dart';
 part 'emission_strategies.dart';
 part 'metal_fragment_builder.dart';
+
+List<String> manifestLookupAliasesForNormalizedFragment(
+  String normalized, {
+  Map<String, List<String>>? aliasesTxtByTarget,
+}) {
+  final out = <String>[];
+  void addUnique(String v) {
+    if (!out.contains(v)) out.add(v);
+  }
+  switch (normalized) {
+    case 'cgrcflare':
+      addUnique('flare_from_light');
+    default:
+      break;
+  }
+  final extra = aliasesTxtByTarget?[normalized];
+  if (extra != null) {
+    for (final a in extra) {
+      addUnique(a);
+    }
+  }
+  return out;
+}
+
+/// Returns Aliases.txt targets (already normalized) that did not match any
+/// manifest fragment normalized name. The manifest is the only source of truth
+/// for shader registration; aliases pointing at a non-existent target would be
+/// silently dropped at runtime, which is exactly what the strict policy bans.
+/// The returned list is sorted to make CI output stable.
+Map<String, String> loadTechniqueFragmentToVertexShaderMap(
+  String rootPathWithSep,
+  String sep,
+) {
+  final Map<String, String> out = {};
+  final String shaderSourceRoot =
+      '${rootPathWithSep}Assets${sep}Shaders${sep}Source';
+  final Directory rootDir = Directory(shaderSourceRoot);
+  if (!rootDir.existsSync()) {
+    return out;
+  }
+  const Set<String> extensions = {
+    '.crycg',
+    '.fx',
+    '.cfx',
+    '.ext',
+    '.txt',
+  };
+  for (final FileSystemEntity entity
+      in rootDir.listSync(recursive: true, followLinks: false)) {
+    if (entity is! File) continue;
+    final String lower = entity.path.toLowerCase();
+    bool extOk = false;
+    for (final String ext in extensions) {
+      if (lower.endsWith(ext)) {
+        extOk = true;
+        break;
+      }
+    }
+    if (!extOk) continue;
+    late final String text;
+    try {
+      text = entity.readAsStringSync(encoding: utf8);
+    } catch (_) {
+      continue;
+    }
+    if (!text.contains('Technique')) continue;
+    final Map<String, String> pairs = parseTechniquePairs(text);
+    for (final MapEntry<String, String> e in pairs.entries) {
+      if (e.key.isEmpty) continue;
+      final String k = e.key.toLowerCase();
+      out.putIfAbsent(k, () => e.value);
+    }
+  }
+  return out;
+}
+
+List<String> findUnmatchedAliasTargets(
+  Map<String, List<String>> aliasesTxtByTarget,
+  Set<String> manifestNormalizedKeys,
+) {
+  final unmatched = aliasesTxtByTarget.keys
+      .where((target) => !manifestNormalizedKeys.contains(target))
+      .toList()
+    ..sort();
+  return unmatched;
+}
+
 void main(List<String> args) {
   String? overridesPath;
   String rootArg = '';
@@ -36,11 +125,24 @@ void main(List<String> args) {
   final _ShaderPairOverrides overrides =
       _loadOverrides(overridesPath, rootPath, sep);
 
+  final Map<String, String> techniqueFragToVertShader =
+      loadTechniqueFragmentToVertexShaderMap(rootPath, sep);
+
   final Directory irDir = Directory(rootPath + 'tools${sep}shader_port${sep}output${sep}ir');
   if (!irDir.existsSync()) {
     stderr.writeln('Missing IR directory: ${irDir.path}');
     exit(1);
   }
+
+  final File aliasesTxtFile = File(
+      rootPath + 'Assets${sep}Shaders${sep}Source${sep}Shaders${sep}Aliases.txt');
+  if (!aliasesTxtFile.existsSync()) {
+    stderr.writeln('ERROR: Shaders/Aliases.txt not found at ${aliasesTxtFile.path}');
+    exit(1);
+  }
+  final Map<String, List<String>> aliasesTxtByTarget =
+      buildManifestLookupAliasesByTargetFromEntries(
+          parseAliasesTxt(aliasesTxtFile.readAsStringSync(encoding: utf8)));
   final Directory outDir = Directory(rootPath + 'RenderDll${sep}XRenderMetal${sep}Generated');
   outDir.createSync(recursive: true);
   final File manifest = File(outDir.path + sep + 'generated_manifest.json');
@@ -111,6 +213,7 @@ void main(List<String> args) {
         String? overrideCategory,
       })> fragmentPairing = {};
   int overrideCount = 0;
+  int techniquePairCount = 0;
   for (final s in allShaders) {
     if (s.data.stage != 'fragment') continue;
     final String norm = s.data.normalizedName;
@@ -124,6 +227,20 @@ void main(List<String> args) {
           overrideCategory: ov.category,
         );
         overrideCount++;
+        continue;
+      }
+    }
+    final String? techVertName =
+        techniqueFragToVertShader[s.data.shaderName.toLowerCase()];
+    if (techVertName != null) {
+      final String? techEp = vertexShaderByName[techVertName];
+      if (techEp != null) {
+        fragmentPairing[norm] = (
+          vertexEntryPoint: techEp,
+          vertexNorm: vertexNormByEntryPoint[techEp],
+          overrideCategory: null,
+        );
+        techniquePairCount++;
         continue;
       }
     }
@@ -249,6 +366,9 @@ void main(List<String> args) {
             data.shaderName, result.directives, data.passStates);
     final String pipelineCategory = pairing?.overrideCategory ??
         _derivePipelineCategory(norm, data.shaderName);
+    final List<String> fragmentLookupAliases =
+        manifestLookupAliasesForNormalizedFragment(norm,
+            aliasesTxtByTarget: aliasesTxtByTarget);
     manifestEntries.add({
       'source': s.relative,
       'metal': s.metalFileName,
@@ -266,6 +386,8 @@ void main(List<String> args) {
       'maskReferences': data.maskReferences,
       if (pairing != null) 'vertexEntryPoint': pairing.vertexEntryPoint,
       'pipelineCategory': pipelineCategory,
+      if (fragmentLookupAliases.isNotEmpty)
+        'lookupAliases': fragmentLookupAliases,
       'uniforms': data.uniforms
           .map((u) => {
                 'name': u.name,
@@ -300,7 +422,24 @@ void main(List<String> args) {
       const JsonEncoder.withIndent('  ').convert(manifestEntries));
   stdout.writeln('Generated $generated Metal shader files');
   stdout.writeln(
-      'Paired: ${fragmentPairing.length} fragment shaders ($overrideCount via overrides)');
+      'Paired: ${fragmentPairing.length} fragment shaders ($overrideCount via overrides, $techniquePairCount via technique sources)');
+
+  final Set<String> manifestNormalizedKeys = manifestEntries
+      .map((e) => (e['normalized'] as String?) ?? '')
+      .where((s) => s.isNotEmpty)
+      .toSet();
+  final List<String> unmatchedAliasTargets =
+      findUnmatchedAliasTargets(aliasesTxtByTarget, manifestNormalizedKeys);
+  if (unmatchedAliasTargets.isNotEmpty) {
+    stderr.writeln(
+        'WARN: ${unmatchedAliasTargets.length} Aliases.txt target(s) do not match any manifest fragment normalized name — those aliases were dropped:');
+    for (final target in unmatchedAliasTargets) {
+      final List<String> orphans = aliasesTxtByTarget[target] ?? const [];
+      stderr.writeln('  $target  <-  ${orphans.join(', ')}');
+    }
+    stderr.writeln(
+        'Fix: either add the missing manifest fragment, or update Assets/Shaders/Source/Shaders/Aliases.txt to point at a valid normalized fragment name.');
+  }
 }
 
 class _OverrideResult {

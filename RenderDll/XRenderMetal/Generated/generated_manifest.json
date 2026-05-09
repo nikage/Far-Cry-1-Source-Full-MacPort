@@ -72992,7 +72992,8 @@
     "vertexEntryPoint": "generated_cgvprogscopeflare_vertex",
     "pipelineCategory": "fullscreen",
     "lookupAliases": [
-      "flare_from_light"
+      "flare_from_light",
+      "crylight"
     ],
     "uniforms": [
       {
@@ -77861,6 +77862,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "tbumpspec"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",
@@ -87148,6 +87152,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_gloss_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "tbs_ga_cm"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",
@@ -88034,6 +88041,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogdefault_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "no_draw",
+      "default"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -94585,6 +94596,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "tbumpspec_nocm"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",
@@ -108332,6 +108346,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_hp_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "tbs_hp"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",
@@ -128476,6 +128493,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffpass_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "tbd"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",
@@ -137029,6 +137049,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffpass_atten_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "tbumpdiffuse_nocm",
+      "tbd_nocm"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",

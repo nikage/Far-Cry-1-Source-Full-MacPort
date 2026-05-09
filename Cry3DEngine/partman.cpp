@@ -164,7 +164,7 @@ CPartManager::CPartManager( )
 
   m_nGlowTexID = GetRenderer()->GenerateAlphaGlowTexture(1);
 
-  m_pPartLightShader = GetRenderer()->EF_LoadShader("ParticleLight", eSH_World, EF_SYSTEM);
+  m_pPartLightShader = GetRenderer()->EF_LoadShader("ParticleLight", eSH_World, 0);
 
 //  CPartSpray::InitVertBuffers(GetRenderer());
 }

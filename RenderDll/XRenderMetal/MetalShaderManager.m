@@ -352,7 +352,7 @@ protected:
     bool CompileShader(const std::string& source, id<MTLFunction>& function);
     void SetShaderParameters(id<MTLRenderCommandEncoder> encoder, IShader* shader);
     void BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader);
-    void InitializeShaderFallbacks();
+
     void RegisterShaderAlias(const char* alias, const char* target);
 
     int GetStartupMissingShaderCount() const { return m_nStartupMissingShaders; }

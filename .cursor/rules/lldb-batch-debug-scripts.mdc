@@ -1,0 +1,56 @@
+---
+description: Prefer lldb --batch scripts for automated or repeatable debugging
+alwaysApply: true
+---
+
+# Prefer lldb --batch for Debug Scripts
+
+When writing debug scripts or automating crash/bug investigation, always use `lldb --batch` rather than interactive sessions or ad-hoc shell commands.
+
+## Command pattern
+
+```bash
+lldb --batch \
+  -o "target create ./MyBinary" \
+  -o "run [args]" \
+  -o "bt" \
+  -o "quit" \
+  -- ./MyBinary [args]
+```
+
+Or via a script file:
+
+```bash
+lldb --batch -s debug_session.lldb -- ./MyBinary
+```
+
+Where `debug_session.lldb` contains one command per line:
+
+```
+target create ./MyBinary
+breakpoint set --name CrashingFunction
+run
+bt all
+quit
+```
+
+## Rules
+
+- Use `--batch` for any scripted, CI, or reproducible debug session — never rely on an interactive REPL in automation.
+- Use `-s <script>` for multi-step sessions; use `-o` for short one-liners.
+- Always end batch scripts with `quit` to ensure a clean exit code.
+- Capture output by redirecting stdout: `lldb --batch ... > debug_output.txt 2>&1`.
+- For crash reproduction, pair with `--core <corefile>` when a core dump is available.
+
+## Examples
+
+```bash
+# ❌ BAD — interactive, not reproducible
+lldb ./game_binary
+
+# ✅ GOOD — batch, scriptable, CI-friendly
+lldb --batch -o "target create ./game_binary" -o "run" -o "bt" -o "quit"
+
+# ✅ GOOD — core dump analysis
+lldb --batch --core crash.core -o "bt all" -o "quit" ./game_binary > crash_report.txt 2>&1
+```

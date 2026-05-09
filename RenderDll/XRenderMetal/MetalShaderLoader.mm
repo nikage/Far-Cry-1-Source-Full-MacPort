@@ -1197,7 +1197,6 @@ bool CMetalShaderManager::InitializeDefaultShaderLibrary()
 #if DEBUG
     ValidateShaderPairs(m_renderer->m_device, defaultLibrary);
 #endif
-    InitializeShaderFallbacks();
     
     return true;
 }

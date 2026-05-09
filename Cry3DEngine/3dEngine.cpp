@@ -69,23 +69,13 @@ static IShader* LoadRendererShaderSafe(const char* shaderName)
 		return 0;
 	}
 
-	IShader* shader = Cry3DEngineBase::m_pRenderer->EF_LoadShader(shaderName, eSH_World, EF_SYSTEM);
+	IShader* shader = Cry3DEngineBase::m_pRenderer->EF_LoadShader(shaderName, eSH_World, 0);
 	if (shader)
 		return shader;
 
 	if (Cry3DEngineBase::m_pLog)
 		Cry3DEngineBase::m_pLog->LogError("Failed to load shader '%s'", shaderName);
 
-	if (shaderName && shaderName[0] && strcmp(shaderName, "Default") != 0)
-	{
-		IShader* fallback = Cry3DEngineBase::m_pRenderer->EF_LoadShader("Default", eSH_World, EF_SYSTEM);
-		if (fallback)
-		{
-			if (Cry3DEngineBase::m_pLog)
-				Cry3DEngineBase::m_pLog->LogWarning("Using fallback shader 'Default' instead of '%s'", shaderName);
-			return fallback;
-		}
-	}
 
 	return 0;
 }

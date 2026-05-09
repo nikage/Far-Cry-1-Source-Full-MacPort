@@ -1,5 +1,10 @@
 /// Parser and resolver for CryEngine CustomAliases.txt shader alias tables.
 ///
+/// **Aliases.txt** (engine `Shaders/Aliases.txt`) is a flat tab/space–separated
+/// table: `AliasName  TargetName`. The Metal generator folds these into each
+/// manifest fragment entry's `lookupAliases` so runtime resolves legacy names
+/// without a C++ fallback table.
+///
 /// The file consists of conditional blocks:
 ///   { <cvar|GPU> = <value>
 ///     AliasName  TargetName  [; optional comment]
@@ -24,8 +29,7 @@ const Set<String> kMetalBuiltins = {
   'unlit',
 };
 
-/// Intermediate alias targets that are themselves registered in
-/// InitializeShaderFallbacks (normalized → builtin or manifest name).
+/// Intermediate alias targets (normalized → builtin or manifest name).
 /// We resolve through these so that alias chains like
 ///   TerrainLake → LowSpecWaterOutdoor_FP → terrain
 /// can be fully resolved.
@@ -42,6 +46,22 @@ const Map<String, String> kIntermediateAliases = {
   'terrainwithdefaultdetailtexture_fp': 'terrain',
   'cgrcterra': 'terrain',
 };
+
+const Map<String, String> kAliasesTxtTargetToManifestNormalized = {
+  'nodraw': 'cgrcdefault',
+  'templbumpdiffuse': 'cgrcbump_diff',
+  'templbumpdiffuse_nocm': 'cgrcbump_diff_singlelight_atten',
+  'templbumpspec': 'cgrcbump_diffspec_singlelight_ps20',
+  'templbumpspec_hp': 'cgrcbump_diffspec_singlelight_hp_atten',
+  'templbumpspec_nocm': 'cgrcbump_diffspec_singlelight',
+  'templbumpspec_glossalpha_envcmamb':
+      'cgrcbump_diffspec_singlelight_glossalpha_envcm_ps20',
+};
+
+String resolveAliasesTxtTarget(String normalizedTarget) {
+  return kAliasesTxtTargetToManifestNormalized[normalizedTarget] ??
+      normalizedTarget;
+}
 
 /// One alias entry extracted from CustomAliases.txt.
 class AliasPair {
@@ -127,6 +147,64 @@ String? _resolve(String normalized, Set<String> manifestNames) {
   final intermediate = kIntermediateAliases[normalized];
   if (intermediate != null) return _resolve(intermediate, manifestNames);
   return null;
+}
+
+/// Normalizes a shader name the same way the Metal loader does
+/// (`ConvertDOSToUnixName` + lowercase).
+String normalizeCryShaderLookupName(String name) {
+  if (name.isEmpty) return '';
+  return name.replaceAll(r'\', '/').toLowerCase();
+}
+
+/// One row from `Shaders/Aliases.txt` (flat alias table, no `{` blocks).
+typedef AliasesTxtEntry = ({String alias, String target});
+
+/// Parses the content of **Aliases.txt**: non-empty lines, optional `;` comment,
+/// first two whitespace-separated tokens are alias and target.
+/// Duplicate aliases (case-insensitive): first occurrence wins.
+List<AliasesTxtEntry> parseAliasesTxt(String content) {
+  final pairs = <AliasesTxtEntry>[];
+  final seenAliases = <String>{};
+
+  for (final rawLine in content.split('\n')) {
+    var line = rawLine.trim();
+    if (line.isEmpty || line.startsWith(';')) continue;
+    final commentIdx = line.indexOf(';');
+    if (commentIdx >= 0) {
+      line = line.substring(0, commentIdx).trim();
+    }
+    if (line.isEmpty) continue;
+
+    final parts = line.split(RegExp(r'\s+'));
+    if (parts.length < 2) continue;
+
+    final alias = parts[0].trim();
+    final target = parts[1].trim();
+    if (alias.isEmpty || target.isEmpty) continue;
+
+    final key = alias.toLowerCase();
+    if (seenAliases.contains(key)) continue;
+    seenAliases.add(key);
+    pairs.add((alias: alias, target: target));
+  }
+
+  return pairs;
+}
+
+/// Groups normalized **target** names → alternate lookup names for manifest
+/// `lookupAliases` (targets are manifest `normalized` fragment keys).
+Map<String, List<String>> buildManifestLookupAliasesByTargetFromEntries(
+  List<AliasesTxtEntry> entries,
+) {
+  final map = <String, List<String>>{};
+  for (final p in entries) {
+    final String t =
+        resolveAliasesTxtTarget(normalizeCryShaderLookupName(p.target));
+    final a = normalizeCryShaderLookupName(p.alias);
+    if (t.isEmpty || a.isEmpty || t == a) continue;
+    map.putIfAbsent(t, () => []).add(a);
+  }
+  return map;
 }
 
 /// Audits [pairs] against [manifestNames] (normalized shader names from the

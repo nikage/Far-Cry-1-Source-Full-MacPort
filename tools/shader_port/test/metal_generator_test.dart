@@ -143,6 +143,56 @@ void main() {
       expect(colorMask['alpha'], isFalse);
     });
 
+    test('manifestLookupAliasesForNormalizedFragment maps cgrcflare to flare_from_light',
+        () {
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcflare'),
+        equals(<String>['flare_from_light']),
+      );
+      expect(manifestLookupAliasesForNormalizedFragment('other'), isEmpty);
+      expect(
+        manifestLookupAliasesForNormalizedFragment(
+          'cgrcbump_diffspec_singlelight_ps20',
+          aliasesTxtByTarget: {
+            'cgrcbump_diffspec_singlelight_ps20': <String>['tbumpspec'],
+          },
+        ),
+        equals(<String>['tbumpspec']),
+      );
+    });
+
+    test(
+        'findUnmatchedAliasTargets reports every Aliases.txt target whose '
+        'normalized name is not in the manifest', () {
+      final Map<String, List<String>> aliasesByTarget = {
+        'templbumpspec': <String>['tbumpspec'],
+        'cgrcambienttempl': <String>['default', 'temploldambient'],
+        'nodraw': <String>['no_draw'],
+      };
+      final Set<String> manifestNormalized = <String>{
+        'cgrcambienttempl',
+        'cgrcflare',
+      };
+      final List<String> unmatched =
+          findUnmatchedAliasTargets(aliasesByTarget, manifestNormalized);
+      expect(unmatched, equals(<String>['nodraw', 'templbumpspec']),
+          reason: 'must list only targets missing from the manifest, sorted');
+      expect(unmatched, isNot(contains('cgrcambienttempl')),
+          reason: 'matched targets must not appear in the unmatched list');
+    });
+
+    test('findUnmatchedAliasTargets returns empty when every target matches',
+        () {
+      final Map<String, List<String>> aliasesByTarget = {
+        'cgrcflare': <String>['flare_from_light'],
+      };
+      final Set<String> manifestNormalized = <String>{'cgrcflare'};
+      expect(
+        findUnmatchedAliasTargets(aliasesByTarget, manifestNormalized),
+        isEmpty,
+      );
+    });
+
     test('promotes dot operands for transform texture shader', () {
       final ShaderIrData data = ShaderIrData(
         shaderName: 'CGVProgTransformTexture',
