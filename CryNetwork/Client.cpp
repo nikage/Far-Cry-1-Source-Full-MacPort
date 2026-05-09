@@ -71,7 +71,7 @@ bool CClient::Init(IClientSink *pSink)
 //////////////////////////////////////////////////////////////////////
 // _IClientServices
 //////////////////////////////////////////////////////////////////////
-#if (defined(PS2) || defined(LINUX))
+#if (defined(PS2) || defined(LINUX) || (defined(__APPLE__) && defined(__MACH__)))
 #define FAILED(value) (((unsigned int)(value))&0x80000000)
 #endif
 

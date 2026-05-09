@@ -35,9 +35,9 @@
 #endif // _MSC_VER > 1000
 #endif
 
-#ifdef LINUX
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 #include <time.h>
-#endif //LINUX
+#endif
 
 /*inline int	gethostname(char *__name, size_t __len)
 {
@@ -110,7 +110,7 @@ private:
 	unsigned int			m_nReceivedBytesInThisSec;		//!< is counting up and reseted every second
 	unsigned int			m_nSentPacketsInThisSec;			//!< is counting up and reseted every second
 	unsigned int			m_nReceivedPacketsInThisSec;	//!< is counting up and reseted every second
-#if defined(LINUX)
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
 	struct ip_mreq		m_imMulticastReq;							//!< needed for call to IP_DROP_MEMBERSHIP
 #endif
 

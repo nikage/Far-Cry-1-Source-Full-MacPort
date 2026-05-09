@@ -1,5 +1,8 @@
 // Standalone regression test for CNullNetwork / CNullServer / CNullClient.
 //
+// Production macOS builds load libCryNetwork.dylib from InitNetwork (see SystemInit.cpp);
+// this header-only stub remains for tests and any future headless/offline use.
+//
 // Build (from CrySystem/test/):
 //   clang++ -std=c++17 -I../.. -I../../CryCommon \
 //     -o null_network_tests NullNetworkTests.cpp && ./null_network_tests

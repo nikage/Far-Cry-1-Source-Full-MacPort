@@ -181,7 +181,7 @@ bool CNetwork::Init( IScriptSystem *pScriptSystem )
 	if(CNetwork::m_nCryNetInitialized)
 		return true;
 	
-#if !defined(PS2) && !defined(LINUX)
+#if !defined(PS2) && !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 	WORD wVersionRequested;
 	WSADATA wsaData;
 	int err;
@@ -206,7 +206,7 @@ bool CNetwork::Init( IScriptSystem *pScriptSystem )
 
 	CNetwork::m_nCryNetInitialized+=1;
 	int n=0;
-	while(m_neNetErrors[n].sErrorDescription!='\0'){
+	while (m_neNetErrors[n].sErrorDescription != nullptr) {
 		m_mapErrors[m_neNetErrors[n].nrErrorCode]=m_neNetErrors[n].sErrorDescription;
 		n++;
 	}
@@ -408,7 +408,7 @@ void CNetwork::Release()
 	
 	if (CNetwork::m_nCryNetInitialized)
 		return;
-#if !defined(LINUX)
+#if !defined(LINUX) && !(defined(__APPLE__) && defined(__MACH__))
 	#if !defined(PS2)
 		else	
 			WSACleanup();
@@ -720,6 +720,12 @@ void CNetwork::LogNetworkInfo()
 					(int)(pin_addr_win->S_un.S_un_b.s_b2),
 					(int)(pin_addr_win->S_un.S_un_b.s_b3),
 					(int)(pin_addr_win->S_un.S_un_b.s_b4));
+#elif defined(__APPLE__) && defined(__MACH__)
+				{
+					const unsigned char *pb = reinterpret_cast<const unsigned char *>(&temp.sin_addr.s_addr);
+					CryLogAlways("  ip:%d.%d.%d.%d",
+						(int)pb[0], (int)pb[1], (int)pb[2], (int)pb[3]);
+				}
 #else
 				CryLogAlways("  ip:%d.%d.%d.%d",		//  port:%d  family:%x",	
 					(int)(temp.sin_addr.S_un.S_un_b.s_b1),

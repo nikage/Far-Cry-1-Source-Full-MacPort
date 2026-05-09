@@ -254,29 +254,9 @@ inline bool CIPAddress::operator ==(const CIPAddress& s1)
 
 inline bool CIPAddress::operator <(const CIPAddress& s1) const 
 {
-	if(s1.m_Address.ADDR <m_Address.ADDR)
-	{
-		return true;
-	}
-	else
-	{
-		if(s1.m_Address.ADDR==m_Address.ADDR)
-		{
-			if(s1.m_Address.sin_port<m_Address.sin_port)
-			{
-				return true;
-			}
-			else
-			{
-				return false;
-			}
-		}
-		else
-		{
-			return false;
-		}
-	}
-	
+	if (m_Address.ADDR != s1.m_Address.ADDR)
+		return m_Address.ADDR < s1.m_Address.ADDR;
+	return m_Address.sin_port < s1.m_Address.sin_port;
 }
 
 

@@ -743,6 +743,14 @@ bool CServer::IsLANIP(const CIPAddress &ip)
 	ipb[1] = ip.m_Address.sin_addr_win.S_un.S_un_b.s_b2;
 	ipb[2] = ip.m_Address.sin_addr_win.S_un.S_un_b.s_b3;
 	ipb[3] = ip.m_Address.sin_addr_win.S_un.S_un_b.s_b4;
+#elif defined(__APPLE__) && defined(__MACH__)
+	{
+		uint32_t h = ntohl(ip.m_Address.sin_addr.s_addr);
+		ipb[0] = (unsigned char)(h >> 24);
+		ipb[1] = (unsigned char)(h >> 16);
+		ipb[2] = (unsigned char)(h >> 8);
+		ipb[3] = (unsigned char)h;
+	}
 #else
 	ipb[0] = ip.m_Address.sin_addr.S_un.S_un_b.s_b1;
 	ipb[1] = ip.m_Address.sin_addr.S_un.S_un_b.s_b2;

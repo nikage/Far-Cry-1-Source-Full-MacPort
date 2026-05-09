@@ -132,8 +132,7 @@ add_subdirectory(CryMovie)
 add_subdirectory(CryPhysics)
 add_subdirectory(CryAISystem)
 add_subdirectory(CryFont)
-# CryNetwork excluded as requested - multiplayer functionality
-# add_subdirectory(CryNetwork)
+add_subdirectory(CryNetwork)
 add_subdirectory(CryScriptSystem)
 add_subdirectory(CrySoundSystem)  # Enabled for macOS - Core Audio implementation available
 add_subdirectory(RenderDll)
@@ -154,7 +153,6 @@ endif()
 # Create the working Far Cry executable
 add_executable(FarCry ${FARCRY_SOURCES})
 
-# Link all CryEngine libraries (excluding CryNetwork as requested)
 target_link_libraries(FarCry PRIVATE
     CrySystem
     Cry3DEngine
@@ -166,8 +164,8 @@ target_link_libraries(FarCry PRIVATE
     CryAISystem
     CryFont
     CryScriptSystem
-    CrySoundSystem  # Enabled for macOS - Core Audio implementation available
-    # CryNetwork excluded as requested - multiplayer functionality
+    CrySoundSystem
+    CryNetwork
     CryGame
 )
 
@@ -229,6 +227,7 @@ if(APPLE)
             $<TARGET_FILE:CryFont>
             $<TARGET_FILE:CryScriptSystem>
             $<TARGET_FILE:CrySoundSystem>
+            $<TARGET_FILE:CryNetwork>
             $<TARGET_FILE:CryGame>
             $<TARGET_FILE:XRenderMetal>
             ${FARCRY_BUNDLE_MACOS}

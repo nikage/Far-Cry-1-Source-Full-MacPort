@@ -34,6 +34,16 @@
 #define __noop ((void)0)
 #endif
 
+#ifndef SAFE_DELETE
+#define SAFE_DELETE(p) { if (p) { delete (p); (p) = NULL; } }
+#endif
+#ifndef SAFE_DELETE_ARRAY
+#define SAFE_DELETE_ARRAY(p) { if (p) { delete[] (p); (p) = NULL; } }
+#endif
+#ifndef SAFE_RELEASE
+#define SAFE_RELEASE(p) { if (p) { (p)->Release(); (p) = NULL; } }
+#endif
+
 // Define DebugBreak for compatibility
 #ifndef DebugBreak
 #define DebugBreak() __builtin_trap()
@@ -1259,6 +1269,68 @@ typedef int (*LPDDENUMCALLBACKEXA)(void*, void*, void*, void*, void*);
 
 // Windows socket type
 typedef int SOCKET;
+
+#include <errno.h>
+#ifndef WSAEINTR
+#define WSAEINTR EINTR
+#define WSAEBADF EBADF
+#define WSAEACCES EACCES
+#define WSAEFAULT EFAULT
+#define WSAEINVAL EINVAL
+#define WSAEMFILE EMFILE
+#define WSAEWOULDBLOCK EAGAIN
+#define WSAEINPROGRESS EINPROGRESS
+#define WSAEALREADY EALREADY
+#define WSAENOTSOCK ENOTSOCK
+#define WSAEDESTADDRREQ EDESTADDRREQ
+#define WSAEMSGSIZE EMSGSIZE
+#define WSAEPROTOTYPE EPROTOTYPE
+#define WSAENOPROTOOPT ENOPROTOOPT
+#define WSAEPROTONOSUPPORT EPROTONOSUPPORT
+#define WSAESOCKTNOSUPPORT ESOCKTNOSUPPORT
+#define WSAEOPNOTSUPP EOPNOTSUPP
+#define WSAEPFNOSUPPORT EPFNOSUPPORT
+#define WSAEAFNOSUPPORT EAFNOSUPPORT
+#define WSAEADDRINUSE EADDRINUSE
+#define WSAEADDRNOTAVAIL EADDRNOTAVAIL
+#define WSAENETDOWN ENETDOWN
+#define WSAENETUNREACH ENETUNREACH
+#define WSAENETRESET ENETRESET
+#define WSAECONNABORTED ECONNABORTED
+#define WSAECONNRESET ECONNRESET
+#define WSAENOBUFS ENOBUFS
+#define WSAEISCONN EISCONN
+#define WSAENOTCONN ENOTCONN
+#define WSAESHUTDOWN ESHUTDOWN
+#define WSAETOOMANYREFS ETOOMANYREFS
+#define WSAETIMEDOUT ETIMEDOUT
+#define WSAECONNREFUSED ECONNREFUSED
+#define WSAELOOP ELOOP
+#define WSAENAMETOOLONG ENAMETOOLONG
+#define WSAEHOSTDOWN EHOSTDOWN
+#define WSAEHOSTUNREACH EHOSTUNREACH
+#define WSAENOTEMPTY ENOTEMPTY
+#define WSAEUSERS EUSERS
+#define WSAEDQUOT EDQUOT
+#define WSAESTALE ESTALE
+#define WSAEREMOTE EREMOTE
+#endif
+#if !defined(WSAEPROCLIM) && defined(EPROCLIM)
+#define WSAEPROCLIM EPROCLIM
+#endif
+
+#include <unistd.h>
+#include <sys/ioctl.h>
+#ifndef FIONBIO
+#include <sys/filio.h>
+#endif
+#define closesocket(fd) close((fd))
+#ifdef __cplusplus
+inline int ioctlsocket(int s, unsigned long cmd, unsigned long *argp)
+{
+	return ioctl(s, static_cast<int>(cmd), argp);
+}
+#endif
 
 // Windows POINT structure
 typedef struct tagPOINT {

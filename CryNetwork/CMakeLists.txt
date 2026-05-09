@@ -21,6 +21,9 @@ target_include_directories(CryNetwork PUBLIC
 target_compile_definitions(CryNetwork PRIVATE
     CRYNETWORK_EXPORTS=1
 )
+if(APPLE)
+    target_compile_definitions(CryNetwork PRIVATE NOT_USE_ASE_SDK=1)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(CryNetwork PRIVATE
@@ -29,3 +32,5 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 install(TARGETS CryNetwork LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+
+stage_dylib_to_bundle(CryNetwork)

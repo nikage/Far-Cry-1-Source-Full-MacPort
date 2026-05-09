@@ -17,6 +17,10 @@
 #include "DatagramSocket.h"
 #include "Network.h"
 
+#if defined(LINUX) || (defined(__APPLE__) && defined(__MACH__))
+#define CRYNET_USE_BSD_SOCKET_API 1
+#endif
+
 #ifdef _DEBUG
 static char THIS_FILE[] = __FILE__;
 #define DEBUG_CLIENTBLOCK new( _NORMAL_BLOCK, THIS_FILE, __LINE__) 
@@ -32,7 +36,7 @@ NRESULT CDatagramSocket::Create(SocketType st)
 {
 	int nErr = 0;
 	m_nStartTick=::GetTickCount();
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 	if ((m_hSocket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) 
 #else
 	if ((m_hSocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == INVALID_SOCKET)
@@ -44,7 +48,7 @@ NRESULT CDatagramSocket::Create(SocketType st)
 	m_stSocketType = st;
 	if (m_stSocketType == NonBlocking)
 	{
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 		if(fcntl( m_hSocket, F_SETFL, O_NONBLOCK ) < 0)
 #else
 		unsigned long nTrue = 1;
@@ -64,7 +68,7 @@ void CDatagramSocket::Close()
 	if (m_hSocket == INVALID_SOCKET)
 		return;
 	// disable receiving 
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 	setsockopt(m_hSocket,IPPROTO_IP,IP_DROP_MEMBERSHIP,(char *)&m_imMulticastReq, sizeof(m_imMulticastReq));
 #endif
 	shutdown(m_hSocket, 0x00);
@@ -97,7 +101,7 @@ NRESULT CDatagramSocket::Listen(WORD wPort, CIPAddress *xaMulticastAddress, CIPA
 	if (xaMulticastAddress)
 	{
 		BOOL bReuse=true;
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 		if(setsockopt(m_hSocket,SOL_SOCKET,SO_REUSEADDR,(const char *)&bReuse,sizeof(BOOL)) < 0)
 #else
 		if(setsockopt(m_hSocket,SOL_SOCKET,SO_REUSEADDR,(const char *)&bReuse,sizeof(BOOL)) == SOCKET_ERROR)
@@ -108,7 +112,7 @@ NRESULT CDatagramSocket::Listen(WORD wPort, CIPAddress *xaMulticastAddress, CIPA
 			GetISystem()->GetILog()->Log("setsockopt 1 failed with registering multicast (WSAGetLastError returned %d)",nErr);
 		}
 	}
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 	BOOL bReuse=true;
 	if(setsockopt(m_hSocket,SOL_SOCKET,SO_REUSEADDR,(const char *)&bReuse,sizeof(BOOL)) < 0)
 	{
@@ -127,7 +131,7 @@ NRESULT CDatagramSocket::Listen(WORD wPort, CIPAddress *xaMulticastAddress, CIPA
 	}
 
 	sockaddr_in sockname;
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 	socklen_t size = (socklen_t)sizeof(sockaddr_in);
 #else
 	int size = sizeof(sockaddr_in);
@@ -160,7 +164,7 @@ NRESULT CDatagramSocket::Listen(WORD wPort, CIPAddress *xaMulticastAddress, CIPA
 		}
 
 		imMulticastReq.imr_multiaddr.s_addr = xaMulticastAddress->GetAsUINT();
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 		if (setsockopt(m_hSocket,IPPROTO_IP,IP_ADD_MEMBERSHIP,(char *)&imMulticastReq, sizeof(ip_mreq))  < 0) 
 #else
 		if(setsockopt(m_hSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&imMulticastReq, sizeof(ip_mreq)) == SOCKET_ERROR)
@@ -178,7 +182,7 @@ NRESULT CDatagramSocket::Listen(WORD wPort, CIPAddress *xaMulticastAddress, CIPA
 			Close();
 			return MAKE_NRESULT(NET_FAIL, NET_FACILITY_SOCKET, nErr);
 		}
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 		const int TTL=255; 
 		if(setsockopt(m_hSocket, IPPROTO_IP, IP_MULTICAST_TTL, &TTL, sizeof(TTL)) < 0)
 		{
@@ -209,7 +213,7 @@ NRESULT CDatagramSocket::GetSocketAddresses(CIPAddress *pAddr, DWORD nMaCIPAddre
 	char	buf[256];
 	struct	hostent *hp;
 	sockaddr_in port;
-#if defined(LINUX)	
+#if defined(CRYNET_USE_BSD_SOCKET_API)	
 	socklen_t n;
 #else
 	int n;
@@ -288,18 +292,18 @@ NRESULT CDatagramSocket::Receive(unsigned char *pBuf/*[MAX_UDP_PACKET_SIZE]*/, i
 	if (m_hSocket == INVALID_SOCKET)
 		return NET_SOCKET_NOT_CREATED;
 	int nRetValue;
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 	socklen_t n = (socklen_t)sizeof(sockaddr_in);
 #else
 	int n = sizeof(sockaddr_in);
 #endif
-#if defined(LINUX)
+#if defined(CRYNET_USE_BSD_SOCKET_API)
 	if ((nRetValue = recvfrom(m_hSocket, (char *)pBuf, nBufLen, 0, (sockaddr*)&pFrom.m_Address, &n)) < 0)
 #else
 	if ((nRetValue = recvfrom(m_hSocket, (char *)pBuf, nBufLen, 0, (sockaddr*)&pFrom.m_Address, &n)) == SOCKET_ERROR)
 #endif
 	{
-#if !defined(LINUX)
+#if !defined(CRYNET_USE_BSD_SOCKET_API)
 		int nErr = GetLastError();
 		switch (nErr)
 		{
@@ -317,7 +321,7 @@ NRESULT CDatagramSocket::Receive(unsigned char *pBuf/*[MAX_UDP_PACKET_SIZE]*/, i
 			return MAKE_NRESULT(NET_FAIL, NET_FACILITY_SOCKET, errno);
 #endif
 
-#if !defined(LINUX)
+#if !defined(CRYNET_USE_BSD_SOCKET_API)
 			break;
 		}
 #endif

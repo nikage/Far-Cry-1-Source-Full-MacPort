@@ -4,17 +4,13 @@
 
 #include <INetwork.h>
 
-#if defined(LINUX) || defined(WIN64)
 #include <map>
-#endif
 #ifdef WIN64
-	#define hash_map map
-#else
-#if defined(LINUX)
-#include <ext/hash_map>
-#else
-#include <hash_map>
+#define hash_map map
 #endif
+
+#ifndef _WIN32
+typedef unsigned char byte;
 #endif
 
 #include <IConsole.h>

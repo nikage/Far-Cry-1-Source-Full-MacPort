@@ -117,7 +117,7 @@ void CNETServerSnooper::AddServer(const CIPAddress &ip)
 	Server.dwTimeout = 0;
 	Server.ipAddress = ip;
 
-	m_hmServerTable.insert(std::pair<CIPAddress, NETSnooperServer>(Server.ipAddress, Server));
+	m_hmServerTable.insert(std::make_pair(Server.ipAddress, Server));
 }
 
 //------------------------------------------------------------------------------------------------- 
