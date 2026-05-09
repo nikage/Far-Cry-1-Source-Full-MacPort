@@ -285,6 +285,8 @@ protected:
     // Font rendering state
     unsigned long m_savedViewportWidth;
     unsigned long m_savedViewportHeight;
+    unsigned long m_fontOrthoVirtualW;
+    unsigned long m_fontOrthoVirtualH;
     int m_savedBlendSrc;
     int m_savedBlendDst;
     id<MTLBuffer> m_fontOrthoBuffer;

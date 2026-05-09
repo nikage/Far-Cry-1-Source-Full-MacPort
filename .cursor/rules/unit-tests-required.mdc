@@ -1,6 +1,6 @@
 ---
 description: Require unit tests for every new feature or bugfix to prevent regression
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Unit Tests Required

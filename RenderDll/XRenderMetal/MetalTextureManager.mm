@@ -909,6 +909,8 @@ CMetalTextureManager::CMetalTextureManager(CMetalBaseRenderer* renderer)
     , m_gammaEnabled(false)
     , m_savedViewportWidth(0)
     , m_savedViewportHeight(0)
+    , m_fontOrthoVirtualW(0)
+    , m_fontOrthoVirtualH(0)
     , m_savedBlendSrc(0)
     , m_savedBlendDst(0)
     , m_fontOrthoBuffer(nil)
@@ -2504,10 +2506,12 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
     
     unsigned long width = nVirtualScreenWidth;
     unsigned long height = nVirtualScreenHeight;
+    const int rw = m_renderer->GetWidth();
+    const int rh = m_renderer->GetHeight();
     if (width == 0)
-        width = static_cast<unsigned long>(std::max(1, m_renderer->GetWidth()));
+        width = static_cast<unsigned long>(rw > 0 ? rw : 1);
     if (height == 0)
-        height = static_cast<unsigned long>(std::max(1, m_renderer->GetHeight()));
+        height = static_cast<unsigned long>(rh > 0 ? rh : 1);
     
     m_savedViewportWidth = width;
     m_savedViewportHeight = height;
@@ -2522,14 +2526,13 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
     m_renderer->m_currentPipelineState = fontPSO;
     [m_renderer->m_renderEncoder setRenderPipelineState:fontPSO];
 
-    // font_vertex reads FontUniforms { float4x4 mvp } from [[buffer(kMetalVertexUniformSlot)]].
-    // Font positions are in virtual 800×600 space: ScaleCoordX/Y are identity so positions
-    // written by CryFont's DrawStringW remain in the virtual coordinate system.
-    // Column-major orthographic matrix: x∈[0,800]→NDC[-1,1], y∈[0,600]→NDC[+1,-1].
-    // The matrix is constant — allocate once and reuse (MRC: no ARC in this target).
+    const float W = static_cast<float>(std::max(1ul, width));
+    const float H = static_cast<float>(std::max(1ul, height));
+    if (m_fontOrthoBuffer && (m_fontOrthoVirtualW != width || m_fontOrthoVirtualH != height)) {
+        [m_fontOrthoBuffer release];
+        m_fontOrthoBuffer = nil;
+    }
     if (!m_fontOrthoBuffer) {
-        const float W = 800.0f;
-        const float H = 600.0f;
         const float ortho[16] = {
              2.0f/W, 0.0f,   0.0f, 0.0f,
              0.0f,  -2.0f/H, 0.0f, 0.0f,
@@ -2541,7 +2544,14 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
                         length:sizeof(ortho)
                        options:MTLResourceStorageModeShared];
         assert(m_fontOrthoBuffer != nil && "FontSetRenderingState: failed to allocate font ortho buffer");
+        m_fontOrthoVirtualW = width;
+        m_fontOrthoVirtualH = height;
     }
+#if DEBUG
+    if (m_renderer->GetFrameID() <= 3 && iLog)
+        iLog->Log("[MetalDiag] FontSetRenderingState frame=%d virtualOrtho=%lux%lu",
+                  m_renderer->GetFrameID(), (unsigned long)width, (unsigned long)height);
+#endif
     if (m_fontOrthoBuffer) {
         [m_renderer->m_renderEncoder setVertexBuffer:m_fontOrthoBuffer
                                               offset:0

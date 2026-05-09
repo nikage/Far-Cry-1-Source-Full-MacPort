@@ -198,8 +198,6 @@ public:
     virtual void DrawLabel(Vec3 pos, float font_size, const char * label_text, ...) {}
     virtual void DrawLabelEx(Vec3 pos, float font_size, float * pfColor, bool bFixedSize, bool bCenter, const char * label_text, ...) {}
     virtual void Draw2dLabel( float x,float y, float font_size, float * pfColor, bool bCenter, const char * label_text, ...) {}
-    virtual float ScaleCoordX(float value) { return value; }
-    virtual float ScaleCoordY(float value) { return value; }
     virtual void    SetCullMode     (int mode=R_CULL_BACK) {}
     virtual bool    EnableFog       (bool enable) { return false; }
     virtual void    SetFog          (float density,float fogstart,float fogend,const float *color,int fogmode) {}

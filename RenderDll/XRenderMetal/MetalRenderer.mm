@@ -267,6 +267,8 @@ extern "C" void CryModuleFree(void* ptr)
 CMetalRenderer::CMetalRenderer()
     : m_textureManager(nullptr), m_shaderManager(nullptr),
       m_utilityRenderer(nullptr), m_window(nil), m_windowMetalLayer(nil),
+      m_windowResizeObserver(nil),
+      m_windowBackingObserver(nil),
       m_2DMode(false), m_2DOriginX(0), m_2DOriginY(0),
       m_debugPipelineState(nil), m_metalDumpStatsFlag(0),
       m_metalGPUCaptureFlag(0), m_diagOutputPath() {}
@@ -1173,12 +1175,6 @@ void CMetalRenderer::EF_AddEf(int NumFog, CRendElement *re, IShader *ef,
 }
 
 void CMetalRenderer::EF_EndEf3D(int nFlags) {
-#if DEBUG
-  static int s_endEf3DCount = 0;
-  if (++s_endEf3DCount <= 3)
-    iLog->Log("[Renderer] EF_EndEf3D call #%d nFlags=0x%x frame=%d", s_endEf3DCount, nFlags, m_nFrameID);
-#endif
-
   const int recurse = SRendItem::m_RecurseLevel - 1;
   if (recurse < 0) {
     iLog->Log("Error: EF_EndEf3D without EF_StartEf");
@@ -1196,6 +1192,16 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
       useHDR = BeginHDRPass();
     }
   }
+#if DEBUG
+  {
+    static int s_endEf3DCount = 0;
+    if (++s_endEf3DCount <= 3 && iLog) {
+      iLog->Log("[Renderer] EF_EndEf3D call #%d nFlags=0x%x frame=%d", s_endEf3DCount, nFlags, m_nFrameID);
+      iLog->Log("[MetalDiag] EF_EndEf3D #%d useHDR=%d m_size=%dx%d hdrRT=%dx%d (A/B: r_HDRRendering=0 forces LDR)",
+                 s_endEf3DCount, useHDR ? 1 : 0, m_width, m_height, m_hdrRTWidth, m_hdrRTHeight);
+    }
+  }
+#endif
 
   // Record end-of-list positions for all sort buckets
   for (int i = 0; i < NUMRI_LISTS; ++i) {
@@ -1691,6 +1697,8 @@ bool CMetalRenderer::InitializeManagers() {
 
   // Initialise HDR pipeline if the engine CVar is set
   m_hdrEnabled = (CV_r_hdrrendering != 0);
+  if (iLog)
+    iLog->Log("Metal HDR: r_HDRRendering=%d (use 0 for LDR / HDR-off comparison)\n", CV_r_hdrrendering);
   if (m_hdrEnabled && !InitHDRPipeline()) {
     iLog->Log("Warning: HDR pipeline init failed – disabling HDR\n");
     m_hdrEnabled = false;
@@ -1711,6 +1719,71 @@ void CMetalRenderer::ShutdownManagers() {
   assert(!m_utilityRenderer && "ShutdownManagers: Utility renderer not released!");
   assert(!m_shaderManager && "ShutdownManagers: Shader manager not released!");
   assert(!m_textureManager && "ShutdownManagers: Texture manager not released!");
+}
+
+void CMetalRenderer::UnregisterWindowGeometryObservers() {
+  if (m_windowResizeObserver) {
+    [[NSNotificationCenter defaultCenter] removeObserver:m_windowResizeObserver];
+    [m_windowResizeObserver release];
+    m_windowResizeObserver = nil;
+  }
+  if (m_windowBackingObserver) {
+    [[NSNotificationCenter defaultCenter] removeObserver:m_windowBackingObserver];
+    [m_windowBackingObserver release];
+    m_windowBackingObserver = nil;
+  }
+}
+
+void CMetalRenderer::RegisterWindowGeometryObservers() {
+  UnregisterWindowGeometryObservers();
+  if (!m_window)
+    return;
+  CMetalRenderer* selfPtr = this;
+  m_windowResizeObserver = [[NSNotificationCenter defaultCenter]
+      addObserverForName:NSWindowDidResizeNotification
+                  object:m_window
+                   queue:[NSOperationQueue mainQueue]
+              usingBlock:^(NSNotification*) { selfPtr->SyncMetalLayerDrawableToContentView(); }];
+  if (m_windowResizeObserver)
+    [m_windowResizeObserver retain];
+  m_windowBackingObserver = [[NSNotificationCenter defaultCenter]
+      addObserverForName:NSWindowDidChangeBackingPropertiesNotification
+                  object:m_window
+                   queue:[NSOperationQueue mainQueue]
+              usingBlock:^(NSNotification*) { selfPtr->SyncMetalLayerDrawableToContentView(); }];
+  if (m_windowBackingObserver)
+    [m_windowBackingObserver retain];
+}
+
+void CMetalRenderer::SyncMetalLayerDrawableToContentView() {
+  if (!m_windowMetalLayer || !m_window)
+    return;
+  NSView* contentView = [m_window contentView];
+  if (!contentView)
+    return;
+  NSScreen* screen = [m_window screen];
+  if (!screen)
+    screen = [NSScreen mainScreen];
+  CGFloat scale = (screen && [screen backingScaleFactor] > 0.0) ? [screen backingScaleFactor] : 1.0;
+  if (scale < 1.0)
+    scale = 1.0;
+  NSRect bounds = [contentView bounds];
+  m_windowMetalLayer.contentsScale = scale;
+  const CGFloat pw =
+      fmax(static_cast<CGFloat>(1.0), static_cast<CGFloat>(std::llround(bounds.size.width * scale)));
+  const CGFloat ph =
+      fmax(static_cast<CGFloat>(1.0), static_cast<CGFloat>(std::llround(bounds.size.height * scale)));
+  m_windowMetalLayer.drawableSize = CGSizeMake(pw, ph);
+  const int iw = static_cast<int>(pw);
+  const int ih = static_cast<int>(ph);
+  EnsureBackbufferSize(static_cast<NSUInteger>(iw), static_cast<NSUInteger>(ih));
+  m_viewportWidth = m_width;
+  m_viewportHeight = m_height;
+#if DEBUG
+  if (iLog)
+    iLog->Log("SyncMetalLayerDrawableToContentView: drawable=%dx%d contentsScale=%.3f bounds=%.1fx%.1f\n",
+               iw, ih, scale, bounds.size.width, bounds.size.height);
+#endif
 }
 
 bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
@@ -1764,7 +1837,6 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     m_windowMetalLayer.device = m_device;
     m_windowMetalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     m_windowMetalLayer.framebufferOnly = YES;
-    m_windowMetalLayer.drawableSize = CGSizeMake(width, height);
     m_windowMetalLayer.maximumDrawableCount = 3;
     m_metalLayer = m_windowMetalLayer;
     
@@ -1773,6 +1845,9 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     
     [m_window makeKeyAndOrderFront:nil];
     [m_window makeFirstResponder:contentView];
+
+    SyncMetalLayerDrawableToContentView();
+    RegisterWindowGeometryObservers();
     
     [m_window retain];
     
@@ -1787,6 +1862,7 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
 
 void CMetalRenderer::DestroyGameWindow() {
   @autoreleasepool {
+    UnregisterWindowGeometryObservers();
     if (m_currentDrawable) {
       [m_currentDrawable release];
       m_currentDrawable = nil;
@@ -3037,7 +3113,13 @@ bool CMetalRenderer::ChangeResolution(int nNewWidth, int nNewHeight,
   m_cbpp = nNewColDepth;
   
   if (m_metalLayer) {
-    CGSize size = CGSizeMake(nNewWidth, nNewHeight);
+    CGFloat scale = 1.0;
+    if (m_window && [m_window screen])
+      scale = fmax(1.0, static_cast<double>([[m_window screen] backingScaleFactor]));
+    else if ([NSScreen mainScreen])
+      scale = fmax(1.0, static_cast<double>([[NSScreen mainScreen] backingScaleFactor]));
+    m_metalLayer.contentsScale = scale;
+    CGSize size = CGSizeMake(static_cast<CGFloat>(nNewWidth), static_cast<CGFloat>(nNewHeight));
     m_metalLayer.drawableSize = size;
   }
   

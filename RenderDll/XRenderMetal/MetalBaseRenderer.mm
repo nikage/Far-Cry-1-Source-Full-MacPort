@@ -749,7 +749,10 @@ bool CMetalBaseRenderer::EnsureBackbufferSize(NSUInteger width, NSUInteger heigh
     m_viewportWidth = m_width;
     m_viewportHeight = m_height;
 
-    return InitializeDepthStencilTextures();
+    if (!InitializeDepthStencilTextures())
+        return false;
+    ResizeHDRPipelineIfNeeded();
+    return true;
 }
 
 bool CMetalBaseRenderer::AcquireDrawableResources()
@@ -964,7 +967,11 @@ bool CMetalBaseRenderer::TryEnsureSwapchainRenderEncoderFor2D()
         return false;
     if (m_renderEncoder && m_renderEncoderOpen
         && [m_renderEncoder commandBuffer] == m_currentCommandBuffer)
+    {
+        SetViewport(0, 0, m_width, m_height);
+        SetScissor(0, 0, m_width, m_height);
         return true;
+    }
     ReleaseRenderEncoder();
     return BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionLoad, MTLLoadActionLoad);
 }
@@ -1003,6 +1010,21 @@ void CMetalBaseRenderer::BeginFrame()
         dispatch_semaphore_signal(frameSemaphore);
         return;
     }
+
+#if DEBUG
+    if (needsDrawable && m_currentDrawable && m_nFrameID <= 3 && iLog)
+    {
+        iLog->Log("[MetalDiag] BeginFrame #%d m_width=%d m_height=%d hdrRT=%dx%d vp=%dx%d",
+                  m_nFrameID, m_width, m_height, m_hdrRTWidth, m_hdrRTHeight,
+                  m_viewportWidth, m_viewportHeight);
+        if (m_metalLayer)
+        {
+            CGSize ds = m_metalLayer.drawableSize;
+            iLog->Log("[MetalDiag] layer drawable=%.0fx%.0f contentsScale=%.3f",
+                      ds.width, ds.height, m_metalLayer.contentsScale);
+        }
+    }
+#endif
 
     __block dispatch_semaphore_t completionSemaphore = frameSemaphore;
     [m_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
@@ -2252,17 +2274,46 @@ void CMetalBaseRenderer::SetMaterialParams(const float* ambient, const float* di
     }
 }
 
-bool CMetalBaseRenderer::InitHDRPipeline()
+void CMetalBaseRenderer::CleanupHDRRenderTargets()
 {
-    if (!m_device || m_hdrColorRT)
-        return m_hdrColorRT != nil;
+    if (m_hdrColorRT) {
+        [m_hdrColorRT release];
+        m_hdrColorRT = nil;
+    }
+    if (m_hdrDepthRT) {
+        [m_hdrDepthRT release];
+        m_hdrDepthRT = nil;
+    }
+    if (m_bloomBrightRT) {
+        [m_bloomBrightRT release];
+        m_bloomBrightRT = nil;
+    }
+    if (m_bloomBlurHRT) {
+        [m_bloomBlurHRT release];
+        m_bloomBlurHRT = nil;
+    }
+    if (m_bloomBlurVRT) {
+        [m_bloomBlurVRT release];
+        m_bloomBlurVRT = nil;
+    }
+    m_hdrRTWidth  = 0;
+    m_hdrRTHeight = 0;
+}
 
-    const int w = m_width  > 0 ? m_width  : 1920;
-    const int h = m_height > 0 ? m_height : 1080;
+bool CMetalBaseRenderer::CreateHDRRenderTargets(int w, int h)
+{
+    if (!m_device)
+        return false;
+    w = std::max(1, w);
+    h = std::max(1, h);
+    if (m_hdrColorRT && m_hdrRTWidth == w && m_hdrRTHeight == h)
+        return true;
+
+    CleanupHDRRenderTargets();
+
     m_hdrRTWidth  = w;
     m_hdrRTHeight = h;
 
-    // HDR colour target — RGBA16Float, readable as shader texture
     MTLTextureDescriptor *colorDesc =
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
                                                           width:w height:h mipmapped:NO];
@@ -2270,12 +2321,12 @@ bool CMetalBaseRenderer::InitHDRPipeline()
     colorDesc.storageMode = MTLStorageModePrivate;
     m_hdrColorRT = [m_device newTextureWithDescriptor:colorDesc];
     if (!m_hdrColorRT) {
-        iLog->Log("InitHDRPipeline: failed to allocate HDRColorRT (%dx%d RGBA16Float)\n", w, h);
+        iLog->Log("CreateHDRRenderTargets: failed to allocate HDRColorRT (%dx%d RGBA16Float)\n", w, h);
+        CleanupHDRRenderTargets();
         return false;
     }
     [m_hdrColorRT setLabel:@"HDRColorRT"];
 
-    // HDR depth target — Depth32Float_Stencil8
     MTLTextureDescriptor *depthDesc =
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float_Stencil8
                                                           width:w height:h mipmapped:NO];
@@ -2283,68 +2334,12 @@ bool CMetalBaseRenderer::InitHDRPipeline()
     depthDesc.storageMode = MTLStorageModePrivate;
     m_hdrDepthRT = [m_device newTextureWithDescriptor:depthDesc];
     if (!m_hdrDepthRT) {
-        iLog->Log("InitHDRPipeline: failed to allocate HDRDepthRT (%dx%d Depth32Float_Stencil8)\n", w, h);
-        [m_hdrColorRT release]; m_hdrColorRT = nil;
+        iLog->Log("CreateHDRRenderTargets: failed to allocate HDRDepthRT (%dx%d)\n", w, h);
+        CleanupHDRRenderTargets();
         return false;
     }
     [m_hdrDepthRT setLabel:@"HDRDepthRT"];
 
-    // Build tone-map PSO: fullscreen triangle VS + Reinhard FS
-    id<MTLLibrary> lib = GetShaderLibrary();
-    if (!lib) return false;
-
-    id<MTLFunction> vsFunc = [lib newFunctionWithName:@"hdr_fullscreen_vertex"];
-    id<MTLFunction> fsFunc = [lib newFunctionWithName:@"hdr_tonemap_fragment"];
-    if (!vsFunc || !fsFunc) return false;
-
-    MTLRenderPipelineDescriptor *psoDesc = [[MTLRenderPipelineDescriptor alloc] init];
-    psoDesc.label                           = @"HDRToneMapPSO";
-    psoDesc.vertexFunction                  = vsFunc;
-    psoDesc.fragmentFunction                = fsFunc;
-    psoDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    psoDesc.depthAttachmentPixelFormat      = MTLPixelFormatInvalid;
-
-    NSError *err = nil;
-    m_hdrToneMapPSO = [m_device newRenderPipelineStateWithDescriptor:psoDesc error:&err];
-    if (!m_hdrToneMapPSO) {
-        iLog->Log("HDR ToneMap PSO error: %s",
-                  err ? [[err localizedDescription] UTF8String] : "unknown");
-        return false;
-    }
-
-    // Linear clamp sampler (reused every frame)
-    MTLSamplerDescriptor *sDesc = [[MTLSamplerDescriptor alloc] init];
-    sDesc.minFilter = MTLSamplerMinMagFilterLinear;
-    sDesc.magFilter = MTLSamplerMinMagFilterLinear;
-    sDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
-    sDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
-    m_hdrSampler = [m_device newSamplerStateWithDescriptor:sDesc];
-
-    // Build bloom PSOs (bright-pass + separable Gaussian blur)
-    auto makePSO = [&](NSString* fsName, NSString* label,
-                       MTLPixelFormat fmt) -> id<MTLRenderPipelineState> {
-        id<MTLFunction> fs = [lib newFunctionWithName:fsName];
-        if (!fs) return nil;
-        MTLRenderPipelineDescriptor *d = [[MTLRenderPipelineDescriptor alloc] init];
-        d.label                           = label;
-        d.vertexFunction                  = vsFunc;
-        d.fragmentFunction                = fs;
-        d.colorAttachments[0].pixelFormat = fmt;
-        d.depthAttachmentPixelFormat      = MTLPixelFormatInvalid;
-        NSError *e = nil;
-        id<MTLRenderPipelineState> pso = [m_device newRenderPipelineStateWithDescriptor:d error:&e];
-        if (!pso && e)
-            iLog->Log("HDR PSO '%s' error: %s", [label UTF8String], [[e localizedDescription] UTF8String]);
-        return pso;
-    };
-    m_hdrBrightPassPSO = makePSO(@"hdr_brightpass_fragment", @"HDRBrightPassPSO",
-                                 MTLPixelFormatRGBA16Float);
-    m_hdrBlurHPSO      = makePSO(@"hdr_blur_h_fragment",     @"HDRBlurHPSO",
-                                 MTLPixelFormatRGBA16Float);
-    m_hdrBlurVPSO      = makePSO(@"hdr_blur_v_fragment",     @"HDRBlurVPSO",
-                                 MTLPixelFormatRGBA16Float);
-
-    // Quarter-res bloom targets
     const int bw = std::max(1, w / 4);
     const int bh = std::max(1, h / 4);
     auto makeBloomTex = [&](NSString* label) -> id<MTLTexture> {
@@ -2360,7 +2355,93 @@ bool CMetalBaseRenderer::InitHDRPipeline()
     m_bloomBrightRT = makeBloomTex(@"BloomBrightRT");
     m_bloomBlurHRT  = makeBloomTex(@"BloomBlurHRT");
     m_bloomBlurVRT  = makeBloomTex(@"BloomBlurVRT");
+    if (!m_bloomBrightRT || !m_bloomBlurHRT || !m_bloomBlurVRT) {
+        iLog->Log("CreateHDRRenderTargets: bloom RT allocation failed\n");
+        CleanupHDRRenderTargets();
+        return false;
+    }
+    return true;
+}
 
+bool CMetalBaseRenderer::ResizeHDRPipelineIfNeeded()
+{
+    if (!m_hdrEnabled)
+        return true;
+    if (!m_device)
+        return false;
+    if (!m_hdrToneMapPSO)
+        return InitHDRPipeline();
+    const int w = m_width  > 0 ? m_width  : 1920;
+    const int h = m_height > 0 ? m_height : 1080;
+    return CreateHDRRenderTargets(w, h);
+}
+
+bool CMetalBaseRenderer::InitHDRPipeline()
+{
+    if (!m_device)
+        return false;
+
+    if (!m_hdrToneMapPSO) {
+        id<MTLLibrary> lib = GetShaderLibrary();
+        if (!lib)
+            return false;
+
+        id<MTLFunction> vsFunc = [lib newFunctionWithName:@"hdr_fullscreen_vertex"];
+        id<MTLFunction> fsFunc = [lib newFunctionWithName:@"hdr_tonemap_fragment"];
+        if (!vsFunc || !fsFunc)
+            return false;
+
+        MTLRenderPipelineDescriptor *psoDesc = [[MTLRenderPipelineDescriptor alloc] init];
+        psoDesc.label                           = @"HDRToneMapPSO";
+        psoDesc.vertexFunction                  = vsFunc;
+        psoDesc.fragmentFunction                = fsFunc;
+        psoDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        psoDesc.depthAttachmentPixelFormat      = MTLPixelFormatInvalid;
+
+        NSError *err = nil;
+        m_hdrToneMapPSO = [m_device newRenderPipelineStateWithDescriptor:psoDesc error:&err];
+        if (!m_hdrToneMapPSO) {
+            iLog->Log("HDR ToneMap PSO error: %s",
+                      err ? [[err localizedDescription] UTF8String] : "unknown");
+            return false;
+        }
+
+        MTLSamplerDescriptor *sDesc = [[MTLSamplerDescriptor alloc] init];
+        sDesc.minFilter = MTLSamplerMinMagFilterLinear;
+        sDesc.magFilter = MTLSamplerMinMagFilterLinear;
+        sDesc.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        sDesc.tAddressMode = MTLSamplerAddressModeClampToEdge;
+        m_hdrSampler = [m_device newSamplerStateWithDescriptor:sDesc];
+
+        auto makePSO = [&](NSString* fsName, NSString* label,
+                           MTLPixelFormat fmt) -> id<MTLRenderPipelineState> {
+            id<MTLFunction> fs = [lib newFunctionWithName:fsName];
+            if (!fs)
+                return nil;
+            MTLRenderPipelineDescriptor *d = [[MTLRenderPipelineDescriptor alloc] init];
+            d.label                           = label;
+            d.vertexFunction                  = vsFunc;
+            d.fragmentFunction                = fs;
+            d.colorAttachments[0].pixelFormat = fmt;
+            d.depthAttachmentPixelFormat      = MTLPixelFormatInvalid;
+            NSError *e = nil;
+            id<MTLRenderPipelineState> pso = [m_device newRenderPipelineStateWithDescriptor:d error:&e];
+            if (!pso && e)
+                iLog->Log("HDR PSO '%s' error: %s", [label UTF8String], [[e localizedDescription] UTF8String]);
+            return pso;
+        };
+        m_hdrBrightPassPSO = makePSO(@"hdr_brightpass_fragment", @"HDRBrightPassPSO",
+                                     MTLPixelFormatRGBA16Float);
+        m_hdrBlurHPSO      = makePSO(@"hdr_blur_h_fragment",     @"HDRBlurHPSO",
+                                     MTLPixelFormatRGBA16Float);
+        m_hdrBlurVPSO      = makePSO(@"hdr_blur_v_fragment",     @"HDRBlurVPSO",
+                                     MTLPixelFormatRGBA16Float);
+    }
+
+    const int w = m_width  > 0 ? m_width  : 1920;
+    const int h = m_height > 0 ? m_height : 1080;
+    if (!CreateHDRRenderTargets(w, h))
+        return false;
     return m_hdrColorRT != nil && m_hdrToneMapPSO != nil;
 }
 
@@ -2470,6 +2551,12 @@ bool CMetalBaseRenderer::BeginHDRPass()
     {
         m_renderEncoderOpen = true;
         [m_renderEncoder setLabel:@"HDRScenePass"];
+        SetViewport(0, 0, m_hdrRTWidth, m_hdrRTHeight);
+        SetScissor(0, 0, m_hdrRTWidth, m_hdrRTHeight);
+#if DEBUG
+        if (m_nFrameID <= 3 && iLog)
+            iLog->Log("[MetalDiag] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
+#endif
     }
     return m_renderEncoder != nil;
 }

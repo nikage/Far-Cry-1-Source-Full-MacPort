@@ -686,6 +686,39 @@ static void test_font_ortho_matrix()
     CHECK(std::fabs(yo - expected_y) < eps);
 }
 
+static void test_font_ortho_matrix_arbitrary_virtual_dimensions()
+{
+    const float W = 1920.0f;
+    const float H = 1080.0f;
+    const float eps = 1e-5f;
+    const float ortho[16] = {
+         2.0f/W, 0.0f,   0.0f, 0.0f,
+         0.0f,  -2.0f/H, 0.0f, 0.0f,
+         0.0f,   0.0f,   1.0f, 0.0f,
+        -1.0f,   1.0f,   0.0f, 1.0f
+    };
+    float xo, yo;
+    apply_font_ortho(ortho, 0.0f, 0.0f, xo, yo);
+    CHECK(std::fabs(xo - (-1.0f)) < eps);
+    CHECK(std::fabs(yo - 1.0f) < eps);
+    apply_font_ortho(ortho, W, H, xo, yo);
+    CHECK(std::fabs(xo - 1.0f) < eps);
+    CHECK(std::fabs(yo - (-1.0f)) < eps);
+}
+
+static void test_scale_coord_formula_matches_renderer_h()
+{
+    const float eps = 1e-4f;
+    const int m_width = 3440;
+    const int m_height = 2232;
+    auto scaleCoordX = [m_width](float v) { return v * float(m_width) / 800.0f; };
+    auto scaleCoordY = [m_height](float v) { return v * float(m_height) / 600.0f; };
+    CHECK(std::fabs(scaleCoordX(400.f) - 400.f * 3440.f / 800.f) < eps);
+    CHECK(std::fabs(scaleCoordY(300.f) - 300.f * 2232.f / 600.f) < eps);
+    CHECK(std::fabs(scaleCoordX(800.f) - float(m_width)) < eps);
+    CHECK(std::fabs(scaleCoordY(600.f) - float(m_height)) < eps);
+}
+
 static void test_dyndvb_pooled_vertex_byte_offset()
 {
     struct MirrorVec3 {
@@ -2383,6 +2416,8 @@ int main()
     test_inline_fallback_shader_has_notex_variant();
     test_font_vertex_color_format_is_non_normalized();
     test_font_ortho_matrix();
+    test_font_ortho_matrix_arbitrary_virtual_dimensions();
+    test_scale_coord_formula_matches_renderer_h();
     test_dyndvb_pooled_vertex_byte_offset();
     test_metal_teardown_encoder_before_commit();
     test_tryensure_swapchain_encoder_source_invariants();

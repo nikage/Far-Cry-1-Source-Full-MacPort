@@ -490,6 +490,12 @@ protected:
     // Window and rendering surface
     NSWindow* m_window;
     CAMetalLayer* m_windowMetalLayer;
+    id m_windowResizeObserver;
+    id m_windowBackingObserver;
+
+    void SyncMetalLayerDrawableToContentView();
+    void RegisterWindowGeometryObservers();
+    void UnregisterWindowGeometryObservers();
     
     // 2D mode state
     bool m_2DMode;

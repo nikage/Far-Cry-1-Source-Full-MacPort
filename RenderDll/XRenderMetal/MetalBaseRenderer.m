@@ -121,6 +121,9 @@ public:
     void SetMaterialParams(const float* ambient, const float* diffuse, const float* specular);
 
     bool InitHDRPipeline();
+    void CleanupHDRRenderTargets();
+    bool CreateHDRRenderTargets(int w, int h);
+    bool ResizeHDRPipelineIfNeeded();
     bool BeginHDRPass();
     void DoBloomPass();
     void EndHDRPass();
@@ -191,8 +194,14 @@ virtual void PushMatrix();
     virtual char* GetVertexProfile(bool bSupportedProfile) { return nullptr; }
     virtual char* GetPixelProfile(bool bSupportedProfile) { return nullptr; }
     virtual void SetType(char type);
-    virtual float ScaleCoordX(float value) { return value; }
-    virtual float ScaleCoordY(float value) { return value; }
+    virtual float ScaleCoordX(float value) override
+    {
+        return value * float(m_width) / 800.0f;
+    }
+    virtual float ScaleCoordY(float value) override
+    {
+        return value * float(m_height) / 600.0f;
+    }
     virtual void SetColorOp(byte eCo, byte eAo, byte eCa, byte eAa) {}
     virtual void EnableSwapBuffers(bool bEnable) { }
     virtual WIN_HWND GetHWND() { return nullptr; }
