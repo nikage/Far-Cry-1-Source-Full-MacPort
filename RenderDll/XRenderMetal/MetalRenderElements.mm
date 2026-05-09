@@ -25,6 +25,7 @@
 #include "ISystem.h"
 #include "LeafBuffer.h"
 #include "CREOcLeaf.h"
+#include "CREOcclusionQuery.h"
 #include "CREScreenProcess.h"
 #include "CRETerrainSector.h"
 #include <Metal/Metal.h>
@@ -1059,8 +1060,7 @@ CRendElement* CreateMetalRenderElement(EDataType edt)
             break;
             
         case eDATA_OcclusionQuery:
-            re = new CRendElement();
-            if (re) re->mfSetType(eDATA_OcclusionQuery);
+            re = new CREOcclusionQuery();
             break;
             
         case eDATA_Poly:
@@ -1079,6 +1079,21 @@ CRendElement* CreateMetalRenderElement(EDataType edt)
     assert((re != nullptr || edt == eDATA_Unknown) && "CreateMetalRenderElement: failed to create render element!");
     
     return re;
+}
+
+CREOcclusionQuery::~CREOcclusionQuery()
+{
+    mfReset();
+}
+
+void CREOcclusionQuery::mfReset()
+{
+    m_nOcclusionID = 0;
+}
+
+bool CREOcclusionQuery::mfDraw(SShader* ef, SShaderPass* sfm)
+{
+    return true;
 }
 
 list2<CMatInfo>* CREOcLeaf::mfGetMatInfoList()

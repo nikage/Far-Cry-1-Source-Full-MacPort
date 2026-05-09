@@ -2840,6 +2840,33 @@ int main()
                 }
             }
         }
+
+        // 9) CreateMetalRenderElement: eDATA_OcclusionQuery -> new CREOcclusionQuery (not CRendElement).
+        {
+            const std::string path =
+                findSource("RenderDll/XRenderMetal/MetalRenderElements.mm");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body =
+                    findFunctionBody(src, "CRendElement* CreateMetalRenderElement(EDataType edt)");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    const size_t ocCase = body.find("case eDATA_OcclusionQuery:");
+                    CHECK(ocCase != std::string::npos);
+                    if (ocCase != std::string::npos) {
+                        const size_t brk = body.find("break;", ocCase);
+                        CHECK(brk != std::string::npos);
+                        if (brk != std::string::npos) {
+                            const std::string slice = body.substr(ocCase, brk - ocCase);
+                            CHECK(slice.find("new CREOcclusionQuery()") != std::string::npos);
+                            CHECK(slice.find("new CRendElement()") == std::string::npos);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
