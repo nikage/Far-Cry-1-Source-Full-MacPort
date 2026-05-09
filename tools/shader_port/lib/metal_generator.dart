@@ -1181,6 +1181,78 @@ bool _isProjectiveTcField(String field) {
   return lower.contains('tc');
 }
 
+Map<String, int> mergeVertexClipPositionInvariant(
+  Map<String, int> resolved,
+  String stage,
+) {
+  if (stage == 'vertex') {
+    resolved['HPosition'] = math.max(resolved['HPosition'] ?? 0, 4);
+  }
+  return resolved;
+}
+
+bool _isBuiltinFragmentColorOutputName(String field) {
+  if (field == 'Color') {
+    return true;
+  }
+  return RegExp(r'^Color\d+$').hasMatch(field);
+}
+
+String _metalFloatTypeFromOutputWidth(int width) {
+  switch (width) {
+    case 1:
+      return 'float';
+    case 2:
+      return 'float2';
+    case 3:
+      return 'float3';
+    case 4:
+      return 'float4';
+    default:
+      stderr.writeln(
+        'WARN: unexpected fragment output width $width — using float4',
+      );
+      return 'float4';
+  }
+}
+
+String resolveFragmentOutputFieldType(
+  String field,
+  Map<String, String> outputFieldTypes,
+  Map<String, int> outputComponentUsage,
+) {
+  final String? declared = outputFieldTypes[field];
+  if (declared != null && declared.isNotEmpty) {
+    return declared;
+  }
+  final int? usage = outputComponentUsage[field];
+  if (usage != null && usage > 0) {
+    int width = usage;
+    if (field != 'Depth') {
+      if (width < 2) {
+        width = 2;
+      } else if (width > 4) {
+        width = 4;
+      }
+    } else {
+      if (width > 4) {
+        width = 4;
+      }
+    }
+    return _metalFloatTypeFromOutputWidth(width);
+  }
+  if (_isBuiltinFragmentColorOutputName(field)) {
+    return 'float4';
+  }
+  if (field == 'Depth') {
+    return 'float';
+  }
+  stderr.writeln(
+    'WARN: output field "$field" has no declared type (fragment stage) — using float4',
+  );
+  return 'float4';
+}
+
 Map<String, int> _resolveOutputComponentCounts(
   ShaderIrData data,
   _InOutAnalyzer analyzer,
@@ -1269,11 +1341,7 @@ Map<String, int> _resolveOutputComponentCounts(
     );
   });
 
-  if (resolved.containsKey('HPosition')) {
-    resolved['HPosition'] = 4;
-  }
-
-  return resolved;
+  return mergeVertexClipPositionInvariant(resolved, data.stage);
 }
 
 String normalizeName(String input) {

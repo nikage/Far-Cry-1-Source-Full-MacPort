@@ -1089,15 +1089,14 @@ class ExpressionTranslator {
   }
 
   String _outputType(String field) {
-    final String? declared = data.outputFieldTypes[field];
     if (data.stage != 'vertex') {
-      if (declared == null) {
-        stderr.writeln(
-          'WARN: output field "$field" has no declared type (fragment stage) — using float4',
-        );
-      }
-      return declared ?? 'float4';
+      return resolveFragmentOutputFieldType(
+        field,
+        data.outputFieldTypes,
+        analyzer.outputComponentUsage,
+      );
     }
+    final String? declared = data.outputFieldTypes[field];
     final int? resolved = _resolvedOutputComponents[field];
     if (resolved != null) {
       return _floatTypeForComponents(resolved);

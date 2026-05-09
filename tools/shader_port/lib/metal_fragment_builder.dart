@@ -611,15 +611,14 @@ float3 CMKYToRGB(float4 vColor) {
       _positionScripts.contains(name.toLowerCase());
 
   String _outputType(String field) {
-    final String? declared = data.outputFieldTypes[field];
     if (!_isVertexStage) {
-      if (declared == null) {
-        stderr.writeln(
-          'WARN: output field "$field" has no declared type (fragment stage) — using float4',
-        );
-      }
-      return declared ?? 'float4';
+      return resolveFragmentOutputFieldType(
+        field,
+        data.outputFieldTypes,
+        _analyzer.outputComponentUsage,
+      );
     }
+    final String? declared = data.outputFieldTypes[field];
     final int? resolved = _resolvedOutputComponents[field];
     if (resolved != null) {
       return _attributeTypeForComponents(resolved);
