@@ -1765,6 +1765,7 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     m_windowMetalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     m_windowMetalLayer.framebufferOnly = YES;
     m_windowMetalLayer.drawableSize = CGSizeMake(width, height);
+    m_windowMetalLayer.maximumDrawableCount = 3;
     m_metalLayer = m_windowMetalLayer;
     
     [contentView setWantsLayer:YES];
@@ -3085,6 +3086,7 @@ bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd) {
   
   if (metalLayer && m_device) {
     metalLayer.device = m_device;
+    metalLayer.maximumDrawableCount = 3;
     m_window = window;
     m_windowMetalLayer = metalLayer;
     m_metalLayer = metalLayer;

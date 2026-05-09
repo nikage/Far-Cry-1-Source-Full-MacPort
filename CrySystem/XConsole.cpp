@@ -974,10 +974,16 @@ void CXConsole::DrawBuffer(int nScrollPos, const char *szEffect)
 		
 		ypos-=csize;
 		
+		const size_t nBufTotal = m_dqConsoleBuffer.size();
+		const bool bTruncateLongLines = (nBufTotal > 48);
+		static const int kMaxConsoleHistoryDrawLines = 48;
+		static const int kMaxDrawLineChars = 200;
+
 		ConsoleBufferRItor ritor;
 		ritor=m_dqConsoleBuffer.rbegin();
 		int nScroll=0;
-		while(ritor!=m_dqConsoleBuffer.rend() && ypos>=0)  
+		int nHistoryDrawn = 0;
+		while(ritor!=m_dqConsoleBuffer.rend() && ypos>=0 && nHistoryDrawn < kMaxConsoleHistoryDrawLines)  
 		{
 			if(nScroll>=m_nScrollLine)
 			{
@@ -986,9 +992,23 @@ void CXConsole::DrawBuffer(int nScrollPos, const char *szEffect)
 				if(*buf>0 && *buf<32) buf++;		// to jump over verbosity level character
 
 				if (ypos+csize>0) 
-  			  m_pFont->DrawString((float)LINE_BORDER, (float)ypos, buf,false);
-					//m_pRenderer->DrawString(LINE_BORDER, ypos, false, buf);
-				//CSystem::GetRenderer()->WriteXY(m_font,0,ypos,0.5f,1,1,1,1,1,buf);			
+				{
+					const char *drawBuf = buf;
+					char truncScratch[256];
+					if (bTruncateLongLines)
+					{
+						size_t L = strlen(buf);
+						if (L > (size_t)kMaxDrawLineChars)
+						{
+							memcpy(truncScratch, buf, (size_t)kMaxDrawLineChars);
+							memcpy(truncScratch + kMaxDrawLineChars, "...", 4);
+							truncScratch[kMaxDrawLineChars + 3] = 0;
+							drawBuf = truncScratch;
+						}
+					}
+					m_pFont->DrawString((float)LINE_BORDER, (float)ypos, drawBuf,false);
+					nHistoryDrawn++;
+				}
 				ypos-=csize;
 			}
 			nScroll++;
@@ -1100,7 +1120,7 @@ void CXConsole::DumpCommandsVars(char *prefix)
 	if(!f) return;
 	
 	fprintf(f," CHEAT: stays in the default value if cheats are not disabled\n");
-	fprintf(f," REQUIRE_NET_SYNC: cannot be changed on client and when connecting it¥s sent to the client\n");
+	fprintf(f," REQUIRE_NET_SYNC: cannot be changed on client and when connecting itùs sent to the client\n");
 	fprintf(f," SAVEGAME: stored when saving a savegame\n");
 	fprintf(f," READONLY: can not be changed by the user\n");
 	fprintf(f,"-------------------------\n");
@@ -1551,10 +1571,12 @@ char *CXConsole::ProcessCompletion(const char *szInputBuffer)
 	{
 		ConsoleInputLog( " " );
 
-		for(std::vector<char *>::iterator i = matches.begin(); i!=matches.end(); ++i)
+		const size_t nMaxCompletionLines = 160;
+		const size_t nShow = (matches.size() > nMaxCompletionLines) ? nMaxCompletionLines : matches.size();
+
+		for(size_t idx = 0; idx < nShow; ++idx)
 		{
-			// List matching variables
-			const char *sVar = *i;
+			const char *sVar = matches[idx];
 			const char *sValue = "";
 			ICVar *pVar = GetCVar( sVar );
 			if (pVar)
@@ -1573,12 +1595,12 @@ char *CXConsole::ProcessCompletion(const char *szInputBuffer)
 						0,0
 					};
 
-					for(int i=0; FlagNames[i].nFlag; i++)
-						if(pVar->GetFlags()&FlagNames[i].nFlag)
+					for(int fi=0; FlagNames[fi].nFlag; fi++)
+						if(pVar->GetFlags()&FlagNames[fi].nFlag)
 						{
 							if(szFalgsString[0])
 								strncat(szFalgsString,", ", sizeof(szFalgsString));
-							strncat(szFalgsString,FlagNames[i].szName, sizeof(szFalgsString));
+							strncat(szFalgsString,FlagNames[fi].szName, sizeof(szFalgsString));
 						}
 				}
 
@@ -1588,6 +1610,11 @@ char *CXConsole::ProcessCompletion(const char *szInputBuffer)
 			{
 				ConsoleInputLog( "    $3%s", sVar,sValue );
 			}
+		}
+
+		if(matches.size() > nMaxCompletionLines)
+		{
+			ConsoleInputLog( "    $5... %u more matches (type after \\\\ to narrow)", (unsigned)(matches.size() - nMaxCompletionLines) );
 		}
 	}
 

@@ -95,6 +95,7 @@ CXClient::CXClient()
 	m_bSelfDestruct=false;			//  to make sure the client is only released in one place
 	m_pSavedConsoleVars=0;
 	m_bLazyChannelState=false;	// start with false on client and serverslot side
+	m_hasAppliedContext=false;
 }
 
 bool CXClient::Init(CXGame *pGame,bool bLocal) 
@@ -254,6 +255,9 @@ bool CXClient::CreateConsoleVariables()
 		"the actual rate is limited by frame rate as well)\n"
 		"Usage: cl_cmdrate [5..100]\n"
 		"Default is 40");
+	cl_context_setup_fastpath = pConsole->CreateVariable("cl_context_setup_fastpath","1",0,
+		"When 1, listen-server single-player skips redundant LoadLevel/ClientStuff/HUD work on repeat OnXContextSetup.\n"
+		"Set to 0 to force the legacy full path every time.");
 /*
 	cl_explShakeDCoef = pConsole->CreateVariable("cl_ExplShakeD",".07",0,
 		"Sets the damping co-efficient of the explosion shake effect.\n"
@@ -413,6 +417,7 @@ void CXClient::OnXClientDisconnect(const char *szCause)
 	// <<FIXME>> Should cleanup the stuff with a new function of the IXSystem interface
 
 	m_bConnected=0;
+	m_hasAppliedContext=false;
 
 	if(m_pISystem)
 		m_pISystem->Disconnected(szCause);
@@ -431,6 +436,20 @@ void CXClient::OnXClientDisconnect(const char *szCause)
 
 
 ///////////////////////////////////////////////
+namespace
+{
+bool ClientContextKeyMatches(const SXGameContext &a, const SXGameContext &b)
+{
+	return stricmp(a.strMapFolder.c_str(), b.strMapFolder.c_str()) == 0
+		&& stricmp(a.strMission.c_str(), b.strMission.c_str()) == 0
+		&& stricmp(a.strGameType.c_str(), b.strGameType.c_str()) == 0
+		&& stricmp(a.strMod.c_str(), b.strMod.c_str()) == 0
+		&& a.wLevelDataCheckSum == b.wLevelDataCheckSum
+		&& a.bForceNonDevMode == b.bForceNonDevMode;
+}
+}
+
+///////////////////////////////////////////////
 void CXClient::Reset()
 {
 	m_pScriptSystem->GetGlobalValue("ClientStuff",m_pClientStuff);
@@ -445,7 +464,11 @@ void CXClient::OnXContextSetup(CStream &stm)
 	GetISystem()->GetILog()->Log("CXClient::OnXContextSetup");
 
 	SetPlayerID(INVALID_WID);
-	UpdateISystem();
+	{
+		CXSystemDummy *pExistingDummy = m_pISystem ? dynamic_cast<CXSystemDummy *>(m_pISystem) : 0;
+		if (!(m_pGame->IsServer() && pExistingDummy))
+			UpdateISystem();
+	}
 
 	m_GameContext.Read(stm);		// Read the sended game context
 
@@ -522,56 +545,71 @@ void CXClient::OnXContextSetup(CStream &stm)
 		}
 	}
 
+	const bool bFastPathSpListen =
+		cl_context_setup_fastpath && cl_context_setup_fastpath->GetIVal() != 0
+		&& m_pGame->IsServer() && !m_pGame->IsMultiplayer()
+		&& m_hasAppliedContext
+		&& ClientContextKeyMatches(m_GameContext, m_lastAppliedContext);
+
 	m_pGame->g_GameType->Set(m_GameContext.strGameType.c_str());
 	m_Snapshot.Reset();
 
-	m_pLog->Log("CXClient::OnXContextSetup - map : %s\n", m_GameContext.strMapFolder.c_str());
-	m_pLog->Log("[FreezeInv] CXClient::OnXContextSetup before m_pISystem->LoadLevel is_server=%d",
-		m_pGame->IsServer() ? 1 : 0);
-	if(!m_pISystem->LoadLevel(m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str(), false))
+	if (!bFastPathSpListen)
 	{
-		m_pLog->LogError("CXClient::OnXContextSetup ERROR LOADING LEVEL: %s\n", m_GameContext.strMapFolder.c_str());
-		
-		LoadingError("@LoadLevelError");
-
-		return;
-	}
-	m_pLog->Log("[GameCheckpoint] Client_OnXContextSetup ixsystem_LoadLevel_ok folder='%s' mission='%s'",
-		m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str());
-
-	if((!m_pGame->m_bEditor) 
-		&& (!m_pGame->IsServer()) 
-		&& (m_pISystem->GetLevelDataCheckSum()!=m_GameContext.wLevelDataCheckSum))
-	{
-		m_pLog->LogError("CXClient::OnXContextSetup ERROR LOADING LEVEL: %s [INVALID CHECKSUM]\n", m_GameContext.strMapFolder.c_str());
-
-		LoadingError("@LevelVersionError");
-
-		return;
-	}
-	if (!m_pGame->m_bEditor && !m_pGame->IsServer())
-		m_pLog->Log("[GameCheckpoint] Client_OnXContextSetup checksum_verified folder='%s' ck=%u",
-			m_GameContext.strMapFolder.c_str(), (unsigned)m_pISystem->GetLevelDataCheckSum());
-
-	_SmartScriptObject pClientStuff(m_pScriptSystem,true);
-	if(m_pScriptSystem->GetGlobalValue("ClientStuff",pClientStuff))				// call ClientStuff:OnShutdown()
-	{
-		m_pScriptSystem->BeginCall("ClientStuff","OnShutdown");
-		m_pScriptSystem->PushFuncParam(pClientStuff);
-		m_pScriptSystem->EndCall();
-	}
-
-	if(!m_pGame->m_bDedicatedServer)								// don't load ClientStuff on dedicated server
-	{
-		if(!m_pGame->ExecuteScript("scripts/$GT$/ClientStuff.lua",true))
+		m_pLog->Log("CXClient::OnXContextSetup - map : %s\n", m_GameContext.strMapFolder.c_str());
+		m_pLog->Log("[FreezeInv] CXClient::OnXContextSetup before m_pISystem->LoadLevel is_server=%d",
+			m_pGame->IsServer() ? 1 : 0);
+		if(!m_pISystem->LoadLevel(m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str(), false))
 		{
-			DebugBreak();	
+			m_pLog->LogError("CXClient::OnXContextSetup ERROR LOADING LEVEL: %s\n", m_GameContext.strMapFolder.c_str());
+			
+			LoadingError("@LoadLevelError");
+
+			return;
 		}
-		m_pScriptSystem->GetGlobalValue("ClientStuff",m_pClientStuff);
-		m_pScriptSystem->BeginCall("ClientStuff","OnInit");
-		m_pScriptSystem->PushFuncParam(m_pClientStuff);
-		m_pScriptSystem->EndCall();
+		m_pLog->Log("[GameCheckpoint] Client_OnXContextSetup ixsystem_LoadLevel_ok folder='%s' mission='%s'",
+			m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str());
+
+		if((!m_pGame->m_bEditor) 
+			&& (!m_pGame->IsServer()) 
+			&& (m_pISystem->GetLevelDataCheckSum()!=m_GameContext.wLevelDataCheckSum))
+		{
+			m_pLog->LogError("CXClient::OnXContextSetup ERROR LOADING LEVEL: %s [INVALID CHECKSUM]\n", m_GameContext.strMapFolder.c_str());
+
+			LoadingError("@LevelVersionError");
+
+			return;
+		}
+		if (!m_pGame->m_bEditor && !m_pGame->IsServer())
+			m_pLog->Log("[GameCheckpoint] Client_OnXContextSetup checksum_verified folder='%s' ck=%u",
+				m_GameContext.strMapFolder.c_str(), (unsigned)m_pISystem->GetLevelDataCheckSum());
+
+		_SmartScriptObject pClientStuff(m_pScriptSystem,true);
+		if(m_pScriptSystem->GetGlobalValue("ClientStuff",pClientStuff))				// call ClientStuff:OnShutdown()
+		{
+			m_pScriptSystem->BeginCall("ClientStuff","OnShutdown");
+			m_pScriptSystem->PushFuncParam(pClientStuff);
+			m_pScriptSystem->EndCall();
+		}
+
+		if(!m_pGame->m_bDedicatedServer)								// don't load ClientStuff on dedicated server
+		{
+			if(!m_pGame->ExecuteScript("scripts/$GT$/ClientStuff.lua",true))
+			{
+				DebugBreak();	
+			}
+			m_pScriptSystem->GetGlobalValue("ClientStuff",m_pClientStuff);
+			m_pScriptSystem->BeginCall("ClientStuff","OnInit");
+			m_pScriptSystem->PushFuncParam(m_pClientStuff);
+			m_pScriptSystem->EndCall();
+		}
 	}
+#ifdef _DEBUG
+	else
+	{
+		m_pLog->Log("[FreezeInv] CXClient::OnXContextSetup redundant SP listen fast path");
+	}
+#endif
 	
 	// Write the stream to send to ContextReady
 	{
@@ -623,23 +661,26 @@ void CXClient::OnXContextSetup(CStream &stm)
 		m_pIClient->ContextReady(stm);
 	}
 
-	// fade in when loading a new map
-	if (!m_pGame->m_bEditor)
-	{	
-		m_pGame->m_p3DEngine->SetScreenFx("ScreenFade",1);
-		float fFadeTime=-2.5f;
-		m_pGame->m_p3DEngine->SetScreenFxParam("ScreenFade","ScreenFadeTime", &fFadeTime);
-		float fPreFade=5.0f;
-		m_pGame->m_p3DEngine->SetScreenFxParam("ScreenFade","ScreenPreFadeTime", &fPreFade);
-	}
-
-	if(!m_pGame->m_bEditor)
+	if (!bFastPathSpListen)
 	{
-		m_pGame->m_pSystem->SetIProcess(m_pGame->m_p3DEngine);
-		m_pGame->m_pSystem->GetIProcess()->SetFlags(PROC_3DENGINE);
-	}
+		// fade in when loading a new map
+		if (!m_pGame->m_bEditor)
+		{	
+			m_pGame->m_p3DEngine->SetScreenFx("ScreenFade",1);
+			float fFadeTime=-2.5f;
+			m_pGame->m_p3DEngine->SetScreenFxParam("ScreenFade","ScreenFadeTime", &fFadeTime);
+			float fPreFade=5.0f;
+			m_pGame->m_p3DEngine->SetScreenFxParam("ScreenFade","ScreenPreFadeTime", &fPreFade);
+		}
 
-	m_pGame->m_pUIHud->Reset();
+		if(!m_pGame->m_bEditor)
+		{
+			m_pGame->m_pSystem->SetIProcess(m_pGame->m_p3DEngine);
+			m_pGame->m_pSystem->GetIProcess()->SetFlags(PROC_3DENGINE);
+		}
+
+		m_pGame->m_pUIHud->Reset();
+	}
 	
 	// We have to tell Ubisoft that the client has successfully connected
 	// If ubisoft is not running this won't do anything.
@@ -653,10 +694,13 @@ void CXClient::OnXContextSetup(CStream &stm)
 	// frame to avoid problems with sloppy/bogus vis areas
 	// this calls RecomputeSoundOcclusion
 
-	if(m_pGame->GetSystem()->GetISoundSystem())
-		m_pGame->GetSystem()->GetISoundSystem()->Silence();
-	if(m_pGame->m_pSystem->GetIMusicSystem())
-		m_pGame->m_pSystem->GetIMusicSystem()->Silence();
+	if (!bFastPathSpListen)
+	{
+		if(m_pGame->GetSystem()->GetISoundSystem())
+			m_pGame->GetSystem()->GetISoundSystem()->Silence();
+		if(m_pGame->m_pSystem->GetIMusicSystem())
+			m_pGame->m_pSystem->GetIMusicSystem()->Silence();
+	}
 
 	if (!m_pGame->m_bIsLoadingLevelFromFile)
 	{
@@ -677,9 +721,11 @@ void CXClient::OnXContextSetup(CStream &stm)
 		m_pGame->m_pSystem->GetIConsole()->ShowConsole(false);
 		m_pGame->m_pSystem->GetIConsole()->SetScrollMax(600/2);
 
-		//if (m_pGame->IsMultiplayer())
 		m_pGame->GetSystem()->GetIRenderer()->ClearColorBuffer(Vec3(0,0,0));
 	}
+
+	m_lastAppliedContext = m_GameContext;
+	m_hasAppliedContext = true;
 }
 
 ///////////////////////////////////////////////

@@ -382,6 +382,8 @@ public: // -------------------------------------------------------------
 
 	// The current game context
 	SXGameContext				m_GameContext;
+	SXGameContext				m_lastAppliedContext;
+	bool									m_hasAppliedContext;
 	
 	// Action map
 	struct IActionMapManager*	m_pIActionMapManager;
@@ -429,6 +431,7 @@ public: // -------------------------------------------------------------
 	ICVar* cl_sound_detection_min_distance;
 	ICVar* cl_netstats;
 	ICVar* cl_cmdrate;
+	ICVar* cl_context_setup_fastpath;
 
   bool										m_bMapConnecting;				//!<
 	EntityIdList						m_lstGarbageEntities;		//!<

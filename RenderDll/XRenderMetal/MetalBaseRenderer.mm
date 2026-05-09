@@ -921,14 +921,9 @@ void CMetalBaseRenderer::BeginFrame()
         dispatch_semaphore_signal(frameSemaphore);
         return;
     }
-    
-    __block dispatch_semaphore_t completionSemaphore = frameSemaphore;
-    [m_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
-        dispatch_semaphore_signal(completionSemaphore);
-    }];
-    
+
     m_dynamicVBPools[m_currentDynamicVBPool].offset = 0;
-    
+
     const bool needsDrawable = (m_metalLayer != nil) || (m_metalView != nil);
     if (needsDrawable && !AcquireDrawableResources())
     {
@@ -937,6 +932,11 @@ void CMetalBaseRenderer::BeginFrame()
         dispatch_semaphore_signal(frameSemaphore);
         return;
     }
+
+    __block dispatch_semaphore_t completionSemaphore = frameSemaphore;
+    [m_currentCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer) {
+        dispatch_semaphore_signal(completionSemaphore);
+    }];
     
     m_numDrawCalls = 0;
     m_numTriangles = 0;
