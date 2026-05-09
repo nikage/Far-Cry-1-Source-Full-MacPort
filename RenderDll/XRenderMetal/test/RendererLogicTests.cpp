@@ -2753,6 +2753,30 @@ int main()
                 }
             }
         }
+
+        // 5) CLeafBuffer::UpdateCustomLighting — must tolerate null m_pShader when
+        //    EF_LoadShader fails (Metal soft miss) so vegetation load does not crash.
+        {
+            const std::string path = findSource("RenderDll/Common/LeafBufferRender.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body = findFunctionBody(
+                    src,
+                    "void CLeafBuffer::UpdateCustomLighting(float fBackSideLevel, Vec3d vStatObjAmbientColor, const Vec3d & vLight, bool bCalcLighting)");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    const size_t getTpl = body.find("GetTemplate(-1)");
+                    CHECK(getTpl != std::string::npos);
+                    if (getTpl != std::string::npos) {
+                        const std::string head = body.substr(0, getTpl);
+                        CHECK(head.find("!mi->shaderItem.m_pShader") != std::string::npos);
+                    }
+                    CHECK(body.find("new bool[m_SecVertCount]()") != std::string::npos);
+                }
+            }
+        }
     }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);

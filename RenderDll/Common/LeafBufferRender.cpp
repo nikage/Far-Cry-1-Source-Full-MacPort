@@ -47,7 +47,7 @@ void CLeafBuffer::UpdateCustomLighting(float fBackSideLevel, Vec3d vStatObjAmbie
 
   int nPosStride = m_VertexSize[m_pSecVertBuffer->m_vertexformat];
   int nNormStride, nColorStride, nInfoStride;
-  bool * arrCullInfo = new bool[m_SecVertCount];
+  bool * arrCullInfo = new bool[m_SecVertCount]();
   ushort *pInds = GetIndices(NULL);
   bool bWasBark = false;
   for(int i=0; i<(*m_pMats).Count(); i++)
@@ -55,13 +55,34 @@ void CLeafBuffer::UpdateCustomLighting(float fBackSideLevel, Vec3d vStatObjAmbie
     if (!(*m_pMats)[i].pRE)
       continue;
     CMatInfo *mi = &(*m_pMats)[i];
+    if (!mi->shaderItem.m_pShader)
+    {
+      static int s_skipNoShaderLog = 0;
+      if (iLog && s_skipNoShaderLog < 8)
+      {
+        iLog->Log("Warning: CLeafBuffer::UpdateCustomLighting: chunk %d has no shader (skipping)\n", i);
+        ++s_skipNoShaderLog;
+      }
+      continue;
+    }
     IShader *ef = mi->shaderItem.m_pShader->GetTemplate(-1);
+    if (!ef)
+    {
+      static int s_skipNoTemplateLog = 0;
+      if (iLog && s_skipNoTemplateLog < 8)
+      {
+        iLog->Log("Warning: CLeafBuffer::UpdateCustomLighting: chunk %d GetTemplate(-1) null (skipping)\n", i);
+        ++s_skipNoTemplateLog;
+      }
+      continue;
+    }
     int nFl = ef->GetFlags3();
     bool bTwoSided;
     if (nFl & EF3_HASVCOLORS)
       bTwoSided = (nFl & EF3_HASALPHATEST) != 0;
     else
-      bTwoSided =  (mi->shaderItem.m_pShaderResources->m_ResFlags & MTLFLAG_2SIDED)!=0;//ef && (ef->GetCull() == e CULL_None);
+      bTwoSided = mi->shaderItem.m_pShaderResources != nullptr &&
+                  (mi->shaderItem.m_pShaderResources->m_ResFlags & MTLFLAG_2SIDED) != 0;
     if (!bTwoSided)
       bWasBark = true;
     for (int j=mi->nFirstIndexId; j<mi->nNumIndices+mi->nFirstIndexId; j++)
