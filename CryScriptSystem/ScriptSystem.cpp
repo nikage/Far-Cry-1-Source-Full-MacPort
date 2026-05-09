@@ -913,8 +913,18 @@ bool CScriptSystem::_ExecuteFile(const char *sFileName, bool bRaiseError)
 	//int nRes = lua_dofile(m_pLS, sFileName);
 
 	char szFileName[_MAX_PATH + 1];
-	szFileName[0] = '@';
-	strcpy(&szFileName[1], sFileName);
+	const int nameLen = snprintf(szFileName, sizeof(szFileName), "@%s", sFileName);
+	if (nameLen < 0 || (size_t)nameLen >= sizeof(szFileName))
+	{
+		delete [] pBuffer;
+		if (GetISystem()->GetILog())
+			GetISystem()->GetILog()->Log(
+				"CScriptSystem::_ExecuteFile: script path too long for Lua chunk name (max %d chars): %s",
+				(int)sizeof(szFileName) - 2, sFileName);
+		if (bRaiseError)
+			RaiseError("Script path too long for Lua chunk name: %s", sFileName);
+		return false;
+	}
 
 	int nRes=lua_dobuffer(m_pLS,pBuffer,nSize,/*sFileName*/ szFileName);
 

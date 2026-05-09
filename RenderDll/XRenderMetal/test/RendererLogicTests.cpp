@@ -2821,6 +2821,25 @@ int main()
                 }
             }
         }
+
+        // 8) CScriptSystem::_ExecuteFile — bounded chunk name for lua_dobuffer (no strcpy overflow).
+        {
+            const std::string path = findSource("CryScriptSystem/ScriptSystem.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body = findFunctionBody(
+                    src,
+                    "bool CScriptSystem::_ExecuteFile(const char *sFileName, bool bRaiseError)");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    CHECK(body.find("strcpy(&szFileName[1], sFileName)") == std::string::npos);
+                    CHECK(body.find("snprintf(szFileName, sizeof(szFileName), \"@%s\", sFileName)") !=
+                          std::string::npos);
+                }
+            }
+        }
     }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
