@@ -23,6 +23,7 @@
 extern "C" int MacOS_IsKeyDown(unsigned short hidKeyCode);
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <sys/time.h>
 
 static double GetCurrentTimeSeconds()
@@ -326,6 +327,14 @@ void CMacOSMouse::Update()
 
     MacOS_GetRawMouseDelta(&m_dx, &m_dy);
 
+    for (int b = 3; b < 8; ++b)
+        m_buttonStates[b] = false;
+
+    m_buttonStates[8]  = (m_wheelDelta > 0);
+    m_buttonStates[9]  = (m_wheelDelta < 0);
+    m_buttonStates[10] = (fabsf(m_dx) > 1e-5f);
+    m_buttonStates[11] = (fabsf(m_dy) > 1e-5f);
+
     m_wheelDelta = 0;
 }
 
@@ -338,24 +347,21 @@ void CMacOSMouse::Shutdown()
 bool CMacOSMouse::MouseDown(int p_numButton)
 {
     const int idx = XKeyToMouseIndex(p_numButton);
-    assert(idx >= 0 && "CMacOSMouse::MouseDown: unknown mouse key");
-    if (idx < 0 || idx >= 8) return false;
+    if (idx < 0 || idx >= 12) return false;
     return m_buttonStates[idx];
 }
 
 bool CMacOSMouse::MousePressed(int p_numButton)
 {
     const int idx = XKeyToMouseIndex(p_numButton);
-    assert(idx >= 0 && "CMacOSMouse::MousePressed: unknown mouse key");
-    if (idx < 0 || idx >= 8) return false;
+    if (idx < 0 || idx >= 12) return false;
     return m_buttonStates[idx] && !m_prevButtonStates[idx];
 }
 
 bool CMacOSMouse::MouseReleased(int p_numButton)
 {
     const int idx = XKeyToMouseIndex(p_numButton);
-    assert(idx >= 0 && "CMacOSMouse::MouseReleased: unknown mouse key");
-    if (idx < 0 || idx >= 8) return false;
+    if (idx < 0 || idx >= 12) return false;
     return !m_buttonStates[idx] && m_prevButtonStates[idx];
 }
 
@@ -439,6 +445,8 @@ void CMacOSMouse::ClearKeyState()
     // Stub implementation
     memset(m_buttonStates, 0, sizeof(m_buttonStates));
     memset(m_prevButtonStates, 0, sizeof(m_prevButtonStates));
+    memset(m_lastClickTime, 0, sizeof(m_lastClickTime));
+    memset(m_prevClickTime, 0, sizeof(m_prevClickTime));
 }
 
 void CMacOSMouse::GetPos(int& x, int& y)
@@ -458,7 +466,7 @@ void CMacOSMouse::SetPos(int x, int y)
 bool CMacOSMouse::ButtonPressed(int nButton)
 {
     // Check if button was just pressed (down this frame but not last frame)
-    if (nButton >= 0 && nButton < 8) {
+    if (nButton >= 0 && nButton < 12) {
         return m_buttonStates[nButton] && !m_prevButtonStates[nButton];
     }
     return false;
@@ -467,7 +475,7 @@ bool CMacOSMouse::ButtonPressed(int nButton)
 bool CMacOSMouse::ButtonReleased(int nButton)
 {
     // Check if button was just released (up this frame but down last frame)
-    if (nButton >= 0 && nButton < 8) {
+    if (nButton >= 0 && nButton < 12) {
         return !m_buttonStates[nButton] && m_prevButtonStates[nButton];
     }
     return false;
@@ -476,7 +484,7 @@ bool CMacOSMouse::ButtonReleased(int nButton)
 bool CMacOSMouse::IsButtonDown(int nButton)
 {
     // Check if button is currently down
-    if (nButton >= 0 && nButton < 8) {
+    if (nButton >= 0 && nButton < 12) {
         return m_buttonStates[nButton];
     }
     return false;
@@ -687,7 +695,7 @@ bool CMacOSInput::MouseDblClick(int p_numButton)
 {
     if (!m_pMouse) return false;
     const int idx = XKeyToMouseIndex(p_numButton);
-    if (idx < 0 || idx >= 8) return false;
+    if (idx < 0 || idx > 2) return false;
     const double kDblClickThreshold = 0.5;
     return m_pMouse->m_buttonStates[idx] && !m_pMouse->m_prevButtonStates[idx]
         && (m_pMouse->m_lastClickTime[idx] - m_pMouse->m_prevClickTime[idx]) < kDblClickThreshold

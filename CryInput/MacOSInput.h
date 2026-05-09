@@ -125,10 +125,10 @@ protected:
     int m_x, m_y;
     int m_prevX, m_prevY;
     float m_dx, m_dy;
-    bool m_buttonStates[8];
-    bool m_prevButtonStates[8];
-    double m_lastClickTime[8];
-    double m_prevClickTime[8];
+    bool m_buttonStates[12];
+    bool m_prevButtonStates[12];
+    double m_lastClickTime[12];
+    double m_prevClickTime[12];
     int m_wheelDelta;
     bool m_bHidden;
     bool m_bExclusive;

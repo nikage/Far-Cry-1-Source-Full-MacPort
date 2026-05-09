@@ -18,6 +18,14 @@ enum
     XKEY_MOUSE2 = 0x00020000,
     XKEY_MOUSE3 = 0x00030000,
     XKEY_MOUSE4 = 0x00040000,
+    XKEY_MOUSE5 = 0x00050000,
+    XKEY_MOUSE6 = 0x00060000,
+    XKEY_MOUSE7 = 0x00070000,
+    XKEY_MOUSE8 = 0x00080000,
+    XKEY_MWHEEL_UP = 0x00090000,
+    XKEY_MWHEEL_DOWN = 0x000A0000,
+    XKEY_MAXIS_X = 0x000B0000,
+    XKEY_MAXIS_Y = 0x000C0000,
 };
 
 // ---------------------------------------------------------------------------
@@ -31,7 +39,16 @@ static int XKeyToMouseIndex(int key)
     case XKEY_MOUSE1: return 0;
     case XKEY_MOUSE2: return 1;
     case XKEY_MOUSE3: return 2;
-    default:          return -1;
+    case XKEY_MOUSE4: return 3;
+    case XKEY_MOUSE5: return 4;
+    case XKEY_MOUSE6: return 5;
+    case XKEY_MOUSE7: return 6;
+    case XKEY_MOUSE8: return 7;
+    case XKEY_MWHEEL_UP: return 8;
+    case XKEY_MWHEEL_DOWN: return 9;
+    case XKEY_MAXIS_X: return 10;
+    case XKEY_MAXIS_Y: return 11;
+    default: return -1;
     }
 }
 
@@ -39,7 +56,7 @@ static int XKeyToMouseIndex(int key)
 // Minimal stub of CMacOSMouse that exercises the fixed lookup path without
 // any OS / framework dependency.
 // ---------------------------------------------------------------------------
-static const int kMaxButtons = 8;
+static const int kMaxButtons = 12;
 
 struct TestMouse
 {
@@ -55,21 +72,24 @@ struct TestMouse
     bool MouseDown(int p_numButton)
     {
         const int idx = XKeyToMouseIndex(p_numButton);
-        if (idx < 0 || idx >= kMaxButtons) return false;
+        if (idx < 0 || idx >= kMaxButtons)
+            return false;
         return m_buttonStates[idx];
     }
 
     bool MousePressed(int p_numButton)
     {
         const int idx = XKeyToMouseIndex(p_numButton);
-        if (idx < 0 || idx >= kMaxButtons) return false;
+        if (idx < 0 || idx >= kMaxButtons)
+            return false;
         return m_buttonStates[idx] && !m_prevButtonStates[idx];
     }
 
     bool MouseReleased(int p_numButton)
     {
         const int idx = XKeyToMouseIndex(p_numButton);
-        if (idx < 0 || idx >= kMaxButtons) return false;
+        if (idx < 0 || idx >= kMaxButtons)
+            return false;
         return !m_buttonStates[idx] && m_prevButtonStates[idx];
     }
 };
@@ -111,14 +131,24 @@ static void Test_XKeyToMouseIndex_KnownButtons()
     CHECK_EQ(XKeyToMouseIndex(XKEY_MOUSE1), 0);
     CHECK_EQ(XKeyToMouseIndex(XKEY_MOUSE2), 1);
     CHECK_EQ(XKeyToMouseIndex(XKEY_MOUSE3), 2);
+    CHECK_EQ(XKeyToMouseIndex(XKEY_MOUSE4), 3);
+    CHECK_EQ(XKeyToMouseIndex(XKEY_MAXIS_X), 10);
+    CHECK_EQ(XKeyToMouseIndex(XKEY_MAXIS_Y), 11);
 }
 
 static void Test_XKeyToMouseIndex_UnknownReturnsNegative()
 {
-    CHECK_EQ(XKeyToMouseIndex(0xDEAD),    -1);
-    CHECK_EQ(XKeyToMouseIndex(0),         -1);
-    CHECK_EQ(XKeyToMouseIndex(XKEY_MOUSE4), -1);
-    CHECK_EQ(XKeyToMouseIndex(-1),        -1);
+    CHECK_EQ(XKeyToMouseIndex(0xDEAD), -1);
+    CHECK_EQ(XKeyToMouseIndex(0), -1);
+    CHECK_EQ(XKeyToMouseIndex(-1), -1);
+}
+
+static void Test_MouseDown_MaxisXReflectsSlot10()
+{
+    TestMouse m;
+    m.m_buttonStates[10] = true;
+    CHECK(m.MouseDown(XKEY_MAXIS_X));
+    CHECK(!m.MouseDown(XKEY_MAXIS_Y));
 }
 
 static void Test_MouseDown_ReturnsFalseWhenNotPressed()
@@ -193,6 +223,7 @@ int main()
 {
     Test_XKeyToMouseIndex_KnownButtons();
     Test_XKeyToMouseIndex_UnknownReturnsNegative();
+    Test_MouseDown_MaxisXReflectsSlot10();
     Test_MouseDown_ReturnsFalseWhenNotPressed();
     Test_MouseDown_ReturnsTrueWhenPressed();
     Test_MouseDown_IgnoresRawLargeIndex();
