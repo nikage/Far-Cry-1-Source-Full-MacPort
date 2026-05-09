@@ -565,12 +565,22 @@ int __cdecl CBrush__Cmp_MatChunks(const void* v1, const void* v2)
   CMatInfo * pMat1 = (CMatInfo*)v1;
   CMatInfo * pMat2 = (CMatInfo*)v2;
 
-  // shader
-  if(pMat1->shaderItem.m_pShader->GetTemplate(-1) > pMat2->shaderItem.m_pShader->GetTemplate(-1))
-    return  1;
-  else
-  if(pMat1->shaderItem.m_pShader->GetTemplate(-1) < pMat2->shaderItem.m_pShader->GetTemplate(-1))
+  IShader *const sh1 = pMat1->shaderItem.m_pShader;
+  IShader *const sh2 = pMat2->shaderItem.m_pShader;
+  if (sh1 && sh2)
+  {
+    IShader *t1 = sh1->GetTemplate(-1);
+    IShader *t2 = sh2->GetTemplate(-1);
+    if(t1 > t2)
+      return  1;
+    else
+    if(t1 < t2)
+      return -1;
+  }
+  else if (!sh1 && sh2)
     return -1;
+  else if (sh1 && !sh2)
+    return 1;
 
   // shader resources
   if(pMat1->shaderItem.m_pShaderResources > pMat2->shaderItem.m_pShaderResources)
@@ -637,6 +647,8 @@ void CObjManager::MergeBrushes()
   if (!nNumGroups)
     return;
   nMergeId = -1;
+
+  static int s_mergeBrushNoShaderLog = 0;
 
   GetLog()->UpdateLoadingScreen("\003---Merge brushes ... ");
 
@@ -711,6 +723,15 @@ void CObjManager::MergeBrushes()
 
           newMatInfo.shaderItem = pCustMat->shaderItem;
         }
+      }
+      if (!newMatInfo.shaderItem.m_pShader)
+      {
+        if (GetLog() && s_mergeBrushNoShaderLog < 8)
+        {
+          GetLog()->Log("Warning: MergeBrushes: skip material m=%d brush i=%d (no shader)\n", m, i);
+          ++s_mergeBrushNoShaderLog;
+        }
+        continue;
       }
       SMatGroup *mg;
       for (j=0; j<groupBrushes[nMergeId].Num(); j++)
@@ -889,6 +910,16 @@ void CObjManager::MergeBrushes()
 
             newMatInfo.shaderItem = pCustMat->shaderItem;
           }
+        }
+
+        if (!newMatInfo.shaderItem.m_pShader)
+        {
+          if (GetLog() && s_mergeBrushNoShaderLog < 8)
+          {
+            GetLog()->Log("Warning: MergeBrushes: skip material m=%d brush nEntityId=%d (no shader)\n", m, nEntityId);
+            ++s_mergeBrushNoShaderLog;
+          }
+          continue;
         }
 
         // copy indices

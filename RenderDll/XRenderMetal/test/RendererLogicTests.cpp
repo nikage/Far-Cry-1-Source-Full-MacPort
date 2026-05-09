@@ -2797,6 +2797,30 @@ int main()
                 }
             }
         }
+
+        // 7) MergeBrushes — skip sub-materials with null m_pShader (Metal soft miss).
+        {
+            const std::string path = findSource("Cry3DEngine/Brush.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string mergeBody =
+                    findFunctionBody(src, "void CObjManager::MergeBrushes()");
+                CHECK(!mergeBody.empty());
+                if (!mergeBody.empty()) {
+                    CHECK(mergeBody.find("!newMatInfo.shaderItem.m_pShader") !=
+                          std::string::npos);
+                }
+                const std::string cmpBody =
+                    findFunctionBody(src,
+                                     "int __cdecl CBrush__Cmp_MatChunks(const void* v1, const void* v2)");
+                CHECK(!cmpBody.empty());
+                if (!cmpBody.empty()) {
+                    CHECK(cmpBody.find("else if (!sh1 && sh2)") != std::string::npos);
+                }
+            }
+        }
     }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
