@@ -898,6 +898,65 @@ bool CMetalBaseRenderer::AcquireDrawableFromView()
     return true;
 }
 
+bool CMetalBaseRenderer::BeginSwapchainRenderPass(MTLLoadAction colorLoad, MTLLoadAction depthLoad,
+                                                  MTLLoadAction stencilLoad)
+{
+    if (!m_currentCommandBuffer)
+        return false;
+
+    id<MTLTexture> colorTexture = nil;
+    if (m_currentDrawable && m_currentDrawable.texture)
+        colorTexture = m_currentDrawable.texture;
+    else if (m_metalView && m_metalView.currentDrawable)
+        colorTexture = m_metalView.currentDrawable.texture;
+    if (!colorTexture)
+        return false;
+
+    id<MTLTexture> depthTexture = m_depthStencilTextures[m_currentFrameIndex];
+    if (!depthTexture)
+        return false;
+
+    if (m_renderEncoder)
+    {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
+    }
+
+    if (m_renderPassDescriptor)
+    {
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
+    }
+
+    MTLRenderPassDescriptor* descriptor =
+        GetOrCreateRenderPassDescriptor(colorTexture, depthTexture, colorLoad, depthLoad, stencilLoad);
+    if (!descriptor)
+        return false;
+
+    m_renderPassDescriptor = [descriptor retain];
+    m_renderEncoder =
+        [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:m_renderPassDescriptor] retain];
+    if (!m_renderEncoder)
+    {
+        [m_renderPassDescriptor release];
+        m_renderPassDescriptor = nil;
+        return false;
+    }
+
+    [m_renderEncoder setLabel:@"SwapchainResumePass"];
+    ApplyRenderState();
+    SetViewport(0, 0, m_width, m_height);
+    return true;
+}
+
+bool CMetalBaseRenderer::TryEnsureSwapchainRenderEncoderFor2D()
+{
+    if (m_renderEncoder)
+        return true;
+    return BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionLoad, MTLLoadActionLoad);
+}
+
 void CMetalBaseRenderer::BeginFrame()
 {
     if (!m_isInitialized || !m_device || !m_commandQueue)
@@ -2430,7 +2489,11 @@ void CMetalBaseRenderer::EndHDRPass()
 
     id<MTLRenderCommandEncoder> tonemapEncoder =
         [m_currentCommandBuffer renderCommandEncoderWithDescriptor:tonemapRPD];
-    if (!tonemapEncoder) return;
+    if (!tonemapEncoder)
+    {
+        BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionClear, MTLLoadActionClear);
+        return;
+    }
     [tonemapEncoder setLabel:@"HDRToneMapPass"];
     [tonemapEncoder setRenderPipelineState:m_hdrToneMapPSO];
     [tonemapEncoder setFragmentTexture:m_hdrColorRT atIndex:0];
@@ -2438,7 +2501,18 @@ void CMetalBaseRenderer::EndHDRPass()
     [tonemapEncoder setFragmentSamplerState:m_hdrSampler atIndex:0];
     [tonemapEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [tonemapEncoder endEncoding];
-    // Drawable is presented in EndFrame via the normal m_currentDrawable path
+
+    if (!BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionClear, MTLLoadActionClear))
+    {
+#if DEBUG
+        static bool s_loggedSwapchainResumeFail = false;
+        if (!s_loggedSwapchainResumeFail && iLog)
+        {
+            iLog->Log("EndHDRPass: BeginSwapchainRenderPass failed — 2D/UI may assert until fixed\n");
+            s_loggedSwapchainResumeFail = true;
+        }
+#endif
+    }
 }
 
 // SetTexgen / SetTexgen3D — fixed-function-era texture coordinate generation API.

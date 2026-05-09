@@ -372,6 +372,7 @@ virtual void PushMatrix();
     virtual void WriteJPG(byte* dat, int wdt, int hgt, char* name) { }
 
 public:
+    bool TryEnsureSwapchainRenderEncoderFor2D();
     // Metal-specific members (public for manager access)
     id<MTLDevice> m_device;
     id<MTLCommandQueue> m_commandQueue;
@@ -637,6 +638,7 @@ public:
     bool AcquireDrawableResources();
     bool AcquireDrawableFromLayer();
     bool AcquireDrawableFromView();
+    bool BeginSwapchainRenderPass(MTLLoadAction colorLoad, MTLLoadAction depthLoad, MTLLoadAction stencilLoad);
     
     // Command buffer tracking
     void TrackCommandBuffer(id<MTLCommandBuffer> buffer);

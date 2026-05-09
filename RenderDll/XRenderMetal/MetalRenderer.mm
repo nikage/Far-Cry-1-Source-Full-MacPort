@@ -3692,18 +3692,17 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
             iLog->Log("PrepareDepthMap: Failed to create shadow map texture\n");
         return;
     }
-    
-    // End any ongoing render pass before starting the shadow pass
-    if (m_renderEncoder) {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
-    
+
     id<MTLTexture> depthTex = m_utilityRenderer->GetRenderTargetDepthTexture(lof->depth_tex_id);
     if (!depthTex || !m_currentCommandBuffer) {
         lof->bUpdateRequested = false;
         return;
+    }
+
+    if (m_renderEncoder) {
+        [m_renderEncoder endEncoding];
+        [m_renderEncoder release];
+        m_renderEncoder = nil;
     }
     
     // Build a depth-only render pass descriptor
@@ -3717,6 +3716,17 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
         [m_currentCommandBuffer renderCommandEncoderWithDescriptor:shadowDesc];
     if (!shadowEncoder) {
         lof->bUpdateRequested = false;
+        if (!BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionLoad, MTLLoadActionLoad))
+        {
+#if DEBUG
+            static bool s_loggedPrepareDepthMapResumeFail = false;
+            if (!s_loggedPrepareDepthMapResumeFail && iLog)
+            {
+                iLog->Log("PrepareDepthMap: shadow encoder nil and BeginSwapchainRenderPass failed\n");
+                s_loggedPrepareDepthMapResumeFail = true;
+            }
+#endif
+        }
         return;
     }
     [shadowEncoder setLabel:@"ShadowDepthPass"];
@@ -3740,12 +3750,8 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
     if (depthPSO) {
         [shadowEncoder setRenderPipelineState:depthPSO];
 
-        // Bind global uniforms (light-space matrices already written above)
         [shadowEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
 
-        // Swap in the shadow encoder as the active encoder so that
-        // EF_AddEf/mfDraw calls in DrawEntity submit to the depth pass.
-        id<MTLRenderCommandEncoder> savedEncoder = m_renderEncoder;
         m_renderEncoder = shadowEncoder;
 
         if (lof->pEntityList)
@@ -3765,15 +3771,23 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
             }
         }
 
-        // Restore main encoder
-        m_renderEncoder = savedEncoder;
+        m_renderEncoder = nil;
     }
 
     [shadowEncoder endEncoding];
-    
-    // Restore the main render encoder viewport
-    SetViewport(0, 0, m_width, m_height);
-    
+
+    if (!BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionLoad, MTLLoadActionLoad))
+    {
+#if DEBUG
+        static bool s_loggedPrepareDepthMapResumeFail2 = false;
+        if (!s_loggedPrepareDepthMapResumeFail2 && iLog)
+        {
+            iLog->Log("PrepareDepthMap: BeginSwapchainRenderPass failed after shadow pass\n");
+            s_loggedPrepareDepthMapResumeFail2 = true;
+        }
+#endif
+    }
+
     lof->bUpdateRequested = false;
 }
 

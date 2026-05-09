@@ -190,8 +190,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     assert(m_renderer != nullptr && "Draw2dImage: utility renderer has no back-reference to CMetalRenderer");
     if (!m_renderer)
         return;
-    assert(m_renderer->m_renderEncoder != nil && "Draw2dImage: no active render encoder — BeginFrame must be called before any 2D draw");
-    if (!m_renderer->m_renderEncoder)
+    if (!m_renderer->m_renderEncoder && !m_renderer->TryEnsureSwapchainRenderEncoderFor2D())
         return;
 
     if (w <= 0.0f || h <= 0.0f)
@@ -994,6 +993,21 @@ bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
         return false;
     if (!m_renderer->m_currentCommandBuffer)
         return false;
+
+    if (nHandle == 0)
+    {
+        if (!m_renderer->m_currentDrawable)
+        {
+            iLog->Log("SetRenderTarget: Back buffer drawable is not available\n");
+            return false;
+        }
+    }
+    else
+    {
+        RenderTargetInfo& preInfo = m_renderTargets[nHandle];
+        if (!preInfo.inUse || !preInfo.colorTexture)
+            return false;
+    }
     
     if (m_renderer->m_renderEncoder)
     {
@@ -1014,20 +1028,12 @@ bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
     
     if (nHandle == 0)
     {
-        if (!m_renderer->m_currentDrawable)
-        {
-            iLog->Log("SetRenderTarget: Back buffer drawable is not available\n");
-            return false;
-        }
         id<MTLTexture> depthTexture = m_renderer->m_depthStencilTextures[m_renderer->m_currentFrameIndex];
         descriptor = m_renderer->CreateRenderPassDescriptor(m_renderer->m_currentDrawable.texture, depthTexture);
     }
     else
     {
         RenderTargetInfo& info = m_renderTargets[nHandle];
-        if (!info.inUse || !info.colorTexture)
-            return false;
-        
         targetWidth = info.width;
         targetHeight = info.height;
         

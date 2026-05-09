@@ -495,6 +495,20 @@ if(BUILD_TESTING OR CMAKE_BUILD_TYPE STREQUAL "Debug")
         target_compile_features(MetalManifestPSOHelpersTests PRIVATE cxx_std_17)
         target_link_options(MetalManifestPSOHelpersTests PRIVATE "-Wl,-rpath,@executable_path")
         add_test(NAME MetalManifestPSOHelpersTests COMMAND MetalManifestPSOHelpersTests)
+        add_executable(BeginSwapchainRenderPassTests test/BeginSwapchainRenderPassTests.mm)
+        target_include_directories(BeginSwapchainRenderPassTests PRIVATE
+            ${CMAKE_SOURCE_DIR}/CryCommon
+            ${CMAKE_SOURCE_DIR}/RenderDll
+            ${CMAKE_CURRENT_SOURCE_DIR})
+        target_link_libraries(BeginSwapchainRenderPassTests PRIVATE XRenderMetal
+            "-framework Foundation"
+            "-framework Metal"
+            "-framework Cocoa"
+            "-framework CoreFoundation")
+        set_source_files_properties(test/BeginSwapchainRenderPassTests.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+        target_compile_features(BeginSwapchainRenderPassTests PRIVATE cxx_std_14)
+        target_link_options(BeginSwapchainRenderPassTests PRIVATE "-Wl,-rpath,@executable_path")
+        add_test(NAME BeginSwapchainRenderPassTests COMMAND BeginSwapchainRenderPassTests)
         add_test(NAME metal_pso_validate COMMAND metal_pso_validate --generated-dir ${CMAKE_CURRENT_SOURCE_DIR}/Generated --max-failures 10)
     endif()
 endif()
