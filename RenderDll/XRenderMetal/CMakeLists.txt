@@ -12,6 +12,7 @@ set(XRENDER_METAL_SOURCES
     MetalTextureManager.mm
     MetalShaderManager.mm
     MetalShaderLoader.mm
+    MetalManifestPSOHelpers.mm
     MetalUtilityRenderer.mm
     MetalStateCache.mm
     MetalVertexDescriptor.mm
@@ -97,6 +98,10 @@ set_source_files_properties(MetalVertexDescriptor.mm PROPERTIES
 )
 
 set_source_files_properties(MetalShaderLoader.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalManifestPSOHelpers.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 
@@ -420,6 +425,37 @@ add_custom_target(StagedMetalShaders ALL
 add_dependencies(StagedMetalShaders MetalShaders)
 add_dependencies(XRenderMetal StagedMetalShaders)
 
+if(APPLE)
+    add_executable(metal_pso_validate test/metal_pso_validate.mm)
+    target_include_directories(metal_pso_validate PRIVATE
+        ${CMAKE_SOURCE_DIR}/CryCommon
+        ${CMAKE_SOURCE_DIR}/RenderDll
+        ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(metal_pso_validate PRIVATE XRenderMetal
+        "-framework Foundation"
+        "-framework Metal"
+        "-framework CoreFoundation")
+    set_source_files_properties(test/metal_pso_validate.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+    target_compile_features(metal_pso_validate PRIVATE cxx_std_17)
+    target_link_options(metal_pso_validate PRIVATE "-Wl,-rpath,@executable_path")
+
+    add_executable(metal_runtime_validate test/metal_runtime_validate.mm)
+    target_include_directories(metal_runtime_validate PRIVATE
+        ${CMAKE_SOURCE_DIR}/CryCommon
+        ${CMAKE_SOURCE_DIR}/RenderDll
+        ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(metal_runtime_validate PRIVATE XRenderMetal
+        "-framework Foundation"
+        "-framework Metal"
+        "-framework MetalKit"
+        "-framework QuartzCore"
+        "-framework Cocoa"
+        "-framework CoreFoundation")
+    set_source_files_properties(test/metal_runtime_validate.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+    target_compile_features(metal_runtime_validate PRIVATE cxx_std_14)
+    target_link_options(metal_runtime_validate PRIVATE "-Wl,-rpath,@executable_path")
+endif()
+
 # ------------------------------------------------------------------
 # Unit tests — pure-logic renderer functions (no Metal dependency)
 # ------------------------------------------------------------------
@@ -440,6 +476,22 @@ if(BUILD_TESTING OR CMAKE_BUILD_TYPE STREQUAL "Debug")
         target_link_options(RendererLogicTests PRIVATE -fno-sanitize=address)
     endif()
     add_test(NAME RendererLogicTests COMMAND RendererLogicTests)
+    if(APPLE)
+        add_executable(MetalManifestPSOHelpersTests test/MetalManifestPSOHelpersTests.mm)
+        target_include_directories(MetalManifestPSOHelpersTests PRIVATE
+            ${CMAKE_SOURCE_DIR}/CryCommon
+            ${CMAKE_SOURCE_DIR}/RenderDll
+            ${CMAKE_CURRENT_SOURCE_DIR})
+        target_link_libraries(MetalManifestPSOHelpersTests PRIVATE XRenderMetal
+            "-framework Foundation"
+            "-framework Metal"
+            "-framework CoreFoundation")
+        set_source_files_properties(test/MetalManifestPSOHelpersTests.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+        target_compile_features(MetalManifestPSOHelpersTests PRIVATE cxx_std_17)
+        target_link_options(MetalManifestPSOHelpersTests PRIVATE "-Wl,-rpath,@executable_path")
+        add_test(NAME MetalManifestPSOHelpersTests COMMAND MetalManifestPSOHelpersTests)
+        add_test(NAME metal_pso_validate COMMAND metal_pso_validate --generated-dir ${CMAKE_CURRENT_SOURCE_DIR}/Generated --max-failures 10)
+    endif()
 endif()
 
 

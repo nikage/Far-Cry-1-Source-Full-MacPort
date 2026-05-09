@@ -13,7 +13,7 @@ Before creating any `git commit`, always run the full test suite for every compo
 |---|---|---|
 | `tools/shader_port/**` | `dart test` | `tools/shader_port/` |
 | `RenderDll/XRenderMetal/test/*.cpp` | `clang++ -std=c++17 -o <name> <file>.cpp && ./<name>` | `RenderDll/XRenderMetal/test/` |
-| `RenderDll/XRenderMetal/**` (shader/PSO changes) | `clang++ -std=c++17 -framework Metal -framework Foundation -framework CoreFoundation -o generated_pso_tests GeneratedPSOTests.mm && ./generated_pso_tests` | `RenderDll/XRenderMetal/test/` |
+| `RenderDll/XRenderMetal/**` (shader/PSO changes) | Prefer CMake-built validator: `cmake --build build --target metal_pso_validate -- -j8` then `./RenderDll/XRenderMetal/metal_pso_validate` (or path under `build/`) with `--generated-dir RenderDll/XRenderMetal/Generated`. Legacy one-liner: `clang++ -std=c++17 -framework Metal -framework Foundation -framework CoreFoundation -o generated_pso_tests GeneratedPSOTests.mm && ./generated_pso_tests` | project `build/` dir or `RenderDll/XRenderMetal/test/` |
 
 ## Rules
 
@@ -33,9 +33,8 @@ clang++ -std=c++17 -o renderer_logic_tests RendererLogicTests.cpp && ./renderer_
 clang++ -std=c++17 -o shader_pair_validation_tests ShaderPairValidationTests.cpp && ./shader_pair_validation_tests
 
 # Generated PSO dry-run (requires Generated/ artifacts — run dart validate_migration.dart first)
-cd RenderDll/XRenderMetal/test
-clang++ -std=c++17 -framework Metal -framework Foundation -framework CoreFoundation \
-    -o generated_pso_tests GeneratedPSOTests.mm && ./generated_pso_tests
+cmake --build build --target metal_pso_validate -- -j8
+./build/RenderDll/XRenderMetal/metal_pso_validate --generated-dir RenderDll/XRenderMetal/Generated
 ```
 
 ## Integration smoke checklist (manual gate before shipping)

@@ -299,14 +299,16 @@ public:
 
     id<MTLLibrary> GetDefaultLibrary() const { return m_defaultLibrary; }
 
+    void RunValidateShaderPairs();
+    int GetLastGeneratedShaderPsoFailureCount() const { return m_lastGeneratedShaderPsoFailureCount; }
+    int GetLastValidateShaderPairsFailureCount() const { return m_lastValidateShaderPairsFailureCount; }
+
 protected:
     // Metal-specific shader management
     bool InitializeDefaultShaderLibrary();
     void CreateDefaultShaders(id<MTLLibrary> library);
     void LoadGeneratedShaders(id<MTLLibrary> vertexLibrary);
-#if DEBUG
     void ValidateShaderPairs(id<MTLDevice> device, id<MTLLibrary> generatedLib);
-#endif
     id<MTLFunction> LoadMetalShader(const char* name, const char* source);
     id<MTLRenderPipelineState> CreatePipelineState(id<MTLFunction> vertexFunction, 
                                                    id<MTLFunction> fragmentFunction,
@@ -358,6 +360,8 @@ protected:
     int GetStartupMissingShaderCount() const { return m_nStartupMissingShaders; }
 
     int m_nStartupMissingShaders;
+    int m_lastGeneratedShaderPsoFailureCount;
+    int m_lastValidateShaderPairsFailureCount;
 };
 
 #endif // __APPLE__ && __MACH__

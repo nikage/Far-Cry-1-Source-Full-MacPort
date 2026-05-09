@@ -12,6 +12,7 @@ This document is a **closure-oriented** path from “macOS build runs” to **sh
 | [`macos_crash_observability_roadmap.md`](macos_crash_observability_roadmap.md) | macOS crash capture, **local** dSYM/symbolication, Metal breadcrumbs, triage workflow (complements Phase F–G; local dev scope) |
 | [`metal-shader-load-fatal-resolution.md`](metal-shader-load-fatal-resolution.md) | `ShaderLoadFatal` policy, resolution tiers, decision tree, LLDB workflow |
 | [`shader-aliases.md`](shader-aliases.md) | Original CryEngine alias semantics vs Metal port (tiers 1–4) |
+| [`metal_pso_validate.md`](metal_pso_validate.md) | Offline **`metal_pso_validate`** binary: manifest-driven PSO creation with vertex descriptor + function constants + pipeline parity |
 
 ---
 
@@ -141,6 +142,7 @@ flowchart LR
 | Work | Evidence / mechanism | Exit criteria |
 |------|----------------------|---------------|
 | Shader pipeline | `dart tools/shader_port/bin/validate_migration.dart .` ([`.cursor/rules/shader-pipeline-validation.mdc`](../.cursor/rules/shader-pipeline-validation.mdc)) | CI step on every shader-related change |
+| Offline Metal PSO gate (macOS) | [`metal_pso_validate.md`](metal_pso_validate.md) — `cmake --build … --target metal_pso_validate`; point `--generated-dir` at a folder containing **both** staged metallib and manifest | Optional CI tier when macOS runners available; catches PSO/layout issues after metallib link |
 | Build + logic tests | [`RenderDll/XRenderMetal/CMakeLists.txt`](../RenderDll/XRenderMetal/CMakeLists.txt) `RendererLogicTests` when `BUILD_TESTING` or Debug | CI compiles and runs tests; document `clang++` fallback from run-tests rule |
 | Repository CI | No `.github/workflows` present in this repo at roadmap authoring time | Add macOS workflow when runners available; document self-hosted need for full Metal GPU tests |
 
@@ -183,6 +185,7 @@ Defer heavy optimization until shader resolution and visuals are signed off.
 | LLDB batch script (documented path) | `build/shader_abort_session.lldb` (see [`metal-shader-load-fatal-resolution.md`](metal-shader-load-fatal-resolution.md) §4) |
 | C++ regression tests | [`RenderDll/XRenderMetal/test/RendererLogicTests.cpp`](../RenderDll/XRenderMetal/test/RendererLogicTests.cpp) |
 | Dart tests | `tools/shader_port/test/` |
+| Offline `metal_pso_validate` | [`metal_pso_validate.md`](metal_pso_validate.md) |
 
 ---
 

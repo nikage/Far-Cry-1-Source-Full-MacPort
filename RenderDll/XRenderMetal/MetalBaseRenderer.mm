@@ -360,6 +360,14 @@ bool CMetalBaseRenderer::InitializeDevice()
     return true;
 }
 
+bool CMetalBaseRenderer::InitializeMinimalForShaderLoadValidation()
+{
+    if (!InitializeDevice())
+        return false;
+    m_stateCache = std::make_unique<CMetalStateCache>(m_device);
+    return m_stateCache != nullptr;
+}
+
 bool CMetalBaseRenderer::InitializeCommandQueue()
 {
     if (!m_device)

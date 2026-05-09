@@ -132,7 +132,9 @@ public:
     virtual void SetTexgen3D(float x1, float y1, float z1, float x2, float y2, float z2);
     virtual void SetLodBias(float value = R_DEFAULT_LODBIAS);
     virtual void EnableVSync(bool enable);
-    virtual void PushMatrix();
+
+    bool InitializeMinimalForShaderLoadValidation();
+virtual void PushMatrix();
     virtual void RotateMatrix(float a, float x, float y, float z);
     virtual void RotateMatrix(const Vec3& angels);
     virtual void TranslateMatrix(float x, float y, float z);
