@@ -19,6 +19,9 @@
 #include <ISystem.h>
 #include <IStreamEngine.h>
 #include "System.h"
+#include "LogLoadingHelpers.h"
+#include <cstdio>
+#include <cstring>
 
 #ifdef _WIN32
 #include <time.h>
@@ -39,6 +42,8 @@ CLog::CLog( ISystem *pSystem )
 	m_pSystem=pSystem;
 	m_pLogVerbosity = 0;
 	m_pLogFileVerbosity = 0;
+	m_pLogLoadingStderr = 0;
+	m_pLogLoadingOverlay = 0;
 	m_pLogIncludeTime = 0;
 }
 
@@ -53,6 +58,8 @@ void CLog::Done()
 	//# These console vars are released when script system shutdown.
 	m_pLogVerbosity = 0;
 	m_pLogFileVerbosity = 0;
+	m_pLogLoadingStderr = 0;
+	m_pLogLoadingOverlay = 0;
 	m_pLogWarningsOnly = 0;
 	m_pLogColoredText = 0;
 	m_pLogIncludeTime = 0;
@@ -65,16 +72,26 @@ void CLog::EnableVerbosity( bool bEnable )
 
 	if (bEnable)
 	{
-		if (!m_pLogVerbosity)
+		IConsole *pConsole = m_pSystem ? m_pSystem->GetIConsole() : 0;
+		if (pConsole)
 		{
-			if (m_pSystem->GetIConsole())
+			if (!m_pLogVerbosity)
 			{
 #if defined(DEBUG) || (defined(LINUX) && !defined(NDEBUG))
-				m_pLogVerbosity = m_pSystem->GetIConsole()->CreateVariable("log_Verbosity","5",VF_DUMPTODISK);
+				m_pLogVerbosity = pConsole->CreateVariable("log_Verbosity","5",VF_DUMPTODISK);
 #else
-				m_pLogVerbosity = m_pSystem->GetIConsole()->CreateVariable("log_Verbosity","3",VF_DUMPTODISK);
+				m_pLogVerbosity = pConsole->CreateVariable("log_Verbosity","3",VF_DUMPTODISK);
 #endif
-				m_pLogFileVerbosity = m_pSystem->GetIConsole()->CreateVariable("log_FileVerbosity","3",VF_DUMPTODISK);
+				m_pLogFileVerbosity = pConsole->CreateVariable("log_FileVerbosity","3",VF_DUMPTODISK);
+			}
+			if (!m_pLogLoadingStderr)
+			{
+#if defined(__APPLE__) && defined(__MACH__)
+				m_pLogLoadingStderr = pConsole->CreateVariable("log_LoadingStderr","1",VF_DUMPTODISK);
+#else
+				m_pLogLoadingStderr = pConsole->CreateVariable("log_LoadingStderr","0",VF_DUMPTODISK);
+#endif
+				m_pLogLoadingOverlay = pConsole->CreateVariable("log_LoadingOverlay","1",VF_DUMPTODISK);
 			}
 		}
 	}
@@ -85,9 +102,13 @@ void CLog::EnableVerbosity( bool bEnable )
 		{
 			m_pSystem->GetIConsole()->UnregisterVariable("log_Verbosity",true);
 			m_pSystem->GetIConsole()->UnregisterVariable("log_FileVerbosity",true);
+			m_pSystem->GetIConsole()->UnregisterVariable("log_LoadingStderr",true);
+			m_pSystem->GetIConsole()->UnregisterVariable("log_LoadingOverlay",true);
 		}
 		m_pLogVerbosity = 0;
 		m_pLogFileVerbosity = 0;
+		m_pLogLoadingStderr = 0;
+		m_pLogLoadingOverlay = 0;
 	}
 }
 
@@ -527,6 +548,23 @@ const char* CLog::GetFileName()
 }
 
 //////////////////////////////////////////////////////////////////////
+void CLog::LogLoadingMirrorStderr( const char *szFormatted )
+{
+	if (!m_pLogLoadingStderr || !m_pLogLoadingStderr->GetIVal())
+		return;
+	if (!szFormatted || !szFormatted[0])
+		return;
+	const char *p = CryLog_TextAfterVerbosityPrefix( szFormatted );
+	if (!p || !p[0])
+		return;
+	fputs( p, stderr );
+	size_t n = strlen( p );
+	if (n == 0 || p[n - 1] != '\n')
+		fputc( '\n', stderr );
+	fflush( stderr );
+}
+
+//////////////////////////////////////////////////////////////////////
 void CLog::UpdateLoadingScreen(const char *szFormat,...)
 {
 	if ((!m_pLogVerbosity) || (m_pLogVerbosity && m_pLogVerbosity->GetIVal()) || ((!m_pLogFileVerbosity) || (m_pLogFileVerbosity && m_pLogFileVerbosity->GetIVal())))
@@ -545,14 +583,13 @@ void CLog::UpdateLoadingScreen(const char *szFormat,...)
 				m_szTemp[sizeof(m_szTemp)-8]=0;
 				va_end(args);
 
-				if (bconsole)
-					LogToConsole(m_szTemp);
+				const bool overlay = !m_pLogLoadingOverlay || m_pLogLoadingOverlay->GetIVal() != 0;
+				LogLoadingMirrorStderr( m_szTemp );
+				if (overlay && bconsole)
+					LogToConsole( m_szTemp );
 				if (bfile)
-					LogToFile(m_szTemp);
-				if (bconsole)
-				{
-					((CSystem*)m_pSystem)->UpdateLoadingScreen();
-				}
+					LogToFile( m_szTemp );
+				((CSystem*)m_pSystem)->UpdateLoadingScreen();
 			}
 		}
 	}
@@ -571,19 +608,20 @@ void CLog::UpdateLoadingScreenPlus(const char *szFormat,...)
 			bool bfile = false, bconsole = false;
 			CheckAgainstVerbosity(szFormat, bfile, bconsole);
 
-			va_list args;
-			va_start(args, szFormat);
-			_vsnprintf(m_szTemp, sizeof(m_szTemp), szFormat, args);
-			m_szTemp[sizeof(m_szTemp)-8]=0;
-			va_end(args);
-
-			if (bconsole)
-				LogToConsolePlus(m_szTemp);
-			if (bfile)
-				LogToFilePlus(m_szTemp);
-			
-			if (bconsole)
+			if (bconsole || bfile)
 			{
+				va_list args;
+				va_start(args, szFormat);
+				_vsnprintf(m_szTemp, sizeof(m_szTemp), szFormat, args);
+				m_szTemp[sizeof(m_szTemp)-8]=0;
+				va_end(args);
+
+				const bool overlay = !m_pLogLoadingOverlay || m_pLogLoadingOverlay->GetIVal() != 0;
+				LogLoadingMirrorStderr( m_szTemp );
+				if (overlay && bconsole)
+					LogToConsolePlus( m_szTemp );
+				if (bfile)
+					LogToFilePlus( m_szTemp );
 				((CSystem*)m_pSystem)->UpdateLoadingScreen();
 			}
 		}

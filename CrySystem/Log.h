@@ -61,6 +61,7 @@ private:
 	void LogStringToFile( const char* szString,bool bAdd=false );
 	void LogStringToConsole( const char* szString,bool bAdd=false );
 	void Done();
+	void LogLoadingMirrorStderr( const char* szFormatted );
 
 	//will format the message into m_szTemp
 	void	FormatMessage(const char *szCommand,...);
@@ -83,6 +84,8 @@ public:
 
 	ICVar			*m_pLogVerbosity;
 	ICVar			*m_pLogFileVerbosity;
+	ICVar			*m_pLogLoadingStderr;
+	ICVar			*m_pLogLoadingOverlay;
 };
 
 
