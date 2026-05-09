@@ -1225,6 +1225,9 @@ String resolveFragmentOutputFieldType(
   if (declared != null && declared.isNotEmpty) {
     return declared;
   }
+  if (_isBuiltinFragmentColorOutputName(field)) {
+    return 'float4';
+  }
   final int? usage = outputComponentUsage[field];
   if (usage != null && usage > 0) {
     int width = usage;
@@ -1240,9 +1243,6 @@ String resolveFragmentOutputFieldType(
       }
     }
     return _metalFloatTypeFromOutputWidth(width);
-  }
-  if (_isBuiltinFragmentColorOutputName(field)) {
-    return 'float4';
   }
   if (field == 'Depth') {
     return 'float';

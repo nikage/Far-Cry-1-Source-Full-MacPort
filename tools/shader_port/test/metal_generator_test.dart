@@ -1554,4 +1554,18 @@ void main() {
       );
     });
   });
+
+  group('translateType (Metal)', () {
+    test('half scalars and vectors map to float', () {
+      expect(translateType('half'), 'float');
+      expect(translateType('half2'), 'float2');
+      expect(translateType('half3'), 'float3');
+      expect(translateType('half4'), 'float4');
+      expect(translateType('HALF4'), 'float4');
+    });
+    test('half matrices map like float matrices', () {
+      expect(translateType('half3x3'), translateType('float3x3'));
+      expect(translateType('half2x4'), translateType('float2x4'));
+    });
+  });
 }

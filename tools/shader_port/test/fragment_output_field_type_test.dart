@@ -39,13 +39,16 @@ void main() {
         ),
         'float3',
       );
+    });
+
+    test('builtin Color* stays float4 even when only .xyz is written', () {
       expect(
         resolveFragmentOutputFieldType(
           'Color',
           const {},
           const {'Color': 3},
         ),
-        'float3',
+        'float4',
       );
       expect(
         resolveFragmentOutputFieldType(
@@ -53,7 +56,7 @@ void main() {
           const {},
           const {'Color': 1},
         ),
-        'float2',
+        'float4',
       );
     });
 

@@ -133,6 +133,9 @@ void main() {
     test('float2 maps to float2', () => expect(translateType('float2'), 'float2'));
     test('float3 maps to float3', () => expect(translateType('float3'), 'float3'));
     test('float4 maps to float4', () => expect(translateType('float4'), 'float4'));
+    test('half maps to float', () => expect(translateType('half'), 'float'));
+    test('half2 maps to float2', () => expect(translateType('half2'), 'float2'));
+    test('half3 maps to float3', () => expect(translateType('half3'), 'float3'));
     test('half4 maps to float4', () => expect(translateType('half4'), 'float4'));
     test('FLOAT4 (uppercase) maps to float4', () => expect(translateType('FLOAT4'), 'float4'));
     test('unknown type maps to float4', () => expect(translateType('matrix3x3'), 'float4'));

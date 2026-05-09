@@ -152,6 +152,12 @@ String translateType(String type) {
       return 'float3';
     case 'float4':
       return 'float4';
+    case 'half':
+      return 'float';
+    case 'half2':
+      return 'float2';
+    case 'half3':
+      return 'float3';
     case 'half4':
       return 'float4';
     default:

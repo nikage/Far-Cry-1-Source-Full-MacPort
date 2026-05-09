@@ -1085,6 +1085,13 @@ String translateType(String type) {
     final String cols = matrixMatch.group(2)!;
     return 'float${cols}x${rows}';
   }
+  final RegExp halfMatrixPattern = RegExp(r'half(\d)x(\d)');
+  final Match? halfMatrixMatch = halfMatrixPattern.firstMatch(lower);
+  if (halfMatrixMatch != null) {
+    final String rows = halfMatrixMatch.group(1)!;
+    final String cols = halfMatrixMatch.group(2)!;
+    return 'float${cols}x${rows}';
+  }
   switch (lower) {
     case 'float':
       return 'float';
@@ -1122,6 +1129,14 @@ String translateType(String type) {
       return 'int4';
     case 'bool':
       return 'bool';
+    case 'half':
+      return 'float';
+    case 'half2':
+      return 'float2';
+    case 'half3':
+      return 'float3';
+    case 'half4':
+      return 'float4';
     default:
       stderr.writeln(
         'WARN: translateType: unknown HLSL type "$type" — using float4 fallback',
