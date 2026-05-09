@@ -2552,6 +2552,7 @@ int main()
             // Cry3DEngine/3dEngine.cpp:184 / 3dEngineLoad.cpp:715. Legacy
             // CryEngine 1 lens-flare shader; Metal port is CGRCFlare.
             CHECK(hasLookupAlias("cgrcflare", "crylight"));
+            CHECK(hasLookupAlias("cgrcflare", "flare_training"));
             // flare_from_light — pre-existing hardcoded alias on cgrcflare.
             CHECK(hasLookupAlias("cgrcflare", "flare_from_light"));
             // Default — engine LoadRendererShaderSafe("Default") at
@@ -2575,6 +2576,12 @@ int main()
                 const std::string bjson = bs.str();
                 CHECK(!bjson.empty());
                 CHECK(builtinArrayContains(bjson, "colortex", "occlusiontest"));
+                CHECK(builtinArrayContains(bjson, "color", "foglayer"));
+                CHECK(builtinArrayContains(bjson, "terrain", "terraindetaillayers"));
+                CHECK(builtinArrayContains(bjson, "terrain", "terrainlightpass"));
+                CHECK(builtinArrayContains(bjson, "terrain", "terrainlayer"));
+                CHECK(builtinArrayContains(bjson, "terrain", "terraindetailtexturelayers"));
+                CHECK(builtinArrayContains(bjson, "basic", "02_carrier"));
             }
             // TerrainWater_OnlySky — CustomAliases.txt NV1X-style row; Metal merges
             // into lookupAliases on CGRCLowMedWater (manifest normalized cgrclowmedwater).

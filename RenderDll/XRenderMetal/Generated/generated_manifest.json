@@ -113929,7 +113929,8 @@
     "pipelineCategory": "fullscreen",
     "lookupAliases": [
       "flare_from_light",
-      "crylight"
+      "crylight",
+      "flare_training"
     ],
     "uniforms": [
       {

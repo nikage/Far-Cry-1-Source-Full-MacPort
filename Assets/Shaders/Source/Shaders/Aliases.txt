@@ -12,6 +12,13 @@ ScreenTexMap               CGRCScreenTexMap
 ParticleLight              CGRCParticleLight
 BumpSunGlow                CGRCBumpSunGlow
 OcclusionTest              colortex
+FogLayer                   color
+TerrainDetailLayers        terrain
+TerrainLightPass           terrain
+TerrainLayer               terrain
+TerrainDetailTextureLayers terrain
+Flare_training             CGRCFlare
+02_Carrier                 basic
 Decal_VP                   CGVProgDecal
 Decal_2D_VP                CGVProgDecal_2D_Atten
 

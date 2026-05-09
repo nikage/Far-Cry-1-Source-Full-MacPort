@@ -93,8 +93,8 @@ static void ShaderLoadFatal(const char* op, const char* requestedName, const cha
                         op, req, lu, (int)Class, flags);
     else
         fprintf(stderr, "FATAL %s: required shader not registered (EF_SYSTEM). name='%s' lookup='%s'\n", op, req, lu);
-    //assert(!"MetalShaderManager: required shader missing (manifest / Aliases.txt / lookupAliases)");
-    //std::abort();
+    assert(!"MetalShaderManager: required shader missing (manifest / Aliases.txt / lookupAliases)");
+    std::abort();
 }
 
 static void ShaderLoadFatalItem(const char* name, const char* templName, EShClass Class, int flags)

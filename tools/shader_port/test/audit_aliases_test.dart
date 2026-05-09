@@ -382,6 +382,94 @@ no_draw			nodraw
       expect(byTarget['colortex'], contains('occlusiontest'));
     });
 
+    test('contains FogLayer -> color (fog volume EF_SYSTEM)', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'foglayer')
+          .firstOrNull;
+      expect(row, isNotNull,
+          reason: 'LoadFogVolumesFromXML uses EF_LoadShader(..., EF_SYSTEM)');
+      expect(row!.target.toLowerCase(), equals('color'));
+    });
+
+    test('FogLayer alias buckets under color for builtin_lookup_aliases', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['color'], contains('foglayer'));
+    });
+
+    test(
+        'contains TerrainDetailLayers/LightPass/Layer/DetailTextureLayers -> terrain',
+        () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      for (final name in <String>[
+        'terraindetaillayers',
+        'terrainlightpass',
+        'terrainlayer',
+        'terraindetailtexturelayers',
+      ]) {
+        final AliasesTxtEntry? row =
+            entries.where((e) => e.alias.toLowerCase() == name).firstOrNull;
+        expect(row, isNotNull, reason: 'missing alias for $name');
+        expect(row!.target.toLowerCase(), equals('terrain'));
+      }
+    });
+
+    test('terrain optional-pass aliases bucket under terrain builtin', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['terrain'], contains('terraindetaillayers'));
+      expect(byTarget['terrain'], contains('terrainlightpass'));
+      expect(byTarget['terrain'], contains('terrainlayer'));
+      expect(byTarget['terrain'], contains('terraindetailtexturelayers'));
+    });
+
+    test('contains Flare_training -> CGRCFlare', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'flare_training')
+          .firstOrNull;
+      expect(row, isNotNull);
+      expect(row!.target, equalsIgnoringCase('CGRCFlare'));
+    });
+
+    test('Flare_training alias produces lookupAliases on cgrcflare', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgrcflare'], contains('flare_training'));
+    });
+
+    test('contains 02_Carrier -> basic', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == '02_carrier')
+          .firstOrNull;
+      expect(row, isNotNull);
+      expect(row!.target.toLowerCase(), equals('basic'));
+    });
+
+    test('02_Carrier alias buckets under basic for builtin_lookup_aliases', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['basic'], contains('02_carrier'));
+    });
+
     test('contains Decal_VP -> CGVProgDecal', () {
       final File aliases = _findAliasesTxt();
       final List<AliasesTxtEntry> entries =
