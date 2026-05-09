@@ -124545,6 +124545,67 @@
     }
   },
   {
+    "source": "HWScripts/Declarations/CGPShaders/CGRCScreenTexMap.crycg.json",
+    "metal": "HWScripts_Declarations_CGPShaders_CGRCScreenTexMap.crycg.json.metal",
+    "shader": "CGRCScreenTexMap",
+    "normalized": "cgrcscreentexmap",
+    "fragment": "generated_cgrcscreentexmap_fragment",
+    "entryPoint": "generated_cgrcscreentexmap_fragment",
+    "stage": "fragment",
+    "uniformStruct": "cgrcscreentexmap_uniforms",
+    "uniformCount": 0,
+    "textureCount": 1,
+    "vertexAttributes": [
+      "POSITION_3",
+      "TEXCOORD0_2"
+    ],
+    "vertexAttributeMetadata": [
+      {
+        "token": "Position",
+        "category": "position",
+        "semantic": "POSITION",
+        "components": 3,
+        "source": "implicit",
+        "label": "POSITION_3"
+      },
+      {
+        "token": "Tex0",
+        "category": "texcoord",
+        "semantic": "TEXCOORD",
+        "components": 2,
+        "source": "derived",
+        "index": 0,
+        "label": "TEXCOORD0_2"
+      }
+    ],
+    "directives": [
+      "PS20Only"
+    ],
+    "maskReferences": [],
+    "vertexEntryPoint": "generated_cgvprogsimple_tex_vertex",
+    "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "screentexmap"
+    ],
+    "uniforms": [],
+    "textures": [
+      {
+        "name": "screenMap",
+        "type": "sampler2D",
+        "semantic": "texunit0",
+        "slot": 0
+      }
+    ],
+    "pipeline": {
+      "blendEnabled": true,
+      "blendMode": "alpha",
+      "depthWrite": false,
+      "depthTest": true,
+      "depthCompare": "lessEqual",
+      "cullMode": "back"
+    }
+  },
+  {
     "source": "HWScripts/Declarations/CGPShaders/CGRCShadowDepth_1Samples.crycg.json",
     "metal": "HWScripts_Declarations_CGPShaders_CGRCShadowDepth_1Samples.crycg.json.metal",
     "shader": "CGRCShadowDepth_1Samples",

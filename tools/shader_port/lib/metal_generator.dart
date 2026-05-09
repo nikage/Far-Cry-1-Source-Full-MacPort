@@ -30,6 +30,8 @@ List<String> manifestLookupAliasesForNormalizedFragment(
   switch (normalized) {
     case 'cgrcflare':
       addUnique('flare_from_light');
+    case 'cgrcscreentexmap':
+      addUnique('screentexmap');
     default:
       break;
   }

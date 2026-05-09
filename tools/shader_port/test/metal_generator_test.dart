@@ -149,6 +149,10 @@ void main() {
         manifestLookupAliasesForNormalizedFragment('cgrcflare'),
         equals(<String>['flare_from_light']),
       );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcscreentexmap'),
+        equals(<String>['screentexmap']),
+      );
       expect(manifestLookupAliasesForNormalizedFragment('other'), isEmpty);
       expect(
         manifestLookupAliasesForNormalizedFragment(

@@ -2532,6 +2532,9 @@ int main()
             // Cry3DEngine/3dEngine.cpp:186. Canonical default-material shader;
             // Metal port is CGRCDefault.
             CHECK(hasLookupAlias("cgrcdefault", "default"));
+            // ScreenTexMap — LoadRendererShaderSafe("ScreenTexMap") at
+            // Cry3DEngine/3dEngine.cpp:242; Metal fragment CGRCScreenTexMap.
+            CHECK(hasLookupAlias("cgrcscreentexmap", "screentexmap"));
         }
     }
 

@@ -230,6 +230,30 @@ no_draw			nodraw
           reason: 'parser+builder must emit default under target cgrcdefault');
     });
 
+    test('contains ScreenTexMap -> CGRCScreenTexMap (screen blit alias)', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'screentexmap')
+          .firstOrNull;
+      expect(row, isNotNull,
+          reason: 'ScreenTexMap alias must be present so '
+              'LoadRendererShaderSafe("ScreenTexMap") resolves on Metal');
+      expect(row!.target, equalsIgnoringCase('CGRCScreenTexMap'),
+          reason: 'logical ScreenTexMap maps to ported fragment CGRCScreenTexMap');
+    });
+
+    test('ScreenTexMap alias produces lookupAliases entry on cgrcscreentexmap',
+        () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgrcscreentexmap'], contains('screentexmap'),
+          reason: 'manifest lookupAliases must register normalized engine name');
+    });
+
     test('Aliases.txt template targets fold onto CGRC manifest keys', () {
       final File aliases = _findAliasesTxt();
       final Map<String, List<String>> byTarget =

@@ -1,0 +1,31 @@
+////////////////////////////////////////////////////////////////////////////
+//
+//  Crytek Engine Source File.
+//  Fragment Program
+//  Copyright (C), Crytek Studios, 2001-2004.
+// -------------------------------------------------------------------------
+//  File name:   CGRCScreenTexMap.crycg
+//  Version:     v1.00
+// -------------------------------------------------------------------------
+////////////////////////////////////////////////////////////////////////////
+
+
+      #include "../CGVPMacro.csi"
+
+      PS20Only
+
+      MainInput { uniform sampler2D screenMap : texunit0 }
+
+      DeclarationsScript
+      {
+        struct vertout
+        {
+          OUT_T0
+        };
+
+        FOUT
+      }
+      CoreScript
+      {
+        OUT.Color = tex2D(screenMap, IN.Tex0.xy);
+      }

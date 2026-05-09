@@ -8,4 +8,5 @@ no_draw			nodraw
 tbs_GA_CM                  TemplBumpSpec_GlossAlpha_EnvCMAmb
 CryLight                   CGRCFlare
 Default                    CGRCDefault
+ScreenTexMap               CGRCScreenTexMap
 

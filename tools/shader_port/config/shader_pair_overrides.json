@@ -18,6 +18,7 @@
     "cgrcreplrgbtoalpha":                { "vertex": "CGVProgScreen",           "category": "fullscreen" },
     "cgrcrainbow":                       { "vertex": "CGVProgScreen",           "category": "fullscreen" },
     "cgrcsun":                           { "vertex": "CGVProgScreen",           "category": "fullscreen" },
+    "cgrcscreentexmap":                  { "vertex": "CGVProgSimple_Tex",       "category": "mesh"       },
     "cgrcrendermodeadv":                 { "vertex": "CGVProgScreen",           "category": "fullscreen" },
     "cgrcrendermodeold":                 { "vertex": "CGVProgScreen",           "category": "fullscreen" },
     "cgrcrendermodecold":                { "vertex": "CGVProgScreen",           "category": "fullscreen" },
