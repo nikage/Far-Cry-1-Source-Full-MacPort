@@ -437,9 +437,13 @@ int CRigidEntity::Action(pe_action *_action)
 		if (pBuddy==WORLD_ENTITY)
 			pBuddy = &g_StaticPhysicalEntity;
 		int i,res,ipart[2];
+		int constraintRegStack[4];
+		int nConstraintReg = 0;
 		vectorf nloc,pt1;
 		quaternionf qframe[2];
 		if (is_unused(action->pt[0]))
+			return 0;
+		if (!pBuddy)
 			return 0;
 		pt1 = is_unused(action->pt[1]) ? action->pt[0] : action->pt[1];
 
@@ -457,10 +461,14 @@ int CRigidEntity::Action(pe_action *_action)
 			ipart[1] = 0;
 
 		res = i = RegisterConstraint(action->pt[0],pt1,ipart[0], pBuddy,ipart[1], contact_constraint_3dof);
+		if (i < 0)
+			return 0;
+		constraintRegStack[nConstraintReg++] = i;
 
-		nloc = !m_pConstraints[i].pbody[0]->q*qframe[0]*vectorf(1,0,0);
 		if (is_unused(qframe[0] = action->qframe[0])) qframe[0].SetIdentity();
 		if (is_unused(qframe[1] = action->qframe[1])) qframe[1].SetIdentity();
+
+		nloc = !m_pConstraints[i].pbody[0]->q*qframe[0]*vectorf(1,0,0);
 		if (action->flags & local_frames) {
 			qframe[0] = m_qrot*qframe[0];
 			qframe[1] = pBuddy->m_qrot*qframe[1];
@@ -478,20 +486,44 @@ int CRigidEntity::Action(pe_action *_action)
 
 		if (!is_unused(action->xlimits[0]) && action->xlimits[0]>=action->xlimits[1]) {
 			i = RegisterConstraint(action->pt[0],pt1,ipart[0], pBuddy,ipart[1], contact_angular|contact_constraint_2dof);
+			if (i < 0) {
+				while (nConstraintReg > 0)
+					RemoveConstraint(constraintRegStack[--nConstraintReg]);
+				return 0;
+			}
+			constraintRegStack[nConstraintReg++] = i;
 			m_pConstraints[i].nloc=nloc; m_pConstraintInfos[i].qframe_rel[0]=qframe[0];	m_pConstraintInfos[i].qframe_rel[1]=qframe[1];
 		} else if (!is_unused(action->yzlimits[0]) && action->yzlimits[0]>=action->yzlimits[1]) {
 			i = RegisterConstraint(action->pt[0],pt1,ipart[0], pBuddy,ipart[1], contact_angular|contact_constraint_1dof);
+			if (i < 0) {
+				while (nConstraintReg > 0)
+					RemoveConstraint(constraintRegStack[--nConstraintReg]);
+				return 0;
+			}
+			constraintRegStack[nConstraintReg++] = i;
 			m_pConstraints[i].nloc=nloc; m_pConstraintInfos[i].qframe_rel[0]=qframe[0];	m_pConstraintInfos[i].qframe_rel[1]=qframe[1];
 		}
 
 		if (!is_unused(action->xlimits[0]) && action->xlimits[0]<action->xlimits[1]) {
 			i = RegisterConstraint(action->pt[0],pt1,ipart[0], pBuddy,ipart[1], contact_angular);
+			if (i < 0) {
+				while (nConstraintReg > 0)
+					RemoveConstraint(constraintRegStack[--nConstraintReg]);
+				return 0;
+			}
+			constraintRegStack[nConstraintReg++] = i;
 			m_pConstraints[i].nloc=nloc; m_pConstraintInfos[i].qframe_rel[0]=qframe[0];	m_pConstraintInfos[i].qframe_rel[1]=qframe[1];
 			m_pConstraintInfos[i].limits[0]=action->xlimits[0]; m_pConstraintInfos[i].limits[1]=action->xlimits[1];
 			m_pConstraintInfos[i].flags = constraint_limited_1axis;
 		}
 		if (!is_unused(action->yzlimits[0]) && action->yzlimits[0]>=action->yzlimits[1]) {
 			i = RegisterConstraint(action->pt[0],pt1,ipart[0], pBuddy,ipart[1], contact_angular);
+			if (i < 0) {
+				while (nConstraintReg > 0)
+					RemoveConstraint(constraintRegStack[--nConstraintReg]);
+				return 0;
+			}
+			constraintRegStack[nConstraintReg++] = i;
 			m_pConstraints[i].nloc=nloc; m_pConstraintInfos[i].qframe_rel[0]=qframe[0];	m_pConstraintInfos[i].qframe_rel[1]=qframe[1];
 			m_pConstraintInfos[i].limits[0]=action->yzlimits[0]; m_pConstraintInfos[i].flags = constraint_limited_2axes;
 		}
