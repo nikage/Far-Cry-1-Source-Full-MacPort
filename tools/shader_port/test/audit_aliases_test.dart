@@ -57,6 +57,34 @@ no_draw			nodraw
       expect(resolveAliasesTxtTarget('cgrcflare'), equals('cgrcflare'));
     });
 
+    test('mergeAliasesTxtTargetManifestOverrides augments resolveAliasesTxtTarget', () {
+      resetAliasesTxtTargetManifestEffectiveForTests();
+      addTearDown(resetAliasesTxtTargetManifestEffectiveForTests);
+      expect(resolveAliasesTxtTarget('custom_fp_target'), equals('custom_fp_target'));
+      mergeAliasesTxtTargetManifestOverrides(
+          <String, String>{'custom_fp_target': 'cgrcflare'});
+      expect(resolveAliasesTxtTarget('custom_fp_target'), equals('cgrcflare'));
+    });
+
+    test('partitionManifestAndBuiltinAliasMaps splits builtin targets', () {
+      final Map<String, List<String>> merged = <String, List<String>>{
+        'terrain': <String>['terrainlowlod'],
+        'cgrcflare': <String>['crylight'],
+      };
+      final ({
+        Map<String, List<String>> manifest,
+        Map<String, List<String>> builtin
+      }) p = partitionManifestAndBuiltinAliasMaps(merged);
+      expect(p.builtin['terrain'], contains('terrainlowlod'));
+      expect(p.manifest['cgrcflare'], contains('crylight'));
+    });
+
+    test('buildManifestLookupAliasesByTargetFromEntries uses intermediate chain', () {
+      final Map<String, List<String>> map = buildManifestLookupAliasesByTargetFromEntries(
+          parseAliasesTxt('TerrainAlias LavaVolume'));
+      expect(map['terrain'], contains('terrainalias'));
+    });
+
     test('normalizeCryShaderLookupName lowercases and flips slashes', () {
       expect(normalizeCryShaderLookupName(r'Foo\Bar'), equals('foo/bar'));
     });

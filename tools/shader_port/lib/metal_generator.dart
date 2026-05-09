@@ -49,11 +49,10 @@ List<String> manifestLookupAliasesForNormalizedFragment(
   return out;
 }
 
-/// Returns merged alias-table targets (Aliases.txt + CustomAliases.txt;
-/// already normalized) that did not match any manifest fragment normalized name.
-/// The manifest is the only source of truth
-/// for shader registration; aliases pointing at a non-existent target would be
-/// silently dropped at runtime, which is exactly what the strict policy bans.
+/// Returns merged **manifest** alias-map keys (builtins partitioned out) that
+/// did not match any manifest fragment normalized name.
+/// Aliases pointing at a non-existent target would be silently dropped at
+/// runtime, which is exactly what the strict policy bans.
 /// The returned list is sorted to make CI output stable.
 Map<String, String> loadTechniqueFragmentToVertexShaderMap(
   String rootPathWithSep,
@@ -103,14 +102,36 @@ Map<String, String> loadTechniqueFragmentToVertexShaderMap(
 }
 
 List<String> findUnmatchedAliasTargets(
-  Map<String, List<String>> aliasesTxtByTarget,
+  Map<String, List<String>> manifestAliasTargetsOnly,
   Set<String> manifestNormalizedKeys,
 ) {
-  final unmatched = aliasesTxtByTarget.keys
+  final unmatched = manifestAliasTargetsOnly.keys
       .where((target) => !manifestNormalizedKeys.contains(target))
       .toList()
     ..sort();
   return unmatched;
+}
+
+Map<String, String> loadAliasTargetToManifestOverrides(
+    String rootPathWithSep, String sep) {
+  final File f = File(
+      '${rootPathWithSep}tools${sep}shader_port${sep}config${sep}alias_target_to_manifest.json');
+  if (!f.existsSync()) {
+    return <String, String>{};
+  }
+  try {
+    final Object? decoded =
+        jsonDecode(f.readAsStringSync(encoding: utf8));
+    if (decoded is! Map<String, dynamic>) {
+      return <String, String>{};
+    }
+    return <String, String>{
+      for (final MapEntry<String, dynamic> e in decoded.entries)
+        e.key.toLowerCase(): e.value.toString().toLowerCase()
+    };
+  } catch (_) {
+    return <String, String>{};
+  }
 }
 
 bool preferDuplicateIrPath(String candidateRelative, String incumbentRelative) {
@@ -138,6 +159,10 @@ void main(List<String> args) {
       (rootArg.isEmpty ? Directory.current : Directory(rootArg)).absolute;
   final String sep = Platform.pathSeparator;
   final String rootPath = root.path.endsWith(sep) ? root.path : root.path + sep;
+
+  resetAliasesTxtTargetManifestEffectiveForTests();
+  mergeAliasesTxtTargetManifestOverrides(
+      loadAliasTargetToManifestOverrides(rootPath, sep));
 
   final _ShaderPairOverrides overrides =
       _loadOverrides(overridesPath, rootPath, sep);
@@ -171,6 +196,16 @@ void main(List<String> args) {
     aliasesTxtByTarget =
         mergeManifestLookupAliasMaps(aliasesTxtByTarget, fromCustom);
   }
+  final ({
+    Map<String, List<String>> manifest,
+    Map<String, List<String>> builtin
+  }) aliasPartitions =
+      partitionManifestAndBuiltinAliasMaps(aliasesTxtByTarget);
+  final Map<String, List<String>> manifestAliasesByTarget =
+      aliasPartitions.manifest;
+  final Map<String, List<String>> builtinAliasesByTarget =
+      aliasPartitions.builtin;
+
   final Directory outDir = Directory(rootPath + 'RenderDll${sep}XRenderMetal${sep}Generated');
   outDir.createSync(recursive: true);
   final File manifest = File(outDir.path + sep + 'generated_manifest.json');
@@ -342,7 +377,7 @@ void main(List<String> args) {
         _summarizeVertexInputs(manifestVertexMetadata);
     final List<String> vertexLookupAliases =
         manifestLookupAliasesForNormalizedFragment(data.normalizedName,
-            aliasesTxtByTarget: aliasesTxtByTarget);
+            aliasesTxtByTarget: manifestAliasesByTarget);
     manifestEntries.add({
       'source': s.relative,
       'metal': s.metalFileName,
@@ -418,7 +453,7 @@ void main(List<String> args) {
         _derivePipelineCategory(norm, data.shaderName);
     final List<String> fragmentLookupAliases =
         manifestLookupAliasesForNormalizedFragment(norm,
-            aliasesTxtByTarget: aliasesTxtByTarget);
+            aliasesTxtByTarget: manifestAliasesByTarget);
     manifestEntries.add({
       'source': s.relative,
       'metal': s.metalFileName,
@@ -470,6 +505,10 @@ void main(List<String> args) {
 
   manifest.writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert(manifestEntries));
+  final File builtinAliasFile =
+      File(outDir.path + sep + 'builtin_lookup_aliases.json');
+  builtinAliasFile.writeAsStringSync(const JsonEncoder.withIndent('  ')
+      .convert(builtinAliasesByTarget));
   stdout.writeln('Generated $generated Metal shader files');
   stdout.writeln(
       'Paired: ${fragmentPairing.length} fragment shaders ($overrideCount via overrides, $techniquePairCount via technique sources)');
@@ -478,13 +517,14 @@ void main(List<String> args) {
       .map((e) => (e['normalized'] as String?) ?? '')
       .where((s) => s.isNotEmpty)
       .toSet();
-  final List<String> unmatchedAliasTargets =
-      findUnmatchedAliasTargets(aliasesTxtByTarget, manifestNormalizedKeys);
+  final List<String> unmatchedAliasTargets = findUnmatchedAliasTargets(
+      manifestAliasesByTarget, manifestNormalizedKeys);
   if (unmatchedAliasTargets.isNotEmpty) {
     stderr.writeln(
         'WARN: ${unmatchedAliasTargets.length} Aliases.txt target(s) do not match any manifest fragment normalized name — those aliases were dropped:');
     for (final target in unmatchedAliasTargets) {
-      final List<String> orphans = aliasesTxtByTarget[target] ?? const [];
+      final List<String> orphans =
+          manifestAliasesByTarget[target] ?? const [];
       stderr.writeln('  $target  <-  ${orphans.join(', ')}');
     }
     stderr.writeln(

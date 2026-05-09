@@ -72425,6 +72425,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogsimple_tex_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templalphablend",
+      "templdecalalphablend"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -72647,6 +72651,12 @@
     ],
     "vertexEntryPoint": "generated_cgvprogambienttempl_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templmodelcommon_offset_ps20",
+      "templfog",
+      "templfogcaustics",
+      "templfogcaustics_fp"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -73303,6 +73313,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogambienttempl_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templdecalmodulate",
+      "templdecalalphaglowselfillum"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -74202,6 +74216,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbendedbush_decal_sunrabbits_vertex",
     "pipelineCategory": "plant",
+    "lookupAliases": [
+      "templplantsbark",
+      "templplantsbark_sunrabbits"
+    ],
     "uniforms": [
       {
         "name": "GlobalFogColor",
@@ -74290,6 +74308,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbeam_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbeamproc"
+    ],
     "uniforms": [],
     "textures": [
       {
@@ -74847,6 +74868,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbubble_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbubble_ps20"
+    ],
     "uniforms": [
       {
         "name": "AlphaScaleBias",
@@ -75344,6 +75368,52 @@
     "lookupAliases": [
       "tbd",
       "templbumpdiffuse_offset_ps20",
+      "playermaskmodulate",
+      "templbumpdiffuse",
+      "templbumpdiffuse_alphaglow",
+      "templbumpoffsetenv",
+      "templbumpspec_envcmamb",
+      "templbumpspec_envcmamb_rt",
+      "templbumpspec_gloss_envcmamb",
+      "templbumpspec_gloss_envcmamb_rt",
+      "templbumpspec_glossalpha_envcmamb",
+      "templbumpspec_glossalpha_envcmamb_rt",
+      "templbumpspec_ps20",
+      "templbumpspec_gloss_ps20",
+      "templbumpspec_glossalpha_ps20",
+      "templbumpspec_envcmamb_ps20",
+      "templbumpspec_envcmamb_rt_ps20",
+      "templbumpspec_gloss_envcmamb_ps20",
+      "templbumpspec_gloss_envcmamb_rt_ps20",
+      "templbumpspec_glossalpha_envcmamb_ps20",
+      "templbumpspec_glossalpha_envcmamb_rt_ps20",
+      "templbumpspec",
+      "templbumpspec_gloss",
+      "templbumpspec_glossalpha",
+      "templbumpspec_hp",
+      "templbumpspec_hp_glossalpha",
+      "templbumpspec_nocm",
+      "templmodelbumpspec_hp",
+      "templmodelbumpspec_hp_glossalpha",
+      "whiteshadow",
+      "templmuzzleflash",
+      "templmodelcommon",
+      "templmuzzleflash_auto",
+      "templlightdiffuse_alphaglow",
+      "templbumpdiffuse_spechigh",
+      "templbumpdiffuse_glossspechigh",
+      "templbumpdiffuse_glossalphaspechigh",
+      "mutantstealth",
+      "mutantmorph",
+      "templmutatedarms",
+      "templbumpspec_envcmspec_ps20",
+      "templbumpspec_envcmspec_rt_ps20",
+      "templbumpspec_gloss_envcmspec_ps20",
+      "templbumpspec_gloss_envcmspec_rt_ps20",
+      "templbumpspec_glossalpha_envcmspec_ps20",
+      "templbumpspec_glossalpha_envcmspec_rt_ps20",
+      "templbumpdiffuse_envcmspec_ps20",
+      "templbumpdiffuse_envcmspec_rt_ps20",
       "templbumpdiffuse_glossalpha_envcmspec_ps20",
       "templbumpdiffuse_glossalpha_envcmspec_rt_ps20",
       "templbumpdiffuse_gloss_envcmspec_ps20",
@@ -80729,7 +80799,8 @@
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_vertex",
     "pipelineCategory": "mesh",
     "lookupAliases": [
-      "tbumpspec_nocm"
+      "tbumpspec_nocm",
+      "templbumpspec_offset_ps20"
     ],
     "uniforms": [
       {
@@ -81031,6 +81102,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_envcmamb_powerglossalpha_ps20",
+      "templbumpspec_envcmamb_powerglossalpha_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -81220,6 +81295,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_atten_envcmspec_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_envcmspec_offset_ps20",
+      "templbumpspec_envcmspec_offset_rt_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -81570,6 +81649,13 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_envcmamb_offset_ps20",
+      "templbumpspec_hp_envcmamb",
+      "templbumpspec_envcmamb_rt_offset_ps20",
+      "templbumpspec_envcmamb_rt_powerglossalpha_ps20",
+      "templbumpspec_envcmamb_rt_powerglossalpha_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -82366,6 +82452,14 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_gloss_envcmspec_rt_offset_ps20",
+      "templbumpspec_gloss_envcmspec_powerglossalpha_ps20",
+      "templbumpspec_gloss_envcmspec_rt_powerglossalpha_ps20",
+      "templbumpspec_gloss_envcmspec_powerglossalpha_offset_ps20",
+      "templbumpspec_gloss_envcmspec_rt_powerglossalpha_offset_ps20",
+      "templbumpspec_gloss_powerglossalpha_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -82520,6 +82614,14 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_glossalpha_envcmspec_rt_offset_ps20",
+      "templbumpspec_glossalpha_envcmspec_powerglossalpha_ps20",
+      "templbumpspec_glossalpha_envcmspec_rt_powerglossalpha_ps20",
+      "templbumpspec_glossalpha_envcmspec_powerglossalpha_offset_ps20",
+      "templbumpspec_glossalpha_envcmspec_rt_powerglossalpha_offset_ps20",
+      "templbumpspec_glossalpha_powerglossalpha_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -82867,6 +82969,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_envcmspec_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_glossalpha_envcmspec_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -83217,6 +83322,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_glossalpha_envcmamb_offset_ps20",
+      "templbumpspec_hp_glossalpha_envcmamb"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -84003,6 +84112,14 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_glossalpha_offset_ps20",
+      "templbumpspec_glossalpha_envcmamb_offset_rt_ps20",
+      "templbumpspec_glossalpha_envcmspec_offset_rt_ps20",
+      "templbumpspec_glossalpha_envcmamb_rt_offset_ps20",
+      "templbumpspec_glossalpha_envcmamb_rt_powerglossalpha_ps20",
+      "templbumpspec_glossalpha_envcmamb_rt_powerglossalpha_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -84149,6 +84266,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_glossalpha_powerglossalpha_offset_ps20",
+      "templbumpspec_gloss_powerglossalpha_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -84311,6 +84432,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_gloss_envcmamb_powerglossalpha_ps20",
+      "templbumpspec_gloss_envcmamb_powerglossalpha_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -84506,6 +84631,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_envcmspec_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_gloss_envcmspec_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -84872,6 +85000,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_gloss_envcmamb_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -85706,6 +85837,14 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_atten_gloss_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_gloss_offset_ps20",
+      "templbumpspec_gloss_envcmamb_offset_rt_ps20",
+      "templbumpspec_gloss_envcmspec_offset_rt_ps20",
+      "templbumpspec_gloss_envcmamb_rt_offset_ps20",
+      "templbumpspec_gloss_envcmamb_rt_powerglossalpha_ps20",
+      "templbumpspec_gloss_envcmamb_rt_powerglossalpha_offset_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -93463,6 +93602,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffspecpass_projatten_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templbumpspec_envcmamb_offset_rt_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -106685,6 +106827,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbump_diffpass_atten_plants_vertex",
     "pipelineCategory": "plant",
+    "lookupAliases": [
+      "templplants",
+      "templplants1"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -112342,6 +112488,13 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogdecal_vertex",
     "pipelineCategory": "decal",
+    "lookupAliases": [
+      "templdecalopacityshift",
+      "templdecalopacityshift1",
+      "templdecalopacityshift2",
+      "templdecalopacityshift3",
+      "templdecalopacityshift4"
+    ],
     "uniforms": [],
     "textures": [
       {
@@ -112792,6 +112945,10 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogdecalgeom_vertex",
     "pipelineCategory": "decal",
+    "lookupAliases": [
+      "decal_vp",
+      "decal_2d_vp"
+    ],
     "uniforms": [
       {
         "name": "FogColor",
@@ -116659,6 +116816,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvproghologram_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templhologram"
+    ],
     "uniforms": [],
     "textures": [
       {
@@ -117121,6 +117281,9 @@
     ],
     "vertexEntryPoint": "generated_cgvproginvulnerabilitymetal_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "characterinvulnerability_metal"
+    ],
     "uniforms": [
       {
         "name": "Matrix",
@@ -117251,6 +117414,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogiridescence_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templiridescence_ps20"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -121180,6 +121346,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogmetallic_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templmetallic_ps20"
+    ],
     "uniforms": [
       {
         "name": "Diffuse",
@@ -121548,6 +121717,11 @@
     ],
     "vertexEntryPoint": "generated_cgvprognightvision_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templcryvision",
+      "templcryvisionplayer",
+      "templcryvision_mask"
+    ],
     "uniforms": [
       {
         "name": "fBluryParams",
@@ -123878,6 +124052,13 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogdecal_vertex",
     "pipelineCategory": "decal",
+    "lookupAliases": [
+      "templglassdispersioncm",
+      "templbumpreflcm",
+      "templbumpreflcm_deform",
+      "templbumpreflcm_light",
+      "templreflcmdecal_reflamountopacity"
+    ],
     "uniforms": [],
     "textures": [
       {
@@ -124053,6 +124234,21 @@
     ],
     "vertexEntryPoint": "generated_cgvprogrefractive_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "templrefract",
+      "templglasscm",
+      "templglassenvcm",
+      "templglasscm_ps20",
+      "templglassdispersionenvcm",
+      "templbumpglasscm",
+      "templbumpglassenvcm",
+      "templbumpglassfresnelcm",
+      "templbumpglassfresnelenvcm",
+      "templbumpreflenvcm",
+      "templbumprefrcm",
+      "templbumprefrenvcm",
+      "templglassenvtex"
+    ],
     "uniforms": [
       {
         "name": "Matrix",

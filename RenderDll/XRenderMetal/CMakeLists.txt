@@ -290,7 +290,7 @@ if(DART_COMMAND)
             COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_AIR_DIR}
             COMMAND ${DART_COMMAND} ${METAL_BUILD_SCRIPT} ${SHADER_PORT_ROOT} ${CMAKE_CURRENT_SOURCE_DIR}/Generated ${GENERATED_AIR_DIR} ${GENERATED_METAL_METALLIB}
             DEPENDS ${GENERATED_STAMP} ${METAL_BUILD_SCRIPT}
-            COMMENT "Compiling generated Metal shaders (IR→Metal fallback)"
+            COMMENT "Compiling generated Metal shaders (IR→Metal)"
             VERBATIM
         )
         add_custom_target(GeneratedMetalShaders ALL DEPENDS ${GENERATED_METAL_METALLIB})
@@ -370,6 +370,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/UtilShaders.metallib
 
 install(FILES ${GENERATED_METAL_METALLIB}
               ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
+              ${CMAKE_CURRENT_SOURCE_DIR}/Generated/builtin_lookup_aliases.json
     DESTINATION lib
 )
 if(USE_HLSL_CONVERSION)
@@ -386,17 +387,21 @@ set(FARCRY_APP_RESOURCES_DIR "${FARCRY_APP_BUNDLE_DIR}/Contents/Resources")
 add_custom_command(
     OUTPUT ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
            ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+           ${FARCRY_APP_RESOURCES_DIR}/builtin_lookup_aliases.json
     COMMAND ${CMAKE_COMMAND} -E make_directory ${FARCRY_APP_RESOURCES_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GENERATED_METAL_METALLIB} ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/Generated/builtin_lookup_aliases.json ${FARCRY_APP_RESOURCES_DIR}/builtin_lookup_aliases.json
     DEPENDS ${GENERATED_METAL_METALLIB} ${CMAKE_CURRENT_SOURCE_DIR}/Generated/generated_manifest.json
+            ${CMAKE_CURRENT_SOURCE_DIR}/Generated/builtin_lookup_aliases.json
     COMMENT "Staging generated Metal shaders into FarCry.app resources"
     VERBATIM
 )
 
 add_custom_target(GeneratedMetalBundleResources ALL
     DEPENDS ${FARCRY_APP_RESOURCES_DIR}/GeneratedShaders.metallib
-            ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json)
+            ${FARCRY_APP_RESOURCES_DIR}/generated_manifest.json
+            ${FARCRY_APP_RESOURCES_DIR}/builtin_lookup_aliases.json)
 if(USE_HLSL_CONVERSION)
     add_dependencies(GeneratedMetalBundleResources ConvertHLSLToMetal)
 else()

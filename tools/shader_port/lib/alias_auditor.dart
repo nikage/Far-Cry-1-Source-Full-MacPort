@@ -45,6 +45,7 @@ const Map<String, String> kIntermediateAliases = {
   'terrainwaterbottomsimple_fp': 'terrain',
   'terrainwithdefaultdetailtexture_fp': 'terrain',
   'cgrcterra': 'terrain',
+  'lavavolume_fp': 'terrain',
 };
 
 const Map<String, String> kAliasesTxtTargetToManifestNormalized = {
@@ -58,9 +59,35 @@ const Map<String, String> kAliasesTxtTargetToManifestNormalized = {
       'cgrcbump_diffspec_singlelight_glossalpha_envcm_ps20',
 };
 
+Map<String, String> _aliasesTxtTargetToManifestEffective =
+    Map<String, String>.from(kAliasesTxtTargetToManifestNormalized);
+
+void mergeAliasesTxtTargetManifestOverrides(Map<String, String> overrides) {
+  _aliasesTxtTargetToManifestEffective.addAll(overrides);
+}
+
+void resetAliasesTxtTargetManifestEffectiveForTests() {
+  _aliasesTxtTargetToManifestEffective =
+      Map<String, String>.from(kAliasesTxtTargetToManifestNormalized);
+}
+
 String resolveAliasesTxtTarget(String normalizedTarget) {
-  return kAliasesTxtTargetToManifestNormalized[normalizedTarget] ??
+  return _aliasesTxtTargetToManifestEffective[normalizedTarget] ??
       normalizedTarget;
+}
+
+({Map<String, List<String>> manifest, Map<String, List<String>> builtin})
+    partitionManifestAndBuiltinAliasMaps(Map<String, List<String>> merged) {
+  final manifest = <String, List<String>>{};
+  final builtin = <String, List<String>>{};
+  for (final MapEntry<String, List<String>> e in merged.entries) {
+    if (kMetalBuiltins.contains(e.key)) {
+      builtin[e.key] = List<String>.from(e.value);
+    } else {
+      manifest[e.key] = List<String>.from(e.value);
+    }
+  }
+  return (manifest: manifest, builtin: builtin);
 }
 
 /// One alias entry extracted from CustomAliases.txt.
@@ -191,14 +218,15 @@ List<AliasesTxtEntry> parseAliasesTxt(String content) {
 }
 
 /// Groups normalized **target** names → alternate lookup names for manifest
-/// `lookupAliases` (targets are manifest `normalized` fragment keys).
+/// `lookupAliases` (targets are manifest `normalized` fragment keys or
+/// [kMetalBuiltins] names after [resolveCustomAliasesTargetForManifest]).
 Map<String, List<String>> buildManifestLookupAliasesByTargetFromEntries(
   List<AliasesTxtEntry> entries,
 ) {
   final map = <String, List<String>>{};
   for (final p in entries) {
-    final String t =
-        resolveAliasesTxtTarget(normalizeCryShaderLookupName(p.target));
+    final String t = resolveCustomAliasesTargetForManifest(
+        normalizeCryShaderLookupName(p.target));
     final a = normalizeCryShaderLookupName(p.alias);
     if (t.isEmpty || a.isEmpty || t == a) continue;
     map.putIfAbsent(t, () => []).add(a);
@@ -207,8 +235,8 @@ Map<String, List<String>> buildManifestLookupAliasesByTargetFromEntries(
 }
 
 /// Chains [kIntermediateAliases] (legacy FP / template names) then applies
-/// [resolveAliasesTxtTarget] for **CustomAliases.txt** right-hand sides so they
-/// fold onto manifest `normalized` keys the same way **Aliases.txt** targets do.
+/// [resolveAliasesTxtTarget] so **Aliases.txt** and **CustomAliases.txt** targets
+/// fold onto manifest `normalized` keys the same way.
 String resolveCustomAliasesTargetForManifest(String normalizedTarget) {
   String t = normalizedTarget;
   for (int i = 0; i < 32; i++) {

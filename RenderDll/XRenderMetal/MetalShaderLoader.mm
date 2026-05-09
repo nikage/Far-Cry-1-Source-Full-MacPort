@@ -1539,6 +1539,41 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             manifestPath = [NSString stringWithUTF8String:"RenderDll/XRenderMetal/Generated/generated_manifest.json"];
     }
 
+    NSString* builtinAliasPath = [[manifestPath stringByDeletingLastPathComponent]
+        stringByAppendingPathComponent:@"builtin_lookup_aliases.json"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:builtinAliasPath])
+    {
+        NSData* baData = [NSData dataWithContentsOfFile:builtinAliasPath];
+        if (baData)
+        {
+            NSError* baErr = nil;
+            id baRoot = [NSJSONSerialization JSONObjectWithData:baData options:0 error:&baErr];
+            if ([baRoot isKindOfClass:[NSDictionary class]])
+            {
+                NSDictionary* baDict = (NSDictionary*)baRoot;
+                for (NSString* builtinKey in baDict)
+                {
+                    id arr = baDict[builtinKey];
+                    if (![arr isKindOfClass:[NSArray class]])
+                        continue;
+                    std::string builtinNorm = NormalizeShaderName([builtinKey UTF8String]);
+                    auto itBuiltin = m_shaderNameMap.find(builtinNorm);
+                    if (itBuiltin == m_shaderNameMap.end())
+                        continue;
+                    int shaderId = itBuiltin->second;
+                    for (id aliasObj in (NSArray*)arr)
+                    {
+                        if (![aliasObj isKindOfClass:[NSString class]] || [(NSString*)aliasObj length] == 0)
+                            continue;
+                        std::string aliasKey = NormalizeShaderName([(NSString*)aliasObj UTF8String]);
+                        if (!aliasKey.empty() && aliasKey != builtinNorm)
+                            m_shaderNameMap[aliasKey] = shaderId;
+                    }
+                }
+            }
+        }
+    }
+
     NSData* manifestData = manifestPath ? [NSData dataWithContentsOfFile:manifestPath] : nil;
     if (!manifestData)
     {
