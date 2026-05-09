@@ -61,6 +61,7 @@ static int g_missingVertexLogCount = 0;
 static int g_vertexMatchLogCount = 0;
 static int g_requirementLogCount = 0;
 static int g_fragmentMetaLogCount = 0;
+static int g_orphanStandaloneVertexLogCount = 0;
 static const int kMaxMissingVertexLogs = 32;
 struct VertexLayoutInfo
 {
@@ -1044,6 +1045,426 @@ void CMetalShaderManager::RunValidateShaderPairs()
     ValidateShaderPairs(m_renderer->m_device, m_defaultLibrary);
 }
 
+int CMetalShaderManager::TryRegisterOneManifestPipeline(
+    NSDictionary* fragEntry,
+    NSDictionary* aliasSourceOverride,
+    const std::string& registrationNormalizedKey,
+    id<MTLLibrary> generatedLibrary,
+    id<MTLLibrary> vertexLibrary,
+    const std::unordered_map<std::string, const GeneratedVertexEntry*>& vertexByFuncName,
+    int* psoFailCount,
+    bool fragmentPairingStats,
+    size_t* matchedFragmentVertexCount,
+    size_t* missingFragmentVertexCount)
+{
+    NSDictionary* aliasSrc = aliasSourceOverride ? aliasSourceOverride : fragEntry;
+
+    NSString* shaderName = fragEntry[@"shader"];
+    NSString* normalizedName = fragEntry[@"normalized"];
+    NSString* fragmentName = fragEntry[@"entryPoint"];
+    if (!fragmentName)
+        fragmentName = fragEntry[@"fragment"];
+    NSArray* uniformArray = fragEntry[@"uniforms"];
+    NSArray* textureArray = fragEntry[@"textures"];
+    NSArray* vertexAttrArray = fragEntry[@"vertexAttributes"];
+    NSArray* vertexAttrMetaArray = fragEntry[@"vertexAttributeMetadata"];
+    NSNumber* textureCountValue = fragEntry[@"textureCount"];
+    NSArray* directiveArray = fragEntry[@"directives"];
+    NSArray* maskArray = fragEntry[@"maskReferences"];
+    NSDictionary* pipelineDict = fragEntry[@"pipeline"];
+
+    if (fragmentPairingStats && g_fragmentMetaLogCount < 5)
+    {
+        long metaCount =
+            (vertexAttrMetaArray && [vertexAttrMetaArray isKindOfClass:[NSArray class]])
+                ? [vertexAttrMetaArray count]
+                : -1;
+        long attrCount =
+            (vertexAttrArray && [vertexAttrArray isKindOfClass:[NSArray class]])
+                ? [vertexAttrArray count]
+                : -1;
+        fprintf(stderr,
+                "MetalShaderManager: fragment '%s' metaCount=%ld attrCount=%ld\n",
+                shaderName ? [shaderName UTF8String] : "<nil>",
+                metaCount,
+                attrCount);
+        g_fragmentMetaLogCount++;
+    }
+
+    if (!shaderName || !fragmentName)
+        return 1;
+
+    std::string fragNormalizedKey;
+    if (normalizedName && [normalizedName length] > 0)
+        fragNormalizedKey = NormalizeShaderName([normalizedName UTF8String]);
+    else
+        fragNormalizedKey = NormalizeShaderName([shaderName UTF8String]);
+
+    const std::string canonicalKey = BuildStageAgnosticKey(fragNormalizedKey);
+
+    const GeneratedVertexEntry* matchedVertexEntry = nullptr;
+    NSString* manifestVEP = fragEntry[@"vertexEntryPoint"];
+    if (manifestVEP && [manifestVEP length] > 0)
+    {
+        const std::string vepKey = NSStringToStdString(manifestVEP);
+        auto it = vertexByFuncName.find(vepKey);
+        if (it != vertexByFuncName.end())
+            matchedVertexEntry = it->second;
+    }
+    if (!matchedVertexEntry)
+    {
+        matchedVertexEntry = FindGeneratedVertexEntry(
+            m_generatedVertexEntries, canonicalKey, vertexAttrMetaArray, vertexAttrArray);
+    }
+    if (fragmentPairingStats)
+    {
+        if (matchedVertexEntry)
+            (*matchedFragmentVertexCount)++;
+        else
+            (*missingFragmentVertexCount)++;
+    }
+
+    if (!matchedVertexEntry && fragmentPairingStats && g_missingVertexLogCount < kMaxMissingVertexLogs)
+    {
+        if (iLog)
+        {
+            iLog->Log(
+                "MetalShaderManager: missing generated vertex entry for key '%s' (shader '%s')\n",
+                canonicalKey.c_str(),
+                shaderName ? [shaderName UTF8String] : "<unnamed>");
+        }
+        else
+        {
+            fprintf(stderr,
+                    "MetalShaderManager: missing generated vertex entry for key '%s' (shader '%s')\n",
+                    canonicalKey.c_str(),
+                    shaderName ? [shaderName UTF8String] : "<unnamed>");
+        }
+        g_missingVertexLogCount++;
+    }
+
+    NSString* lowerShaderName = [shaderName lowercaseString];
+    MTLFunctionConstantValues* funcConstants =
+        MetalManifestBuildFunctionConstants(lowerShaderName, directiveArray);
+
+    bool forceTangentFrame = false;
+
+    NSError* funcErr = nil;
+    id<MTLFunction> fragmentFunction =
+        [generatedLibrary newFunctionWithName:fragmentName
+                               constantValues:funcConstants
+                                        error:&funcErr];
+    if (!fragmentFunction)
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: Missing generated fragment function '%s' (error: %s)\n",
+                      [fragmentName UTF8String],
+                      funcErr ? [[funcErr localizedDescription] UTF8String] : "unknown");
+        return 1;
+    }
+
+    int textureCount = textureCountValue ? textureCountValue.intValue : 0;
+    if (textureArray && [textureArray isKindOfClass:[NSArray class]])
+        textureCount = static_cast<int>([textureArray count]);
+
+    if (vertexAttrMetaArray && ![vertexAttrMetaArray isKindOfClass:[NSArray class]] && iLog)
+    {
+        iLog->Log("MetalShaderManager: vertexAttributeMetadata for '%s' is %s instead of NSArray",
+                  shaderName ? [shaderName UTF8String] : "<unnamed>",
+                  NSStringFromClass([vertexAttrMetaArray class]).UTF8String);
+    }
+    VertexAttributeSummary attributeSummary =
+        BuildAttributeSummary(vertexAttrArray, vertexAttrMetaArray, textureCount, shaderName);
+    forceTangentFrame =
+        attributeSummary.hasTNormal || attributeSummary.hasTangent || attributeSummary.hasBinormal;
+    const bool hasGeneratedVertexEntry = (matchedVertexEntry != nullptr);
+    if (fragmentPairingStats && hasGeneratedVertexEntry &&
+        g_vertexMatchLogCount < kMaxMissingVertexLogs)
+    {
+        if (iLog)
+        {
+            iLog->Log("MetalShaderManager: matched fragment key '%s' to vertex entry '%s'\n",
+                      canonicalKey.c_str(),
+                      matchedVertexEntry->entryPoint.c_str());
+        }
+        fprintf(stderr,
+                "MetalShaderManager: matched fragment key '%s' to vertex entry '%s'\n",
+                canonicalKey.c_str(),
+                matchedVertexEntry->entryPoint.c_str());
+        g_vertexMatchLogCount++;
+    }
+    VertexLayoutInfo layout = InferVertexLayout(attributeSummary, shaderName);
+    ApplyScreenVertexFallback(hasGeneratedVertexEntry, layout, attributeSummary, shaderName);
+    if (forceTangentFrame)
+    {
+        layout.needsTangents = true;
+        layout.functionName = @"tangent_vertex";
+        layout.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+        layout.hasTexCoords = true;
+        layout.hasColor = true;
+        layout.hasNormal = true;
+    }
+    NSString* vertexFunctionName = layout.functionName;
+    int vertexFormat = layout.format;
+    MTLVertexDescriptor* descriptor = nil;
+    bool metadataNeedsTangents = layout.needsTangents;
+    if (matchedVertexEntry)
+    {
+        if (!matchedVertexEntry->vertexInputDescs.empty())
+        {
+            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromVertexInputs(
+                matchedVertexEntry->vertexInputDescs);
+            layout.needsTangents = false;
+        }
+        else
+        {
+            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(
+                matchedVertexEntry->attributes, &metadataNeedsTangents, &vertexFormat);
+            if (descriptor)
+                layout.needsTangents = metadataNeedsTangents;
+        }
+    }
+    if (layout.needsTangents && iLog)
+    {
+        iLog->Log("MetalShaderManager: '%s' requires tangent stream support (format=%d)\n",
+                  shaderName ? [shaderName UTF8String] : "<unnamed>",
+                  vertexFormat);
+    }
+    id<MTLFunction> vertexFunction = nil;
+
+    PipelineStateConfig pipelineConfig = MetalManifestDefaultPipelineConfig();
+    MetalManifestApplyPipelineConfigFromManifest(pipelineConfig, pipelineDict);
+
+    if (vertexLibrary)
+    {
+        if (matchedVertexEntry && generatedLibrary)
+        {
+            NSString* generatedVertexName =
+                (manifestVEP && [manifestVEP length] > 0)
+                    ? manifestVEP
+                    : [NSString stringWithUTF8String:matchedVertexEntry->entryPoint.c_str()];
+            if (generatedVertexName && [generatedVertexName length] > 0)
+            {
+                NSError* vertFuncErr = nil;
+                id<MTLFunction> generatedVertexFunction =
+                    [generatedLibrary newFunctionWithName:generatedVertexName
+                                           constantValues:funcConstants
+                                                    error:&vertFuncErr];
+                if (generatedVertexFunction)
+                {
+                    vertexFunction = generatedVertexFunction;
+                    vertexFunctionName = generatedVertexName;
+                }
+                else if (iLog)
+                {
+                    iLog->Log("MetalShaderManager: Missing generated vertex function '%s' for shader '%s'\n",
+                              [generatedVertexName UTF8String],
+                              shaderName ? [shaderName UTF8String] : "<unnamed>");
+                }
+            }
+        }
+
+        if (!vertexFunction)
+        {
+            vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
+            if (!vertexFunction)
+            {
+                const char* shaderLabel = shaderName ? [shaderName UTF8String] : "<unnamed>";
+                const char* functionLabel = [vertexFunctionName UTF8String];
+                if (iLog)
+                {
+                    iLog->LogError(
+                        "MetalShaderManager: Missing vertex entry '%s' required by shader '%s' - "
+                        "ensure UtilShaders.metal defines this helper and regenerate UtilShaders.metallib\n",
+                        functionLabel, shaderLabel);
+                }
+                assert(!"MetalShaderManager: Missing vertex entry in UtilShaders.metallib");
+                return 2;
+            }
+        }
+    }
+    else
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: No vertex library available; skipping shader '%s'\n",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>");
+        assert(!"MetalShaderManager: No default vertex library available");
+        return 2;
+    }
+
+    if (!vertexFunction)
+    {
+        if (iLog)
+            iLog->Log("MetalShaderManager: Missing generated vertex function for shader '%s'\n",
+                       [shaderName UTF8String]);
+        assert(!"MetalShaderManager: Missing generated vertex function");
+        return 2;
+    }
+
+    if (!descriptor)
+    {
+        descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
+    }
+    if (!descriptor)
+    {
+        assert(!"MetalShaderManager: Failed to create vertex descriptor");
+        return 2;
+    }
+    if (layout.needsTangents)
+    {
+        CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
+    }
+
+    ShaderInfo info;
+    info.blendEnabled = pipelineConfig.blendEnabled;
+    info.blendMode = static_cast<uint32>(pipelineConfig.blendMode);
+    info.sourceBlendFactor = pipelineConfig.sourceBlendFactor;
+    info.destinationBlendFactor = pipelineConfig.destinationBlendFactor;
+    info.blendOperation = pipelineConfig.blendOperation;
+    info.sourceAlphaBlendFactor = pipelineConfig.sourceAlphaBlendFactor;
+    info.destinationAlphaBlendFactor = pipelineConfig.destinationAlphaBlendFactor;
+    info.alphaBlendOperation = pipelineConfig.alphaBlendOperation;
+    info.depthTestEnabled = pipelineConfig.depthTestEnabled;
+    info.depthWriteEnabled = pipelineConfig.depthWriteEnabled;
+    info.depthCompareFunction = pipelineConfig.depthCompareFunction;
+    info.cullMode = pipelineConfig.cullMode;
+    info.colorWriteMask = pipelineConfig.colorWriteMask;
+    info.name = registrationNormalizedKey;
+    id<MTLRenderPipelineState> pipelineState =
+        CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
+    if (!pipelineState && iLog)
+    {
+        iLog->Log("MetalShaderManager: pipeline failure for '%s' (needsTangents=%d, tangentError=%d)",
+                  shaderName ? [shaderName UTF8String] : "<unnamed>",
+                  layout.needsTangents ? 1 : 0,
+                  m_lastPipelineHadTangentMismatch ? 1 : 0);
+    }
+    if (!pipelineState && !layout.needsTangents && m_lastPipelineHadTangentMismatch)
+    {
+        if (iLog)
+        {
+            iLog->Log("MetalShaderManager: Retrying shader '%s' with tangent vertex stream\n",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>");
+        }
+        layout.needsTangents = true;
+        vertexFunctionName = @"tangent_vertex";
+        vertexFormat = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
+        vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
+        descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
+        if (descriptor)
+            CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
+        pipelineState =
+            CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
+    }
+    if (!pipelineState)
+    {
+        (*psoFailCount)++;
+        if (iLog)
+            iLog->Log("MetalShaderManager: PSO creation failed for '%s' — shader will be unavailable at runtime\n",
+                      shaderName ? [shaderName UTF8String] : "<unnamed>");
+        return 1;
+    }
+
+    auto existing = m_shaderNameMap.find(registrationNormalizedKey);
+    if (existing != m_shaderNameMap.end())
+    {
+        ReleaseShaderId(existing->second);
+    }
+
+    int shaderId = AllocateShaderId();
+    info.shaderClass = eSH_Misc;
+    info.needsTangents = layout.needsTangents;
+    info.isLoaded = true;
+    info.nMaskGen = 0;
+    info.shaderWrapper = new CMetalShader(shaderId, this);
+    info.vertexFunction = vertexFunction;
+    info.fragmentFunction = fragmentFunction;
+    info.pipelineState = pipelineState;
+    info.vertexDescriptor = descriptor;
+    if (uniformArray && [uniformArray isKindOfClass:[NSArray class]])
+    {
+        for (NSDictionary* uniformDict in uniformArray)
+        {
+            if (![uniformDict isKindOfClass:[NSDictionary class]])
+                continue;
+            GeneratedUniformBinding binding;
+            NSString* uName = uniformDict[@"name"];
+            NSString* uType = uniformDict[@"type"];
+            NSString* uSemantic = uniformDict[@"semantic"];
+            NSNumber* uArraySize = uniformDict[@"arraySize"];
+            if (uName)
+                binding.name = [uName UTF8String];
+            if (uType)
+                binding.type = [uName UTF8String];
+            if (uSemantic)
+                binding.semantic = [uSemantic UTF8String];
+            binding.arraySize = uArraySize ? uArraySize.intValue : 0;
+            info.uniformBindings.push_back(binding);
+        }
+    }
+    if (textureArray && [textureArray isKindOfClass:[NSArray class]])
+    {
+        for (NSDictionary* textureDict in textureArray)
+        {
+            if (![textureDict isKindOfClass:[NSDictionary class]])
+                continue;
+            GeneratedTextureBinding binding;
+            NSString* tName = textureDict[@"name"];
+            NSString* tType = textureDict[@"type"];
+            NSString* tSemantic = textureDict[@"semantic"];
+            NSNumber* tSlot = textureDict[@"slot"];
+            if (tName)
+                binding.name = [tName UTF8String];
+            if (tType)
+                binding.type = [tType UTF8String];
+            if (tSemantic)
+                binding.semantic = [tSemantic UTF8String];
+            binding.slot = tSlot ? tSlot.intValue : static_cast<int>(info.textureBindings.size());
+            info.textureBindings.push_back(binding);
+        }
+    }
+    if (directiveArray && [directiveArray isKindOfClass:[NSArray class]])
+    {
+        for (NSString* directive in directiveArray)
+        {
+            if (![directive isKindOfClass:[NSString class]])
+                continue;
+            info.directives.emplace_back([directive UTF8String]);
+        }
+    }
+    if (maskArray && [maskArray isKindOfClass:[NSArray class]])
+    {
+        for (NSString* mask in maskArray)
+        {
+            if (![mask isKindOfClass:[NSString class]])
+                continue;
+            info.maskReferences.emplace_back([mask UTF8String]);
+        }
+    }
+
+    m_shaders[shaderId] = info;
+    m_shaderNameMap[registrationNormalizedKey] = shaderId;
+
+    NSArray* lookupAliases = aliasSrc[@"lookupAliases"];
+    if (lookupAliases && [lookupAliases isKindOfClass:[NSArray class]])
+    {
+        for (id aliasObj in lookupAliases)
+        {
+            if (![aliasObj isKindOfClass:[NSString class]] || [(NSString*)aliasObj length] == 0)
+                continue;
+            std::string aliasKey = NormalizeShaderName([(NSString*)aliasObj UTF8String]);
+            if (!aliasKey.empty() && aliasKey != registrationNormalizedKey)
+                m_shaderNameMap[aliasKey] = shaderId;
+        }
+    }
+
+    if (iLog)
+        iLog->Log("MetalShaderManager: Registered generated shader '%s' (id=%d)\n",
+                  [shaderName UTF8String], shaderId);
+
+    return 0;
+}
+
 void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
 {
     if (!m_renderer || !m_renderer->m_device)
@@ -1241,8 +1662,89 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                 m_generatedVertexEntries.size());
     }
 
-    // Second pass: build fragment pipelines
+    NSMutableDictionary* sampleFragmentByVertexEp = [NSMutableDictionary dictionary];
+    for (NSDictionary* scanEntry in entries)
+    {
+        if (![scanEntry isKindOfClass:[NSDictionary class]])
+            continue;
+        NSString* st = scanEntry[@"stage"];
+        NSString* loweredScan = st ? [st lowercaseString] : @"fragment";
+        if ([loweredScan isEqualToString:@"vertex"])
+            continue;
+        NSString* vepScan = scanEntry[@"vertexEntryPoint"];
+        if (!vepScan || [vepScan length] == 0)
+            continue;
+        if ([sampleFragmentByVertexEp objectForKey:vepScan] == nil)
+            [sampleFragmentByVertexEp setObject:scanEntry forKey:vepScan];
+    }
+
     int psoFailCount = 0;
+
+    for (NSDictionary* entry in entries)
+    {
+        if (![entry isKindOfClass:[NSDictionary class]])
+            continue;
+        NSString* stageValueVs = entry[@"stage"];
+        NSString* loweredVs = stageValueVs ? [stageValueVs lowercaseString] : @"fragment";
+        if (![loweredVs isEqualToString:@"vertex"])
+            continue;
+
+        NSString* normalizedNameVs = entry[@"normalized"];
+        NSString* shaderNameVs = entry[@"shader"];
+        if (!shaderNameVs)
+            continue;
+        std::string vertexRegKey;
+        if (normalizedNameVs && [normalizedNameVs length] > 0)
+            vertexRegKey = NormalizeShaderName([normalizedNameVs UTF8String]);
+        else
+            vertexRegKey = NormalizeShaderName([shaderNameVs UTF8String]);
+        if (vertexRegKey.empty())
+            continue;
+        if (m_shaderNameMap.find(vertexRegKey) != m_shaderNameMap.end())
+            continue;
+
+        NSString* vep = entry[@"entryPoint"];
+        if (!vep || ![vep length])
+            vep = entry[@"fragment"];
+        if (!vep || ![vep length])
+            continue;
+
+        NSDictionary* pairedFrag = [sampleFragmentByVertexEp objectForKey:vep];
+        if (!pairedFrag)
+        {
+            if (g_orphanStandaloneVertexLogCount < kMaxMissingVertexLogs)
+            {
+                if (iLog)
+                    iLog->Log(
+                        "MetalShaderManager: no fragment references vertexEntryPoint '%s' — skipping standalone VS '%s'\n",
+                        [vep UTF8String],
+                        [shaderNameVs UTF8String]);
+                else
+                    fprintf(stderr,
+                            "MetalShaderManager: no fragment references vertexEntryPoint '%s' — skipping standalone VS '%s'\n",
+                            [vep UTF8String],
+                            [shaderNameVs UTF8String]);
+                g_orphanStandaloneVertexLogCount++;
+            }
+            continue;
+        }
+
+        int rcVs = TryRegisterOneManifestPipeline(
+            pairedFrag,
+            entry,
+            vertexRegKey,
+            generatedLibrary,
+            vertexLibrary,
+            vertexByFuncName,
+            &psoFailCount,
+            false,
+            &matchedFragmentVertexCount,
+            &missingFragmentVertexCount);
+        if (rcVs == 2)
+            return;
+    }
+
+    // Second pass: build fragment pipelines
     for (NSDictionary* entry in entries)
     {
         if (![entry isKindOfClass:[NSDictionary class]])
@@ -1254,25 +1756,6 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         if (!fragmentName)
             fragmentName = entry[@"fragment"];
         NSString* stageValue = entry[@"stage"];
-        NSArray* uniformArray = entry[@"uniforms"];
-        NSArray* textureArray = entry[@"textures"];
-        NSArray* vertexAttrArray = entry[@"vertexAttributes"];
-        NSArray* vertexAttrMetaArray = entry[@"vertexAttributeMetadata"];
-        NSNumber* textureCountValue = entry[@"textureCount"];
-        NSArray* directiveArray = entry[@"directives"];
-        NSArray* maskArray = entry[@"maskReferences"];
-        NSDictionary* pipelineDict = entry[@"pipeline"];
-
-        if (g_fragmentMetaLogCount < 5)
-        {
-            long metaCount = (vertexAttrMetaArray && [vertexAttrMetaArray isKindOfClass:[NSArray class]]) ? [vertexAttrMetaArray count] : -1;
-            long attrCount = (vertexAttrArray && [vertexAttrArray isKindOfClass:[NSArray class]]) ? [vertexAttrArray count] : -1;
-            fprintf(stderr, "MetalShaderManager: fragment '%s' metaCount=%ld attrCount=%ld\n",
-                    shaderName ? [shaderName UTF8String] : "<nil>",
-                    metaCount,
-                    attrCount);
-            g_fragmentMetaLogCount++;
-        }
         if (!shaderName || !fragmentName)
             continue;
 
@@ -1285,372 +1768,19 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         if ([loweredStage isEqualToString:@"vertex"])
             continue;
 
-        const std::string canonicalKey = BuildStageAgnosticKey(normalizedKey);
-
-        // Prefer the Dart-assigned vertexEntryPoint from the manifest (authoritative pairing).
-        // Fall back to the heuristic FindGeneratedVertexEntry only when the field is absent.
-        const GeneratedVertexEntry* matchedVertexEntry = nullptr;
-        NSString* manifestVEP = entry[@"vertexEntryPoint"];
-        if (manifestVEP && [manifestVEP length] > 0)
-        {
-            const std::string vepKey = NSStringToStdString(manifestVEP);
-            auto it = vertexByFuncName.find(vepKey);
-            if (it != vertexByFuncName.end())
-                matchedVertexEntry = it->second;
-        }
-        if (!matchedVertexEntry)
-        {
-            matchedVertexEntry = FindGeneratedVertexEntry(m_generatedVertexEntries,
-                                                          canonicalKey,
-                                                          vertexAttrMetaArray,
-                                                          vertexAttrArray);
-        }
-        if (matchedVertexEntry)
-        {
-            matchedFragmentVertexCount++;
-        }
-        else
-        {
-            missingFragmentVertexCount++;
-        }
-
-        if (!matchedVertexEntry && g_missingVertexLogCount < kMaxMissingVertexLogs)
-        {
-            if (iLog)
-            {
-                iLog->Log("MetalShaderManager: missing generated vertex entry for key '%s' (shader '%s')\n",
-                          canonicalKey.c_str(),
-                          shaderName ? [shaderName UTF8String] : "<unnamed>");
-            }
-            else
-            {
-                fprintf(stderr, "MetalShaderManager: missing generated vertex entry for key '%s' (shader '%s')\n",
-                        canonicalKey.c_str(),
-                        shaderName ? [shaderName UTF8String] : "<unnamed>");
-            }
-            g_missingVertexLogCount++;
-        }
-
-        NSString* lowerShaderName = [shaderName lowercaseString];
-        MTLFunctionConstantValues* funcConstants = MetalManifestBuildFunctionConstants(lowerShaderName, directiveArray);
-
-        // Tangent-frame requirement is determined solely by vertex attribute metadata
-        bool forceTangentFrame = false;
-
-        NSError* funcErr = nil;
-        id<MTLFunction> fragmentFunction = [generatedLibrary newFunctionWithName:fragmentName
-                                                                  constantValues:funcConstants
-                                                                           error:&funcErr];
-        if (!fragmentFunction)
-        {
-            if (iLog)
-                iLog->Log("MetalShaderManager: Missing generated fragment function '%s' (error: %s)\n",
-                          [fragmentName UTF8String],
-                          funcErr ? [[funcErr localizedDescription] UTF8String] : "unknown");
-            continue;
-        }
-
-        int textureCount = textureCountValue ? textureCountValue.intValue : 0;
-        if (textureArray && [textureArray isKindOfClass:[NSArray class]])
-        {
-            textureCount = static_cast<int>([textureArray count]);
-        }
-
-        if (vertexAttrMetaArray && ![vertexAttrMetaArray isKindOfClass:[NSArray class]] && iLog)
-        {
-            iLog->Log("MetalShaderManager: vertexAttributeMetadata for '%s' is %s instead of NSArray",
-                      shaderName ? [shaderName UTF8String] : "<unnamed>",
-                      NSStringFromClass([vertexAttrMetaArray class]).UTF8String);
-        }
-        VertexAttributeSummary attributeSummary = BuildAttributeSummary(vertexAttrArray, vertexAttrMetaArray, textureCount, shaderName);
-        // Use metadata to decide tangent-frame requirement
-        forceTangentFrame = attributeSummary.hasTNormal || attributeSummary.hasTangent || attributeSummary.hasBinormal;
-        const bool hasGeneratedVertexEntry = (matchedVertexEntry != nullptr);
-        if (hasGeneratedVertexEntry && g_vertexMatchLogCount < kMaxMissingVertexLogs)
-        {
-            if (iLog)
-            {
-                iLog->Log("MetalShaderManager: matched fragment key '%s' to vertex entry '%s'\n",
-                          canonicalKey.c_str(),
-                          matchedVertexEntry->entryPoint.c_str());
-            }
-            fprintf(stderr, "MetalShaderManager: matched fragment key '%s' to vertex entry '%s'\n",
-                    canonicalKey.c_str(),
-                    matchedVertexEntry->entryPoint.c_str());
-            g_vertexMatchLogCount++;
-        }
-        VertexLayoutInfo layout = InferVertexLayout(attributeSummary, shaderName);
-        ApplyScreenVertexFallback(hasGeneratedVertexEntry, layout, attributeSummary, shaderName);
-        if (forceTangentFrame)
-        {
-            layout.needsTangents = true;
-            layout.functionName = @"tangent_vertex";
-            layout.format = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-            layout.hasTexCoords = true;
-            layout.hasColor = true;
-            layout.hasNormal = true;
-        }
-        NSString* vertexFunctionName = layout.functionName;
-        int vertexFormat = layout.format;
-        MTLVertexDescriptor* descriptor = nil;
-        bool metadataNeedsTangents = layout.needsTangents;
-        if (matchedVertexEntry)
-        {
-            if (!matchedVertexEntry->vertexInputDescs.empty())
-            {
-                descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromVertexInputs(
-                    matchedVertexEntry->vertexInputDescs);
-                layout.needsTangents = false;
-            }
-            else
-            {
-                descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptorFromMetadata(
-                    matchedVertexEntry->attributes,
-                    &metadataNeedsTangents,
-                    &vertexFormat);
-                if (descriptor)
-                    layout.needsTangents = metadataNeedsTangents;
-            }
-        }
-        if (layout.needsTangents && iLog)
-        {
-            iLog->Log("MetalShaderManager: '%s' requires tangent stream support (format=%d)\n",
-                      shaderName ? [shaderName UTF8String] : "<unnamed>",
-                      vertexFormat);
-        }
-        id<MTLFunction> vertexFunction = nil;
-        bool usedGeneratedVertex = false;
-
-        PipelineStateConfig pipelineConfig = MetalManifestDefaultPipelineConfig();
-        MetalManifestApplyPipelineConfigFromManifest(pipelineConfig, pipelineDict);
-
-        if (vertexLibrary)
-        {
-            if (matchedVertexEntry && generatedLibrary)
-            {
-                // Prefer the manifest vertexEntryPoint name directly: it names
-                // the exact VS function the generator paired with this FS.
-                // matchedVertexEntry may be the canonical-winner (e.g. _vs20) whose
-                // entryPoint differs from manifestVEP (e.g. bare VS).  Loading the
-                // function by manifestVEP ensures VS output types match the FS
-                // stage_in regardless of which VS variant won the canonical slot.
-                NSString* generatedVertexName =
-                    (manifestVEP && [manifestVEP length] > 0)
-                        ? manifestVEP
-                        : [NSString stringWithUTF8String:matchedVertexEntry->entryPoint.c_str()];
-                if (generatedVertexName && [generatedVertexName length] > 0)
-                {
-                    NSError* vertFuncErr = nil;
-                    id<MTLFunction> generatedVertexFunction = [generatedLibrary newFunctionWithName:generatedVertexName
-                                                                                    constantValues:funcConstants
-                                                                                             error:&vertFuncErr];
-                    if (generatedVertexFunction)
-                    {
-                        vertexFunction = generatedVertexFunction;
-                        vertexFunctionName = generatedVertexName;
-                        usedGeneratedVertex = true;
-                    }
-                    else if (iLog)
-                    {
-                        iLog->Log("MetalShaderManager: Missing generated vertex function '%s' for shader '%s'\n",
-                                  [generatedVertexName UTF8String],
-                                  shaderName ? [shaderName UTF8String] : "<unnamed>");
-                    }
-                }
-            }
-
-            if (!vertexFunction)
-            {
-                vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
-                if (!vertexFunction)
-                {
-                    const char* shaderLabel = shaderName ? [shaderName UTF8String] : "<unnamed>";
-                    const char* functionLabel = [vertexFunctionName UTF8String];
-                    if (iLog)
-                    {
-                        iLog->LogError("MetalShaderManager: Missing vertex entry '%s' required by shader '%s' - "
-                                       "ensure UtilShaders.metal defines this helper and regenerate UtilShaders.metallib\n",
-                                       functionLabel, shaderLabel);
-                    }
-                    assert(!"MetalShaderManager: Missing vertex entry in UtilShaders.metallib");
-                    return;
-                }
-            }
-        }
-        else
-        {
-            if (iLog)
-                iLog->Log("MetalShaderManager: No vertex library available; skipping shader '%s'\n",
-                          shaderName ? [shaderName UTF8String] : "<unnamed>");
-            assert(!"MetalShaderManager: No default vertex library available");
+        int rc = TryRegisterOneManifestPipeline(
+            entry,
+            nil,
+            normalizedKey,
+            generatedLibrary,
+            vertexLibrary,
+            vertexByFuncName,
+            &psoFailCount,
+            true,
+            &matchedFragmentVertexCount,
+            &missingFragmentVertexCount);
+        if (rc == 2)
             return;
-        }
-
-        if (!vertexFunction)
-        {
-            if (iLog)
-                iLog->Log("MetalShaderManager: Missing generated vertex function for shader '%s'\n", [shaderName UTF8String]);
-            assert(!"MetalShaderManager: Missing generated vertex function");
-            return;
-        }
-
-        if (!descriptor)
-        {
-            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
-        }
-        if (!descriptor)
-        {
-            assert(!"MetalShaderManager: Failed to create vertex descriptor");
-            return;
-        }
-        if (layout.needsTangents)
-        {
-            CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
-        }
-
-        ShaderInfo info;
-        info.blendEnabled = pipelineConfig.blendEnabled;
-        info.blendMode = static_cast<uint32>(pipelineConfig.blendMode);
-        info.sourceBlendFactor = pipelineConfig.sourceBlendFactor;
-        info.destinationBlendFactor = pipelineConfig.destinationBlendFactor;
-        info.blendOperation = pipelineConfig.blendOperation;
-        info.sourceAlphaBlendFactor = pipelineConfig.sourceAlphaBlendFactor;
-        info.destinationAlphaBlendFactor = pipelineConfig.destinationAlphaBlendFactor;
-        info.alphaBlendOperation = pipelineConfig.alphaBlendOperation;
-        info.depthTestEnabled = pipelineConfig.depthTestEnabled;
-        info.depthWriteEnabled = pipelineConfig.depthWriteEnabled;
-        info.depthCompareFunction = pipelineConfig.depthCompareFunction;
-        info.cullMode = pipelineConfig.cullMode;
-        info.colorWriteMask = pipelineConfig.colorWriteMask;
-        info.name = normalizedKey;
-        id<MTLRenderPipelineState> pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
-        if (!pipelineState && iLog)
-        {
-            iLog->Log("MetalShaderManager: pipeline failure for '%s' (needsTangents=%d, tangentError=%d)",
-                      shaderName ? [shaderName UTF8String] : "<unnamed>",
-                      layout.needsTangents ? 1 : 0,
-                      m_lastPipelineHadTangentMismatch ? 1 : 0);
-        }
-        if (!pipelineState && !layout.needsTangents && m_lastPipelineHadTangentMismatch)
-        {
-            if (iLog)
-            {
-                iLog->Log("MetalShaderManager: Retrying shader '%s' with tangent vertex stream\n",
-                          shaderName ? [shaderName UTF8String] : "<unnamed>");
-            }
-            layout.needsTangents = true;
-            vertexFunctionName = @"tangent_vertex";
-            vertexFormat = VERTEX_FORMAT_P3F_N_COL4UB_TEX2F;
-            vertexFunction = [vertexLibrary newFunctionWithName:vertexFunctionName];
-            descriptor = CMetalVertexDescriptorHelper::CreateVertexDescriptor(vertexFormat);
-            if (descriptor)
-                CMetalVertexDescriptorHelper::AttachTangentAttributes(descriptor);
-            pipelineState = CreatePipelineStateWithFunctions(vertexFunction, fragmentFunction, descriptor, &info);
-        }
-        if (!pipelineState)
-        {
-            psoFailCount++;
-            if (iLog)
-                iLog->Log("MetalShaderManager: PSO creation failed for '%s' — shader will be unavailable at runtime\n",
-                          shaderName ? [shaderName UTF8String] : "<unnamed>");
-            continue;
-        }
-
-        auto existing = m_shaderNameMap.find(normalizedKey);
-        if (existing != m_shaderNameMap.end())
-        {
-            ReleaseShaderId(existing->second);
-        }
-
-        int shaderId = AllocateShaderId();
-        info.shaderClass = eSH_Misc;
-        info.needsTangents = layout.needsTangents;
-        info.isLoaded = true;
-        info.nMaskGen = 0;
-        info.shaderWrapper = new CMetalShader(shaderId, this);
-        info.vertexFunction = vertexFunction;
-        info.fragmentFunction = fragmentFunction;
-        info.pipelineState = pipelineState;
-        info.vertexDescriptor = descriptor;
-        if (uniformArray && [uniformArray isKindOfClass:[NSArray class]])
-        {
-            for (NSDictionary* uniformDict in uniformArray)
-            {
-                if (![uniformDict isKindOfClass:[NSDictionary class]])
-                    continue;
-                GeneratedUniformBinding binding;
-                NSString* uName = uniformDict[@"name"];
-                NSString* uType = uniformDict[@"type"];
-                NSString* uSemantic = uniformDict[@"semantic"];
-                NSNumber* uArraySize = uniformDict[@"arraySize"];
-                if (uName)
-                    binding.name = [uName UTF8String];
-                if (uType)
-                    binding.type = [uType UTF8String];
-                if (uSemantic)
-                    binding.semantic = [uSemantic UTF8String];
-                binding.arraySize = uArraySize ? uArraySize.intValue : 0;
-                info.uniformBindings.push_back(binding);
-            }
-        }
-        if (textureArray && [textureArray isKindOfClass:[NSArray class]])
-        {
-            for (NSDictionary* textureDict in textureArray)
-            {
-                if (![textureDict isKindOfClass:[NSDictionary class]])
-                    continue;
-                GeneratedTextureBinding binding;
-                NSString* tName = textureDict[@"name"];
-                NSString* tType = textureDict[@"type"];
-                NSString* tSemantic = textureDict[@"semantic"];
-                NSNumber* tSlot = textureDict[@"slot"];
-                if (tName)
-                    binding.name = [tName UTF8String];
-                if (tType)
-                    binding.type = [tType UTF8String];
-                if (tSemantic)
-                    binding.semantic = [tSemantic UTF8String];
-                binding.slot = tSlot ? tSlot.intValue : static_cast<int>(info.textureBindings.size());
-                info.textureBindings.push_back(binding);
-            }
-        }
-        if (directiveArray && [directiveArray isKindOfClass:[NSArray class]])
-        {
-            for (NSString* directive in directiveArray)
-            {
-                if (![directive isKindOfClass:[NSString class]])
-                    continue;
-                info.directives.emplace_back([directive UTF8String]);
-            }
-        }
-        if (maskArray && [maskArray isKindOfClass:[NSArray class]])
-        {
-            for (NSString* mask in maskArray)
-            {
-                if (![mask isKindOfClass:[NSString class]])
-                    continue;
-                info.maskReferences.emplace_back([mask UTF8String]);
-            }
-        }
-
-        m_shaders[shaderId] = info;
-        m_shaderNameMap[normalizedKey] = shaderId;
-
-        NSArray* lookupAliases = entry[@"lookupAliases"];
-        if (lookupAliases && [lookupAliases isKindOfClass:[NSArray class]])
-        {
-            for (id aliasObj in lookupAliases)
-            {
-                if (![aliasObj isKindOfClass:[NSString class]] || [(NSString*)aliasObj length] == 0)
-                    continue;
-                std::string aliasKey = NormalizeShaderName([(NSString*)aliasObj UTF8String]);
-                if (!aliasKey.empty() && aliasKey != normalizedKey)
-                    m_shaderNameMap[aliasKey] = shaderId;
-            }
-        }
-
-        if (iLog)
-            iLog->Log("MetalShaderManager: Registered generated shader '%s' (id=%d)\n", [shaderName UTF8String], shaderId);
     }
 
     if (iLog)

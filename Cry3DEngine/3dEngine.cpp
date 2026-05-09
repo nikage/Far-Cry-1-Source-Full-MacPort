@@ -77,7 +77,7 @@ static IShader* LoadRendererShaderSafe(const char* shaderName)
 		Cry3DEngineBase::m_pLog->LogError("Failed to load shader '%s'", shaderName);
 
 
-	return 0;
+	return nullptr;
 }
 
 static ITexPic* LoadRendererTextureSafe(const char* label, const char** baseNames)

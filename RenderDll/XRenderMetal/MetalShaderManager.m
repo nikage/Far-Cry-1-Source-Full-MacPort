@@ -308,6 +308,17 @@ protected:
     bool InitializeDefaultShaderLibrary();
     void CreateDefaultShaders(id<MTLLibrary> library);
     void LoadGeneratedShaders(id<MTLLibrary> vertexLibrary);
+    int TryRegisterOneManifestPipeline(
+        NSDictionary* fragEntry,
+        NSDictionary* aliasSourceOverride,
+        const std::string& registrationNormalizedKey,
+        id<MTLLibrary> generatedLibrary,
+        id<MTLLibrary> vertexLibrary,
+        const std::unordered_map<std::string, const GeneratedVertexEntry*>& vertexByFuncName,
+        int* psoFailCount,
+        bool fragmentPairingStats,
+        size_t* matchedFragmentVertexCount,
+        size_t* missingFragmentVertexCount);
     void ValidateShaderPairs(id<MTLDevice> device, id<MTLLibrary> generatedLib);
     id<MTLFunction> LoadMetalShader(const char* name, const char* source);
     id<MTLRenderPipelineState> CreatePipelineState(id<MTLFunction> vertexFunction, 

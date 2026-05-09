@@ -70,6 +70,12 @@ absent and that's the design constraint that shapes every resolution.
 - Each entry corresponds to one Metal shader: `cgrcterrain`, `cgrcflare`,
   `cgrcdefault`, `cgrc_hdr_finalscene_ps20`, etc.
 - This is the only tier that actually serves draw calls.
+- **Vertex rows:** logical names that map to **vertex** programs (for example
+  `decal_vp` → `cgvprogdecal`) are registered when
+  `LoadGeneratedShaders` runs a **vertex registration pass** after caching VS
+  metadata and pairing each standalone VS manifest row with a representative
+  fragment row for PSO creation. See
+  [`metal_vertex_manifest_registration.md`](metal_vertex_manifest_registration.md).
 
 ### Tier 2 — `Aliases.txt`
 
