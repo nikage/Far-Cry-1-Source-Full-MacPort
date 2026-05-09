@@ -337,6 +337,28 @@ no_draw			nodraw
       expect(byTarget['cgrcparticlelight'], contains('particlelight'));
     });
 
+    test('contains BumpSunGlow -> CGRCBumpSunGlow (terrain sun road EF_SYSTEM)',
+        () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'bumpsunglow')
+          .firstOrNull;
+      expect(row, isNotNull,
+          reason: 'BumpSunGlow must alias for terrain_water_quad EF_SYSTEM load');
+      expect(row!.target, equalsIgnoringCase('CGRCBumpSunGlow'),
+          reason: 'Metal port fragment CGRCBumpSunGlow');
+    });
+
+    test('BumpSunGlow alias produces lookupAliases on cgrcbumpsunglow', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgrcbumpsunglow'], contains('bumpsunglow'));
+    });
+
     test('contains Decal_VP -> CGVProgDecal', () {
       final File aliases = _findAliasesTxt();
       final List<AliasesTxtEntry> entries =

@@ -2537,6 +2537,8 @@ int main()
             CHECK(hasLookupAlias("cgrcscreentexmap", "screentexmap"));
             // ParticleLight — CDecalManager EF_SYSTEM load (DecalManager.cpp).
             CHECK(hasLookupAlias("cgrcparticlelight", "particlelight"));
+            // BumpSunGlow — terrain_water_quad.cpp EF_SYSTEM; XML SunWaterRefl default.
+            CHECK(hasLookupAlias("cgrcbumpsunglow", "bumpsunglow"));
             // TerrainWater_OnlySky — CustomAliases.txt NV1X-style row; Metal merges
             // into lookupAliases on CGRCLowMedWater (manifest normalized cgrclowmedwater).
             CHECK(hasLookupAlias("cgrclowmedwater", "terrainwater_onlysky"));

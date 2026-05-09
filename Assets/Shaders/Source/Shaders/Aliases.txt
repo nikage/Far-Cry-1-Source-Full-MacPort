@@ -10,6 +10,7 @@ CryLight                   CGRCFlare
 Default                    CGRCDefault
 ScreenTexMap               CGRCScreenTexMap
 ParticleLight              CGRCParticleLight
+BumpSunGlow                CGRCBumpSunGlow
 Decal_VP                   CGVProgDecal
 Decal_2D_VP                CGVProgDecal_2D_Atten
 

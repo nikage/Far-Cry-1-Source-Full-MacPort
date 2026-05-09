@@ -355,7 +355,7 @@ subsystem actually loads. Classify each on demand using §3.
 
 | Module                                           | Names                                                                                |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `Cry3DEngine/terrain_water_quad.cpp`             | `TerrainWaterBottomSimple`, `TerrainWater_FP`, `terrainwater`, `BumpSunGlow`, `OcclusionTest` |
+| `Cry3DEngine/terrain_water_quad.cpp`             | `TerrainWaterBottomSimple`, `TerrainWater_FP`, `terrainwater`, `BumpSunGlow` (alias landed §6), `OcclusionTest` |
 | `Cry3DEngine/DecalManager.cpp`                   | `ParticleLight`, `Decal_VP`, `Decal_2D_VP`                                            |
 | `Cry3DEngine/3dEngineLoad.cpp`                   | `FogLayer` (×2 via XML), level-XML shore/water/sun/lensflare loaders                  |
 | `Cry3DEngine/3DEngineLight.cpp`                  | `StencilState_Terrain`, `GlowingMonkeyEyes`, dynamic XML light shaders                |
@@ -380,6 +380,7 @@ subsystem actually loads. Classify each on demand using §3.
 | `crylight`         | `cgrcflare`       | Both are sun lens-flare effect entry points; `m_pSHLensFlares` is consumed via `EF_AddEf` on the flare render-element pipeline. |
 | `flare_from_light` | `cgrcflare`       | Pre-existing alias retained from earlier work.                                              |
 | `default`          | `cgrcdefault`     | `CGRCDefault` is the Metal port's authored "default decal" component used by `BrushLM::SetChunk` when material binding is absent. |
+| `bumpsunglow`      | `cgrcbumpsunglow` | `terrain_water_quad.cpp` and level XML `Environment/Shaders/SunWaterRefl` default call `EF_LoadShader("BumpSunGlow", …, EF_SYSTEM)`; logical name normalizes to `bumpsunglow`, manifest key is `cgrcbumpsunglow`. |
 
 To add a new alias:
 

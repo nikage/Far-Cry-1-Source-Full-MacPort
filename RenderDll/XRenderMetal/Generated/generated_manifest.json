@@ -74959,6 +74959,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogbumpsunglow_vs20_vertex",
     "pipelineCategory": "mesh",
+    "lookupAliases": [
+      "bumpsunglow"
+    ],
     "uniforms": [
       {
         "name": "Specular",
