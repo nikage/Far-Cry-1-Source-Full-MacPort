@@ -373,11 +373,13 @@ virtual void PushMatrix();
 
 public:
     bool TryEnsureSwapchainRenderEncoderFor2D();
+    void ReleaseRenderEncoder();
     // Metal-specific members (public for manager access)
     id<MTLDevice> m_device;
     id<MTLCommandQueue> m_commandQueue;
     id<MTLCommandQueue> m_blitCommandQueue;   // dedicated queue for texture uploads
     id<MTLRenderCommandEncoder> m_renderEncoder;
+    bool m_renderEncoderOpen;
     MTKView* m_metalView;
     CAMetalLayer* m_metalLayer;
     

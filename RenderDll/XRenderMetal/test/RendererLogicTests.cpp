@@ -686,6 +686,395 @@ static void test_font_ortho_matrix()
     CHECK(std::fabs(yo - expected_y) < eps);
 }
 
+static void test_dyndvb_pooled_vertex_byte_offset()
+{
+    struct MirrorVec3 {
+        float x, y, z;
+    };
+    struct MirrorUCol {
+        unsigned int dcolor;
+    };
+    struct MirrorP3F_COL4UB_TEX2F {
+        MirrorVec3 xyz;
+        MirrorUCol color;
+        float st[2];
+    };
+    CHECK(sizeof(MirrorP3F_COL4UB_TEX2F) == 24u);
+    const int nOffs = 1704;
+    const size_t correctBytes =
+        static_cast<size_t>(nOffs) * sizeof(MirrorP3F_COL4UB_TEX2F);
+    const size_t wrongBytes = static_cast<size_t>(nOffs);
+    CHECK(correctBytes != wrongBytes);
+}
+
+static void test_metal_teardown_encoder_before_commit()
+{
+    auto fileExists = [](const std::string& p) -> bool {
+        struct stat st;
+        return ::stat(p.c_str(), &st) == 0;
+    };
+    auto walkUpToProjectRoot = [&](std::string dir,
+                                   const std::string& probe) -> std::string {
+        for (size_t i = 0; i < 12; ++i) {
+            const std::string candidate = dir + "/" + probe;
+            if (fileExists(candidate) && fileExists(dir + "/tools/shader_port"))
+                return candidate;
+            const size_t slash = dir.find_last_of('/');
+            if (slash == std::string::npos) break;
+            dir = dir.substr(0, slash);
+            if (dir.empty()) break;
+        }
+        return std::string();
+    };
+    auto findMetalRendererPath = [&]() -> std::string {
+        const std::string fileStr = __FILE__;
+        const size_t fileSlash = fileStr.find_last_of('/');
+        if (fileSlash != std::string::npos) {
+            const std::string p = walkUpToProjectRoot(
+                fileStr.substr(0, fileSlash), "RenderDll/XRenderMetal/MetalRenderer.mm");
+            if (!p.empty()) return p;
+        }
+        char cwd[4096];
+        if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+            const std::string p = walkUpToProjectRoot(
+                std::string(cwd), "RenderDll/XRenderMetal/MetalRenderer.mm");
+            if (!p.empty()) return p;
+        }
+        return std::string();
+    };
+    auto readFile = [](const std::string& path) -> std::string {
+        std::ifstream f(path);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    };
+    auto findFunctionBody = [](const std::string& src,
+                               const std::string& signature) -> std::string {
+        const size_t fnPos = src.find(signature);
+        if (fnPos == std::string::npos) return std::string();
+        const size_t bodyStart = src.find('{', fnPos);
+        if (bodyStart == std::string::npos) return std::string();
+        int depth = 0;
+        for (size_t i = bodyStart; i < src.size(); ++i) {
+            if (src[i] == '{') ++depth;
+            else if (src[i] == '}') {
+                if (--depth == 0) return src.substr(bodyStart, i - bodyStart);
+            }
+        }
+        return std::string();
+    };
+
+    const std::string path = findMetalRendererPath();
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = readFile(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const char* kReleaseEnc = "ReleaseRenderEncoder()";
+    const char* kCommit = "[m_currentCommandBuffer commit]";
+
+    auto assertReleaseEncoderBeforeCommit = [&](const std::string& body) {
+        const size_t pr = body.find(kReleaseEnc);
+        const size_t pc = body.find(kCommit);
+        CHECK(pr != std::string::npos);
+        CHECK(pc != std::string::npos);
+        CHECK(pr < pc);
+    };
+
+    const std::string deleteBody =
+        findFunctionBody(src, "bool CMetalRenderer::DeleteContext(WIN_HWND hWnd)");
+    CHECK(!deleteBody.empty());
+    if (!deleteBody.empty()) assertReleaseEncoderBeforeCommit(deleteBody);
+
+    const std::string contextBody =
+        findFunctionBody(src, "bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd)");
+    CHECK(!contextBody.empty());
+    if (!contextBody.empty()) assertReleaseEncoderBeforeCommit(contextBody);
+
+    const std::string freeBody =
+        findFunctionBody(src, "void CMetalRenderer::FreeResources(int nFlags)");
+    CHECK(!freeBody.empty());
+    if (!freeBody.empty()) {
+        const size_t reinit = freeBody.find("FRR_REINITHW");
+        CHECK(reinit != std::string::npos);
+        if (reinit != std::string::npos) {
+            const size_t baseCall =
+                freeBody.find("CMetalBaseRenderer::FreeResources", reinit);
+            CHECK(baseCall != std::string::npos);
+            if (baseCall != std::string::npos) {
+                const std::string slice = freeBody.substr(reinit, baseCall - reinit);
+                assertReleaseEncoderBeforeCommit(slice);
+            }
+        }
+    }
+}
+
+static void test_tryensure_swapchain_encoder_source_invariants()
+{
+    auto fileExists = [](const std::string& p) -> bool {
+        struct stat st;
+        return ::stat(p.c_str(), &st) == 0;
+    };
+    auto walkUpToProjectRoot = [&](std::string dir,
+                                   const std::string& probe) -> std::string {
+        for (size_t i = 0; i < 12; ++i) {
+            const std::string candidate = dir + "/" + probe;
+            if (fileExists(candidate) && fileExists(dir + "/tools/shader_port"))
+                return candidate;
+            const size_t slash = dir.find_last_of('/');
+            if (slash == std::string::npos) break;
+            dir = dir.substr(0, slash);
+            if (dir.empty()) break;
+        }
+        return std::string();
+    };
+    auto findBasePath = [&]() -> std::string {
+        const std::string fileStr = __FILE__;
+        const size_t fileSlash = fileStr.find_last_of('/');
+        if (fileSlash != std::string::npos) {
+            const std::string p = walkUpToProjectRoot(
+                fileStr.substr(0, fileSlash), "RenderDll/XRenderMetal/MetalBaseRenderer.mm");
+            if (!p.empty()) return p;
+        }
+        char cwd[4096];
+        if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+            const std::string p = walkUpToProjectRoot(
+                std::string(cwd), "RenderDll/XRenderMetal/MetalBaseRenderer.mm");
+            if (!p.empty()) return p;
+        }
+        return std::string();
+    };
+    auto readFile = [](const std::string& path) -> std::string {
+        std::ifstream f(path);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    };
+    auto findFunctionBody = [](const std::string& src,
+                               const std::string& signature) -> std::string {
+        const size_t fnPos = src.find(signature);
+        if (fnPos == std::string::npos) return std::string();
+        const size_t bodyStart = src.find('{', fnPos);
+        if (bodyStart == std::string::npos) return std::string();
+        int depth = 0;
+        for (size_t i = bodyStart; i < src.size(); ++i) {
+            if (src[i] == '{') ++depth;
+            else if (src[i] == '}') {
+                if (--depth == 0) return src.substr(bodyStart, i - bodyStart);
+            }
+        }
+        return std::string();
+    };
+
+    const std::string path = findBasePath();
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = readFile(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string releaseBody =
+        findFunctionBody(src, "void CMetalBaseRenderer::ReleaseRenderEncoder()");
+    CHECK(!releaseBody.empty());
+    if (!releaseBody.empty()) {
+        CHECK(releaseBody.find("m_renderEncoderOpen") != std::string::npos);
+        CHECK(releaseBody.find("endEncoding") != std::string::npos);
+    }
+
+    const std::string tryBody =
+        findFunctionBody(src, "bool CMetalBaseRenderer::TryEnsureSwapchainRenderEncoderFor2D()");
+    CHECK(!tryBody.empty());
+    if (!tryBody.empty()) {
+        CHECK(tryBody.find("commandBuffer") != std::string::npos);
+        CHECK(tryBody.find("ReleaseRenderEncoder") != std::string::npos);
+    }
+}
+
+static void test_metal_drawdynvb_script_draw_source_invariants()
+{
+    auto fileExists = [](const std::string& p) -> bool {
+        struct stat st;
+        return ::stat(p.c_str(), &st) == 0;
+    };
+    auto walkUpToProjectRoot = [&](std::string dir,
+                                   const std::string& probe) -> std::string {
+        for (size_t i = 0; i < 12; ++i) {
+            const std::string candidate = dir + "/" + probe;
+            if (fileExists(candidate) && fileExists(dir + "/tools/shader_port"))
+                return candidate;
+            const size_t slash = dir.find_last_of('/');
+            if (slash == std::string::npos) break;
+            dir = dir.substr(0, slash);
+            if (dir.empty()) break;
+        }
+        return std::string();
+    };
+    auto findRendererPath = [&]() -> std::string {
+        const std::string fileStr = __FILE__;
+        const size_t fileSlash = fileStr.find_last_of('/');
+        if (fileSlash != std::string::npos) {
+            const std::string p = walkUpToProjectRoot(
+                fileStr.substr(0, fileSlash), "RenderDll/XRenderMetal/MetalRenderer.mm");
+            if (!p.empty()) return p;
+        }
+        char cwd[4096];
+        if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+            const std::string p = walkUpToProjectRoot(
+                std::string(cwd), "RenderDll/XRenderMetal/MetalRenderer.mm");
+            if (!p.empty()) return p;
+        }
+        return std::string();
+    };
+    auto readFile = [](const std::string& path) -> std::string {
+        std::ifstream f(path);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    };
+    auto findFunctionBody = [](const std::string& src,
+                               const std::string& signature) -> std::string {
+        const size_t fnPos = src.find(signature);
+        if (fnPos == std::string::npos) return std::string();
+        const size_t bodyStart = src.find('{', fnPos);
+        if (bodyStart == std::string::npos) return std::string();
+        int depth = 0;
+        for (size_t i = bodyStart; i < src.size(); ++i) {
+            if (src[i] == '{') ++depth;
+            else if (src[i] == '}') {
+                if (--depth == 0) return src.substr(bodyStart, i - bodyStart);
+            }
+        }
+        return std::string();
+    };
+
+    const std::string path = findRendererPath();
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = readFile(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string prepBody =
+        findFunctionBody(src, "void CMetalRenderer::PrepareDynVBColortexDrawState()");
+    CHECK(!prepBody.empty());
+    if (!prepBody.empty()) {
+        CHECK(prepBody.find("GetPipelineStateForShader(\"colortex\")") !=
+              std::string::npos);
+        CHECK(prepBody.find("ApplyCachedFragmentBindingsToEncoder(1)") !=
+              std::string::npos);
+        CHECK(prepBody.find("SetShaderTangentRequirement(false)") !=
+              std::string::npos);
+        CHECK(prepBody.find("SetCullMode(R_CULL_DISABLE)") != std::string::npos);
+    }
+
+    const std::string dynIndexed =
+        findFunctionBody(src,
+                         "void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf,");
+    CHECK(!dynIndexed.empty());
+    if (!dynIndexed.empty()) {
+        CHECK(dynIndexed.find("PrepareDynVBColortexDrawState()") != std::string::npos);
+        CHECK(dynIndexed.find("CMetalBaseRenderer::DrawDynVB(pBuf") !=
+              std::string::npos);
+    }
+
+    const std::string dynPool =
+        findFunctionBody(src, "void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)");
+    CHECK(!dynPool.empty());
+    if (!dynPool.empty()) {
+        CHECK(dynPool.find("PrepareDynVBColortexDrawState()") != std::string::npos);
+        CHECK(dynPool.find("CMetalBaseRenderer::DrawDynVB(nOffs") != std::string::npos);
+    }
+}
+
+static void test_settexture_cached_bindings_source_invariants()
+{
+    auto fileExists = [](const std::string& p) -> bool {
+        struct stat st;
+        return ::stat(p.c_str(), &st) == 0;
+    };
+    auto walkUpToProjectRoot = [&](std::string dir,
+                                   const std::string& probe) -> std::string {
+        for (size_t i = 0; i < 12; ++i) {
+            const std::string candidate = dir + "/" + probe;
+            if (fileExists(candidate) && fileExists(dir + "/tools/shader_port"))
+                return candidate;
+            const size_t slash = dir.find_last_of('/');
+            if (slash == std::string::npos) break;
+            dir = dir.substr(0, slash);
+            if (dir.empty()) break;
+        }
+        return std::string();
+    };
+    auto findTexPath = [&]() -> std::string {
+        const std::string fileStr = __FILE__;
+        const size_t fileSlash = fileStr.find_last_of('/');
+        if (fileSlash != std::string::npos) {
+            const std::string p = walkUpToProjectRoot(
+                fileStr.substr(0, fileSlash),
+                "RenderDll/XRenderMetal/MetalTextureManager.mm");
+            if (!p.empty()) return p;
+        }
+        char cwd[4096];
+        if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+            const std::string p = walkUpToProjectRoot(
+                std::string(cwd), "RenderDll/XRenderMetal/MetalTextureManager.mm");
+            if (!p.empty()) return p;
+        }
+        return std::string();
+    };
+    auto readFile = [](const std::string& path) -> std::string {
+        std::ifstream f(path);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    };
+    auto findFunctionBody = [](const std::string& src,
+                               const std::string& signature) -> std::string {
+        const size_t fnPos = src.find(signature);
+        if (fnPos == std::string::npos) return std::string();
+        const size_t bodyStart = src.find('{', fnPos);
+        if (bodyStart == std::string::npos) return std::string();
+        int depth = 0;
+        for (size_t i = bodyStart; i < src.size(); ++i) {
+            if (src[i] == '{') ++depth;
+            else if (src[i] == '}') {
+                if (--depth == 0) return src.substr(bodyStart, i - bodyStart);
+            }
+        }
+        return std::string();
+    };
+
+    const std::string path = findTexPath();
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = readFile(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string setTexBody =
+        findFunctionBody(src, "void CMetalTextureManager::SetTexture(int tnum, ETexType Type)");
+    CHECK(!setTexBody.empty());
+    if (!setTexBody.empty()) {
+        const size_t cacheAssign =
+            setTexBody.find("m_boundFragmentTextures[textureIndex] = m_currentTexture");
+        const size_t encoderIf =
+            setTexBody.find("if (m_renderer && m_renderer->m_renderEncoder && m_currentTexture)");
+        CHECK(cacheAssign != std::string::npos);
+        CHECK(encoderIf != std::string::npos);
+        CHECK(cacheAssign < encoderIf);
+    }
+
+    const std::string applyBody = findFunctionBody(
+        src,
+        "void CMetalTextureManager::ApplyCachedFragmentBindingsToEncoder(int maxSlotExclusive)");
+    CHECK(!applyBody.empty());
+    if (!applyBody.empty()) {
+        CHECK(applyBody.find("setFragmentTexture:") != std::string::npos);
+        CHECK(applyBody.find("setFragmentSamplerState:") != std::string::npos);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The ortho matrix for font rendering is a compile-time constant (always
 // 800x600 virtual space). Two independent computations must yield identical
@@ -1994,6 +2383,11 @@ int main()
     test_inline_fallback_shader_has_notex_variant();
     test_font_vertex_color_format_is_non_normalized();
     test_font_ortho_matrix();
+    test_dyndvb_pooled_vertex_byte_offset();
+    test_metal_teardown_encoder_before_commit();
+    test_tryensure_swapchain_encoder_source_invariants();
+    test_metal_drawdynvb_script_draw_source_invariants();
+    test_settexture_cached_bindings_source_invariants();
     test_no_transient_buffer_allocation_pattern();
     test_virtual_screen_coordinate_mapping();
     test_system_cursor_hide_state_machine();

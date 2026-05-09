@@ -40,6 +40,7 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     : m_device(nil)
     , m_commandQueue(nil)
     , m_renderEncoder(nil)
+    , m_renderEncoderOpen(false)
     , m_metalView(nil)
     , m_metalLayer(nil)
     , m_currentCommandBuffer(nil)
@@ -254,12 +255,7 @@ void CMetalBaseRenderer::ShutDown(bool bReInit)
     
     m_stateCache.reset();
     
-    if (m_renderEncoder)
-    {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
     m_currentCommandBuffer = nil;
     if (m_renderPassDescriptor)
     {
@@ -837,6 +833,7 @@ bool CMetalBaseRenderer::AcquireDrawableFromLayer()
     }
 
     SetViewport(0, 0, static_cast<int>(targetWidth), static_cast<int>(targetHeight));
+    m_renderEncoderOpen = true;
     return true;
 }
 
@@ -895,7 +892,22 @@ bool CMetalBaseRenderer::AcquireDrawableFromView()
     }
 
     SetViewport(0, 0, static_cast<int>(targetWidth), static_cast<int>(targetHeight));
+    m_renderEncoderOpen = true;
     return true;
+}
+
+void CMetalBaseRenderer::ReleaseRenderEncoder()
+{
+    if (!m_renderEncoder)
+    {
+        m_renderEncoderOpen = false;
+        return;
+    }
+    if (m_renderEncoderOpen)
+        [m_renderEncoder endEncoding];
+    [m_renderEncoder release];
+    m_renderEncoder = nil;
+    m_renderEncoderOpen = false;
 }
 
 bool CMetalBaseRenderer::BeginSwapchainRenderPass(MTLLoadAction colorLoad, MTLLoadAction depthLoad,
@@ -916,12 +928,7 @@ bool CMetalBaseRenderer::BeginSwapchainRenderPass(MTLLoadAction colorLoad, MTLLo
     if (!depthTexture)
         return false;
 
-    if (m_renderEncoder)
-    {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
 
     if (m_renderPassDescriptor)
     {
@@ -947,13 +954,18 @@ bool CMetalBaseRenderer::BeginSwapchainRenderPass(MTLLoadAction colorLoad, MTLLo
     [m_renderEncoder setLabel:@"SwapchainResumePass"];
     ApplyRenderState();
     SetViewport(0, 0, m_width, m_height);
+    m_renderEncoderOpen = true;
     return true;
 }
 
 bool CMetalBaseRenderer::TryEnsureSwapchainRenderEncoderFor2D()
 {
-    if (m_renderEncoder)
+    if (!m_currentCommandBuffer)
+        return false;
+    if (m_renderEncoder && m_renderEncoderOpen
+        && [m_renderEncoder commandBuffer] == m_currentCommandBuffer)
         return true;
+    ReleaseRenderEncoder();
     return BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionLoad, MTLLoadActionLoad);
 }
 
@@ -1033,12 +1045,7 @@ void CMetalBaseRenderer::EndFrame()
     if (!m_currentCommandBuffer)
         return;
     
-    if (m_renderEncoder)
-    {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
     
     if (m_currentDrawable)
     {
@@ -1796,7 +1803,9 @@ void* CMetalBaseRenderer::GetDynVBPtr(int nVerts, int& nOffs, int Pool)
 
 void CMetalBaseRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
 {
-    if (!m_renderEncoder || nVerts <= 0 || Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
+    if (nVerts <= 0 || Pool < 0 || Pool >= NUM_DYNAMIC_VB_POOLS)
+        return;
+    if (!TryEnsureSwapchainRenderEncoderFor2D())
         return;
     
     if (!m_currentPipelineState)
@@ -1820,7 +1829,9 @@ void CMetalBaseRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
 void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf, 
                                   ushort* pInds, int nVerts, int nInds, int nPrimType)
 {
-    if (!m_renderEncoder || !pBuf || nVerts <= 0)
+    if (!pBuf || nVerts <= 0)
+        return;
+    if (!TryEnsureSwapchainRenderEncoderFor2D())
         return;
     
     if (!m_currentPipelineState)
@@ -1840,12 +1851,20 @@ void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf,
     
     if (pInds && nInds > 0)
     {
+        if (!m_dynamicVBPools[0].buffer)
+            return;
+
         size_t indexBufferSize = nInds * sizeof(ushort);
         id<MTLBuffer> indexBuffer = [m_device newBufferWithBytes:pInds 
                                                           length:indexBufferSize 
                                                          options:MTLResourceStorageModeShared];
-        
-        [m_renderEncoder setVertexBuffer:m_dynamicVBPools[0].buffer offset:nOffs atIndex:kMetalVertexStream_General];
+        if (!indexBuffer)
+            return;
+
+        const int vertexSize = sizeof(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F);
+        const size_t vertexByteOffset =
+            static_cast<size_t>(nOffs) * static_cast<size_t>(vertexSize);
+        [m_renderEncoder setVertexBuffer:m_dynamicVBPools[0].buffer offset:vertexByteOffset atIndex:kMetalVertexStream_General];
         [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
         [m_renderEncoder drawIndexedPrimitives:primType 
                                     indexCount:nInds 
@@ -2131,12 +2150,7 @@ void CMetalBaseRenderer::ClearColorBuffer(const Vec3 vColor)
     if (!m_currentCommandBuffer)
         return;
 
-    if (m_renderEncoder)
-    {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
 
     id<MTLTexture> colorTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
     if (!colorTexture && m_metalView)
@@ -2163,7 +2177,10 @@ void CMetalBaseRenderer::ClearColorBuffer(const Vec3 vColor)
 
     m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:rpd] retain];
     if (m_renderEncoder)
+    {
+        m_renderEncoderOpen = true;
         ApplyRenderState();
+    }
 }
 
 void CMetalBaseRenderer::ClearDepthBuffer()
@@ -2176,12 +2193,7 @@ void CMetalBaseRenderer::ClearDepthBuffer()
     if (!depthTexture)
         return;
 
-    if (m_renderEncoder)
-    {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
 
     id<MTLTexture> colorTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
     if (!colorTexture && m_metalView)
@@ -2205,7 +2217,10 @@ void CMetalBaseRenderer::ClearDepthBuffer()
 
     m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:rpd] retain];
     if (m_renderEncoder)
+    {
+        m_renderEncoderOpen = true;
         ApplyRenderState();
+    }
 }
 
 void CMetalBaseRenderer::EnableTexGen(bool enable)
@@ -2437,12 +2452,7 @@ bool CMetalBaseRenderer::BeginHDRPass()
         return false;
     }
 
-    // End the previous encoder if active
-    if (m_renderEncoder) {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
 
     MTLRenderPassDescriptor *hdrRPD = [MTLRenderPassDescriptor renderPassDescriptor];
     hdrRPD.colorAttachments[0].texture     = m_hdrColorRT;
@@ -2456,7 +2466,11 @@ bool CMetalBaseRenderer::BeginHDRPass()
 
     m_renderEncoder = [[m_currentCommandBuffer
         renderCommandEncoderWithDescriptor:hdrRPD] retain];
-    if (m_renderEncoder) [m_renderEncoder setLabel:@"HDRScenePass"];
+    if (m_renderEncoder)
+    {
+        m_renderEncoderOpen = true;
+        [m_renderEncoder setLabel:@"HDRScenePass"];
+    }
     return m_renderEncoder != nil;
 }
 
@@ -2468,12 +2482,7 @@ void CMetalBaseRenderer::EndHDRPass()
         return;
     }
 
-    // End the HDR scene encoder so bloom passes can open their own encoders
-    if (m_renderEncoder) {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
 
     // Bloom chain: each pass opens/closes its own encoder (no active encoder here)
     DoBloomPass();

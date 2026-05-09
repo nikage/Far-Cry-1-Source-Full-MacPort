@@ -1922,19 +1922,40 @@ void *CMetalRenderer::GetDynVBPtr(int nVerts, int &nOffs, int Pool) {
   return CMetalBaseRenderer::GetDynVBPtr(nVerts, nOffs, Pool);
 }
 
-void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts) {
-  if (!m_renderEncoder)
+void CMetalRenderer::PrepareDynVBColortexDrawState() {
+  if (!m_renderEncoder || !m_shaderManager)
     return;
+  id<MTLRenderPipelineState> pso =
+      m_shaderManager->GetPipelineStateForShader("colortex");
+  if (pso) {
+    m_currentPipelineState = pso;
+    [m_renderEncoder setRenderPipelineState:pso];
+  }
+  SetShaderTangentRequirement(false);
+  SetCullMode(R_CULL_DISABLE);
+  if (m_textureManager)
+    m_textureManager->ApplyCachedFragmentBindingsToEncoder(1);
+}
 
+void CMetalRenderer::DrawDynVB(int nOffs, int Pool, int nVerts) {
+  if (nVerts <= 0 || Pool < 0 || Pool >= 2)
+    return;
+  if (!TryEnsureSwapchainRenderEncoderFor2D())
+    return;
+  PrepareDynVBColortexDrawState();
   CMetalBaseRenderer::DrawDynVB(nOffs, Pool, nVerts);
 }
 
 void CMetalRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F *pBuf,
                                ushort *pInds, int nVerts, int nInds,
                                int nPrimType) {
-  if (!pBuf || !m_renderEncoder)
+  if (!pBuf)
     return;
-
+  if (nVerts <= 0)
+    return;
+  if (!TryEnsureSwapchainRenderEncoderFor2D())
+    return;
+  PrepareDynVBColortexDrawState();
   CMetalBaseRenderer::DrawDynVB(pBuf, pInds, nVerts, nInds, nPrimType);
 }
 
@@ -2330,12 +2351,7 @@ void CMetalRenderer::ScreenShot(const char *filename) {
                                                options:MTLResourceStorageModeShared];
   if (!staging) { iLog->Log("ScreenShot: staging alloc failed\n"); return; }
 
-  // End active encoder if any
-  if (m_renderEncoder) {
-    [m_renderEncoder endEncoding];
-    [m_renderEncoder release];
-    m_renderEncoder = nil;
-  }
+  ReleaseRenderEncoder();
 
   id<MTLCommandBuffer> cb   = [m_commandQueue commandBuffer];
   id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
@@ -2924,16 +2940,11 @@ bool CMetalRenderer::CreateContext(WIN_HWND hWnd, bool bAllowFSAA) {
 }
 
 bool CMetalRenderer::DeleteContext(WIN_HWND hWnd) {
+  ReleaseRenderEncoder();
   if (m_currentCommandBuffer) {
     [m_currentCommandBuffer commit];
     [m_currentCommandBuffer waitUntilCompleted];
     m_currentCommandBuffer = nil;
-  }
-  
-  if (m_renderEncoder) {
-    [m_renderEncoder endEncoding];
-    [m_renderEncoder release];
-    m_renderEncoder = nil;
   }
   if (m_currentDrawable) {
     [m_currentDrawable release];
@@ -2963,16 +2974,11 @@ void CMetalRenderer::FreeResources(int nFlags) {
   }
   
   if (nFlags & FRR_REINITHW) {
+    ReleaseRenderEncoder();
     if (m_currentCommandBuffer) {
       [m_currentCommandBuffer commit];
       [m_currentCommandBuffer waitUntilCompleted];
       m_currentCommandBuffer = nil;
-    }
-    
-    if (m_renderEncoder) {
-      [m_renderEncoder endEncoding];
-      [m_renderEncoder release];
-      m_renderEncoder = nil;
     }
     if (m_currentDrawable) {
       [m_currentDrawable release];
@@ -3091,15 +3097,10 @@ bool CMetalRenderer::SetCurrentContext(WIN_HWND hWnd) {
     m_windowMetalLayer = metalLayer;
     m_metalLayer = metalLayer;
     
+    ReleaseRenderEncoder();
     if (m_currentCommandBuffer) {
       [m_currentCommandBuffer commit];
       m_currentCommandBuffer = nil;
-    }
-    
-    if (m_renderEncoder) {
-      [m_renderEncoder endEncoding];
-      [m_renderEncoder release];
-      m_renderEncoder = nil;
     }
     if (m_currentDrawable) {
       [m_currentDrawable release];
@@ -3699,11 +3700,7 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
         return;
     }
 
-    if (m_renderEncoder) {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
     
     // Build a depth-only render pass descriptor
     MTLRenderPassDescriptor *shadowDesc = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -3752,7 +3749,8 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
 
         [shadowEncoder setVertexBuffer:m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
 
-        m_renderEncoder = shadowEncoder;
+        m_renderEncoder = [shadowEncoder retain];
+        m_renderEncoderOpen = true;
 
         if (lof->pEntityList)
         {
@@ -3771,10 +3769,10 @@ void CMetalRenderer::PrepareDepthMap(ShadowMapFrustum * lof, bool make_new_tid) 
             }
         }
 
-        m_renderEncoder = nil;
+        ReleaseRenderEncoder();
+    } else {
+        [shadowEncoder endEncoding];
     }
-
-    [shadowEncoder endEncoding];
 
     if (!BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionLoad, MTLLoadActionLoad))
     {
@@ -3842,11 +3840,7 @@ void CMetalRenderer::DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewD
 
 void CMetalRenderer::EF_PipelineShutdown() {
     // Flush any in-flight command buffers
-    if (m_renderEncoder) {
-        [m_renderEncoder endEncoding];
-        [m_renderEncoder release];
-        m_renderEncoder = nil;
-    }
+    ReleaseRenderEncoder();
     if (m_currentCommandBuffer) {
         [m_currentCommandBuffer commit];
         [m_currentCommandBuffer waitUntilCompleted];

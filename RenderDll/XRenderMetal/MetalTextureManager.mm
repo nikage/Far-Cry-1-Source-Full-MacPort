@@ -960,51 +960,55 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
         m_currentTexture = (*handle)->metalTexture;
         m_currentTextureSlot = tnum;
         
+        int textureIndex = 0;
+        switch (Type)
+        {
+            case eTT_Base:
+                textureIndex = 0;
+                break;
+            case eTT_Bumpmap:
+                textureIndex = 1;
+                break;
+            case eTT_DSDTBump:
+                textureIndex = 2;
+                break;
+            case eTT_Cubemap:
+                textureIndex = 3;
+                break;
+            case eTT_AutoCubemap:
+                textureIndex = 4;
+                break;
+            case eTT_3D:
+                textureIndex = 5;
+                break;
+            case eTT_Rectangle:
+                textureIndex = 6;
+                break;
+            default:
+                textureIndex = 0;
+                break;
+        }
+        int stage = textureIndex;
+        if (stage < 0)
+            stage = 0;
+        if (stage >= static_cast<int>(m_stageTextureIds.size()))
+            stage = static_cast<int>(m_stageTextureIds.size()) - 1;
+        m_lastBoundStage = stage;
+        if (tnum > 0)
+            m_stageTextureIds[stage] = tnum;
+        else
+            m_stageTextureIds[stage] = 0;
+        if (m_currentTexture && textureIndex >= 0
+            && textureIndex < static_cast<int>(m_boundFragmentTextures.size()))
+        {
+            m_boundFragmentTextures[textureIndex] = m_currentTexture;
+            id<MTLSamplerState> sampler = GetDefaultSampler();
+            if (sampler && textureIndex < static_cast<int>(m_boundFragmentSamplers.size()))
+                m_boundFragmentSamplers[textureIndex] = sampler;
+        }
         if (m_renderer && m_renderer->m_renderEncoder && m_currentTexture)
         {
-            int textureIndex = 0;
-            switch (Type)
-            {
-                case eTT_Base:
-                    textureIndex = 0;
-                    break;
-                case eTT_Bumpmap:
-                    textureIndex = 1;
-                    break;
-                case eTT_DSDTBump:
-                    textureIndex = 2;
-                    break;
-                case eTT_Cubemap:
-                    textureIndex = 3;
-                    break;
-                case eTT_AutoCubemap:
-                    textureIndex = 4;
-                    break;
-                case eTT_3D:
-                    textureIndex = 5;
-                    break;
-                case eTT_Rectangle:
-                    textureIndex = 6;
-                    break;
-                default:
-                    textureIndex = 0;
-                    break;
-            }
-            int stage = textureIndex;
-            if (stage < 0)
-                stage = 0;
-            if (stage >= static_cast<int>(m_stageTextureIds.size()))
-                stage = static_cast<int>(m_stageTextureIds.size()) - 1;
-            m_lastBoundStage = stage;
-            if (tnum > 0)
-                m_stageTextureIds[stage] = tnum;
-            else
-                m_stageTextureIds[stage] = 0;
             [m_renderer->m_renderEncoder setFragmentTexture:m_currentTexture atIndex:textureIndex];
-            if (textureIndex >= 0 && textureIndex < static_cast<int>(m_boundFragmentTextures.size()))
-            {
-                m_boundFragmentTextures[textureIndex] = m_currentTexture;
-            }
             id<MTLSamplerState> sampler = GetDefaultSampler();
             if (sampler)
                 BindSampler(textureIndex, sampler);
@@ -1012,16 +1016,21 @@ void CMetalTextureManager::SetTexture(int tnum, ETexType Type)
     }
     else
     {
-        if (m_whiteTexture && m_renderer && m_renderer->m_renderEncoder)
+        if (m_whiteTexture)
         {
             m_lastBoundStage = 0;
             if (!m_stageTextureIds.empty())
                 m_stageTextureIds[0] = 0;
-            [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
             m_boundFragmentTextures[0] = m_whiteTexture;
             id<MTLSamplerState> sampler = GetDefaultSampler();
-            if (sampler)
-                BindSampler(0, sampler);
+            if (sampler && !m_boundFragmentSamplers.empty())
+                m_boundFragmentSamplers[0] = sampler;
+            if (m_renderer && m_renderer->m_renderEncoder)
+            {
+                [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
+                if (sampler)
+                    BindSampler(0, sampler);
+            }
         }
     }
 }
@@ -1052,11 +1061,13 @@ void CMetalTextureManager::SetWhiteTexture()
     if (!m_stageTextureIds.empty())
         m_stageTextureIds[0] = 0;
     
+    m_boundFragmentTextures[0] = m_whiteTexture;
+    id<MTLSamplerState> sampler = GetDefaultSampler();
+    if (sampler && !m_boundFragmentSamplers.empty())
+        m_boundFragmentSamplers[0] = sampler;
     if (m_renderer && m_renderer->m_renderEncoder)
     {
         [m_renderer->m_renderEncoder setFragmentTexture:m_whiteTexture atIndex:0];
-        m_boundFragmentTextures[0] = m_whiteTexture;
-        id<MTLSamplerState> sampler = GetDefaultSampler();
         if (sampler)
             BindSampler(0, sampler);
     }
@@ -2453,6 +2464,10 @@ void CMetalTextureManager::FontSetTexture(int nTexId, int nFilterMode)
     id<MTLTexture> texture = (*handle)->metalTexture;
     m_currentTexture = texture;
     m_currentTextureSlot = nTexId;
+    m_boundFragmentTextures[0] = texture;
+    id<MTLSamplerState> fontSampler = GetDefaultSampler();
+    if (fontSampler && !m_boundFragmentSamplers.empty())
+        m_boundFragmentSamplers[0] = fontSampler;
     
     if (m_renderer && m_renderer->m_renderEncoder)
     {
@@ -2497,7 +2512,7 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
     m_savedViewportWidth = width;
     m_savedViewportHeight = height;
 
-    if (!m_renderer->m_renderEncoder && !m_renderer->TryEnsureSwapchainRenderEncoderFor2D())
+    if (!m_renderer->TryEnsureSwapchainRenderEncoderFor2D())
         return;
 
     id<MTLRenderPipelineState> fontPSO = m_renderer->GetFontPSO();
@@ -2531,6 +2546,12 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
         [m_renderer->m_renderEncoder setVertexBuffer:m_fontOrthoBuffer
                                               offset:0
                                              atIndex:kMetalVertexUniformSlot];
+    }
+
+    if (m_currentTexture && m_renderer->m_renderEncoder)
+    {
+        [m_renderer->m_renderEncoder setFragmentTexture:m_currentTexture atIndex:0];
+        BindDefaultSampler(0);
     }
 }
 
@@ -3465,22 +3486,45 @@ void CMetalTextureManager::BindTexture(int slot, id<MTLTexture> texture)
     assert(slot >= 0 && "BindTexture: slot cannot be negative!");
     assert(m_renderer && "BindTexture: renderer is null!");
     
+    if (slot >= 0 && slot < static_cast<int>(m_boundFragmentTextures.size()))
+        m_boundFragmentTextures[slot] = texture;
     if (m_renderer && m_renderer->m_renderEncoder)
-    {
         [m_renderer->m_renderEncoder setFragmentTexture:texture atIndex:slot];
-        if (slot >= 0 && slot < static_cast<int>(m_boundFragmentTextures.size()))
-            m_boundFragmentTextures[slot] = texture;
-    }
 }
 
 void CMetalTextureManager::BindSampler(int slot, id<MTLSamplerState> sampler)
 {
     assert(slot >= 0 && "BindSampler: slot cannot be negative!");
+    if (slot >= 0 && slot < static_cast<int>(m_boundFragmentSamplers.size()))
+        m_boundFragmentSamplers[slot] = sampler;
     if (!m_renderer || !m_renderer->m_renderEncoder)
         return;
     [m_renderer->m_renderEncoder setFragmentSamplerState:sampler atIndex:slot];
-    if (slot >= 0 && slot < static_cast<int>(m_boundFragmentSamplers.size()))
-        m_boundFragmentSamplers[slot] = sampler;
+}
+
+void CMetalTextureManager::ApplyCachedFragmentBindingsToEncoder(int maxSlotExclusive)
+{
+    if (!m_renderer || !m_renderer->m_renderEncoder)
+        return;
+    if (maxSlotExclusive <= 0)
+        return;
+    id<MTLSamplerState> defaultSampler = GetDefaultSampler();
+    const int n = static_cast<int>(m_boundFragmentTextures.size());
+    const int limit = std::min(n, std::min(16, maxSlotExclusive));
+    for (int i = 0; i < limit; ++i)
+    {
+        id<MTLTexture> tex = m_boundFragmentTextures[i];
+        if (!tex && i == 0)
+            tex = m_currentTexture;
+        if (!tex)
+            continue;
+        [m_renderer->m_renderEncoder setFragmentTexture:tex atIndex:i];
+        id<MTLSamplerState> sam = m_boundFragmentSamplers[i];
+        if (!sam)
+            sam = defaultSampler;
+        if (sam)
+            [m_renderer->m_renderEncoder setFragmentSamplerState:sam atIndex:i];
+    }
 }
 
 id<MTLSamplerState> CMetalTextureManager::GetOrCreateSamplerState(const SShaderTexUnit& unit)

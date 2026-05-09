@@ -190,7 +190,7 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
     assert(m_renderer != nullptr && "Draw2dImage: utility renderer has no back-reference to CMetalRenderer");
     if (!m_renderer)
         return;
-    if (!m_renderer->m_renderEncoder && !m_renderer->TryEnsureSwapchainRenderEncoderFor2D())
+    if (!m_renderer->TryEnsureSwapchainRenderEncoderFor2D())
         return;
 
     if (w <= 0.0f || h <= 0.0f)
@@ -473,13 +473,7 @@ void CMetalUtilityRenderer::ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int
     if (!pRGB || nSizeX <= 0 || nSizeY <= 0) return;
     if (!m_renderer || !m_renderer->m_device) return;
 
-    // End any active render encoder before blitting
-    if (m_renderer->m_renderEncoder)
-    {
-        [m_renderer->m_renderEncoder endEncoding];
-        [m_renderer->m_renderEncoder release];
-        m_renderer->m_renderEncoder = nil;
-    }
+    m_renderer->ReleaseRenderEncoder();
 
     // Use the current frame's already-acquired drawable — do not call nextDrawable
     id<MTLTexture> srcTex = m_renderer->m_currentDrawable
@@ -1009,12 +1003,7 @@ bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
             return false;
     }
     
-    if (m_renderer->m_renderEncoder)
-    {
-        [m_renderer->m_renderEncoder endEncoding];
-        [m_renderer->m_renderEncoder release];
-        m_renderer->m_renderEncoder = nil;
-    }
+    m_renderer->ReleaseRenderEncoder();
     
     if (m_renderer->m_renderPassDescriptor)
     {
@@ -1060,6 +1049,7 @@ bool CMetalUtilityRenderer::SetRenderTarget(int nHandle)
     
     if (!m_renderer->m_renderEncoder)
         return false;
+    m_renderer->m_renderEncoderOpen = true;
     
     m_renderer->SetViewport(0, 0, targetWidth, targetHeight);
     return true;

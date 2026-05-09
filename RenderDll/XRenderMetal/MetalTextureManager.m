@@ -88,6 +88,7 @@ public:
     void ApplyTexUnit(int stage, SShaderTexUnit& unit);
     id<MTLSamplerState> AcquireDefaultSampler();
     void BindDefaultSampler(int slot);
+    void ApplyCachedFragmentBindingsToEncoder(int maxSlotExclusive = 16);
     
     // Upload texture data from memory to GPU
     unsigned int DownLoadToVideoMemory(unsigned char* data, int w, int h, 

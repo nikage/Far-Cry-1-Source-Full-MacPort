@@ -436,6 +436,7 @@ private:
                               size_t pipelineStates, size_t depthStates,
                               size_t samplerStates) const;
     bool LoadDiagnosticsRequestFromFile(bool& requestFileFound);
+    void PrepareDynVBColortexDrawState();
 
     int m_metalDumpStatsFlag;
     int m_metalGPUCaptureFlag;
