@@ -24,6 +24,10 @@
 #include <xtl.h>
 #endif
 
+#if defined(__APPLE__) && defined(__MACH__)
+extern "C" void ProcessMacOSEvents();
+#endif
+
 #include <IRenderer.h>
 #include "Log.h"
 #include "XConsole.h"
@@ -942,6 +946,8 @@ void CSystem::UpdateLoadingScreen()
         break;
     }
 	}
+#elif defined(__APPLE__) && defined(__MACH__)
+	ProcessMacOSEvents();
 #endif
 }
 
