@@ -19,6 +19,7 @@ TerrainLayer               terrain
 TerrainDetailTextureLayers terrain
 Flare_training             CGRCFlare
 02_Carrier                 basic
+LightBeamHangingGreen      CGRCBeam
 Decal_VP                   CGVProgDecal
 Decal_2D_VP                CGVProgDecal_2D_Atten
 

@@ -2777,6 +2777,26 @@ int main()
                 }
             }
         }
+
+        // 6) LoadStaticLightSources — StatLights.dat shader names are level
+        //    content; must not pass EF_SYSTEM (Metal ShaderLoadFatal).
+        {
+            const std::string path = findSource("Cry3DEngine/3DEngineLight.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body = findFunctionBody(
+                    src,
+                    "bool C3DEngine::LoadStaticLightSources (const char *pszFileName)");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    CHECK(body.find("EF_LoadShader(szShaderName, eSH_World, 0)") !=
+                          std::string::npos);
+                    CHECK(body.find("EF_NOTFOUND") != std::string::npos);
+                }
+            }
+        }
     }
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);

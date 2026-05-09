@@ -470,6 +470,25 @@ no_draw			nodraw
       expect(byTarget['basic'], contains('02_carrier'));
     });
 
+    test('contains LightBeamHangingGreen -> CGRCBeam (StatLights.dat)', () {
+      final File aliases = _findAliasesTxt();
+      final List<AliasesTxtEntry> entries =
+          parseAliasesTxt(aliases.readAsStringSync());
+      final AliasesTxtEntry? row = entries
+          .where((e) => e.alias.toLowerCase() == 'lightbeamhanginggreen')
+          .firstOrNull;
+      expect(row, isNotNull);
+      expect(row!.target, equalsIgnoringCase('CGRCBeam'));
+    });
+
+    test('LightBeamHangingGreen alias produces lookupAliases on cgrcbeam', () {
+      final File aliases = _findAliasesTxt();
+      final Map<String, List<String>> byTarget =
+          buildManifestLookupAliasesByTargetFromEntries(
+              parseAliasesTxt(aliases.readAsStringSync()));
+      expect(byTarget['cgrcbeam'], contains('lightbeamhanginggreen'));
+    });
+
     test('contains Decal_VP -> CGVProgDecal', () {
       final File aliases = _findAliasesTxt();
       final List<AliasesTxtEntry> entries =

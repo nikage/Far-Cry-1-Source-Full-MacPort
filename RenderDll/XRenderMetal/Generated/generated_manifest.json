@@ -74309,6 +74309,7 @@
     "vertexEntryPoint": "generated_cgvprogbeam_vertex",
     "pipelineCategory": "mesh",
     "lookupAliases": [
+      "lightbeamhanginggreen",
       "templbeamproc"
     ],
     "uniforms": [],

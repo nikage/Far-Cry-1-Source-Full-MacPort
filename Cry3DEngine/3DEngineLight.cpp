@@ -1374,7 +1374,17 @@ bool C3DEngine::LoadStaticLightSources (const char *pszFileName)
 			newLight.m_pLightImage = GetRenderer()->EF_LoadTexture(szTextureName, 0, nTextureFlags2/*FT2_FORCECUBEMAP*/, eTT_Cubemap);
 
 		if(szShaderName[0])
-			newLight.m_pShader = GetRenderer()->EF_LoadShader(szShaderName, eSH_World, EF_SYSTEM);
+		{
+			newLight.m_pShader = GetRenderer()->EF_LoadShader(szShaderName, eSH_World, 0);
+			if (newLight.m_pShader != 0 && (newLight.m_pShader->GetFlags() & EF_NOTFOUND))
+			{
+				newLight.m_pShader->Release();
+				newLight.m_pShader = 0;
+				newLight.m_Flags |= DLF_FAKE;
+			}
+			if (newLight.m_pShader != 0 && (newLight.m_pShader->GetLFlags() & LMF_DISABLE))
+				newLight.m_Flags |= DLF_FAKE;
+		}
 
 		AddStaticLightSource(newLight,0,0,0);
 	}
