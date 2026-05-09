@@ -31,11 +31,11 @@ const Set<String> kMetalBuiltins = {
 
 /// Intermediate alias targets (normalized → builtin or manifest name).
 /// We resolve through these so that alias chains like
-///   TerrainLake → LowSpecWaterOutdoor_FP → terrain
+///   TerrainLake → LowSpecWaterOutdoor_FP → cgrclowmedwater
 /// can be fully resolved.
 const Map<String, String> kIntermediateAliases = {
-  'lowspecwateroutdoor_fp': 'terrain',
-  'lowspecwaterindoor_fp': 'terrain',
+  'lowspecwateroutdoor_fp': 'cgrclowmedwater',
+  'lowspecwaterindoor_fp': 'cgrcindoorwater',
   'lavavolume': 'terrain',
   'terrain_fp': 'terrain',
   'terrainshadowpass_fp': 'terrain',
@@ -142,10 +142,9 @@ List<AliasPair> parseCustomAliases(String content) {
 /// Resolves [name] (already lowercased) to a Metal shader name.
 /// Returns null if the name cannot be resolved.
 String? _resolve(String normalized, Set<String> manifestNames) {
-  if (kMetalBuiltins.contains(normalized)) return normalized;
-  if (manifestNames.contains(normalized)) return normalized;
-  final intermediate = kIntermediateAliases[normalized];
-  if (intermediate != null) return _resolve(intermediate, manifestNames);
+  final String resolved = resolveCustomAliasesTargetForManifest(normalized);
+  if (kMetalBuiltins.contains(resolved)) return resolved;
+  if (manifestNames.contains(resolved)) return resolved;
   return null;
 }
 
@@ -207,6 +206,54 @@ Map<String, List<String>> buildManifestLookupAliasesByTargetFromEntries(
   return map;
 }
 
+/// Chains [kIntermediateAliases] (legacy FP / template names) then applies
+/// [resolveAliasesTxtTarget] for **CustomAliases.txt** right-hand sides so they
+/// fold onto manifest `normalized` keys the same way **Aliases.txt** targets do.
+String resolveCustomAliasesTargetForManifest(String normalizedTarget) {
+  String t = normalizedTarget;
+  for (int i = 0; i < 32; i++) {
+    final String? next = kIntermediateAliases[t];
+    if (next == null || next == t) break;
+    t = next;
+  }
+  return resolveAliasesTxtTarget(t);
+}
+
+/// Same grouping as [buildManifestLookupAliasesByTargetFromEntries], but for
+/// pairs from [parseCustomAliases]. Uses [resolveCustomAliasesTargetForManifest].
+Map<String, List<String>> buildManifestLookupAliasesByTargetFromCustomAliasPairs(
+  List<AliasPair> pairs,
+) {
+  final map = <String, List<String>>{};
+  for (final p in pairs) {
+    final String t = resolveCustomAliasesTargetForManifest(
+        normalizeCryShaderLookupName(p.target));
+    final String a = normalizeCryShaderLookupName(p.alias);
+    if (t.isEmpty || a.isEmpty || t == a) continue;
+    map.putIfAbsent(t, () => []).add(a);
+  }
+  return map;
+}
+
+/// Merges alias-by-target maps (e.g. **Aliases.txt** + **CustomAliases.txt**).
+/// Duplicate aliases under the same target are skipped.
+Map<String, List<String>> mergeManifestLookupAliasMaps(
+  Map<String, List<String>> a,
+  Map<String, List<String>> b,
+) {
+  final out = <String, List<String>>{
+    for (final MapEntry<String, List<String>> e in a.entries)
+      e.key: List<String>.from(e.value),
+  };
+  for (final MapEntry<String, List<String>> e in b.entries) {
+    final List<String> list = out.putIfAbsent(e.key, () => []);
+    for (final String alias in e.value) {
+      if (!list.contains(alias)) list.add(alias);
+    }
+  }
+  return out;
+}
+
 /// Audits [pairs] against [manifestNames] (normalized shader names from the
 /// generated Metal manifest) and returns one [AuditResult] per unique alias.
 List<AuditResult> auditAliases(
@@ -218,7 +265,8 @@ List<AuditResult> auditAliases(
       AuditResult(
         alias: p.alias,
         rawTarget: p.target,
-        metalTarget: _resolve(p.target.toLowerCase(), manifestNames),
+        metalTarget:
+            _resolve(normalizeCryShaderLookupName(p.target), manifestNames),
       ),
   ];
 }

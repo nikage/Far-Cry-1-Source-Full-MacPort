@@ -49,8 +49,9 @@ List<String> manifestLookupAliasesForNormalizedFragment(
   return out;
 }
 
-/// Returns Aliases.txt targets (already normalized) that did not match any
-/// manifest fragment normalized name. The manifest is the only source of truth
+/// Returns merged alias-table targets (Aliases.txt + CustomAliases.txt;
+/// already normalized) that did not match any manifest fragment normalized name.
+/// The manifest is the only source of truth
 /// for shader registration; aliases pointing at a non-existent target would be
 /// silently dropped at runtime, which is exactly what the strict policy bans.
 /// The returned list is sorted to make CI output stable.
@@ -156,9 +157,20 @@ void main(List<String> args) {
     stderr.writeln('ERROR: Shaders/Aliases.txt not found at ${aliasesTxtFile.path}');
     exit(1);
   }
-  final Map<String, List<String>> aliasesTxtByTarget =
+  Map<String, List<String>> aliasesTxtByTarget =
       buildManifestLookupAliasesByTargetFromEntries(
           parseAliasesTxt(aliasesTxtFile.readAsStringSync(encoding: utf8)));
+  final File customAliasesTxtFile = File(
+      rootPath +
+          'Assets${sep}Shaders${sep}Source${sep}Shaders${sep}CustomAliases.txt');
+  if (customAliasesTxtFile.existsSync()) {
+    final List<AliasPair> customPairs =
+        parseCustomAliases(customAliasesTxtFile.readAsStringSync(encoding: utf8));
+    final Map<String, List<String>> fromCustom =
+        buildManifestLookupAliasesByTargetFromCustomAliasPairs(customPairs);
+    aliasesTxtByTarget =
+        mergeManifestLookupAliasMaps(aliasesTxtByTarget, fromCustom);
+  }
   final Directory outDir = Directory(rootPath + 'RenderDll${sep}XRenderMetal${sep}Generated');
   outDir.createSync(recursive: true);
   final File manifest = File(outDir.path + sep + 'generated_manifest.json');

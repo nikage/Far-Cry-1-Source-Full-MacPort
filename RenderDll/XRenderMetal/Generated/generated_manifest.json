@@ -75342,7 +75342,18 @@
     "vertexEntryPoint": "generated_cgvprogbump_diffpass_vs20_vertex",
     "pipelineCategory": "mesh",
     "lookupAliases": [
-      "tbd"
+      "tbd",
+      "templbumpdiffuse_offset_ps20",
+      "templbumpdiffuse_glossalpha_envcmspec_ps20",
+      "templbumpdiffuse_glossalpha_envcmspec_rt_ps20",
+      "templbumpdiffuse_gloss_envcmspec_ps20",
+      "templbumpdiffuse_gloss_envcmspec_rt_ps20",
+      "templbumpdiffuse_envcmspec_offset_ps20",
+      "templbumpdiffuse_envcmspec_rt_offset_ps20",
+      "templbumpdiffuse_glossalpha_envcmspec_offset_ps20",
+      "templbumpdiffuse_glossalpha_envcmspec_rt_offset_ps20",
+      "templbumpdiffuse_gloss_envcmspec_offset_ps20",
+      "templbumpdiffuse_gloss_envcmspec_rt_offset_ps20"
     ],
     "uniforms": [
       {
@@ -88275,7 +88286,9 @@
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_gloss_envcm_vs20_vertex",
     "pipelineCategory": "mesh",
     "lookupAliases": [
-      "tbs_ga_cm"
+      "tbs_ga_cm",
+      "templbumpspec_glossalpha_envcmamb_powerglossalpha_ps20",
+      "templbumpspec_glossalpha_envcmamb_powerglossalpha_offset_ps20"
     ],
     "uniforms": [
       {
@@ -93016,7 +93029,15 @@
     "vertexEntryPoint": "generated_cgvprogbump_diffspec_vertex",
     "pipelineCategory": "mesh",
     "lookupAliases": [
-      "tbumpspec"
+      "tbumpspec",
+      "templbumpspec_envcmspec_rt_offset_ps20",
+      "templbumpspec_envcmspec_powerglossalpha_ps20",
+      "templbumpspec_envcmspec_rt_powerglossalpha_ps20",
+      "templbumpspec_envcmspec_powerglossalpha_offset_ps20",
+      "templbumpspec_envcmspec_rt_powerglossalpha_offset_ps20",
+      "templbumpspec_powerglossalpha_ps20",
+      "templbumpspec_powerglossalpha_offset_ps20",
+      "templbumpglitter_ps20"
     ],
     "uniforms": [
       {
@@ -116720,6 +116741,10 @@
     ],
     "vertexEntryPoint": "generated_cgvprogindoorwater_vertex",
     "pipelineCategory": "water",
+    "lookupAliases": [
+      "watervolume",
+      "watervolumebumpreflcm"
+    ],
     "uniforms": [
       {
         "name": "Matrix",
@@ -120900,6 +120925,19 @@
     ],
     "vertexEntryPoint": "generated_cgvproglowmedwater_vertex",
     "pipelineCategory": "water",
+    "lookupAliases": [
+      "terrainwater",
+      "terrainwater_templeriver",
+      "terrainriver",
+      "terrainlake",
+      "terrainlake_nofresnel",
+      "terrainlake_deformed",
+      "templlake",
+      "templlakerefr",
+      "terrainwater_onlysky",
+      "terraindeepwater",
+      "terrainocean2"
+    ],
     "uniforms": [
       {
         "name": "Matrix",

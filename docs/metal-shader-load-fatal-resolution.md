@@ -54,15 +54,57 @@ ship and uses `EF_SYSTEM` even when the use site already null-checks.
 ## 2. The four tiers of shader resolution
 
 A name handed to `EF_LoadShader` can resolve through any of these tiers. The
-Metal port has **only tier 1** wired through; tiers 2–4 are partial or
-absent and that's the design constraint that shapes every resolution.
+Metal port wires **tiers 1–3** into runtime lookup through **manifest fragments**
+and **`lookupAliases`** (tiers 2–3 are emitted by `metal_generator.dart`).
+**Tier 4** remains unported and that gap still shapes resolution for legacy
+high-level shader objects.
 
 | Tier | Source                                              | Format                                                  | Metal port state                                                                                  |
 | ---- | --------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | 1    | **Manifest fragments**                              | `RenderDll/XRenderMetal/Generated/generated_manifest.json` (`normalized` keys) | ✅ Wired — primary lookup path                                                                    |
 | 2    | **Flat aliases** (`Aliases.txt`)                    | `Assets/Shaders/Source/Shaders/Aliases.txt`            | 🔶 Wired through Dart → manifest `lookupAliases`                                                  |
-| 3    | **Conditional aliases** (`CustomAliases.txt`)       | `Assets/Shaders/Source/Shaders/CustomAliases.txt`      | ❌ Not wired — GPU/CVar conditionals are ignored                                                  |
+| 3    | **Conditional aliases** (`CustomAliases.txt`)       | `Assets/Shaders/Source/Shaders/CustomAliases.txt`      | 🔶 Wired through Dart — merged into manifest `lookupAliases` (Tier 3 subsection below)              |
 | 4    | **Top-level `Shader 'X' ( … )` blocks** in `.csl`   | `Assets/Shaders/Source/Shaders/HWScripts/Techniques/*.csl`, `Scripts/CryShaders/*.csl` | ❌ Not ported — Metal port has only fragment-level `CGRC*`/`CGVProg*` programs                    |
+
+### Build-time architecture — tiers 2–3 → `lookupAliases`
+
+All alias rows that reach Metal share **one** runtime mechanism: each manifest fragment row may carry a **`lookupAliases`** array of normalized strings. Nothing in `CustomAliases.txt` is evaluated as true/false at codegen; instead the Dart pipeline produces a **static** union suitable for registration during `LoadGeneratedShaders` (same path as `Aliases.txt`).
+
+**Data flow**
+
+```mermaid
+flowchart LR
+  aliasesTxt["Aliases.txt"]
+  customTxt["CustomAliases.txt"]
+  parseFlat["parseAliasesTxt → buildManifestLookupAliasesByTargetFromEntries"]
+  parseCustom["parseCustomAliases → buildManifestLookupAliasesByTargetFromCustomAliasPairs"]
+  merge["mergeManifestLookupAliasMaps"]
+  gen["metal_generator: per-fragment manifestLookupAliasesForNormalizedFragment"]
+  json["generated_manifest.json"]
+  load["LoadGeneratedShaders → m_shaderNameMap"]
+
+  aliasesTxt --> parseFlat
+  customTxt --> parseCustom
+  parseFlat --> merge
+  parseCustom --> merge
+  merge --> gen
+  gen --> json
+  json --> load
+```
+
+**Target folding (CustomAliases right-hand sides)** — `resolveCustomAliasesTargetForManifest` in [`tools/shader_port/lib/alias_auditor.dart`](../tools/shader_port/lib/alias_auditor.dart):
+
+1. Repeatedly apply **`kIntermediateAliases`** (e.g. `lowspecwateroutdoor_fp` → `cgrclowmedwater`, `lowspecwaterindoor_fp` → `cgrcindoorwater`; other entries still route legacy FP names to **`terrain`** where that remains the stand-in).
+2. Apply **`resolveAliasesTxtTarget`** (same **`kAliasesTxtTargetToManifestNormalized`** map as flat `Aliases.txt` targets).
+
+**Merge semantics** — `mergeManifestLookupAliasMaps(A, B)` starts from the `Aliases.txt` map `A`, then appends each alias from `B` per manifest target key **without duplicate strings** on the same target.
+
+**Audit parity** — `auditAliases` resolves each pair’s target with the same **`resolveCustomAliasesTargetForManifest`** result before checking **`kMetalBuiltins`** or the manifest name set (see [`tools/shader_port/test/audit_aliases_test.dart`](../tools/shader_port/test/audit_aliases_test.dart)).
+
+**Explicit non-goals for this architecture**
+
+- No second registration path: **`RegisterShaderAlias`** is **not** used for this table merge (avoid double-mapping).
+- No D3D-style **CVar/GPU condition evaluation** at codegen; policy is **first alias occurrence wins** globally (see Tier 3 below). Full parity with `CShader::mfShaderNameForAlias` conditional blocks remains future work (profiles or runtime evaluation).
 
 ### Tier 1 — Manifest fragments
 
@@ -87,6 +129,10 @@ absent and that's the design constraint that shapes every resolution.
   reported with a stderr warning by `findUnmatchedAliasTargets` — no silent drops.
 
 ### Tier 3 — `CustomAliases.txt` (shipping reference)
+
+**Metal policy:** the Dart pipeline parses **every** `{ … }` block in the source file and applies **first occurrence wins** per alias name (same as `parseCustomAliases` dedup). **GPU/CVar conditions are not evaluated** at manifest generation time; static precedence is defined only by file order and first-seen alias rows.
+
+Right-hand targets such as `LowSpecWaterOutdoor_FP` / `LowSpecWaterIndoor_FP` are chained through `alias_auditor.dart` intermediate maps and `resolveAliasesTxtTarget` so they fold onto manifest `normalized` keys (for example `cgrclowmedwater`, `cgrcindoorwater`) before emission into each fragment’s `lookupAliases`. The merged map is combined with **Tier 2** (`Aliases.txt`) via `mergeManifestLookupAliasMaps` — duplicate alias strings under the same target are skipped.
 
 The **shipped** `FCData/Shaders/CustomAliases.txt` (extracted from
 `Shaders.pak` / Steam install) contains exactly **4 conditional blocks**:

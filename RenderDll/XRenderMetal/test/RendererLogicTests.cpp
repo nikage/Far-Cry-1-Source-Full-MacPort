@@ -2537,6 +2537,9 @@ int main()
             CHECK(hasLookupAlias("cgrcscreentexmap", "screentexmap"));
             // ParticleLight — CDecalManager EF_SYSTEM load (DecalManager.cpp).
             CHECK(hasLookupAlias("cgrcparticlelight", "particlelight"));
+            // TerrainWater_OnlySky — CustomAliases.txt NV1X-style row; Metal merges
+            // into lookupAliases on CGRCLowMedWater (manifest normalized cgrclowmedwater).
+            CHECK(hasLookupAlias("cgrclowmedwater", "terrainwater_onlysky"));
             // Decal_VP / Decal_2D_VP — same ctor EF_SYSTEM vertex shaders.
             CHECK(hasLookupAlias("cgvprogdecal", "decal_vp"));
             CHECK(hasLookupAlias("cgvprogdecal_2d_atten", "decal_2d_vp"));

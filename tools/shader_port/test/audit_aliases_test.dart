@@ -98,6 +98,30 @@ no_draw			nodraw
       expect(lakePairs.first.target, equals('LowSpecWaterOutdoor_FP'));
     });
 
+    test(
+        'buildManifestLookupAliasesByTargetFromCustomAliasPairs folds outdoor/indoor water to CGRC fragments',
+        () {
+      final pairs = parseCustomAliases(_sampleAliases);
+      final map = buildManifestLookupAliasesByTargetFromCustomAliasPairs(pairs);
+      expect(map['cgrclowmedwater'], contains('terrainwater_onlysky'));
+      expect(map['cgrclowmedwater'], contains('terrainlake'));
+      expect(map['cgrcindoorwater'], contains('watervolume'));
+    });
+
+    test('mergeManifestLookupAliasMaps merges without duplicate aliases per target',
+        () {
+      final a = <String, List<String>>{
+        'cgrcflare': <String>['crylight'],
+      };
+      final b = <String, List<String>>{
+        'cgrcflare': <String>['crylight'],
+        'cgrclowmedwater': <String>['terrainwater_onlysky'],
+      };
+      final m = mergeManifestLookupAliasMaps(a, b);
+      expect(m['cgrcflare'], equals(<String>['crylight']));
+      expect(m['cgrclowmedwater'], contains('terrainwater_onlysky'));
+    });
+
     test('returns empty list for empty input', () {
       expect(parseCustomAliases(''), isEmpty);
     });
@@ -109,12 +133,20 @@ no_draw			nodraw
   });
 
   group('auditAliases', () {
-    final manifestNames = <String>{'cgrcflare', 'cgrcambienttempl', 'cgrcambient'};
+    final manifestNames = <String>{
+      'cgrcflare',
+      'cgrcambienttempl',
+      'cgrcambient',
+      'cgrclowmedwater',
+      'cgrcindoorwater',
+    };
 
-    test('resolves alias whose target is a Metal builtin via kIntermediateAliases', () {
+    test(
+        'resolves LowSpecWaterOutdoor_FP targets to cgrclowmedwater when present in manifest',
+        () {
       final pairs = [const AliasPair('TerrainLake', 'LowSpecWaterOutdoor_FP', '')];
       final results = auditAliases(pairs, manifestNames);
-      expect(results.single.metalTarget, equals('terrain'));
+      expect(results.single.metalTarget, equals('cgrclowmedwater'));
     });
 
     test('resolves alias whose target is directly in the manifest', () {
@@ -135,16 +167,16 @@ no_draw			nodraw
       expect(results.single.metalTarget, isNull);
     });
 
-    test('resolves chain: alias → intermediate → builtin', () {
+    test('resolves chain: alias → LowSpecWaterOutdoor_FP → cgrclowmedwater', () {
       final pairs = [const AliasPair('TerrainWater_OnlySky', 'LowSpecWaterOutdoor_FP', '')];
       final results = auditAliases(pairs, manifestNames);
-      expect(results.single.metalTarget, equals('terrain'));
+      expect(results.single.metalTarget, equals('cgrclowmedwater'));
     });
 
-    test('resolves WaterVolume via kIntermediateAliases chain', () {
+    test('resolves WaterVolume via LowSpecWaterIndoor_FP → cgrcindoorwater', () {
       final pairs = [const AliasPair('WaterVolume', 'LowSpecWaterIndoor_FP', '')];
       final results = auditAliases(pairs, manifestNames);
-      expect(results.single.metalTarget, equals('terrain'));
+      expect(results.single.metalTarget, equals('cgrcindoorwater'));
     });
 
     test('all known builtins resolve to themselves', () {
@@ -344,12 +376,21 @@ no_draw			nodraw
 }
 ''';
 
-    test('all NV1X water aliases resolve via kIntermediateAliases to terrain', () {
+    test(
+        'NV1X water aliases resolve to cgrclowmedwater / cgrcindoorwater when in manifest',
+        () {
       final pairs = parseCustomAliases(input);
-      final results = auditAliases(pairs, {});
+      final manifest = <String>{'cgrclowmedwater', 'cgrcindoorwater'};
+      final results = auditAliases(pairs, manifest);
       for (final r in results) {
-        expect(r.metalTarget, equals('terrain'),
-            reason: '${r.alias} -> ${r.rawTarget} should resolve to terrain');
+        final String low = r.alias.toLowerCase();
+        if (low == 'watervolumebumpreflcm') {
+          expect(r.metalTarget, equals('cgrcindoorwater'),
+              reason: '${r.alias} -> ${r.rawTarget}');
+        } else {
+          expect(r.metalTarget, equals('cgrclowmedwater'),
+              reason: '${r.alias} -> ${r.rawTarget}');
+        }
       }
     });
   });

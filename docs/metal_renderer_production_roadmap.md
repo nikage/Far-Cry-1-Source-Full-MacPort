@@ -84,13 +84,15 @@ flowchart LR
 
 ## Phase C — Conditional alias parity (`CustomAliases.txt`)
 
-**Goal:** Behavior matches shipped Far Cry intent for CVar/GPU-gated alias blocks, or the gap is explicitly documented per supported configuration.
+**Goal:** Logical names from shipping `CustomAliases.txt` resolve on Metal without hand-duplicating every row in `Aliases.txt`; remaining gaps (CVar/GPU fidelity vs PC) are explicit.
+
+**Shipped architecture (build-time merge)** — documented in [`metal-shader-load-fatal-resolution.md`](metal-shader-load-fatal-resolution.md) (**Build-time architecture — tiers 2–3**): [`tools/shader_port/lib/metal_generator.dart`](../tools/shader_port/lib/metal_generator.dart) merges **`parseCustomAliases`** output into the same **`lookupAliases`** map as **`Aliases.txt`** via [`alias_auditor.dart`](../tools/shader_port/lib/alias_auditor.dart) (`mergeManifestLookupAliasMaps`, `resolveCustomAliasesTargetForManifest`). Policy: **first alias occurrence wins**; block conditions are **not** evaluated — one static union in `generated_manifest.json`.
 
 | Work | Evidence / mechanism | Exit criteria |
 |------|----------------------|---------------|
-| Acknowledge current gap | [`shader-aliases.md`](shader-aliases.md): tier 3 not wired at runtime. [`tools/shader_port/lib/alias_auditor.dart`](../tools/shader_port/lib/alias_auditor.dart) implements `parseCustomAliases`; [`tools/shader_port/bin/audit_aliases.dart`](../tools/shader_port/bin/audit_aliases.dart) audits file — **generator `metal_generator.dart` does not call `parseCustomAliases` for manifest emission** | Written decision: approach (1) or (2) below implemented or waived with sign-off |
-| Approach (1) Runtime evaluation | Mirror `CShader::mfShaderNameForAlias` order (see [`shader-aliases.md`](shader-aliases.md)): flat aliases then conditional | Metal shader manager applies same rules before manifest lookup; tests for sample conditions from shipping `CustomAliases.txt` |
-| Approach (2) Build profiles | Pre-flatten conditional blocks into per-profile `lookupAliases` or manifests | Documented profiles (e.g. quality tier); `validate_migration` run per profile |
+| ~~Acknowledge generator gap~~ | **Done:** generator calls `parseCustomAliases` when `CustomAliases.txt` exists; see [`shader-aliases.md`](shader-aliases.md) Tier 3 (Metal — partial) | — |
+| Optional — Approach (1) Runtime evaluation | Mirror `CShader::mfShaderNameForAlias`: conditional blocks evaluated against CVars/GPU before manifest lookup | Only if product requires **per-setting** shader swaps beyond the static union; tests from representative `CustomAliases.txt` blocks |
+| Optional — Approach (2) Build profiles | Multiple manifests or `lookupAliases` tables per profile (quality tier, GPU class) | Documented profiles; `validate_migration` per profile |
 
 ---
 
@@ -165,7 +167,7 @@ Defer heavy optimization until shader resolution and visuals are signed off.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| `CustomAliases.txt` not applied at runtime | Wrong shader variant for quality/GPU settings | Phase C; document interim limitations |
+| Conditional `CustomAliases.txt` blocks vs static Metal merge | Single codegen union may differ from PC path for a given CVar/GPU combo | Documented in [`shader-aliases.md`](shader-aliases.md) / [`metal-shader-load-fatal-resolution.md`](metal-shader-load-fatal-resolution.md); optional Phase C runtime/profiles if QA requires |
 | Loader vertex heuristics + `screen_vertex` fallback | Rare PSO mismatch or wrong layout | Phase E; generator pairing + DEBUG `ValidateShaderPairs` |
 | `UniformBufferData` vs `UtilShaders.metal` drift | Silent wrong uniforms | Single source of truth discipline per [`metal_renderer_plan.md`](metal_renderer_plan.md) P2 insight; code review on struct changes |
 | Strict `ShaderLoadFatal` | Hard crash on any `EF_SYSTEM` miss | Phases B/D; never “fix” with silent generic shaders (per fatal-resolution policy) |
