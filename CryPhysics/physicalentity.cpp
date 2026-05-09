@@ -531,7 +531,7 @@ int CPhysicalEntity::RemoveCollider(CPhysicalEntity *pCollider, bool bRemoveAlwa
 int CPhysicalEntity::AddCollider(CPhysicalEntity *pCollider)
 {
 	if (m_iSimClass==0)
-		return 1;
+		return -1;
 	int i,j;
 	for(i=0;i<m_nColliders && m_pColliders[i]!=pCollider;i++);
 	if (i==m_nColliders) {

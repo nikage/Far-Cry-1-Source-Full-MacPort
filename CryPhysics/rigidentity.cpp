@@ -502,7 +502,7 @@ int CRigidEntity::Action(pe_action *_action)
 	if (_action->type==pe_action_remove_constraint::type_id) {
 		pe_action_remove_constraint *action = (pe_action_remove_constraint*)_action;
 		if (is_unused(action->idConstraint)) {
-			for(int i=m_nColliders; i>=0 ;i--) if (m_pColliderConstraints[i]) {
+			for(int i=m_nColliders-1; i>=0 ;i--) if (m_pColliderConstraints[i]) {
 				m_pColliderConstraints[i] = 0;
 				if (!m_pColliderContacts[i] && !m_pColliders[i]->HasContactsWith(this)) {
 					CPhysicalEntity *pCollider = m_pColliders[i]; 
@@ -796,6 +796,9 @@ int CRigidEntity::RegisterContactPoint(masktype &contact_mask, int idx, const ve
 		return -1;
 	FUNCTION_PROFILER( GetISystem(),PROFILE_PHYSICS );
 
+	if (!g_CurColliders[idx] || m_iSimClass==0 || g_CurColliders[idx]->m_iSimClass==0)
+		return -1;
+
 	float min_dist2 = sqr(min(m_parts[g_CurCollParts[idx][0]].minContactDist,
 		g_CurColliders[idx]->m_parts[g_CurCollParts[idx][1]].minContactDist));// * (penetration>0 ? 3.0f:1.0f));
 	int i,j,bUseSimpleSolver=iszero((int)m_flags&ref_use_simple_solver)^1;
@@ -826,13 +829,22 @@ int CRigidEntity::RegisterContactPoint(masktype &contact_mask, int idx, const ve
 			memcpy(m_pContacts = new entity_contact[(m_nContactsAlloc=(i&~7)+8)], pcontacts, ncontacts*sizeof(entity_contact));
 			if (pcontacts) delete[] pcontacts;
 		}
-		for(j=m_nColliders-1;j>=0;j--) // detach contact slot we are going to use from all other colliders
-		if (!((m_pColliderContacts[j]&=~getmask(i)) | m_pColliderConstraints[j]) && !m_pColliders[j]->HasContactsWith(this)) {
-			CPhysicalEntity *pCollider = m_pColliders[j]; 
-			pCollider->RemoveCollider(this); RemoveCollider(pCollider);
+		for(j=m_nColliders-1;j>=0;j--) {
+			if (!m_pColliders[j])
+				continue;
+			if (!((m_pColliderContacts[j]&=~getmask(i)) | m_pColliderConstraints[j]) && !m_pColliders[j]->HasContactsWith(this)) {
+				CPhysicalEntity *pCollider = m_pColliders[j];
+				pCollider->RemoveCollider(this); RemoveCollider(pCollider);
+			}
 		}
-		m_pColliderContacts[AddCollider(g_CurColliders[idx])] |= getmask(i);
-		g_CurColliders[idx]->AddCollider(this);
+		int collSlot = AddCollider(g_CurColliders[idx]);
+		if (collSlot < 0)
+			return -1;
+		m_pColliderContacts[collSlot] |= getmask(i);
+		if (g_CurColliders[idx]->AddCollider(this) < 0) {
+			RemoveCollider(g_CurColliders[idx]);
+			return -1;
+		}
 		contact_mask |= getmask(i);
 	} else if (bUseSimpleSolver || 
 		(m_pContacts[i].penetration==0 || m_pContacts[i].flags&contact_new) && 
@@ -1160,7 +1172,11 @@ int CRigidEntity::RegisterConstraint(const vectorf &pt0,const vectorf &pt1, int 
 	if (!m_pColliderConstraints || iCollider < 0 || iCollider >= m_nCollidersAlloc)
 		return -1;
 	m_pColliderConstraints[iCollider] |= getmask(i);
-	pBuddy->AddCollider(this);
+	if (pBuddy->AddCollider(this) < 0) {
+		m_pColliderConstraints[iCollider] &= ~getmask(i);
+		RemoveCollider(pBuddy);
+		return -1;
+	}
 	
 	m_pConstraints[i].pt[0] = pt0;
 	m_pConstraints[i].pt[1] = pt1;
