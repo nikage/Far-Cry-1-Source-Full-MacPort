@@ -35,6 +35,31 @@ void CTerrain::DrawVisibleSectors()
 {
 	FUNCTION_PROFILER( GetSystem(),PROFILE_3DENGINE );
 
+  if (GetConsole())
+  {
+    ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
+    if (pTr && pTr->GetIVal() != 0 && GetLog())
+    {
+      static int s_terrVisTrace = 0;
+      if ((++s_terrVisTrace % 120) == 0)
+      {
+        if (!GetCVars()->e_terrain)
+          GetLog()->Log("\003[CryTrace] DrawVisibleSectors skip e_terrain=0");
+        else
+        {
+          int nGroundVis = 0;
+          for (int j = 0; j < m_lstVisSectors.Count(); j++)
+            if (m_lstVisSectors[j]->m_bGroundVisible)
+              nGroundVis++;
+          const bool bOut = GetVisAreaManager()->IsOutdoorAreasVisible();
+          GetLog()->Log("\003[CryTrace] DrawVisibleSectors lst=%d groundVis=%d outdoorVis=%d m_pTerrainEf=%p stack=%d",
+                         m_lstVisSectors.Count(), nGroundVis, bOut ? 1 : 0,
+                         (void*)m_pTerrainEf, m_nRenderStackLevel);
+        }
+      }
+    }
+  }
+
   if(!GetCVars()->e_terrain)
     return;
 

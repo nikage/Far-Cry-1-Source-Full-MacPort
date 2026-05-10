@@ -325,7 +325,20 @@ void CSectorInfo::RenderSector(CCObject * pTerrainCCObject)
   int nBoundCode = r + 2*l + 4*t + 8*b;
 
   if(!m_pLeafBuffer && m_pTerrain->m_nRenderStackLevel)
+  {
+    if (GetConsole())
+    {
+      ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
+      if (pTr && pTr->GetIVal() != 0 && GetLog())
+      {
+        static int s_secEarly = 0;
+        if ((++s_secEarly % 120) == 0)
+          GetLog()->Log("\003[CryTrace] RenderSector early-out no_leafbuf stack=%d origin=(%d,%d)",
+                         m_pTerrain->m_nRenderStackLevel, m_nOriginX, m_nOriginY);
+      }
+    }
     return;
+  }
 
   if(m_pLeafBuffer)
   if(/*m_pTerrain->m_lstSectorVertArray.Count() && */( m_pTerrain->m_nRenderStackLevel ||( m_cPrevGeomMML == m_cGeometryMML && nBoundCode == m_cCurrBoundCode )))

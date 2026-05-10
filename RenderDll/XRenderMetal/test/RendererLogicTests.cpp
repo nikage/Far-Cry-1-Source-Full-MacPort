@@ -3240,6 +3240,16 @@ int main()
             }
         }
 
+        {
+            const std::string path = findSource("RenderDll/XRenderMetal/Generated/builtin_lookup_aliases.json");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string j = readFile(path);
+                CHECK(j.find("\"cgrcdefault\"") != std::string::npos);
+                CHECK(j.find("screenprocess") != std::string::npos);
+            }
+        }
+
         // 6) LoadStaticLightSources — StatLights.dat shader names are level
         //    content; must not pass EF_SYSTEM (Metal ShaderLoadFatal).
         {
