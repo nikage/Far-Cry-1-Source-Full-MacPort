@@ -1211,20 +1211,22 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     SRendItem::m_EndRI[recurse][i] = SRendItem::m_RendItems[i].Num();
   }
 
-  // Sort opaque items (GENERAL bucket) by shader/material for state batching
-  {
-    const int nStart = SRendItem::m_StartRI[recurse][EFSLIST_GENERAL_ID];
-    const int nEnd   = SRendItem::m_EndRI[recurse][EFSLIST_GENERAL_ID];
+  auto sortBySortVal = [&](int bucketId) {
+    const int nStart = SRendItem::m_StartRI[recurse][bucketId];
+    const int nEnd   = SRendItem::m_EndRI[recurse][bucketId];
     if (nEnd > nStart) {
-      SRendItemPre *pItems = &SRendItem::m_RendItems[EFSLIST_GENERAL_ID][nStart];
+      SRendItemPre *pItems = &SRendItem::m_RendItems[bucketId][nStart];
       std::sort(pItems, pItems + (nEnd - nStart),
         [](const SRendItemPre &a, const SRendItemPre &b) {
           return a.SortVal.SortVal < b.SortVal.SortVal;
         });
     }
-  }
+  };
 
-  // Sort transparent/distance items
+  sortBySortVal(EFSLIST_PREPROCESS_ID);
+  sortBySortVal(EFSLIST_GENERAL_ID);
+  sortBySortVal(EFSLIST_LAST_ID);
+
   {
     const int nStart = SRendItem::m_StartRI[recurse][EFSLIST_DISTSORT_ID];
     const int nEnd   = SRendItem::m_EndRI[recurse][EFSLIST_DISTSORT_ID];
@@ -1232,7 +1234,7 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
       SRendItemPre *pItems = &SRendItem::m_RendItems[EFSLIST_DISTSORT_ID][nStart];
       std::sort(pItems, pItems + (nEnd - nStart),
         [](const SRendItemPre &a, const SRendItemPre &b) {
-          return a.fDist > b.fDist;  // back-to-front for transparency
+          return a.fDist > b.fDist;
         });
     }
   }
@@ -1262,9 +1264,15 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         auto riCount = [&](int bucket) {
           return SRendItem::m_EndRI[recurse][bucket] - SRendItem::m_StartRI[recurse][bucket];
         };
-        iLog->Log("\003[CryTrace] EF_EndEf3D frame=%d ri_gen=%d ri_dist=%d ri_last=%d recurse=%d",
-                   m_nFrameID, riCount(EFSLIST_GENERAL_ID), riCount(EFSLIST_DISTSORT_ID),
-                   riCount(EFSLIST_LAST_ID), recurse);
+        iLog->Log("\003[CryTrace] EF_EndEf3D frame=%d ri_pre=%d ri_sten=%d ri_uns=%d ri_gen=%d ri_dist=%d ri_last=%d recurse=%d",
+                   m_nFrameID,
+                   riCount(EFSLIST_PREPROCESS_ID),
+                   riCount(EFSLIST_STENCIL_ID),
+                   riCount(EFSLIST_UNSORTED_ID),
+                   riCount(EFSLIST_GENERAL_ID),
+                   riCount(EFSLIST_DISTSORT_ID),
+                   riCount(EFSLIST_LAST_ID),
+                   recurse);
       }
     }
   }
@@ -1370,10 +1378,14 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     }
   };
 
-  // Draw buckets in order: preprocess → stencil shadow → general → unsorted → distsort → last
+  // Match CD3D9Renderer::EF_RenderPipeLine order (D3DRendPipeline.cpp)
+  drawBucket(EFSLIST_PREPROCESS_ID);
+  drawBucket(EFSLIST_STENCIL_ID);
   drawBucket(EFSLIST_GENERAL_ID);
+  drawBucket(EFSLIST_UNSORTED_ID);
   drawBucket(EFSLIST_DISTSORT_ID);
-  drawBucket(EFSLIST_LAST_ID);
+  if (SRendItem::m_RecurseLevel <= 1)
+    drawBucket(EFSLIST_LAST_ID);
 
   // HDR: tone-map the float16 RT into the drawable
   if (useHDR) EndHDRPass();
@@ -1452,7 +1464,7 @@ bool CMetalRenderer::EF_DrawPartialEf(IShader *ef, SVrect *vr, SVrect *pr,
 
 void *CMetalRenderer::EF_Query(int Query, int Param) {
 
-  return m_shaderManager->EF_Query(Query, Param);
+  return CRenderer::EF_Query(Query, Param);
 }
 
 void CMetalRenderer::EF_ConstructEf(IShader *Ef) {

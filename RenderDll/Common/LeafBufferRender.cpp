@@ -290,25 +290,6 @@ void CLeafBuffer::AddRenderElements(CCObject * pObj, int DLightMask, int nTempla
     IShader * e = pMat->shaderItem.m_pShader;
     SRenderShaderResources *sr = pMat->shaderItem.m_pShaderResources;
 
-    // On Apple Silicon, valid user-space pointers use at most 47 bits.
-    // Also validate the vtable pointer to catch use-after-free: when malloc
-    // frees a CMetalShader it writes free-list bookkeeping into the first word,
-    // producing a garbage vtable that causes EXC_BAD_ACCESS on virtual dispatch.
-#if defined(__APPLE__) && defined(__aarch64__)
-    if (e) {
-      if ((uintptr_t)e >> 47) {
-        pMat->shaderItem.m_pShader = nullptr;
-        e = nullptr;
-      } else {
-        const uintptr_t vtable = *reinterpret_cast<const uintptr_t*>(e);
-        if ((vtable >> 47) != 0) {
-          pMat->shaderItem.m_pShader = nullptr;
-          e = nullptr;
-        }
-      }
-    }
-#endif
-
     if (e && pOrigRE)// && pMat->nNumIndices)
     {
       TArray<CRendElement *> *pREs = e->GetREs();

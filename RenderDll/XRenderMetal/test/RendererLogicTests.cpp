@@ -2639,11 +2639,7 @@ int main()
         CHECK(waves.Num() <= 4);
     }
 
-    // AddRenderElements pointer-validity guard — stale Windows pointers must not crash
     {
-        // Mirrors the guard in LeafBufferRender.cpp: pointers with bits[63:47] non-zero
-        // are stale Windows serialized addresses (high-bit set or above 128 TB) and
-        // must be cleared to null before any virtual-dispatch is attempted.
         auto isValidUserPtr = [](const void* p) -> bool {
             return p == nullptr || ((uintptr_t)p >> 47) == 0;
         };
@@ -3223,6 +3219,23 @@ int main()
                         CHECK(head.find("!mi->shaderItem.m_pShader") != std::string::npos);
                     }
                     CHECK(body.find("new bool[m_SecVertCount]()") != std::string::npos);
+                }
+            }
+        }
+
+        {
+            const std::string path = findSource("RenderDll/Common/LeafBufferRender.cpp");
+            CHECK(!path.empty());
+            if (!path.empty()) {
+                const std::string src = readFile(path);
+                CHECK(!src.empty());
+                const std::string body = findFunctionBody(
+                    src,
+                    "void CLeafBuffer::AddRenderElements(CCObject * pObj, int DLightMask, int nTemplate, int nFogVolumeID, int nSortId, IMatInfo * pIMatInfo)");
+                CHECK(!body.empty());
+                if (!body.empty()) {
+                    CHECK(body.find("(uintptr_t)e >> 47") == std::string::npos);
+                    CHECK(body.find("vtable >> 47") == std::string::npos);
                 }
             }
         }
