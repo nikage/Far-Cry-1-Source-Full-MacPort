@@ -881,7 +881,7 @@ bool CXGame::Update()
 			{
 				const Vec3 vc = m_pSystem->GetViewCamera().GetPos();
 				const int gR = g_Render ? g_Render->GetIVal() : 1;
-				m_pLog->Log("[CryTrace] Game cam=(%.2f,%.2f,%.2f) menuOv=%d uiOv=%d bRenderFrame=%d g_Render=%d trace3DEnable=%d editor=%d",
+				m_pLog->Log("\003[CryTrace] Game cam=(%.2f,%.2f,%.2f) menuOv=%d uiOv=%d bRenderFrame=%d g_Render=%d trace3DEnable=%d editor=%d",
 					vc.x, vc.y, vc.z,
 					m_bMenuOverlay ? 1 : 0, m_bUIOverlay ? 1 : 0,
 					bRenderFrame ? 1 : 0, gR, trace3DEnable, m_bEditor ? 1 : 0);

@@ -62,12 +62,14 @@ Metal / black-world investigation (CryTrace)
 
 1) cry_trace_render_gates defaults to 1 (set 0 to disable). Override in console or SystemCfgOverride.Cfg.
 
-2) After reproducing, grep log.txt for: [CryTrace]
+2) log.txt path is relative to process CWD (macOS: often log.txt next to the working directory). If the file cannot be opened, one [CLog] line is printed to stderr.
 
-3) If the screen stays black for ~60s and there is still no [CryTrace] while using a Debug build, capture a main-thread sample while black:
+3) After reproducing, grep log.txt for: [CryTrace] (lines use CryEngine log verbosity 3; default log_Verbosity/log_FileVerbosity show them)
+
+4) If the screen stays black for ~60s and there is still no [CryTrace] while trace is enabled, capture a main-thread sample while black:
    sample <pid> 5 -file /tmp/farcry_black.txt
 
-4) @ClientHasQuit / ShutdownClient: emitted from CXGame::ShutdownClient (GameClientServer.cpp). Expected call sites include:
+5) @ClientHasQuit / ShutdownClient: emitted from CXGame::ShutdownClient (GameClientServer.cpp). Expected call sites include:
    - CXGame destructor / shutdown (Game.cpp)
    - LoadLevel when keepclient is false (Game.cpp) before restarting server/client
    - SaveConfiguration while quitting (GameLoading.cpp)
@@ -75,7 +77,7 @@ Metal / black-world investigation (CryTrace)
    - Script Game.Connect / Game.Disconnect (ScriptObjectGame.cpp)
    A quit immediately before a second "Loading level" is usually intentional teardown for reload, not proof of failure.
 
-5) Shader manifest gaps: run dart run shader_port:shader_metal_backlog <repo-root>
+6) Shader manifest gaps: run dart run shader_port:shader_metal_backlog <repo-root>
    Full pipeline: dart tools/shader_port/bin/validate_migration.dart <repo-root>
 ''';
 }

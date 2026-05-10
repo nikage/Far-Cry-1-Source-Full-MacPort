@@ -918,7 +918,7 @@ void CXClient::Update()
 			{
 				ICVar* pTr = m_pGame->m_pSystem->GetIConsole()->GetCVar("cry_trace_render_gates");
 				if (pTr && pTr->GetIVal() != 0)
-					m_pLog->Log("[CryTrace] CXClient::Update: early return (player entity NULL) m_wPlayerID=%u",
+					m_pLog->Log("\003[CryTrace] CXClient::Update: early return (player entity NULL) m_wPlayerID=%u",
 						(unsigned)m_wPlayerID);
 			}
 			return;
@@ -1009,7 +1009,7 @@ void CXClient::Update()
 			if (pTr && pTr->GetIVal() != 0)
 			{
 				const Vec3 v = m_pGame->m_pSystem->GetViewCamera().GetPos();
-				m_pLog->Log("[CryTrace] CXClient::Update: pEntCam NULL — SetViewCamera not called this frame (m_wPlayerID=%u viewCam=(%.2f,%.2f,%.2f))",
+				m_pLog->Log("\003[CryTrace] CXClient::Update: pEntCam NULL — SetViewCamera not called this frame (m_wPlayerID=%u viewCam=(%.2f,%.2f,%.2f))",
 					(unsigned)m_wPlayerID, v.x, v.y, v.z);
 			}
 		}

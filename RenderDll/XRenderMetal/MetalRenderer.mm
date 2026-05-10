@@ -1247,7 +1247,7 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     if (iConsole) {
       ICVar* pTr = iConsole->GetCVar("cry_trace_render_gates");
       if (pTr && pTr->GetIVal() != 0 && iLog)
-        iLog->Log("[CryTrace] EF_EndEf3D: no active render encoder (frame=%d)", m_nFrameID);
+        iLog->Log("\003[CryTrace] EF_EndEf3D: no active render encoder (frame=%d)", m_nFrameID);
     }
     iLog->Log("Warning: EF_EndEf3D — no active render encoder");
     SRendItem::m_RecurseLevel--;
@@ -1262,7 +1262,7 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         auto riCount = [&](int bucket) {
           return SRendItem::m_EndRI[recurse][bucket] - SRendItem::m_StartRI[recurse][bucket];
         };
-        iLog->Log("[CryTrace] EF_EndEf3D frame=%d ri_gen=%d ri_dist=%d ri_last=%d recurse=%d",
+        iLog->Log("\003[CryTrace] EF_EndEf3D frame=%d ri_gen=%d ri_dist=%d ri_last=%d recurse=%d",
                    m_nFrameID, riCount(EFSLIST_GENERAL_ID), riCount(EFSLIST_DISTSORT_ID),
                    riCount(EFSLIST_LAST_ID), recurse);
       }

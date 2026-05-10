@@ -46,7 +46,7 @@ void C3DEngine::Draw()
 		{
 			ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
 			if (pTr && pTr->GetIVal() != 0)
-				GetLog()->Log("[CryTrace] C3DEngine::Draw skipped: I3DEngine::Enable(0) (menu/UI blocked world)");
+				GetLog()->Log("\003[CryTrace] C3DEngine::Draw skipped: I3DEngine::Enable(0) (menu/UI blocked world)");
 		}
 		return;
 	}
@@ -180,7 +180,7 @@ void C3DEngine::RenderScene(unsigned int dwDrawFlags)
 		{
 			ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
 			if (pTr && pTr->GetIVal() != 0)
-				GetLog()->Log("[CryTrace] RenderScene: m_pTerrain is NULL (level/terrain not initialized)");
+				GetLog()->Log("\003[CryTrace] RenderScene: m_pTerrain is NULL (level/terrain not initialized)");
 		}
     return;
   }

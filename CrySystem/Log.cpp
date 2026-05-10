@@ -31,6 +31,7 @@
 //#define RETURN return
 #define RETURN
 
+static bool s_logFileAppendOpenWarned;
 
 //////////////////////////////////////////////////////////////////////
 
@@ -453,6 +454,12 @@ void CLog::LogStringToFile( const char *szString,bool bAdd )
 			fputs(szTemp,fp);		
 			fclose(fp);
 		}
+		else if (!s_logFileAppendOpenWarned && m_szFilename[0])
+		{
+			s_logFileAppendOpenWarned = true;
+			fprintf(stderr, "[CLog] Cannot open log file (r+t): %s\n", m_szFilename);
+			fflush(stderr);
+		}
 	}
 	else
 	{
@@ -460,7 +467,13 @@ void CLog::LogStringToFile( const char *szString,bool bAdd )
 		{
 			fputs(szTemp,fp);
 			fclose(fp);
-		}  
+		}
+		else if (!s_logFileAppendOpenWarned && m_szFilename[0])
+		{
+			s_logFileAppendOpenWarned = true;
+			fprintf(stderr, "[CLog] Cannot open log file (append): %s (path is relative to process CWD)\n", m_szFilename);
+			fflush(stderr);
+		}
 	}
 }
 

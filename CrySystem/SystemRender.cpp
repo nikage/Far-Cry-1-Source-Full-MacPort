@@ -1047,7 +1047,7 @@ void CSystem::Render()
 			{
 				ICVar* pTr = GetIConsole()->GetCVar("cry_trace_render_gates");
 				if (pTr && pTr->GetIVal() != 0 && GetILog())
-					GetILog()->Log("[CryTrace] CSystem::Render: skipped m_pProcess->Draw (PROC_3DENGINE, view camera at origin)");
+					GetILog()->Log("\003[CryTrace] CSystem::Render: skipped m_pProcess->Draw (PROC_3DENGINE, view camera at origin)");
 			}
 		}
   }
