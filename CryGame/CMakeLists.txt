@@ -38,7 +38,6 @@ target_include_directories(CryGame PUBLIC
 target_compile_definitions(CryGame PRIVATE
     CRYGAME_EXPORTS=1
     NOT_USE_CRY_MEMORY_MANAGER=1
-    $<$<CONFIG:Debug>:CRY_DEFAULT_TRACE_RENDER_GATES=1>
 )
 
 # For macOS, use forced include of clean headers to bypass legacy issues

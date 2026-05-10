@@ -60,7 +60,7 @@ String renderGatesDiagnosisHelp() {
   return '''
 Metal / black-world investigation (CryTrace)
 
-1) Debug CMake builds default cry_trace_render_gates=1 (Release stays 0). Override in console or SystemCfgOverride.Cfg.
+1) cry_trace_render_gates defaults to 1 (set 0 to disable). Override in console or SystemCfgOverride.Cfg.
 
 2) After reproducing, grep log.txt for: [CryTrace]
 

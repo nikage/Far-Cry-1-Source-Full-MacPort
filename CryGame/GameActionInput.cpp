@@ -617,13 +617,8 @@ void CXGame::InitConsoleVars()
 		"Usage:\n"
 		"");
 
-#if defined(CRY_DEFAULT_TRACE_RENDER_GATES) && CRY_DEFAULT_TRACE_RENDER_GATES
-	static const char szCryTraceRenderGatesDefault[] = "1";
-#else
-	static const char szCryTraceRenderGatesDefault[] = "0";
-#endif
-	pConsole->CreateVariable("cry_trace_render_gates", szCryTraceRenderGatesDefault, 0,
-		"When 1, logs throttled [CryTrace] lines for 3D render gates (camera, g_Render, 3D Enable, terrain, EF_EndEf3D). Grep log.txt for [CryTrace] and [MetalDiag]. Debug CMake builds default to 1; Release to 0. Override with SystemCfgOverride.Cfg or console.\n");
+	pConsole->CreateVariable("cry_trace_render_gates", "1", 0,
+		"When 1, logs throttled [CryTrace] lines for 3D render gates (camera, g_Render, 3D Enable, terrain, EF_EndEf3D). Grep log.txt for [CryTrace] and [MetalDiag]. Default 1; set 0 to disable. Override with SystemCfgOverride.Cfg or console.\n");
 
 	cl_ViewFace=pConsole->CreateVariable("cl_ViewFace","0",CVAR_FLOAT,
 		"\n"
