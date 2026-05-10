@@ -1040,6 +1040,16 @@ void CSystem::Render()
 			if (m_pAISystem)		
 				m_pAISystem->DebugDraw(g_pRenderer);		
 		}
+		else
+		{
+			static int s_skipOriginFrame = 0;
+			if ((++s_skipOriginFrame % 120) == 0 && GetIConsole())
+			{
+				ICVar* pTr = GetIConsole()->GetCVar("cry_trace_render_gates");
+				if (pTr && pTr->GetIVal() != 0 && GetILog())
+					GetILog()->Log("[CryTrace] CSystem::Render: skipped m_pProcess->Draw (PROC_3DENGINE, view camera at origin)");
+			}
+		}
   }
   else
   {

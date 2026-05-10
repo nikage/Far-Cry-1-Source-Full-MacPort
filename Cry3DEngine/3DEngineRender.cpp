@@ -41,6 +41,13 @@ void C3DEngine::Draw()
 
 	if (!m_bEnabled)
 	{
+		static int s_traceDisFrame = 0;
+		if ((++s_traceDisFrame % 120) == 0 && GetConsole())
+		{
+			ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
+			if (pTr && pTr->GetIVal() != 0)
+				GetLog()->Log("[CryTrace] C3DEngine::Draw skipped: I3DEngine::Enable(0) (menu/UI blocked world)");
+		}
 		return;
 	}
 #if !defined(LINUX)
@@ -167,7 +174,16 @@ void C3DEngine::RenderScene(unsigned int dwDrawFlags)
 {
 	FUNCTION_PROFILER( GetSystem(),PROFILE_3DENGINE );
   if (!m_pTerrain)
+  {
+		static int s_traceTerrFrame = 0;
+		if ((++s_traceTerrFrame % 120) == 0 && GetConsole())
+		{
+			ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
+			if (pTr && pTr->GetIVal() != 0)
+				GetLog()->Log("[CryTrace] RenderScene: m_pTerrain is NULL (level/terrain not initialized)");
+		}
     return;
+  }
 
 #ifdef WIN64
 #pragma warning( push )									//AMD Port

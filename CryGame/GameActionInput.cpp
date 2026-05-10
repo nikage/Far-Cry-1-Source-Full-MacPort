@@ -617,6 +617,9 @@ void CXGame::InitConsoleVars()
 		"Usage:\n"
 		"");
 
+	pConsole->CreateVariable("cry_trace_render_gates","0",0,
+		"When 1, logs throttled [CryTrace] lines for 3D render gates (camera, g_Render, 3D Enable, terrain, EF_EndEf3D). Grep log.txt for [CryTrace] and [MetalDiag].\n");
+
 	cl_ViewFace=pConsole->CreateVariable("cl_ViewFace","0",CVAR_FLOAT,
 		"\n"
 		"Usage: \n"

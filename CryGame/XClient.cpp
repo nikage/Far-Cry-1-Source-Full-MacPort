@@ -912,7 +912,17 @@ void CXClient::Update()
 			m_pIActionMapManager->Update((unsigned int)(time*1000.f));
 
 		if(en==NULL)
+		{
+			static int s_traceNullEnt = 0;
+			if ((++s_traceNullEnt % 120) == 0)
+			{
+				ICVar* pTr = m_pGame->m_pSystem->GetIConsole()->GetCVar("cry_trace_render_gates");
+				if (pTr && pTr->GetIVal() != 0)
+					m_pLog->Log("[CryTrace] CXClient::Update: early return (player entity NULL) m_wPlayerID=%u",
+						(unsigned)m_wPlayerID);
+			}
 			return;
+		}
 	}
 
 	//ASSIGN THE CAMERA
@@ -989,6 +999,20 @@ void CXClient::Update()
 		m_pGame->m_pSystem->SetViewCamera(cam);
 		if(m_bLinkListenerToCamera && m_pGame->m_pSystem->GetISoundSystem())
 			m_pGame->m_pSystem->GetISoundSystem()->SetListener(cam,Vec3(0,0,0));
+	}
+	else
+	{
+		static int s_traceNoCam = 0;
+		if ((++s_traceNoCam % 120) == 0)
+		{
+			ICVar* pTr = m_pGame->m_pSystem->GetIConsole()->GetCVar("cry_trace_render_gates");
+			if (pTr && pTr->GetIVal() != 0)
+			{
+				const Vec3 v = m_pGame->m_pSystem->GetViewCamera().GetPos();
+				m_pLog->Log("[CryTrace] CXClient::Update: pEntCam NULL — SetViewCamera not called this frame (m_wPlayerID=%u viewCam=(%.2f,%.2f,%.2f))",
+					(unsigned)m_wPlayerID, v.x, v.y, v.z);
+			}
+		}
 	}
 
 	if (m_wPlayerID != INVALID_WID)

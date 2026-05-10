@@ -849,6 +849,7 @@ bool CXGame::Update()
 		m_nFreezeInvPostLoadTicks--;
 	}
 
+	int trace3DEnable = -1;
 	if (!m_bEditor)
 	{
 		assert(m_p3DEngine != NULL && "3D Engine must be initialized");
@@ -862,6 +863,7 @@ bool CXGame::Update()
 				bCanRender = true;
 			}
 		}
+		trace3DEnable = bCanRender ? 1 : 0;
 		m_p3DEngine->Enable(bCanRender ? 1 : 0);
 	}
 
@@ -869,6 +871,23 @@ bool CXGame::Update()
 	
 	bool bRenderFrame = (!m_pSystem->GetViewCamera().GetPos().IsZero() || m_bMenuOverlay || m_bUIOverlay) 
 									&& (g_Render ? g_Render->GetIVal() != 0 : true);
+
+	{
+		static int s_cryTraceFrame = 0;
+		if ((++s_cryTraceFrame % 90) == 0)
+		{
+			ICVar* pTr = m_pSystem->GetIConsole()->GetCVar("cry_trace_render_gates");
+			if (pTr && pTr->GetIVal() != 0)
+			{
+				const Vec3 vc = m_pSystem->GetViewCamera().GetPos();
+				const int gR = g_Render ? g_Render->GetIVal() : 1;
+				m_pLog->Log("[CryTrace] Game cam=(%.2f,%.2f,%.2f) menuOv=%d uiOv=%d bRenderFrame=%d g_Render=%d trace3DEnable=%d editor=%d",
+					vc.x, vc.y, vc.z,
+					m_bMenuOverlay ? 1 : 0, m_bUIOverlay ? 1 : 0,
+					bRenderFrame ? 1 : 0, gR, trace3DEnable, m_bEditor ? 1 : 0);
+			}
+		}
+	}
 
 	static bool s_bRenderFrameFirstTime = true;
 	if (bRenderFrame && s_bRenderFrameFirstTime) {
