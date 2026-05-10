@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "description": "Base shader names reported as EF_LoadShader unregistered on Metal (Training / user logs). Compare to generated_manifest.json normalized keys.",
+  "entries": [
+    { "name": "gunship_light" },
+    { "name": "humvee_frontlight" },
+    { "name": "humvee_backlight" },
+    { "name": "redalarmlight" }
+  ]
+}

@@ -16,3 +16,7 @@ dev_dependencies:
   lints: ^2.1.1
   test: ^1.25.2
 
+executables:
+  shader_metal_backlog: shader_metal_backlog
+  render_gates_diagnosis: render_gates_diagnosis
+
