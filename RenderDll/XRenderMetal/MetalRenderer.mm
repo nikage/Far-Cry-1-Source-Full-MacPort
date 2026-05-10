@@ -1294,6 +1294,27 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
       int numFog = 0;
       SRendItem::mfGet(ri.SortVal, &nObject, &pShader, &pShaderState, &numFog, &pRes);
 
+      if (iConsole) {
+        ICVar *pTr = iConsole->GetCVar("cry_trace_render_gates");
+        if (pTr && pTr->GetIVal() != 0 && iLog && nEnd > nStart) {
+          static int s_drawBucketDiag = 0;
+          if ((++s_drawBucketDiag % 180) == 0) {
+            const int shaderSlot = (ri.SortVal.i.High >> 14) & 0xfff;
+            SShader *tableEntry =
+                (shaderSlot > 0 && SShader::m_Shaders_known.GetSize() > shaderSlot)
+                    ? SShader::m_Shaders_known[shaderSlot]
+                    : nullptr;
+            const char *skipReason = !pShader   ? "!pShader"
+                                     : !ri.Item ? "!item"
+                                                : "ok";
+            iLog->Log("\003[CryTrace] drawBucket bid=%d slot=%d SortVal=%llx pShader=%p item=%p table=%p %s",
+                       bucketId, shaderSlot,
+                       (unsigned long long)ri.SortVal.SortVal, (void *)pShader,
+                       (void *)ri.Item, (void *)tableEntry, skipReason);
+          }
+        }
+      }
+
       if (!pShader || !ri.Item)
         continue;
 

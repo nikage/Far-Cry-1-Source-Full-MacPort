@@ -2562,6 +2562,27 @@ int main()
         CHECK(arr.Num() == before);
     }
 
+    // SRendItem PIPE_USE_INSTANCING: shader id is packed at bits 14..25 of SortVal.i.High.
+    // Metal registers the same id in SShader::m_Shaders_known via InstallRendItemTableStub;
+    // mfAdd must encode IShader::GetID() (not offsetof SShader::m_Id on non-SShader pointers).
+    {
+        union UnINT64 {
+            unsigned long long SortVal;
+            struct {
+                unsigned Low;
+                unsigned High;
+            } i;
+        };
+        const int shaderId = 42;
+        const int nSortField = 5;
+        const int resId = 3;
+        UnINT64 sv{};
+        sv.i.Low = 0;
+        sv.i.High = (unsigned)((nSortField << 26) | (shaderId << 14) | resId);
+        const int decoded = (int)((sv.i.High >> 14) & 0xfff);
+        CHECK_EQ(decoded, shaderId);
+    }
+
     // EF_GetObject ring-buffer logic — returns distinct non-null pointers
     {
         static const int kSz = 8;

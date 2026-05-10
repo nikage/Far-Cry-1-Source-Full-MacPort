@@ -36,6 +36,7 @@
 class CMetalBaseRenderer;
 class CMetalTextureManager;
 class CMetalShaderManager;
+struct SShader;
 
 enum class UniformScalarType : uint8_t
 {
@@ -98,6 +99,8 @@ public:
     virtual int Size(int Flags);
     virtual uint64 GetGenerationMask();
     virtual SShaderGen* GetGenerationParams();
+
+    void ApplyRendPipelineSortFlags(bool depthWriteEnabled, bool blendEnabled);
     
 private:
     int m_shaderId;
@@ -193,6 +196,7 @@ public:
         bool runtimeBindingsPrepared = false;
         size_t uniformDataSize = 0;
         std::vector<uint8_t> uniformStaging;
+        SShader* rendItemStub = nullptr;
     };
 
     CMetalShaderManager(CMetalBaseRenderer* renderer, CMetalTextureManager* textureManager);
@@ -367,6 +371,9 @@ protected:
     void BindShaderTextures(id<MTLRenderCommandEncoder> encoder, IShader* shader);
 
     void RegisterShaderAlias(const char* alias, const char* target);
+
+    void InstallRendItemTableStub(int shaderId, ShaderInfo& info);
+    void ReleaseRendItemTableStub(ShaderInfo& info);
 
     int GetStartupMissingShaderCount() const { return m_nStartupMissingShaders; }
 

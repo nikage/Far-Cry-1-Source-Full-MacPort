@@ -2277,14 +2277,18 @@ void CRenderer::EF_AddEf_NotVirtual (int NumFog, CRendElement *re, IShader *ef, 
   assert(NumFog>=0);
   if (re && ef)
   {
-    SShader *eft = (SShader *)ef->GetTemplate(nTempl);
-    if (eft->m_Flags3 & EF3_NODRAW)
+    IShader *eftI = ef->GetTemplate(nTempl);
+    if (!eftI)
       return;
+    if (eftI->GetFlags3() & EF3_NODRAW)
+      return;
+    SShader *eft = (SShader *)eftI;
     if (m_pDefaultShader/* && (eft->m_Flags & EF_HASDIFFUSEMAP)*/)
       eft = m_pDefaultShader;
+    IShader *eftForMeta = m_pDefaultShader ? (IShader *)m_pDefaultShader : eftI;
     if (m_HidedShaderTemplates.Num())
     {
-      CName cn = CName(eft->m_Name.c_str(), eFN_Find);
+      CName cn = CName(eftForMeta->GetName(), eFN_Find);
       if (cn.GetIndex())
       {
         for (int i=0; i<m_HidedShaderTemplates.Num(); i++)
@@ -2296,9 +2300,9 @@ void CRenderer::EF_AddEf_NotVirtual (int NumFog, CRendElement *re, IShader *ef, 
     }
     if (!CV_r_envlighting && obj)
       obj->m_ObjFlags &= ~FOB_ENVLIGHTING;
-    if (eft->m_nPreprocess)
+    if (eftForMeta->GetPreprocessFlags())
     {
-      if (!(eft->m_nPreprocess & FSPR_SCANLCM) || (obj && (obj->m_ObjFlags & FOB_ENVLIGHTING)))
+      if (!(eftForMeta->GetPreprocessFlags() & FSPR_SCANLCM) || (obj && (obj->m_ObjFlags & FOB_ENVLIGHTING)))
         SRendItem::mfAdd(re, obj, eft, sr ? sr->m_Id : 0, NULL, NumFog, nTempl, eS_PreProcess | EFSLIST_PREPROCESS);
     }
 
@@ -2319,7 +2323,7 @@ void CRenderer::EF_AddEf_NotVirtual (int NumFog, CRendElement *re, IShader *ef, 
         obj->m_ObjFlags |= FOB_BENDED;
     }
 
-    int nS = (nSort & 0x1f) ? (nSort & 0x1f) : eft->m_eSort;
+    int nS = (nSort & 0x1f) ? (nSort & 0x1f) : (int)eftForMeta->GetSort();
     switch(nS)
     {
       case eS_FogShader:
@@ -2337,10 +2341,28 @@ void CRenderer::EF_AddEf_NotVirtual (int NumFog, CRendElement *re, IShader *ef, 
     }
     if ((nSort & EFSLIST_MASK) != EFSLIST_LAST)
     {
-      int nFlags2 = eft->GetFlags2();
+      int nFlags2 = eftForMeta->GetFlags2();
+      if (iConsole)
+      {
+        ICVar *pTr = iConsole->GetCVar("cry_trace_render_gates");
+        if (pTr && pTr->GetIVal() != 0 && iLog && (nSort & EFSLIST_MASK) == EFSLIST_STENCIL)
+        {
+          static int s_stenTrace = 0;
+          if ((++s_stenTrace % 240) == 0)
+          {
+            const char *branch = (!(nFlags2 & EF2_DONTSORTBYDIST) &&
+                                  (!(nFlags2 & EF2_OPAQUE) || eftForMeta->GetSort() == eS_Water ||
+                                   (obj && obj->m_Color.a != 1.0f) || (sr && sr->m_Opacity != 1.f)))
+                           ? "distsort"
+                           : "keep_nSort";
+            iLog->Log("\003[CryTrace] EF_AddEf stencil-submit flags2=0x%x sort=%d branch=%s",
+                       (unsigned)nFlags2, (int)eftForMeta->GetSort(), branch);
+          }
+        }
+      }
       if (!(nFlags2 & EF2_DONTSORTBYDIST))
       {
-        if (!(nFlags2&EF2_OPAQUE) || eft->m_eSort == eS_Water || (obj && obj->m_Color.a!=1.0f) || (sr && sr->m_Opacity!=1.f))
+        if (!(nFlags2&EF2_OPAQUE) || eftForMeta->GetSort() == eS_Water || (obj && obj->m_Color.a!=1.0f) || (sr && sr->m_Opacity!=1.f))
           SRendItem::mfAdd(re, obj, eft, sr ? sr->m_Id : 0, (SShader *)efState, NumFog, nTempl, (nSort & ~EFSLIST_MASK) | EFSLIST_DISTSORT);
         else
           SRendItem::mfAdd(re, obj, eft, sr ? sr->m_Id : 0, (SShader *)efState, NumFog, nTempl, nSort);

@@ -932,7 +932,8 @@ void CMetalShaderManager::CreateDefaultShaders(id<MTLLibrary> library)
 
         m_shaders[shaderId] = info;
         m_shaderNameMap[shader.name] = shaderId;
-        
+        InstallRendItemTableStub(shaderId, m_shaders[shaderId]);
+
         assert(m_shaders.find(shaderId) != m_shaders.end() && "CreateDefaultShaders: shader should be in map!");
         assert(m_shaderNameMap.find(shader.name) != m_shaderNameMap.end() && "CreateDefaultShaders: shader name should be in map!");
         
@@ -1444,6 +1445,7 @@ int CMetalShaderManager::TryRegisterOneManifestPipeline(
 
     m_shaders[shaderId] = info;
     m_shaderNameMap[registrationNormalizedKey] = shaderId;
+    InstallRendItemTableStub(shaderId, m_shaders[shaderId]);
 
     NSArray* lookupAliases = aliasSrc[@"lookupAliases"];
     if (lookupAliases && [lookupAliases isKindOfClass:[NSArray class]])
@@ -2053,6 +2055,44 @@ int CMetalShaderManager::AllocateShaderId()
     return id;
 }
 
+void CMetalShaderManager::ReleaseRendItemTableStub(ShaderInfo& info)
+{
+    if (!info.rendItemStub)
+        return;
+    int id = 0;
+    if (info.shaderWrapper)
+        id = info.shaderWrapper->GetID();
+    if (id > 0 && SShader::m_Shaders_known.GetSize() > id &&
+        SShader::m_Shaders_known[id] == info.rendItemStub)
+        SShader::m_Shaders_known[id] = nullptr;
+    delete info.rendItemStub;
+    info.rendItemStub = nullptr;
+}
+
+void CMetalShaderManager::InstallRendItemTableStub(int shaderId, ShaderInfo& info)
+{
+    if (shaderId <= 0 || shaderId >= MAX_SHADERS)
+        return;
+    ReleaseRendItemTableStub(info);
+    SShader* s = new SShader();
+    s->m_Id = shaderId;
+    s->m_nRefCounter = 1;
+    s->m_Name = info.name;
+    s->m_Flags2 |= EF2_DONTSORTBYDIST;
+    if (info.depthWriteEnabled && !info.blendEnabled)
+        s->m_Flags2 |= EF2_OPAQUE;
+    s->m_eSort = eS_Opaque;
+    if (shaderId < SShader::m_Shaders_known.GetSize())
+    {
+        if (SShader::m_Shaders_known[shaderId] && SShader::m_Shaders_known[shaderId] != s)
+            delete SShader::m_Shaders_known[shaderId];
+        SShader::m_Shaders_known[shaderId] = s;
+    }
+    info.rendItemStub = s;
+    if (info.shaderWrapper)
+        info.shaderWrapper->ApplyRendPipelineSortFlags(info.depthWriteEnabled, info.blendEnabled);
+}
+
 void CMetalShaderManager::ReleaseShaderId(int id)
 {
     assert(id > 0 && "ReleaseShaderId: shader ID must be positive!");
@@ -2061,6 +2101,7 @@ void CMetalShaderManager::ReleaseShaderId(int id)
     if (it != m_shaders.end())
     {
         ShaderInfo& info = it->second;
+        ReleaseRendItemTableStub(info);
         info.shaderWrapper = nullptr;
         
         std::string nameToRemove = info.name;
@@ -2079,6 +2120,7 @@ void CMetalShaderManager::ClearAllShaders()
     for (auto& pair : m_shaders)
     {
         ShaderInfo& info = pair.second;
+        ReleaseRendItemTableStub(info);
         if (info.shaderWrapper)
         {
             info.shaderWrapper->m_manager = nullptr;
@@ -2107,9 +2149,11 @@ void CMetalShaderManager::ShareCacheWith(CMetalShaderManager* other)
             if (nameIt == m_shaderNameMap.end()) {
                 int newShaderId = AllocateShaderId();
                 ShaderInfo info = shaderInfo;
+                info.rendItemStub = nullptr;
                 info.shaderWrapper = new CMetalShader(newShaderId, this);
                 m_shaders[newShaderId] = info;
                 m_shaderNameMap[shaderInfo.name] = newShaderId;
+                InstallRendItemTableStub(newShaderId, m_shaders[newShaderId]);
             }
         }
     }
@@ -2122,9 +2166,11 @@ void CMetalShaderManager::ShareCacheWith(CMetalShaderManager* other)
             if (nameIt == other->m_shaderNameMap.end()) {
                 int newShaderId = other->AllocateShaderId();
                 ShaderInfo info = shaderInfo;
+                info.rendItemStub = nullptr;
                 info.shaderWrapper = new CMetalShader(newShaderId, other);
                 other->m_shaders[newShaderId] = info;
                 other->m_shaderNameMap[shaderInfo.name] = newShaderId;
+                other->InstallRendItemTableStub(newShaderId, other->m_shaders[newShaderId]);
             }
         }
     }

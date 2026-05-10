@@ -207,11 +207,14 @@ void SShader::mfFree()
 
 SShader::~SShader()
 {
-  gRenDev->m_cEF.mfRemoveFromHash(this);
+  if (gRenDev)
+    gRenDev->m_cEF.mfRemoveFromHash(this);
 
   mfFree();
 
-  SShader::m_Shaders_known[m_Id] = NULL;
+  if (m_Id > 0 && SShader::m_Shaders_known.GetSize() > m_Id &&
+      SShader::m_Shaders_known[m_Id] == this)
+    SShader::m_Shaders_known[m_Id] = NULL;
 }
 
 #ifdef WIN64

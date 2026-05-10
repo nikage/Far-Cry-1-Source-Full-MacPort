@@ -675,6 +675,15 @@ CMetalShader::CMetalShader(int shaderId, CMetalShaderManager* manager)
     assert(shaderId > 0 && "CMetalShader: shaderId must be positive!");
 }
 
+void CMetalShader::ApplyRendPipelineSortFlags(bool depthWriteEnabled, bool blendEnabled)
+{
+    m_flags2 |= EF2_DONTSORTBYDIST;
+    if (depthWriteEnabled && !blendEnabled)
+        m_flags2 |= EF2_OPAQUE;
+    if (m_sort == eS_Unknown)
+        m_sort = eS_Opaque;
+}
+
 CMetalShader::~CMetalShader()
 {
     if (m_templates)
@@ -1138,6 +1147,7 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
             if (shaderIt != m_shaders.end())
             {
                 ShaderInfo& info = shaderIt->second;
+                ReleaseRendItemTableStub(info);
                 if (info.shaderWrapper)
                 {
                     info.shaderWrapper->Release(true);
@@ -1169,7 +1179,8 @@ IShader* CMetalShaderManager::EF_LoadShader(const char* name, EShClass Class, in
             
             m_shaders[shaderId] = info;
             m_shaderNameMap[lookupName] = shaderId;
-            
+            InstallRendItemTableStub(shaderId, m_shaders[shaderId]);
+
             return info.shaderWrapper;
         }
     }

@@ -12,6 +12,8 @@ Copyright (c) 2001 Crytek Studios. All Rights Reserved.
 #ifndef __RENDERPIPELINE_H__
 #define __RENDERPIPELINE_H__
 
+#include "IShader.h"
+
 //====================================================================
 
 #define PIPE_USE_INSTANCING
@@ -77,6 +79,14 @@ struct SRendItem : SRendItemPre
 
 
 #ifdef PIPE_USE_INSTANCING
+  static _inline int mfShaderIdForRendItem(SShader *Shader)
+  {
+    return Shader ? reinterpret_cast<IShader *>(Shader)->GetID() : 0;
+  }
+  static _inline EF_Sort mfShaderSortForRendItem(SShader *Shader)
+  {
+    return Shader ? reinterpret_cast<IShader *>(Shader)->GetSort() : eS_Unknown;
+  }
   static _inline void mfAdd(CRendElement *Item, CCObject *pObj, SShader *Shader, int ResId, SShader *EfState, int numFog, int nTempl, int nSort=0)
   {
     int nList = nSort>>28;
@@ -84,8 +94,8 @@ struct SRendItem : SRendItemPre
     int n = m_RendItems[nList].Num();
     m_RendItems[nList].AddIndex(1);
     SRendItemPre *ri = &m_RendItems[nList][n];
-    int IdState = EfState ? EfState->m_Id : 0;
-    nSort = (nSort > 0) ? nSort : Shader->m_eSort;
+    int IdState = EfState ? mfShaderIdForRendItem(EfState) : 0;
+    nSort = (nSort > 0) ? nSort : (int)mfShaderSortForRendItem(Shader);
     int ObjNum;
     if (pObj)
     {
@@ -100,7 +110,7 @@ struct SRendItem : SRendItemPre
       ri->DynLMask = 0;
     }
     ri->SortVal.i.Low = (ObjNum<<20) | (IdState<<8) | (numFog);
-    ri->SortVal.i.High = (nSort<<26) | (Shader->m_Id<<14) | (ResId);
+    ri->SortVal.i.High = (nSort<<26) | (mfShaderIdForRendItem(Shader)<<14) | (ResId);
     ri->Item = Item;
   }
   static _inline void mfGet(UnINT64 flag, int *nObject, SShader **Shader, SShader **ShaderState, int *numFog, SRenderShaderResources **Res)
@@ -130,6 +140,14 @@ struct SRendItem : SRendItemPre
     return SShader::m_Shaders_known[(flag.i.High>>14) & 0xfff];
   }
 #else
+  static _inline int mfShaderIdForRendItemNoInst(SShader *Shader)
+  {
+    return Shader ? reinterpret_cast<IShader *>(Shader)->GetID() : 0;
+  }
+  static _inline EF_Sort mfShaderSortForRendItemNoInst(SShader *Shader)
+  {
+    return Shader ? reinterpret_cast<IShader *>(Shader)->GetSort() : eS_Unknown;
+  }
   static _inline void mfAdd(CRendElement *Item, CCObject *pObj, SShader *Shader, int ResId, SShader *EfState, int numFog, int nTempl, int nSort=0)
   {
     int nList = nSort>>28;
@@ -137,10 +155,10 @@ struct SRendItem : SRendItemPre
     int n = m_RendItems[nList].Num();
     m_RendItems[nList].AddIndex(1);
     SRendItemPre *ri = &m_RendItems[nList][n];
-    int IdState = EfState ? EfState->m_Id : 0;
-    nSort = (nSort > 0) ? nSort : Shader->m_eSort;
+    int IdState = EfState ? mfShaderIdForRendItemNoInst(EfState) : 0;
+    nSort = (nSort > 0) ? nSort : (int)mfShaderSortForRendItemNoInst(Shader);
     int ObjNum = pObj ? pObj->m_VisId : 0;
-    ri->SortVal.i.Low = (Shader->m_Id<<20) | (IdState<<8) | (numFog);
+    ri->SortVal.i.Low = (mfShaderIdForRendItemNoInst(Shader)<<20) | (IdState<<8) | (numFog);
     ri->SortVal.i.High = (nSort<<26) | (ObjNum<<15) | (ResId);
     ri->Item = Item;
   }
