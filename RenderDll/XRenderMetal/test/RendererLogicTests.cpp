@@ -513,8 +513,8 @@ static void test_draw2dimage_winding_is_ccw()
 // ---------------------------------------------------------------------------
 // NDC bounds of Draw2dImage for the UI smoke-test quad
 // ---------------------------------------------------------------------------
-// The smoke-test quad is placed at (sw*0.1, sh*0.1) with size (sw*0.8, sh*0.8).
-// This test verifies the screen→NDC conversion produces the expected bounds:
+// Draw2dImage takes virtual 800x600 coordinates; Metal applies ScaleCoordX/Y
+// (same as D3D9) then maps pixels to NDC. Quad: 10% margin, 80% size in virtual space.
 //   x left  = 0.1 * 2 - 1 = -0.8
 //   x right = 0.9 * 2 - 1 =  0.8
 //   y top   = 1 - 0.1 * 2 =  0.8
@@ -522,8 +522,12 @@ static void test_draw2dimage_winding_is_ccw()
 static void test_smoketest_quad_ndc_bounds()
 {
     const float sw = 1280.0f, sh = 720.0f;
-    const float xpos = sw * 0.1f, ypos = sh * 0.1f;
-    const float w    = sw * 0.8f, h    = sh * 0.8f;
+    const float vx = 800.0f * 0.1f, vy = 600.0f * 0.1f;
+    const float vw = 800.0f * 0.8f, vh = 600.0f * 0.8f;
+    const float xpos = vx * (sw / 800.0f);
+    const float ypos = vy * (sh / 600.0f);
+    const float w    = vw * (sw / 800.0f);
+    const float h    = vh * (sh / 600.0f);
 
     auto screenToNdcX = [&](float x) { return (x / sw) * 2.0f - 1.0f; };
     auto screenToNdcY = [&](float y) { return 1.0f - (y / sh) * 2.0f; };

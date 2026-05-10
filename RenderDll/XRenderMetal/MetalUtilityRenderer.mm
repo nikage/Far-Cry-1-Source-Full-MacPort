@@ -226,8 +226,6 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
         }
     }
     
-    // Convert screen coordinates to normalized device coordinates (NDC)
-    // Metal NDC: x=[-1,1] left to right, y=[-1,1] bottom to top
     float screenWidth = static_cast<float>(m_renderer->GetWidth());
     float screenHeight = static_cast<float>(m_renderer->GetHeight());
     
@@ -236,9 +234,14 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
         assert(false && "Draw2dImage: renderer reports zero screen dimensions — window not yet ready");
         return;
     }
+
+    xpos = m_renderer->ScaleCoordX(xpos);
+    w = m_renderer->ScaleCoordX(w);
+    ypos = m_renderer->ScaleCoordY(ypos);
+    h = m_renderer->ScaleCoordY(h);
     
     // Convert to NDC
-    // Input: screen coordinates where (0,0) is top-left, (screenWidth, screenHeight) is bottom-right
+    // Input: pixel coordinates where (0,0) is top-left, (screenWidth, screenHeight) is bottom-right
     // Output: NDC where (-1,-1) is bottom-left, (1,1) is top-right
     float x0_ndc = (xpos / screenWidth) * 2.0f - 1.0f;
     float y0_ndc = 1.0f - (ypos / screenHeight) * 2.0f;  // Flip Y: top becomes +1

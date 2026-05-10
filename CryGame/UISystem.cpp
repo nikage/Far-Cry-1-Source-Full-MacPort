@@ -2671,26 +2671,18 @@ int CUISystem::DrawImage(const UIRect &pRect, int iTextureID, const float *vTexC
 			vClippedTexCoord[3] = 0.0f + (fTexH * ((fB - (pRect.fTop + pRect.fHeight)) * fRcpHeight));
 		}
 
-		// Convert virtual coordinates to screen coordinates
-		// AdjustWidth/AdjustHeight round back to virtual for pixel-perfect alignment, but we need actual screen coords
-		float screenX = (float)(fX * m_fVirtualToRealX);
-		float screenY = (float)(fY * m_fVirtualToRealY);
-		float screenW = (float)((fR - fX) * m_fVirtualToRealX);
-		float screenH = (float)((fB - fY) * m_fVirtualToRealY);
+		float drawW = fR - fX;
+		float drawH = fB - fY;
 
-
-		m_pRenderer->Draw2dImage(screenX, screenY, screenW, screenH,
+		m_pRenderer->Draw2dImage(fX, fY, drawW, drawH,
 			iTextureID, vClippedTexCoord[0], vClippedTexCoord[1], vClippedTexCoord[2], vClippedTexCoord[3], 0, cColor.v[0], cColor.v[1], cColor.v[2], cColor.v[3], 0);
 	}
 	else
 	{
-		// Convert virtual coordinates to screen coordinates
-		float screenX = (float)(fX * m_fVirtualToRealX);
-		float screenY = (float)(fY * m_fVirtualToRealY);
-		float screenW = (float)((fR - fX) * m_fVirtualToRealX);
-		float screenH = (float)((fB - fY) * m_fVirtualToRealY);
+		float drawW = fR - fX;
+		float drawH = fB - fY;
 
-		m_pRenderer->Draw2dImage(screenX, screenY, screenW, screenH,
+		m_pRenderer->Draw2dImage(fX, fY, drawW, drawH,
 			-1, 0, 0, 1, 1, 0, cColor.v[0], cColor.v[1], cColor.v[2], cColor.v[3], 0);
 	}
 
