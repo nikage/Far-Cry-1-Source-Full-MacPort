@@ -92,7 +92,7 @@ void CLog::EnableVerbosity( bool bEnable )
 #else
 				m_pLogLoadingStderr = pConsole->CreateVariable("log_LoadingStderr","0",VF_DUMPTODISK);
 #endif
-				m_pLogLoadingOverlay = pConsole->CreateVariable("log_LoadingOverlay","1",VF_DUMPTODISK);
+				m_pLogLoadingOverlay = pConsole->CreateVariable("log_LoadingOverlay",false,VF_DUMPTODISK);
 			}
 		}
 	}

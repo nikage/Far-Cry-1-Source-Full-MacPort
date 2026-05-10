@@ -120,7 +120,7 @@ public:
         return true; 
     }
     virtual void Update() override { 
-        printf("CSimpleMacOSMusicSystem::Update called\n");
+        // printf("CSimpleMacOSMusicSystem::Update called\n");
         fflush(stdout);
     }
     virtual SMusicSystemStatus* GetStatus() override { 

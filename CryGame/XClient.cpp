@@ -576,7 +576,7 @@ void CXClient::OnXContextSetup(CStream &stm)
 
 			return;
 		}
-		m_pLog->Log("[GameCheckpoint] Client_OnXContextSetup ixsystem_LoadLevel_ok folder='%s' mission='%s'",
+		m_pLog->Log("\003[GameCheckpoint] Client_OnXContextSetup ixsystem_LoadLevel_ok folder='%s' mission='%s'",
 			m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str());
 
 		if((!m_pGame->m_bEditor) 
@@ -590,7 +590,7 @@ void CXClient::OnXContextSetup(CStream &stm)
 			return;
 		}
 		if (!m_pGame->m_bEditor && !m_pGame->IsServer())
-			m_pLog->Log("[GameCheckpoint] Client_OnXContextSetup checksum_verified folder='%s' ck=%u",
+			m_pLog->Log("\003[GameCheckpoint] Client_OnXContextSetup checksum_verified folder='%s' ck=%u",
 				m_GameContext.strMapFolder.c_str(), (unsigned)m_pISystem->GetLevelDataCheckSum());
 
 		_SmartScriptObject pClientStuff(m_pScriptSystem,true);
@@ -1348,7 +1348,7 @@ void CXClient::OnMapChanged()
 {
 	m_bMapConnecting = true;
 	const char *lvl = m_pGame && m_pGame->g_LevelName ? m_pGame->g_LevelName->GetString() : "";
-	m_pLog->Log("[GameCheckpoint] Client_OnMapChanged pending_local_player level='%s' mp=%d",
+	m_pLog->Log("\003[GameCheckpoint] Client_OnMapChanged pending_local_player level='%s' mp=%d",
 		lvl, m_pGame->IsMultiplayer() ? 1 : 0);
 };
 
@@ -1358,7 +1358,7 @@ void CXClient::OnMapChangedReally()
   m_bMapConnecting = false;
 
 	const char *lvl = m_pGame && m_pGame->g_LevelName ? m_pGame->g_LevelName->GetString() : "";
-	m_pLog->Log("[GameCheckpoint] Client_OnMapChangedReally playable_hooks level='%s' mp=%d checkpoint_load=%d",
+	m_pLog->Log("\003[GameCheckpoint] Client_OnMapChangedReally playable_hooks level='%s' mp=%d checkpoint_load=%d",
 		lvl, m_pGame->IsMultiplayer() ? 1 : 0, m_pGame->m_bMapLoadedFromCheckpoint ? 1 : 0);
 
 	// [marcio] reseting the movie system here stop any cutscene the begins imediately

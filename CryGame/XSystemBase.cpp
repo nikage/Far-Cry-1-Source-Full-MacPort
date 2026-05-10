@@ -1359,7 +1359,7 @@ void CXSystemBase::SetEntityEvents( IEntity *entity,XDOM::IXMLDOMNodeList* pEven
 //////////////////////////////////////////////////////////////////////////
 void CXSystemBase::StartLoading(bool bEditor)
 {
-	m_pLog->Log("[GameCheckpoint] loading_shell_begin editor=%d", bEditor ? 1 : 0);
+	m_pLog->Log("\003[GameCheckpoint] loading_shell_begin editor=%d", bEditor ? 1 : 0);
 	IConsole *pConsole=m_pConsole;
 	IRenderer *pRenderer=m_pSystem->GetIRenderer();
 	m_pPrevConsoleImg=pConsole->GetImage();
@@ -1425,7 +1425,7 @@ void CXSystemBase::EndLoading(bool bEditor)
 	m_pSystem->GetViewCamera().SetPos( Vec3(0,0,0) );
 	m_pSystem->GetViewCamera().SetAngle( Vec3(0,0,0) );
 
-	m_pLog->Log("[GameCheckpoint] loading_shell_end editor=%d", bEditor ? 1 : 0);
+	m_pLog->Log("\003[GameCheckpoint] loading_shell_end editor=%d", bEditor ? 1 : 0);
 
 	//will be removed from script
 	//pRenderer->RemoveTexture(m_pLoadingImg);
@@ -1648,7 +1648,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	missionInfo.m_dwMissionCheckSum = missionInfo.pMissionXML->getCheckSum();
 	m_wCheckSum = missionInfo.m_dwLevelDataCheckSum + missionInfo.m_dwMissionCheckSum;
 
-	m_pLog->Log("[GameCheckpoint] LoadLevelCommon mission_resolved folder='%s' level='%s' mission='%s'",
+	m_pLog->Log("\003[GameCheckpoint] LoadLevelCommon mission_resolved folder='%s' level='%s' mission='%s'",
 		missionInfo.sLevelFolder.c_str(), missionInfo.sLevelName.c_str(), missionInfo.sMissionName.c_str());
 
 	//////////////////////////////////////////////////////////////////////////
@@ -1694,7 +1694,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	//load the materials names
 	if(!LoadMaterials(missionInfo.pLevelDataXML))
 		return false;
-	m_pLog->Log("[GameCheckpoint] LoadLevelCommon materials_ok folder='%s'", missionInfo.sLevelFolder.c_str());
+	m_pLog->Log("\003[GameCheckpoint] LoadLevelCommon materials_ok folder='%s'", missionInfo.sLevelFolder.c_str());
 
 	// reload the previously unloaded models since the materials are now reloaded
 	if (m_pGame->m_pUISystem)
@@ -1715,7 +1715,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 			missionInfo.sLevelFolder.c_str(), missionInfo.sMissionName.c_str());
 		return false;
 	}
-	m_pLog->Log("[GameCheckpoint] LoadLevelCommon i3dengine_ok folder='%s'", missionInfo.sLevelFolder.c_str());
+	m_pLog->Log("\003[GameCheckpoint] LoadLevelCommon i3dengine_ok folder='%s'", missionInfo.sLevelFolder.c_str());
 	//////////////////////////////////////////////////////////////////////////
 
 	///////////////////////////////////////////////////////////////////////////////////////
@@ -1749,7 +1749,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	string sMovieDataXml = missionInfo.sLevelFolder + "/moviedata.xml";
 	if (m_pSystem->GetIMovieSystem())
 		m_pSystem->GetIMovieSystem()->Load( sMovieDataXml.c_str(),missionInfo.sMissionName.c_str() );
-	m_pLog->Log("[GameCheckpoint] LoadLevelCommon ai_weapon_movie_ok mission='%s'", missionInfo.sMissionName.c_str());
+	m_pLog->Log("\003[GameCheckpoint] LoadLevelCommon ai_weapon_movie_ok mission='%s'", missionInfo.sMissionName.c_str());
 	//////////////////////////////////////////////////////////////////////////
 
 	//////////////////////////////////////////////////////////////////////////
@@ -1761,7 +1761,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 		m_pLog->LogError("[LoadLevelCommon] LoadLevelEntities failed for '%s'", missionInfo.sLevelFolder.c_str());
 		return false;
 	}
-	m_pLog->Log("[GameCheckpoint] LoadLevelCommon entities_spawned folder='%s'", missionInfo.sLevelFolder.c_str());
+	m_pLog->Log("\003[GameCheckpoint] LoadLevelCommon entities_spawned folder='%s'", missionInfo.sLevelFolder.c_str());
 
 	//////////////////////////////////////////////////////////////////////////
 	// Triangulation must be loaded after loading of entities.
@@ -1806,7 +1806,7 @@ bool CXSystemBase::LoadLevelCommon( SMissionInfo &missionInfo )
 	CTimeValue timeLoad = m_pSystem->GetITimer()->GetCurrTimePrecise() - time0;
 	// Log level load times.
 	m_pLog->LogToFile( "\001 Level %s loaded in %.3f seconds",missionInfo.sLevelName.c_str(),timeLoad.GetSeconds() );
-	m_pLog->Log("[GameCheckpoint] LoadLevelCommon complete level='%s' sec=%.3f",
+	m_pLog->Log("\003[GameCheckpoint] LoadLevelCommon complete level='%s' sec=%.3f",
 		missionInfo.sLevelName.c_str(), timeLoad.GetSeconds());
 	//////////////////////////////////////////////////////////////////////////
 
