@@ -3032,6 +3032,19 @@ int main()
             CHECK(hasLookupAlias("cgrcparticlelight", "particlelight"));
             // BumpSunGlow — terrain_water_quad.cpp EF_SYSTEM; XML SunWaterRefl default.
             CHECK(hasLookupAlias("cgrcbumpsunglow", "bumpsunglow"));
+            CHECK(hasLookupAlias("cgrcscreen", "screenprocess"));
+            CHECK(hasLookupAlias("cgrcscreen", "screendistort"));
+            CHECK(hasLookupAlias("cgrcscreen", "outspace"));
+            CHECK(hasLookupAlias("cgrcscreen", "binoculardistortmask"));
+            CHECK(hasLookupAlias("cgrcscreen", "sniperdistortmask"));
+            CHECK(hasLookupAlias("cgrcscreen", "rainmap"));
+            CHECK(hasLookupAlias("cgrcdefault", "clearstencil"));
+            CHECK(hasLookupAlias("cgrcdefault", "stencilstate"));
+            CHECK(hasLookupAlias("cgrcdefault", "stencilstateinv"));
+            CHECK(hasLookupAlias("cgrcdefault", "<stencil>"));
+            CHECK(hasLookupAlias("cgrcshadowgen_depth", "shadowmapgen"));
+            CHECK(hasLookupAlias("cgrctreesprites", "fartreesprites"));
+            CHECK(hasLookupAlias("cgrcambient_particle", "terrainparticles"));
             // OcclusionTest — terrain_water_quad.cpp EF_SYSTEM when RFT_OCCLUSIONTEST;
             // aliases to builtin colortex (no CGRC port).
             {
@@ -3258,16 +3271,6 @@ int main()
                     CHECK(body.find("(uintptr_t)e >> 47") == std::string::npos);
                     CHECK(body.find("vtable >> 47") == std::string::npos);
                 }
-            }
-        }
-
-        {
-            const std::string path = findSource("RenderDll/XRenderMetal/Generated/builtin_lookup_aliases.json");
-            CHECK(!path.empty());
-            if (!path.empty()) {
-                const std::string j = readFile(path);
-                CHECK(j.find("\"cgrcdefault\"") != std::string::npos);
-                CHECK(j.find("screenprocess") != std::string::npos);
             }
         }
 

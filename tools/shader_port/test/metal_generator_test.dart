@@ -157,6 +157,38 @@ void main() {
         manifestLookupAliasesForNormalizedFragment('cgrcparticlelight'),
         equals(<String>['particlelight']),
       );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcscreen'),
+        equals(<String>[
+          'screenprocess',
+          'screendistort',
+          'outspace',
+          'binoculardistortmask',
+          'sniperdistortmask',
+          'rainmap',
+        ]),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcdefault'),
+        equals(<String>[
+          'clearstencil',
+          'stencilstate',
+          'stencilstateinv',
+          '<stencil>',
+        ]),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcshadowgen_depth'),
+        equals(<String>['shadowmapgen']),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrctreesprites'),
+        equals(<String>['fartreesprites']),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcambient_particle'),
+        equals(<String>['terrainparticles']),
+      );
       expect(manifestLookupAliasesForNormalizedFragment('other'), isEmpty);
       expect(
         manifestLookupAliasesForNormalizedFragment(

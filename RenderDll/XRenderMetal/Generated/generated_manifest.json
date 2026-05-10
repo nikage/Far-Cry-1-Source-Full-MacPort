@@ -74046,6 +74046,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogsimple_particle_vertex",
     "pipelineCategory": "particle",
+    "lookupAliases": [
+      "terrainparticles"
+    ],
     "uniforms": [
       {
         "name": "Ambient",
@@ -113028,6 +113031,10 @@
     "vertexEntryPoint": "generated_cgvprogdefault_vertex",
     "pipelineCategory": "mesh",
     "lookupAliases": [
+      "clearstencil",
+      "stencilstate",
+      "stencilstateinv",
+      "<stencil>",
       "no_draw",
       "default"
     ],
@@ -124860,6 +124867,14 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogscreen_vertex",
     "pipelineCategory": "fullscreen",
+    "lookupAliases": [
+      "screenprocess",
+      "screendistort",
+      "outspace",
+      "binoculardistortmask",
+      "sniperdistortmask",
+      "rainmap"
+    ],
     "uniforms": [],
     "textures": [
       {
@@ -126044,6 +126059,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogshadowgen_depth_vertex",
     "pipelineCategory": "shadow",
+    "lookupAliases": [
+      "shadowmapgen"
+    ],
     "uniforms": [],
     "textures": [
       {
@@ -135404,6 +135422,9 @@
     "maskReferences": [],
     "vertexEntryPoint": "generated_cgvprogsimple_plant_bended_sprite_vertex",
     "pipelineCategory": "plant",
+    "lookupAliases": [
+      "fartreesprites"
+    ],
     "uniforms": [
       {
         "name": "GlobalFogColor",

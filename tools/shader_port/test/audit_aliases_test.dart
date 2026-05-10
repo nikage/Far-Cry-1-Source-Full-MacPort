@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:shader_port/metal_generator.dart';
 import 'package:test/test.dart';
 import '../lib/alias_auditor.dart';
 
@@ -572,6 +573,43 @@ no_draw			nodraw
               reason: '${r.alias} -> ${r.rawTarget}');
         }
       }
+    });
+  });
+
+  group('3dEngine soft-load lookupAliases (metal_generator)', () {
+    test('maps LoadRendererShaderSafe names to manifest fragments', () {
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcscreen'),
+        containsAll(<String>[
+          'screenprocess',
+          'screendistort',
+          'outspace',
+          'binoculardistortmask',
+          'sniperdistortmask',
+          'rainmap',
+        ]),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcdefault'),
+        containsAll(<String>[
+          'clearstencil',
+          'stencilstate',
+          'stencilstateinv',
+          '<stencil>',
+        ]),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcshadowgen_depth'),
+        contains('shadowmapgen'),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrctreesprites'),
+        contains('fartreesprites'),
+      );
+      expect(
+        manifestLookupAliasesForNormalizedFragment('cgrcambient_particle'),
+        contains('terrainparticles'),
+      );
     });
   });
 }

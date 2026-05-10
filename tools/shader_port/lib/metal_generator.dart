@@ -37,6 +37,29 @@ List<String> manifestLookupAliasesForNormalizedFragment(
     case 'cgrcparticlelight':
       addUnique('particlelight');
       break;
+    case 'cgrcscreen':
+      addUnique('screenprocess');
+      addUnique('screendistort');
+      addUnique('outspace');
+      addUnique('binoculardistortmask');
+      addUnique('sniperdistortmask');
+      addUnique('rainmap');
+      break;
+    case 'cgrcdefault':
+      addUnique('clearstencil');
+      addUnique('stencilstate');
+      addUnique('stencilstateinv');
+      addUnique('<stencil>');
+      break;
+    case 'cgrcshadowgen_depth':
+      addUnique('shadowmapgen');
+      break;
+    case 'cgrctreesprites':
+      addUnique('fartreesprites');
+      break;
+    case 'cgrcambient_particle':
+      addUnique('terrainparticles');
+      break;
     default:
       break;
   }

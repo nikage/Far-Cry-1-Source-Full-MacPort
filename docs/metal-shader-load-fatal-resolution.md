@@ -348,6 +348,19 @@ Post-fix runtime state: `lldb --batch` runs through `C3DEngine` ctor →
 `C3DEngine::Init()` → `CreateGame` → `Starting game` → macOS event loop
 with **zero `ShaderLoadFatal` aborts**.
 
+### Diagnostics — deferred bucket draws vs `LoadRendererShaderSafe` (soft `EF_LoadShader`)
+
+These are **different code paths**:
+
+- **Deferred / bucket rendering** can show healthy logs (`drawBucket` with matching `pShader`, non-zero `ri_gen`, etc.) because materials and known shader tables already resolve to registered Metal pipelines.
+- **`C3DEngine` constructor** still calls `LoadRendererShaderSafe("ScreenProcess")`, `("OutSpace")`, … (`Cry3DEngine/3dEngine.cpp` ~242–257). Those use **soft** `EF_LoadShader` (no `EF_SYSTEM`). If the normalized name is missing from `m_shaderNameMap`, the Metal manager logs **`EF_LoadShader unregistered '…'`** and returns null. Call sites null-check, so startup continues, but **post-processing, stencil helpers, distortion, rain, terrain particles, etc.** may never bind a real shader — a common reason geometry “draws” while the final frame looks wrong (black menu, missing composite).
+
+**Wiring:** add manifest **`lookupAliases`** on the closest ported fragment (see §6 — `cgrcscreen`, `cgrcdefault`, …). Prefer generator changes in **`manifestLookupAliasesForNormalizedFragment`** (`tools/shader_port/lib/metal_generator.dart`) so aliases survive `validate_migration.dart` regen.
+
+**`builtin_lookup_aliases.json` vs manifest:** only keys in **`kMetalBuiltins`** (`basic`, `colortex`, `terrain`, …) are emitted into **`builtin_lookup_aliases.json`**. Aliases for **`cgrcscreen`**, **`cgrcdefault`**, and other manifest fragments belong in **`generated_manifest.json`** `lookupAliases`, not in the builtin JSON (the loader requires builtin JSON keys to already name a registered builtin).
+
+**Runtime check:** after rebuilding with an updated `Generated/` tree copied into the app bundle, grep logs for `EF_LoadShader unregistered` — expect **no** lines for the 3dEngine soft-load list once aliases land.
+
 ### Caller-bug callers still in the engine (not yet hit at runtime)
 
 These remain `EF_SYSTEM` and will surface only when the corresponding
@@ -383,9 +396,21 @@ subsystem actually loads. Classify each on demand using §3.
 | `bumpsunglow`      | `cgrcbumpsunglow` | `terrain_water_quad.cpp` and level XML `Environment/Shaders/SunWaterRefl` default call `EF_LoadShader("BumpSunGlow", …, EF_SYSTEM)`; logical name normalizes to `bumpsunglow`, manifest key is `cgrcbumpsunglow`. |
 | `occlusiontest`    | `colortex` (builtin) | `terrain_water_quad.cpp` calls `EF_LoadShader("OcclusionTest", …, EF_SYSTEM)` when `RFT_OCCLUSIONTEST`; no `CGRCOcclusionTest` in the Metal port — `colortex` is the registered builtin stand-in via `builtin_lookup_aliases.json`. |
 
+### 3dEngine soft loads (`LoadRendererShaderSafe`) — generator `lookupAliases`
+
+The names below are **not** in shipping `Aliases.txt` / `CustomAliases.txt`; they are loaded only from code (`Cry3DEngine/3dEngine.cpp`). They are wired via **`manifestLookupAliasesForNormalizedFragment`** in `metal_generator.dart` (merged into each fragment row’s `lookupAliases` at generate time). Mappings are **best-effort** until dedicated CGRC ports exist; fullscreen/post names share **`cgrcscreen`**, stencil helpers share **`cgrcdefault`**.
+
+| Normalized lookup key | Manifest `normalized` | Source engine string |
+| --------------------- | --------------------- | --------------------- |
+| `screenprocess`, `screendistort`, `outspace`, `binoculardistortmask`, `sniperdistortmask`, `rainmap` | `cgrcscreen` | `ScreenProcess`, `ScreenDistort`, `OutSpace`, `BinocularDistortMask`, `SniperDistortMask`, `RainMap` |
+| `clearstencil`, `stencilstate`, `stencilstateinv`, `<stencil>` | `cgrcdefault` | `ClearStencil`, `StencilState`, `StencilStateInv`, `<Stencil>` |
+| `shadowmapgen` | `cgrcshadowgen_depth` | `ShadowMapGen` |
+| `fartreesprites` | `cgrctreesprites` | `FarTreeSprites` |
+| `terrainparticles` | `cgrcambient_particle` | `TerrainParticles` |
+
 To add a new alias:
 
-1. Edit `Assets/Shaders/Source/Shaders/Aliases.txt`. Format: `Alias Target`,
+1. Prefer **`manifestLookupAliasesForNormalizedFragment`** when the name is code-only or should stay in sync with codegen. Otherwise edit `Assets/Shaders/Source/Shaders/Aliases.txt`. Format: `Alias Target`,
    one pair per line, whitespace separated.
 2. Re-run the unified validator:
    ```bash
@@ -396,7 +421,8 @@ To add a new alias:
    `RenderDll/XRenderMetal/Generated/generated_manifest.json` under the
    target fragment's `lookupAliases` array.
 4. Add a Dart regression test in
-   `tools/shader_port/test/audit_aliases_test.dart`.
+   `tools/shader_port/test/audit_aliases_test.dart` and/or
+   `tools/shader_port/test/metal_generator_test.dart` (for generator-native aliases).
 5. Add a C++ regression test in
    `RenderDll/XRenderMetal/test/RendererLogicTests.cpp` using `hasLookupAlias`.
 
@@ -451,12 +477,12 @@ CHECK(hasLookupAlias("cgrcdefault", "default"));
 ```bash
 cd RenderDll/XRenderMetal/test
 clang++ -std=c++17 -o renderer_logic_tests RendererLogicTests.cpp
-./renderer_logic_tests          # 429/429 expected at the time of writing
+./renderer_logic_tests          # expect "N passed, 0 failed" (count grows with suite)
 ```
 
 ```bash
 cd tools/shader_port
-dart test                       # 418/418 expected at the time of writing
+dart test                       # full package suite; expect "All tests passed!"
 ```
 
 Both must run before every commit per
@@ -477,7 +503,8 @@ Both must run before every commit per
    the function body no longer contains `EF_SYSTEM`.
 6. The shipping `CustomAliases.txt` and `Aliases.txt` are the **canonical
    reference** for legacy alias semantics. Compare against them before
-   inventing new aliases.
+   inventing new aliases. Code-only names (3dEngine soft loads) may still need
+   **`manifestLookupAliasesForNormalizedFragment`** entries when they never appear in those files.
 
 ---
 
@@ -495,7 +522,7 @@ Both must run before every commit per
 | Conditional aliases (shipping reference)     | Steam install: `FCData/Shaders/CustomAliases.txt`                                      |
 | Top-level `Shader 'X'` blocks (shipping)     | Inside `Shaders.pak`: `Shaders/HWScripts/Techniques/*.csl`, `Shaders/Scripts/CryShaders/*.csl` |
 | Dart alias auditor                           | `tools/shader_port/lib/alias_auditor.dart`                                             |
-| Dart manifest generator                      | `tools/shader_port/lib/metal_generator.dart` (`findUnmatchedAliasTargets`)             |
+| Dart manifest generator                      | `tools/shader_port/lib/metal_generator.dart` (`findUnmatchedAliasTargets`, `manifestLookupAliasesForNormalizedFragment`) |
 | Unified validator                            | `tools/shader_port/bin/validate_migration.dart`                                        |
 | LLDB session script                          | `build/shader_abort_session.lldb`                                                      |
 | C++ regression tests                         | `RenderDll/XRenderMetal/test/RendererLogicTests.cpp`                                   |
