@@ -506,6 +506,7 @@ int CScriptObjectGame::KillTimer(IFunctionHandler *pH)
 int CScriptObjectGame::RefreshServerList(IFunctionHandler *pH)
 {
 	CHECK_PARAMETERS(0);
+	m_pGame->m_pLog->Log("\003[GameCheckpoint] Lua_Game_RefreshServerList invoked");
 	m_pGame->RefreshServerList();
 	
 	return pH->EndFunction();

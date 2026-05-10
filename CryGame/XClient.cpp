@@ -343,6 +343,7 @@ void CXClient::OnXConnect()
 	m_fLastRemoteAsyncCurrTime=0;
 	m_fLastScoreBoardTime = 0;
 	TRACE("CXClient::OnXConnect");	
+	m_pLog->Log("\003[GameCheckpoint] CXClient_OnXConnect");
 	LoadPlayerDesc();
 
 /*	if (bDoSwitch)
@@ -554,8 +555,16 @@ void CXClient::OnXContextSetup(CStream &stm)
 	m_pGame->g_GameType->Set(m_GameContext.strGameType.c_str());
 	m_Snapshot.Reset();
 
+	if (bFastPathSpListen)
+	{
+		m_pLog->Log("\003[GameCheckpoint] OnXContextSetup branch=SP_listen_fastpath skip_client_IXSystem_LoadLevel folder='%s' mission='%s'",
+			m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str());
+	}
+
 	if (!bFastPathSpListen)
 	{
+		m_pLog->Log("\003[GameCheckpoint] OnXContextSetup branch=full_path client_IXSystem_LoadLevel folder='%s' mission='%s' is_server=%d",
+			m_GameContext.strMapFolder.c_str(), m_GameContext.strMission.c_str(), m_pGame->IsServer() ? 1 : 0);
 		m_pLog->Log("CXClient::OnXContextSetup - map : %s\n", m_GameContext.strMapFolder.c_str());
 		m_pLog->Log("[FreezeInv] CXClient::OnXContextSetup before m_pISystem->LoadLevel is_server=%d",
 			m_pGame->IsServer() ? 1 : 0);

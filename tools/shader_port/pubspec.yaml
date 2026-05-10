@@ -19,4 +19,5 @@ dev_dependencies:
 executables:
   shader_metal_backlog: shader_metal_backlog
   render_gates_diagnosis: render_gates_diagnosis
+  load_sequence_diagnosis: load_sequence_diagnosis
 

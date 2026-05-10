@@ -132,6 +132,7 @@ void CXGame::ShutdownClient()
 {
 	if (!m_pClient) 
 		return;
+	m_pLog->Log("\003[GameCheckpoint] ShutdownClient before XDisconnect @ClientHasQuit");
 	m_pLog->Log("Disconnect the client");
 	m_pClient->XDisconnect("@ClientHasQuit");
 	m_pLog->Log("Shutdown the Client");
@@ -202,6 +203,7 @@ void CXGame::OnNETServerTimeout(const CIPAddress &ip)
 //////////////////////////////////////////////////////////////////////////
 void CXGame::RefreshServerList()
 {
+	m_pLog->Log("\003[GameCheckpoint] RefreshServerList LAN search (see script Game:RefreshServerList / UI caller)");
 	m_ServersInfos.clear();
 	if(m_pServerSnooper)
 		m_pServerSnooper->SearchForLANServers(GetCurrentTime());

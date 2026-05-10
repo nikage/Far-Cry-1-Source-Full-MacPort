@@ -1413,6 +1413,7 @@ void CXSystemBase::EndLoading(bool bEditor)
 		m_pEntitySystem->SetPrecacheResourcesMode( true );
 		m_pSystem->GetI3DEngine()->OnLevelLoaded();
 		m_pEntitySystem->SetPrecacheResourcesMode( false );
+		m_pLog->Log("\003[GameCheckpoint] precache_OnLevelLoaded_done editor=%d", bEditor ? 1 : 0);
 	}
 
 	m_pSystem->GetITimer()->Reset();	// reset timer (cause problems?)
