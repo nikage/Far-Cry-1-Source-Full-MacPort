@@ -7,6 +7,7 @@ endif()
 
 # Metal renderer source files
 set(XRENDER_METAL_SOURCES
+    CryMetalGameView.mm
     MetalRenderer.mm
     MetalBaseRenderer.mm
     MetalTextureManager.mm
@@ -69,6 +70,10 @@ target_link_libraries(XRenderMetal PRIVATE
 )
 
 # Compiler settings for Objective-C++
+set_source_files_properties(CryMetalGameView.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
 set_source_files_properties(MetalRenderer.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )

@@ -18,6 +18,7 @@
 
 // Include PCH first for proper type definitions
 #include "MetalRenderPCH.h"
+#include "CryMetalGameView.h"
 #include "MetalRenderer.m"
 #include "I3DEngine.h"
 #include "CryCommon/IEntityRenderState.h"
@@ -1839,6 +1840,10 @@ bool CMetalRenderer::CreateGameWindow(int width, int height, bool fullscreen) {
     
     [m_window setTitle:@"Far Cry - macOS Metal Port"];
     [m_window setAcceptsMouseMovedEvents:YES];
+    
+    CryMetalGameView* gameView = [[CryMetalGameView alloc] initWithFrame:NSMakeRect(0, 0, width, height)];
+    [m_window setContentView:gameView];
+    [gameView release];
     
     NSView* contentView = [m_window contentView];
     if (!contentView) {
