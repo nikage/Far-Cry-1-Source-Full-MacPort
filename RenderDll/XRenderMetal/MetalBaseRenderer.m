@@ -624,6 +624,7 @@ public:
     int m_frameID;
     int m_numDrawCalls;
     int m_numTriangles;
+    bool m_lastEf3DUsedHDR;
     
     // Internal methods - some need to be public for manager classes to access
     bool InitializeDevice();

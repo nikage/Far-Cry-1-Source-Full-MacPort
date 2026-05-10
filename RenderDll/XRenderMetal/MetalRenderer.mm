@@ -1203,6 +1203,8 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
   }
 #endif
 
+  m_lastEf3DUsedHDR |= useHDR;
+
   // Record end-of-list positions for all sort buckets
   for (int i = 0; i < NUMRI_LISTS; ++i) {
     SRendItem::m_EndRI[recurse][i] = SRendItem::m_RendItems[i].Num();
@@ -1237,6 +1239,10 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
   // Obtain (or create) the render encoder for this frame
   id<MTLRenderCommandEncoder> encoder = m_renderEncoder;
   if (!encoder) {
+#if DEBUG
+    if (m_nFrameID > 1)
+      assert(false && "EF_EndEf3D: no active render encoder after frame 1");
+#endif
     iLog->Log("Warning: EF_EndEf3D — no active render encoder");
     SRendItem::m_RecurseLevel--;
     return;
@@ -1290,19 +1296,28 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         }
       }
 
-      // Bind PSO — use shader name to look up generated Metal pipeline
-      if (pShader != prevShader && m_shaderManager) {
+      if (pShader != prevShader) {
+        if (!m_shaderManager) {
+#if DEBUG
+          assert(false && "EF_EndEf3D: no shader manager");
+#endif
+          continue;
+        }
         id<MTLRenderPipelineState> pso =
           m_shaderManager->GetPipelineStateForShader(pShader->m_Name.c_str());
+        if (!pso)
+          pso = m_shaderManager->GetPipelineStateForFormat(m_RP.m_CurVFormat);
         if (!pso) {
-          // Fall back to the format-based PSO
-          pso = m_shaderManager->GetPipelineStateForFormat(
-              m_RP.m_CurVFormat);
+#if DEBUG
+          if (iLog)
+            iLog->Log("[MetalDiag] EF_EndEf3D: missing PSO shader=%s vfmt=%d",
+                      pShader->m_Name.c_str(), (int)m_RP.m_CurVFormat);
+          assert(false && "EF_EndEf3D: missing Metal PSO (shader + format fallback)");
+#endif
+          continue;
         }
-        if (pso) {
-          [encoder setRenderPipelineState:pso];
-          prevShader = pShader;
-        }
+        [encoder setRenderPipelineState:pso];
+        prevShader = pShader;
       }
 
       // Bind global and material uniforms
@@ -1768,17 +1783,27 @@ void CMetalRenderer::SyncMetalLayerDrawableToContentView() {
   if (scale < 1.0)
     scale = 1.0;
   NSRect bounds = [contentView bounds];
-  m_windowMetalLayer.contentsScale = scale;
   const CGFloat pw =
       fmax(static_cast<CGFloat>(1.0), static_cast<CGFloat>(std::llround(bounds.size.width * scale)));
   const CGFloat ph =
       fmax(static_cast<CGFloat>(1.0), static_cast<CGFloat>(std::llround(bounds.size.height * scale)));
-  m_windowMetalLayer.drawableSize = CGSizeMake(pw, ph);
   const int iw = static_cast<int>(pw);
   const int ih = static_cast<int>(ph);
-  EnsureBackbufferSize(static_cast<NSUInteger>(iw), static_cast<NSUInteger>(ih));
-  m_viewportWidth = m_width;
-  m_viewportHeight = m_height;
+  if (!ChangeResolution(iw, ih, m_cbpp, 0, m_fullscreen)) {
+    if (iLog)
+      iLog->Log("SyncMetalLayerDrawableToContentView: ChangeResolution failed for %dx%d\n", iw, ih);
+    return;
+  }
+  if (iConsole) {
+    if (ICVar* cw = iConsole->GetCVar("r_Width")) {
+      if (cw->GetIVal() != iw)
+        cw->Set(iw);
+    }
+    if (ICVar* ch = iConsole->GetCVar("r_Height")) {
+      if (ch->GetIVal() != ih)
+        ch->Set(ih);
+    }
+  }
 #if DEBUG
   if (iLog)
     iLog->Log("SyncMetalLayerDrawableToContentView: drawable=%dx%d contentsScale=%.3f bounds=%.1fx%.1f\n",

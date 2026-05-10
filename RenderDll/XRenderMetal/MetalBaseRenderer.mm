@@ -113,6 +113,7 @@ CMetalBaseRenderer::CMetalBaseRenderer()
     , m_frameID(0)
     , m_numDrawCalls(0)
     , m_numTriangles(0)
+    , m_lastEf3DUsedHDR(false)
 {
     m_currentMatrix.SetIdentity();
     m_viewMatrix.SetIdentity();
@@ -983,6 +984,8 @@ void CMetalBaseRenderer::BeginFrame()
     
     m_cEF.mfBeginFrame();
 
+    m_lastEf3DUsedHDR = false;
+
     m_nPolygons = 0;
     m_nShadowVolumePolys = 0;
     m_nFrameID++;
@@ -1066,7 +1069,26 @@ void CMetalBaseRenderer::EndFrame()
 {
     if (!m_currentCommandBuffer)
         return;
-    
+
+#if DEBUG
+    if (iLog && (m_nFrameID <= 15 || (m_nFrameID % 300) == 0))
+    {
+        iLog->Log("[MetalDiag] EndFrame frame=%d draws=%d tris=%d size=%dx%d lastEF3D_HDR=%d",
+                  m_nFrameID, m_numDrawCalls, m_numTriangles, m_width, m_height,
+                  m_lastEf3DUsedHDR ? 1 : 0);
+    }
+    if (iLog && m_currentDrawable && m_nFrameID > 60 && m_numDrawCalls == 0
+        && m_numTriangles == 0)
+    {
+        static bool s_loggedZeroDrawSession = false;
+        if (!s_loggedZeroDrawSession)
+        {
+            iLog->Log("[MetalDiag] EndFrame: zero draws/tris after frame 60 — check EF_EndEf3D / PSO / buckets");
+            s_loggedZeroDrawSession = true;
+        }
+    }
+#endif
+
     ReleaseRenderEncoder();
     
     if (m_currentDrawable)
@@ -2558,6 +2580,10 @@ bool CMetalBaseRenderer::BeginHDRPass()
             iLog->Log("[MetalDiag] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
 #endif
     }
+#if DEBUG
+    if (m_hdrColorRT && !m_renderEncoder)
+        assert(false && "BeginHDRPass: failed to create HDR encoder (swapchain pass already ended)");
+#endif
     return m_renderEncoder != nil;
 }
 
@@ -2576,7 +2602,14 @@ void CMetalBaseRenderer::EndHDRPass()
 
     // Use the drawable that was already acquired in AcquireDrawableFromLayer/View
     id<MTLTexture> dstTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
-    if (!dstTexture) return;
+    if (!dstTexture)
+    {
+#if DEBUG
+        if (m_hdrColorRT)
+            assert(false && "EndHDRPass: no drawable texture while HDR colour RT exists");
+#endif
+        return;
+    }
 
     MTLRenderPassDescriptor *tonemapRPD = [MTLRenderPassDescriptor renderPassDescriptor];
     tonemapRPD.colorAttachments[0].texture     = dstTexture;
@@ -2597,6 +2630,13 @@ void CMetalBaseRenderer::EndHDRPass()
     [tonemapEncoder setFragmentSamplerState:m_hdrSampler atIndex:0];
     [tonemapEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [tonemapEncoder endEncoding];
+#if DEBUG
+    if (m_nFrameID <= 3 && iLog)
+        iLog->Log("[MetalDiag] EndHDRPass frame=%d tonemap dst=%lux%lu hdrTex=%dx%d",
+                  m_nFrameID,
+                  (unsigned long)[dstTexture width], (unsigned long)[dstTexture height],
+                  m_hdrRTWidth, m_hdrRTHeight);
+#endif
 
     if (!BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionClear, MTLLoadActionClear))
     {

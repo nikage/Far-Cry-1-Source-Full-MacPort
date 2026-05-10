@@ -719,6 +719,21 @@ static void test_scale_coord_formula_matches_renderer_h()
     CHECK(std::fabs(scaleCoordY(600.f) - float(m_height)) < eps);
 }
 
+static bool metaldiag_endframe_zero_draw_warning_predicate(int frameId, bool hasDrawable,
+                                                           int drawCalls, int tris)
+{
+    return hasDrawable && frameId > 60 && drawCalls == 0 && tris == 0;
+}
+
+static void test_metaldiag_endframe_zero_draw_warning_gate()
+{
+    CHECK(!metaldiag_endframe_zero_draw_warning_predicate(60, true, 0, 0));
+    CHECK(metaldiag_endframe_zero_draw_warning_predicate(61, true, 0, 0));
+    CHECK(!metaldiag_endframe_zero_draw_warning_predicate(61, false, 0, 0));
+    CHECK(!metaldiag_endframe_zero_draw_warning_predicate(61, true, 1, 0));
+    CHECK(!metaldiag_endframe_zero_draw_warning_predicate(61, true, 0, 1));
+}
+
 static void test_dyndvb_pooled_vertex_byte_offset()
 {
     struct MirrorVec3 {
@@ -2418,6 +2433,7 @@ int main()
     test_font_ortho_matrix();
     test_font_ortho_matrix_arbitrary_virtual_dimensions();
     test_scale_coord_formula_matches_renderer_h();
+    test_metaldiag_endframe_zero_draw_warning_gate();
     test_dyndvb_pooled_vertex_byte_offset();
     test_metal_teardown_encoder_before_commit();
     test_tryensure_swapchain_encoder_source_invariants();

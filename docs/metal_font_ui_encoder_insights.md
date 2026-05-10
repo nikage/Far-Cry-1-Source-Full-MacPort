@@ -15,6 +15,10 @@ This note captures findings from debugging script/HUD `DrawDynVB`, menu fonts, a
 - `CMetalRenderer::Update()` historically called `FlushTextMessages()` **after** `CMetalBaseRenderer::Update()` → `EndFrame()` → commit and `m_currentCommandBuffer = nil`, so that flush could not encode.
 - Any flush that needs a render encoder must run **before** present/commit, aligned with `RenderEnd` ordering.
 
+## 2b. `ScaleCoordX` / `ScaleCoordY` on Metal
+
+- `CMetalBaseRenderer` implements the same formula as `CRenderer` in `Renderer.h`: scale from **virtual 800×600** layout coordinates to **`GetWidth` / `GetHeight`** (backbuffer pixels). Together with `FontSetRenderingState(0,0)` using full backbuffer ortho, CryFont matches the D3D path where coordinates are scaled before the orthographic projection.
+
 ## 3. `TryEnsureSwapchainRenderEncoderFor2D()` reuses the current encoder
 
 - If `m_renderEncoder` is already open on the same command buffer, `TryEnsure` returns **true** without resetting **viewport/scissor**.

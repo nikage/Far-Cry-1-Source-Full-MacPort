@@ -111,7 +111,35 @@ pick up `METAL_COMPILER_AVAILABLE=TRUE`.
 | p6-gpu-timing      | `GPUStartTime`/`GPUEndTime` → `SPipeStat::m_fFlushTime`           | ✅      | Accumulated in `addCompletedHandler` on every tracked command buffer                                                           |
 | p6-ocean           | `CMetalREOcean` grid generation + sinusoidal update + GPU draw    | ✅      | `GenerateGeometry`, `Update`, `FlushVerticesToGPU`, `mfDraw`; PSO looked up as `"ocean"` or `VERTEX_FORMAT_P3F_TEX2F` fallback |
 | p6-readframebuffer | `ReadFrameBuffer` GPU readback                                    | ✅      | Blit-to-shared-buffer + BGRA→RGB/RGBA copy; uses `m_currentDrawable.texture` (never `nextDrawable`)                            |
+| p6-retina-swapchain | Retina `drawableSize`, resize, HDR RT resize                     | ✅      | `SyncMetalLayerDrawableToContentView` → `ChangeResolution` (pixel bounds × backing scale); `NSWindowDidResize` / `DidChangeBackingProperties`; `ResizeHDRPipelineIfNeeded` from `EnsureBackbufferSize`; `GetWidth`/`GetHeight` = backbuffer pixels; UI virtual 800×600 via `ScaleCoordX`/`Y` + font ortho from `GetWidth`/`Height` when `FontSetRenderingState(0,0)` |
 
+
+### DEBUG — MetalDiag fast-fails and sharing evidence
+
+**Built-in (DEBUG builds only)**
+
+- `CMetalRenderer::EF_EndEf3D`: assert if there is no render encoder after frame 1; assert (and log shader name + vertex format) if neither manifest PSO nor format fallback PSO exists — **Release skips that draw** instead of issuing `mfDraw` with an undefined pipeline.
+- `CMetalBaseRenderer::BeginHDRPass`: assert if `m_hdrColorRT` is non-nil but the HDR render encoder failed to create (swapchain pass was already ended).
+- `CMetalBaseRenderer::EndHDRPass`: assert if the HDR colour RT exists but the drawable texture is nil.
+- `CMetalBaseRenderer::EndFrame`: `[MetalDiag] EndFrame` logs `m_nFrameID`, `m_numDrawCalls`, `m_numTriangles`, backbuffer size, and `lastEF3D_HDR` (accumulated from `EF_EndEf3D` that frame). If there is a drawable, `m_nFrameID > 60`, and draws/tris are both zero, a **one-shot** log suggests checking the 3D path / PSO / buckets.
+
+**Console CVars**
+
+- `metal_gpucapture 1` — start a single-frame `MTLCaptureManager` capture (see `CMetalRenderer::RegisterMetalConsoleVariables`).
+- `metal_dumpstats 1` — dump Metal diagnostics after the next frame.
+- `r_HDRRendering 0` vs `1` — A/B LDR (direct swapchain 3D) vs HDR (scene to float16 RT, then tonemap).
+
+**Xcode Metal GPU capture**
+
+1. Scheme **Edit Scheme → Run → Diagnostics** — enable **Metal API Validation** while reproducing.
+2. Run or attach to the game, then **Debug → Capture GPU Frame** (or trigger `metal_gpucapture` and open the capture from the navigator).
+3. In the capture: confirm whether **HDRColorRT** or the **swapchain** receives colour draws after the initial clear; inspect bound **PSO**, **viewport/scissor**, and **depth** for the first failing draw.
+
+**What to paste when reporting an issue**
+
+- Lines containing `[MetalDiag]`, `EF_EndEf3D`, `BeginHDRPass`, `EndHDRPass`, `missing PSO`, or any new assert message.
+- Whether the black screen appears with **HDR off** (`r_HDRRendering 0`) only, **HDR on** only, or both.
+- Build (**DEBUG** vs Release), macOS version, and GPU. Optional: screenshot and a short description of the capture (e.g. “HDR RT stays black after clear”).
 
 ---
 
