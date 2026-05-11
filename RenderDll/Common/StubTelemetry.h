@@ -33,7 +33,7 @@ namespace StubTelemetry
         static int s_hits = 0; \
         ++s_hits; \
         if (::StubTelemetry::ShouldTraceStubs() && (s_hits == 1 || (s_hits % 300) == 0)) \
-            iLog->Log("[Stub] " tag " hits=%d " fmt, s_hits, ##__VA_ARGS__); \
+            iLog->Log("\003[Stub] " tag " hits=%d " fmt, s_hits, ##__VA_ARGS__); \
     } while (0)
 
 #define METAL_STUB_TRACE_BARE(tag) \
@@ -41,5 +41,5 @@ namespace StubTelemetry
         static int s_hits = 0; \
         ++s_hits; \
         if (::StubTelemetry::ShouldTraceStubs() && (s_hits == 1 || (s_hits % 300) == 0)) \
-            iLog->Log("[Stub] " tag " hits=%d", s_hits); \
+            iLog->Log("\003[Stub] " tag " hits=%d", s_hits); \
     } while (0)

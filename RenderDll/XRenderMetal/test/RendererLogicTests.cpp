@@ -2862,6 +2862,7 @@ static void test_metal_debug_cvars_registered()
     CHECK(src.find("int g_metal_debug_disable_depth") != std::string::npos);
     CHECK(src.find("int g_metal_debug_dump_scope")    != std::string::npos);
     CHECK(src.find("int g_metal_debug_dump_texunits") != std::string::npos);
+    CHECK(src.find("int g_metal_debug_dump_elems")    != std::string::npos);
 
     const std::string body =
         _find_function_body(src, "void CMetalRenderer::RegisterMetalConsoleVariables()");
@@ -2872,11 +2873,13 @@ static void test_metal_debug_cvars_registered()
     CHECK(body.find("\"metal_debug_disable_depth\"") != std::string::npos);
     CHECK(body.find("\"metal_debug_dump_scope\"")    != std::string::npos);
     CHECK(body.find("\"metal_debug_dump_texunits\"") != std::string::npos);
+    CHECK(body.find("\"metal_debug_dump_elems\"")    != std::string::npos);
     CHECK(body.find("&g_metal_debug_clear_color")   != std::string::npos);
     CHECK(body.find("&g_metal_debug_dump_draws")    != std::string::npos);
     CHECK(body.find("&g_metal_debug_disable_depth") != std::string::npos);
     CHECK(body.find("&g_metal_debug_dump_scope")    != std::string::npos);
     CHECK(body.find("&g_metal_debug_dump_texunits") != std::string::npos);
+    CHECK(body.find("&g_metal_debug_dump_elems")    != std::string::npos);
 
     const std::string unregBody =
         _find_function_body(src, "void CMetalRenderer::UnregisterMetalConsoleVariables()");
@@ -2887,6 +2890,7 @@ static void test_metal_debug_cvars_registered()
     CHECK(unregBody.find("\"metal_debug_disable_depth\"") != std::string::npos);
     CHECK(unregBody.find("\"metal_debug_dump_scope\"")    != std::string::npos);
     CHECK(unregBody.find("\"metal_debug_dump_texunits\"") != std::string::npos);
+    CHECK(unregBody.find("\"metal_debug_dump_elems\"")    != std::string::npos);
 
     CHECK(body.find("iSystem->LoadConfiguration(\"SystemCfgOverride.Cfg\")") != std::string::npos);
     CHECK(body.find("getenv(envName)") != std::string::npos);
@@ -3142,6 +3146,41 @@ static void test_metal_material_texture_binder_bound_in_ef_endef3d()
         CHECK(bindCall > psoBind);
     if (bindCall != std::string::npos && mfDraw != std::string::npos)
         CHECK(bindCall < mfDraw);
+}
+
+static void test_metal_elem_histogram_wired_in_ef_endef3d()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    CHECK(body.find("struct ElemBucketStats") != std::string::npos);
+    CHECK(body.find("elemHist[")              != std::string::npos);
+    CHECK(body.find("elemHistEnabled")        != std::string::npos);
+    CHECK(body.find("g_metal_debug_dump_elems") != std::string::npos);
+    CHECK(body.find("typeid(*ri.Item).name()") != std::string::npos);
+    CHECK(body.find("[ElemHist]")             != std::string::npos);
+    CHECK(body.find("s_elemHistEf3DCounter")  != std::string::npos);
+    CHECK(body.find("% g_metal_debug_dump_elems") != std::string::npos);
+
+    const size_t okReturn = body.find("okReturn  = ri.Item->mfDraw");
+    const size_t dcBefore = body.find("dcBefore  = m_numDrawCalls");
+    const size_t triBefore = body.find("triBefore = m_numTriangles");
+    CHECK(okReturn  != std::string::npos);
+    CHECK(dcBefore  != std::string::npos);
+    CHECK(triBefore != std::string::npos);
+    if (dcBefore != std::string::npos && okReturn != std::string::npos)
+        CHECK(dcBefore < okReturn);
+    if (triBefore != std::string::npos && okReturn != std::string::npos)
+        CHECK(triBefore < okReturn);
 }
 
 static void test_metal_per_shader_uniforms_reset_each_frame()
@@ -4348,6 +4387,9 @@ int main()
     test_metal_material_texture_binder_module_present();
     test_metal_material_texture_binder_registered_in_manifest_loader();
     test_metal_material_texture_binder_bound_in_ef_endef3d();
+
+    // Phase 11 — versatile per-render-element histogram diagnostic
+    test_metal_elem_histogram_wired_in_ef_endef3d();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

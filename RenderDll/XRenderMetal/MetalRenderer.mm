@@ -41,6 +41,8 @@
 #include <unistd.h>
 #include <limits.h>
 #include <string>
+#include <map>
+#include <typeinfo>
 #include <unordered_set>
 #include <cctype>
 #include <memory>
@@ -173,6 +175,7 @@ int g_metal_debug_dump_draws  = 0;
 int g_metal_debug_disable_depth = 0;
 int g_metal_debug_dump_scope    = 0;
 int g_metal_debug_dump_texunits = 0;
+int g_metal_debug_dump_elems    = 0;
 
 namespace
 {
@@ -1337,7 +1340,22 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     }
   }
 
-  // Draw helper: iterate one render-item bucket
+  struct ElemBucketStats {
+    int  submitted  = 0;
+    int  reallyDrew = 0;
+    int  reportedOk = 0;
+    int  triDelta   = 0;
+    int  bidMask    = 0;
+    int  noPres     = 0;
+    int  noPass     = 0;
+  };
+  std::map<std::string, ElemBucketStats> elemHist;
+  static int s_elemHistEf3DCounter = 0;
+  ++s_elemHistEf3DCounter;
+  const bool elemHistEnabled =
+      (g_metal_debug_dump_elems > 0) &&
+      ((s_elemHistEf3DCounter % g_metal_debug_dump_elems) == 0);
+
   auto drawBucket = [&](int bucketId) {
     const int nStart = SRendItem::m_StartRI[recurse][bucketId];
     const int nEnd   = SRendItem::m_EndRI[recurse][bucketId];
@@ -1527,7 +1545,36 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         MetalDrawDiag::OnDepthDisableFired();
         SetDepthTest(false);
       }
-      ri.Item->mfDraw(pShader, pPass);
+      const unsigned int dcBefore  = m_numDrawCalls;
+      const unsigned int triBefore = m_numTriangles;
+      const bool         okReturn  = ri.Item->mfDraw(pShader, pPass);
+      const unsigned int dcAfter   = m_numDrawCalls;
+      const unsigned int triAfter  = m_numTriangles;
+
+      if (elemHistEnabled)
+      {
+        const char* elemName = typeid(*ri.Item).name();
+        ElemBucketStats& st = elemHist[elemName ? elemName : "?"];
+        ++st.submitted;
+        if (dcAfter > dcBefore) ++st.reallyDrew;
+        if (okReturn)           ++st.reportedOk;
+        st.triDelta += (int)(triAfter - triBefore);
+        st.bidMask  |= (1 << (bucketId & 31));
+        if (!pRes)  ++st.noPres;
+        if (!pPass) ++st.noPass;
+      }
+
+      if (g_metal_debug_dump_draws > 0 && iLog && dcAfter == dcBefore)
+      {
+        const char* elemName = typeid(*ri.Item).name();
+        static int s_dropTrace = 0;
+        if ((++s_dropTrace) <= 24)
+        {
+          iLog->Log("\003[MetalDiag] drop bid=%d shader=%s elem=%s pRes=%p item=%p",
+                    bucketId, pShader->m_Name.c_str(), elemName ? elemName : "?",
+                    (void*)pRes, (void*)ri.Item);
+        }
+      }
     }
   };
 
@@ -1541,6 +1588,28 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     drawBucket(EFSLIST_DISTSORT_ID);
     if (SRendItem::m_RecurseLevel <= 1)
       drawBucket(EFSLIST_LAST_ID);
+  }
+
+  if (elemHistEnabled && iLog)
+  {
+    int totSubmitted = 0, totDrew = 0, totOk = 0, totTri = 0;
+    for (const auto& kv : elemHist)
+    {
+      totSubmitted += kv.second.submitted;
+      totDrew      += kv.second.reallyDrew;
+      totOk        += kv.second.reportedOk;
+      totTri       += kv.second.triDelta;
+    }
+    iLog->Log("\003[ElemHist] frame=%d kinds=%zu submit=%d drew=%d ok=%d tris=%d",
+              m_nFrameID, elemHist.size(), totSubmitted, totDrew, totOk, totTri);
+    for (const auto& kv : elemHist)
+    {
+      const ElemBucketStats& s = kv.second;
+      iLog->Log("\003[ElemHist]   elem=%s submit=%d drew=%d ok=%d tris=%d "
+                "bidMask=0x%x noPres=%d noPass=%d",
+                kv.first.c_str(), s.submitted, s.reallyDrew, s.reportedOk,
+                s.triDelta, s.bidMask, s.noPres, s.noPass);
+    }
   }
 
   // HDR: tone-map the float16 RT into the drawable
@@ -3061,6 +3130,13 @@ void CMetalRenderer::RegisterMetalConsoleVariables()
                      "Set to N to log the first N EF_EndEf3D draws' SShaderPass texture units: "
                      "pass ptr, m_TUnits count, and for each unit the m_TexPic pointer + textureID. "
                      "Pinpoints whether textures reach fragment slots or fall through to nil/white.");
+  iConsole->Register("metal_debug_dump_elems", &g_metal_debug_dump_elems, 0, 0,
+                     "Set to N to log a per-render-element histogram every N-th EF_EndEf3D "
+                     "invocation (0 = off). Each row reports typeid name, submitted count, "
+                     "really-drew (m_numDrawCalls delta > 0), reported-ok (mfDraw returned true), "
+                     "triangle delta sum, bucket-id bitmask, pRes-nil count, pPass-nil count. "
+                     "Versatile drop diagnostic that works for every CRendElement subclass "
+                     "without per-element instrumentation.");
 
 #ifdef DEBUG
   // Register GPU capture trigger (DEBUG builds only)
@@ -3085,6 +3161,7 @@ void CMetalRenderer::RegisterMetalConsoleVariables()
   applyEnvIntCVar("METAL_DEBUG_DISABLE_DEPTH", "metal_debug_disable_depth");
   applyEnvIntCVar("METAL_DEBUG_DUMP_SCOPE",    "metal_debug_dump_scope");
   applyEnvIntCVar("METAL_DEBUG_DUMP_TEXUNITS", "metal_debug_dump_texunits");
+  applyEnvIntCVar("METAL_DEBUG_DUMP_ELEMS",    "metal_debug_dump_elems");
   applyEnvIntCVar("CRY_TRACE_RENDER_GATES",    "cry_trace_render_gates");
 }
 
@@ -3098,6 +3175,7 @@ void CMetalRenderer::UnregisterMetalConsoleVariables()
   iConsole->UnregisterVariable("metal_debug_disable_depth");
   iConsole->UnregisterVariable("metal_debug_dump_scope");
   iConsole->UnregisterVariable("metal_debug_dump_texunits");
+  iConsole->UnregisterVariable("metal_debug_dump_elems");
 #ifdef DEBUG
   iConsole->UnregisterVariable("metal_gpucapture");
 #endif
