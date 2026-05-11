@@ -3,7 +3,8 @@
 > Strict policy, decision tree, and resolution log for `MetalShaderManager.mm`
 > `ShaderLoadFatal` aborts. Companion to [`shader-aliases.md`](shader-aliases.md)
 > (alias-table format) and [`metal_renderer_plan.md`](metal_renderer_plan.md)
-> (port status).
+> (port status). If shader names resolve but the level still looks black, see
+> [`metal_3d_visual_pitfalls.md`](metal_3d_visual_pitfalls.md) (encoder, HDR, `CREScreenProcess` stub).
 
 ---
 

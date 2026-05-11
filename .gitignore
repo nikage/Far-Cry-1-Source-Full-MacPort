@@ -490,6 +490,7 @@ RenderDll/XRenderMetal/Generated
 /Shaders/Legacy/
 /RenderDll/XRenderMetal/generated_air_manual/
 build-*
+xcode-build
 
 log.txt
 tools/shader_port/.dart_tool/

@@ -17,6 +17,7 @@
 #include "CREScreenProcess.h"
 
 extern IConsole *iConsole;
+extern ILog *iLog;
 
 #define SET_PARAMETER(pProcess, pParam, pType, pValue) \
     case (pProcess): (pParam) = *((pType*)(pValue)); break;
@@ -140,8 +141,19 @@ void CREScreenProcess::mfPrepare()
 {
 }
 
-bool CREScreenProcess::mfDraw(SShader *, SShaderPass *)
+bool CREScreenProcess::mfDraw(SShader *ef, SShaderPass *)
 {
+    static bool s_loggedOnce = false;
+    static int s_hitCount = 0;
+    ++s_hitCount;
+    if (iLog && (!s_loggedOnce || (s_hitCount % 300) == 0)) {
+        s_loggedOnce = true;
+        const char *shaderName =
+            (ef && ef->m_Name.length() > 0) ? ef->m_Name.c_str() : "(none)";
+        iLog->Log("CREScreenProcess::mfDraw (Metal stub): eDATA_ScreenProcess draw requested but "
+                   "no Metal draws are issued (shader=%s, hit=%d)",
+                   shaderName, s_hitCount);
+    }
     return false;
 }
 

@@ -13,6 +13,7 @@ This document is a **closure-oriented** path from “macOS build runs” to **sh
 | [`metal-shader-load-fatal-resolution.md`](metal-shader-load-fatal-resolution.md) | `ShaderLoadFatal` policy, resolution tiers, decision tree, LLDB workflow |
 | [`shader-aliases.md`](shader-aliases.md) | Original CryEngine alias semantics vs Metal port (tiers 1–4) |
 | [`metal_pso_validate.md`](metal_pso_validate.md) | Offline **`metal_pso_validate`** binary: manifest-driven PSO creation with vertex descriptor + function constants + pipeline parity |
+| [`metal_3d_visual_pitfalls.md`](metal_3d_visual_pitfalls.md) | Black / invisible level **after** shader `lookupAliases` work: GPU capture, `r_HDRRendering` A/B, `CREScreenProcess` stub vs D3D9 |
 
 ---
 

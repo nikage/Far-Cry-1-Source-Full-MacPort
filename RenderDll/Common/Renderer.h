@@ -952,6 +952,9 @@ public:
 
   static int CV_r_geominstancing;
 
+  /// Metal (macOS): 0 = default throttled errors only; 1 = extra encoder/HDR context on early frames; 2 = periodic PSO-skip summary.
+  static int CV_r_metalrenderdiag;
+
   static int CV_r_nobumpmap;
   static int CV_r_bumpselfshadow;
   static int CV_r_selfshadow;

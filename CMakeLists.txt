@@ -1,4 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
+if(CMAKE_HOST_APPLE)
+    if(NOT CMAKE_OSX_SYSROOT OR CMAKE_OSX_SYSROOT MATCHES "\\.app/")
+        set(CMAKE_OSX_SYSROOT "macosx" CACHE STRING
+            "Active Xcode default macOS SDK (avoids pinning generated Xcode projects to a removed Xcode.app path)"
+            FORCE)
+    endif()
+endif()
 project(FarCry VERSION 1.34 LANGUAGES C CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -7,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Platform detection
 if(APPLE)
     message(STATUS "Building working Far Cry for macOS ARM64 (Apple Silicon)")
+    set(FARCRY_MACOS_BUNDLE_IDENTIFIER "com.crytek.farcry" CACHE STRING "FarCry.app bundle ID; needs App ID + profile when FARCRY_APPLE_DEVELOPMENT_TEAM is set")
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
     
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
@@ -44,22 +52,62 @@ if(APPLE)
     find_library(CARBON_FRAMEWORK Carbon REQUIRED)
     find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
 
-    # Require the Metal shader compiler (xcrun metal).
-    # The binary lives inside the Xcode toolchain and is not on $PATH,
-    # so find_program is unreliable — use xcrun directly.
+    set(_farcry_metal_ok 0)
+    set(_farcry_metal_diag "")
     execute_process(
-        COMMAND xcrun -sdk macosx metal --version
-        OUTPUT_QUIET
-        ERROR_QUIET
-        RESULT_VARIABLE METAL_COMPILER_CHECK
+        COMMAND xcrun metal --version
+        OUTPUT_VARIABLE _farcry_metal_out
+        ERROR_VARIABLE _farcry_metal_err
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE _farcry_metal_r
     )
-    if(NOT METAL_COMPILER_CHECK EQUAL 0)
-        message(FATAL_ERROR "Metal shader compiler not found.\n"
-                            "Ensure Xcode is installed and selected as the active developer directory:\n"
-                            "  sudo xcode-select -s /Applications/Xcode.app\n"
-                            "Then re-run cmake.")
+    set(_farcry_metal_diag "${_farcry_metal_out}${_farcry_metal_err}")
+    if(_farcry_metal_r EQUAL 0)
+        set(_farcry_metal_ok 1)
+    endif()
+    if(NOT _farcry_metal_ok)
+        execute_process(
+            COMMAND xcrun -sdk macosx metal --version
+            OUTPUT_VARIABLE _farcry_metal_out2
+            ERROR_VARIABLE _farcry_metal_err2
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _farcry_metal_r2
+        )
+        string(APPEND _farcry_metal_diag "${_farcry_metal_out2}${_farcry_metal_err2}")
+        if(_farcry_metal_r2 EQUAL 0)
+            set(_farcry_metal_ok 1)
+        endif()
+    endif()
+    if(NOT _farcry_metal_ok)
+        execute_process(
+            COMMAND xcode-select -p
+            OUTPUT_VARIABLE _farcry_xcode_select_p
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(_farcry_metal_diag MATCHES "MetalToolchain|downloadComponent")
+            message(FATAL_ERROR "Metal Toolchain is not installed for this Xcode.\n"
+                "Install it, then re-run cmake:\n"
+                "  xcodebuild -downloadComponent MetalToolchain\n"
+                "Or open Xcode → Settings → Platforms / Components and install the Metal toolchain.\n"
+                "Active developer directory: ${_farcry_xcode_select_p}\n"
+                "xcrun said: ${_farcry_metal_diag}")
+        endif()
+        message(FATAL_ERROR "Metal shader compiler not found (xcrun metal --version failed).\n"
+            "Use full Xcode (not Command Line Tools only) and select it:\n"
+            "  sudo xcode-select -s /Applications/Xcode.app/Contents/Developer\n"
+            "Active developer directory: ${_farcry_xcode_select_p}\n"
+            "xcrun output: ${_farcry_metal_diag}")
     endif()
     message(STATUS "Metal shader compiler: found (xcrun metal)")
+
+    if(CMAKE_GENERATOR STREQUAL "Xcode")
+        set(FARCRY_APPLE_DEVELOPMENT_TEAM "" CACHE STRING "Development Team ID for FarCry.app (Manual + Apple Development)")
+        set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS "YES")
+        set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual")
+        set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Sign to Run Locally")
+        message(STATUS "Xcode: engine dylibs skip Xcode sign (codesign in stage_dylib_to_bundle); FarCry.app Manual/local or Apple Development")
+    endif()
 endif()
 
 # Include directories
@@ -107,12 +155,14 @@ endif()
 function(stage_dylib_to_bundle tgt)
     if(APPLE)
         add_custom_command(TARGET ${tgt} POST_BUILD
+            COMMAND xcrun codesign --sign - --force --timestamp=none
+                "$<TARGET_FILE:${tgt}>"
             COMMAND ${CMAKE_COMMAND} -E make_directory
                 "${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "$<TARGET_FILE:${tgt}>"
                 "${CMAKE_BINARY_DIR}/FarCry.app/Contents/MacOS/"
-            COMMENT "Staging ${tgt} to app bundle"
+            COMMENT "Ad-hoc sign and stage ${tgt} to app bundle"
         )
     endif()
 endfunction()
@@ -190,11 +240,42 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_NAME "Far Cry"
         MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
         MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-        MACOSX_BUNDLE_IDENTIFIER "com.crytek.farcry"
+        MACOSX_BUNDLE_IDENTIFIER "${FARCRY_MACOS_BUNDLE_IDENTIFIER}"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/FARCRY/Info.plist.in"
     )
 
     add_dependencies(FarCry XRenderMetal)
+
+    if(CMAKE_GENERATOR STREQUAL "Xcode")
+        set(_farcry_dylib_targets
+            CrySystem Cry3DEngine CryEntitySystem CryAnimation CryInput CryMovie
+            CryPhysics CryAISystem CryFont CryNetwork CryScriptSystem CrySoundSystem
+            CryGame XRenderMetal)
+        foreach(_t ${_farcry_dylib_targets})
+            if(TARGET ${_t})
+                set_target_properties(${_t} PROPERTIES
+                    XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
+                    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO)
+            endif()
+        endforeach()
+        set_target_properties(FarCry PROPERTIES
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${FARCRY_MACOS_BUNDLE_IDENTIFIER}")
+        if(FARCRY_APPLE_DEVELOPMENT_TEAM)
+            set_target_properties(FarCry PROPERTIES
+                XCODE_ATTRIBUTE_CODE_SIGN_STYLE Manual
+                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
+                XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS YES
+                XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${FARCRY_APPLE_DEVELOPMENT_TEAM}")
+        else()
+            set_target_properties(FarCry PROPERTIES
+                XCODE_ATTRIBUTE_CODE_SIGN_STYLE Manual
+                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Sign to Run Locally"
+                XCODE_ATTRIBUTE_CODE_SIGN_INJECT_BASE_ENTITLEMENTS YES
+                XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+                XCODE_ATTRIBUTE_PROVISIONING_PROFILE_SPECIFIER ""
+                XCODE_ATTRIBUTE_PROVISIONING_PROFILE "")
+        endif()
+    endif()
 endif()
 
 # Install

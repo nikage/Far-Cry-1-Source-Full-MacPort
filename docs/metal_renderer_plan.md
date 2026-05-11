@@ -1,6 +1,6 @@
 # Metal Renderer — MacPort Implementation Plan
 
-**See also:** [Metal renderer production roadmap](metal_renderer_production_roadmap.md) — phased path to shippable confidence (packaging, shader resolution, QA, automation).
+**See also:** [Metal renderer production roadmap](metal_renderer_production_roadmap.md) — phased path to shippable confidence (packaging, shader resolution, QA, automation). · [Metal 3D visual pitfalls](metal_3d_visual_pitfalls.md) — black level / no composite after shader `lookupAliases` are fixed (GPU capture, HDR A/B, `CREScreenProcess` stub).
 
 > Status key: ✅ Done · 🔶 Partial · ❌ Blocked · 🔲 Pending
 

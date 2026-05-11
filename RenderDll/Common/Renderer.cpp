@@ -94,6 +94,8 @@ float CRenderer::CV_r_hdrbrightthreshold;
 
 int CRenderer::CV_r_geominstancing;
 
+int CRenderer::CV_r_metalrenderdiag;
+
 int CRenderer::CV_r_bumpselfshadow;
 int CRenderer::CV_r_selfshadow;
 int CRenderer::CV_r_shadowtype;
@@ -365,6 +367,11 @@ CRenderer::CRenderer()
     "HDR rendering bright offset.\n"
     "Usage: r_HDRBrightOffset [Value]\n"
     "Default is 6.0f");
+  iConsole->Register("r_MetalRenderDiag", &CV_r_metalrenderdiag, 0, VF_DUMPTODISK,
+    "Metal renderer extra diagnostics in log.txt.\n"
+    "0 = default (throttled critical messages only).\n"
+    "1 = extra EF_EndEf3D encoder/HDR context on early frames.\n"
+    "2 = also periodic missing-PSO skip summary in EndFrame.\n");
   iConsole->Register("r_GeomInstancing", &CV_r_geominstancing, 1, 0,
     "Toggles HW geometry instancing.\n"
     "Usage: r_GeomInstancing [0/1]\n"

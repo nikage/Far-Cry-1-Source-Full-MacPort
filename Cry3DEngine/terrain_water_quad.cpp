@@ -35,7 +35,7 @@ CWaterOcean::CWaterOcean(IShader * pTerrainWaterShader, int nBottomTexId, IShade
   
   m_pTerrainWaterShader       = pTerrainWaterShader;
   m_pSunRoadShader            = pSunRoadShader;    
-  m_pTerrainWaterBottomShader = GetRenderer()->EF_LoadShader("TerrainWaterBottomSimple", eSH_World, EF_SYSTEM);
+  m_pTerrainWaterBottomShader = GetRenderer()->EF_LoadShader("TerrainWaterBottomSimple", eSH_World, 0);
 
   m_fWaterTranspRatio   = fWaterTranspRatio;
   m_fWaterReflectRatio  = fWaterReflectRatio;
@@ -639,6 +639,8 @@ void CWaterOcean::RenderBottom(int nRecursionLevel)
 {
 	FUNCTION_PROFILER( GetSystem(),PROFILE_3DENGINE );
 	if(nRecursionLevel)
+		return;
+	if(!m_pTerrainWaterBottomShader)
 		return;
 
 	Vec3d vCamPos = GetViewCamera().GetPos();

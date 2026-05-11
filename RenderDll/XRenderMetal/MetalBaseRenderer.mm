@@ -2579,6 +2579,8 @@ bool CMetalBaseRenderer::BeginHDRPass()
         if (m_nFrameID <= 3 && iLog)
             iLog->Log("[MetalDiag] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
 #endif
+        if (CRenderer::CV_r_metalrenderdiag >= 1 && m_nFrameID <= 5 && iLog)
+            iLog->Log("[Metal] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
     }
 #if DEBUG
     if (m_hdrColorRT && !m_renderEncoder)
@@ -2604,6 +2606,14 @@ void CMetalBaseRenderer::EndHDRPass()
     id<MTLTexture> dstTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
     if (!dstTexture)
     {
+        static bool s_loggedNoDrawableForTonemap = false;
+        if (!s_loggedNoDrawableForTonemap && iLog)
+        {
+            s_loggedNoDrawableForTonemap = true;
+            iLog->Log("EndHDRPass: no drawable texture while HDR colour RT exists — tone-map skipped "
+                       "(frame=%d, check AcquireDrawableResources / layer)\n",
+                       m_nFrameID);
+        }
 #if DEBUG
         if (m_hdrColorRT)
             assert(false && "EndHDRPass: no drawable texture while HDR colour RT exists");
@@ -2637,6 +2647,10 @@ void CMetalBaseRenderer::EndHDRPass()
                   (unsigned long)[dstTexture width], (unsigned long)[dstTexture height],
                   m_hdrRTWidth, m_hdrRTHeight);
 #endif
+    if (CRenderer::CV_r_metalrenderdiag >= 1 && m_nFrameID <= 5 && iLog)
+        iLog->Log("[Metal] EndHDRPass frame=%d tone-mapped to drawable %lux%lu",
+                  m_nFrameID,
+                  (unsigned long)[dstTexture width], (unsigned long)[dstTexture height]);
 
     if (!BeginSwapchainRenderPass(MTLLoadActionLoad, MTLLoadActionClear, MTLLoadActionClear))
     {

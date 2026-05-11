@@ -1135,21 +1135,30 @@ bool CSystem::Update( int updateFlags, int nPauseMode )
 		if (m_pProcess && (m_pProcess->GetFlags() & PROC_3DENGINE))
 		{
 			if ((nPauseMode!=1))
-			if (!IsEquivalent(m_ViewCamera.GetPos(),Vec3(0,0,0),VEC_EPSILON))
-			{			
-				if (m_pI3DEngine)
-				{
-					m_pI3DEngine->SetCamera(m_ViewCamera);			
-					m_pProcess->Update();
-
-					//////////////////////////////////////////////////////////////////////////
-					// Strange, !do not remove... ask Timur for the meaning of this.
-					//////////////////////////////////////////////////////////////////////////
-					if (m_nStrangeRatio > 32767)
+			{
+				if (!IsEquivalent(m_ViewCamera.GetPos(),Vec3(0,0,0),VEC_EPSILON))
+				{			
+					if (m_pI3DEngine)
 					{
-						g_nPrecaution = 1 + (rand()%3); // lets get nasty.
+						m_pI3DEngine->SetCamera(m_ViewCamera);			
+						m_pProcess->Update();
+
+						//////////////////////////////////////////////////////////////////////////
+						// Strange, !do not remove... ask Timur for the meaning of this.
+						//////////////////////////////////////////////////////////////////////////
+						if (m_nStrangeRatio > 32767)
+						{
+							g_nPrecaution = 1 + (rand()%3); // lets get nasty.
+						}
+						//////////////////////////////////////////////////////////////////////////
 					}
-					//////////////////////////////////////////////////////////////////////////
+				}
+				else
+				{
+					static int s_gateAUpdateHits = 0;
+					++s_gateAUpdateHits;
+					if (GetILog() && (s_gateAUpdateHits == 1 || (s_gateAUpdateHits % 300) == 0))
+						GetILog()->Log("[EngineGate] CSystem::Update: skipped m_pProcess->Update (PROC_3DENGINE, view camera at origin)");
 				}
 			}
 		}

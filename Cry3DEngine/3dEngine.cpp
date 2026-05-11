@@ -397,7 +397,12 @@ bool C3DEngine::IsCameraAnd3DEngineInvalid(const CCamera cam, const char * szCal
 
 	if (!m_pObjManager || !m_pDecalManager)
 	{
-		//GetLog()->Log("Warning: %s: Engine not initialized or level not loaded");
+		static bool s_gateMgrOnce = false;
+		if (!s_gateMgrOnce && GetLog())
+		{
+			s_gateMgrOnce = true;
+			GetLog()->Log("[EngineGate] IsCameraAnd3DEngineInvalid: ObjManager or DecalManager NULL (engine not ready) caller=%s", szCaller);
+		}
 		return (true); 
 	}
 
@@ -412,6 +417,10 @@ bool C3DEngine::IsCameraAnd3DEngineInvalid(const CCamera cam, const char * szCal
       vCamPos.x, vCamPos.y, vCamPos.z, 
       vAngles.x, vAngles.y, vAngles.z,
       fFov, m_fMaxViewDist, m_fFogFarDist);
+		static int s_gateCamInvalidHits = 0;
+		++s_gateCamInvalidHits;
+		if (GetLog() && (s_gateCamInvalidHits == 1 || (s_gateCamInvalidHits % 120) == 0))
+			GetLog()->Log("[EngineGate] %s: camera or view limits invalid (see Warning line above for Pos/Fov/Fog)", szCaller);
     return true;
   }
 

@@ -40,6 +40,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <string>
+#include <unordered_set>
 #include <cctype>
 #include <memory>
 
@@ -164,6 +165,37 @@ namespace
         depthWrite = (state & GS_DEPTHWRITE) != 0;
         blend = (state & (GS_BLSRC_MASK | GS_BLDST_MASK)) != 0 || NeedsBlend(color);
     }
+}
+
+namespace
+{
+std::atomic<int> g_ef3dMissingPsoTotalSkips{0};
+std::atomic<int> g_ef3dMissingPsoSuppressedDetail{0};
+std::unordered_set<std::string> g_ef3dMissingPsoLoggedShaderNames;
+bool g_ef3dMissingPsoThrottleAnnounced = false;
+
+void MetalLogMissingEf3DPSO(const std::string& shaderName, int vfmt)
+{
+    g_ef3dMissingPsoTotalSkips.fetch_add(1, std::memory_order_relaxed);
+    if (!iLog)
+        return;
+    bool emitted = false;
+    if (g_ef3dMissingPsoLoggedShaderNames.size() < 8u) {
+        if (g_ef3dMissingPsoLoggedShaderNames.insert(shaderName).second) {
+            iLog->Log("Warning: EF_EndEf3D missing Metal PSO (shader=%s vfmt=%d)",
+                       shaderName.c_str(), vfmt);
+            emitted = true;
+        }
+    } else if (g_ef3dMissingPsoLoggedShaderNames.count(shaderName) == 0) {
+        if (!g_ef3dMissingPsoThrottleAnnounced) {
+            g_ef3dMissingPsoThrottleAnnounced = true;
+            iLog->Log("Warning: EF_EndEf3D missing Metal PSO: per-shader detail suppressed "
+                       "after first 8 unique names");
+        }
+    }
+    if (!emitted)
+        g_ef3dMissingPsoSuppressedDetail.fetch_add(1, std::memory_order_relaxed);
+}
 }
 
 // NVDXT texture compression stubs (C++ linkage matching dxtlib.h declarations)
@@ -1182,6 +1214,9 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     return;
   }
 
+  const bool hdrRequested =
+      (nFlags & SHDF_ALLOWHDR) != 0 && m_hdrEnabled && m_hdrColorRT != nil;
+
   // HDR: if flag set and HDR pipeline ready, render into float16 RT
   bool useHDR = (nFlags & SHDF_ALLOWHDR) && m_hdrEnabled
                 && m_hdrColorRT != nil;
@@ -1251,7 +1286,23 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
       if (pTr && pTr->GetIVal() != 0 && iLog)
         iLog->Log("\003[CryTrace] EF_EndEf3D: no active render encoder (frame=%d)", m_nFrameID);
     }
-    iLog->Log("Warning: EF_EndEf3D — no active render encoder");
+    if (iLog) {
+      iLog->Log("Warning: EF_EndEf3D — no active render encoder (frame=%d recurse=%d hdrRequested=%d "
+                 "useHDR=%d nFlags=0x%x)",
+                 m_nFrameID, (int)SRendItem::m_RecurseLevel, hdrRequested ? 1 : 0,
+                 useHDR ? 1 : 0, nFlags);
+      if (m_nFrameID <= 2)
+        iLog->Log("[Metal] EF_EndEf3D encoder nil (startup): toneMapPSO=%p drawable=%p",
+                  m_hdrToneMapPSO, m_currentDrawable);
+      if (CRenderer::CV_r_metalrenderdiag >= 1 && m_nFrameID <= 5) {
+        id<MTLTexture> drawableTex = m_currentDrawable ? m_currentDrawable.texture : nil;
+        iLog->Log("[Metal] EF_EndEf3D encoder nil detail: m_hdrEnabled=%d hdrColorRT=%p "
+                   "drawableTex=%lux%lu",
+                   m_hdrEnabled ? 1 : 0, m_hdrColorRT,
+                   drawableTex ? (unsigned long)[drawableTex width] : 0ul,
+                   drawableTex ? (unsigned long)[drawableTex height] : 0ul);
+      }
+    }
     SRendItem::m_RecurseLevel--;
     return;
   }
@@ -1358,10 +1409,8 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         if (!pso)
           pso = m_shaderManager->GetPipelineStateForFormat(m_RP.m_CurVFormat);
         if (!pso) {
+          MetalLogMissingEf3DPSO(pShader->m_Name, (int)m_RP.m_CurVFormat);
 #if DEBUG
-          if (iLog)
-            iLog->Log("[MetalDiag] EF_EndEf3D: missing PSO shader=%s vfmt=%d",
-                      pShader->m_Name.c_str(), (int)m_RP.m_CurVFormat);
           assert(false && "EF_EndEf3D: missing Metal PSO (shader + format fallback)");
 #endif
           continue;
@@ -2856,6 +2905,16 @@ void CMetalRenderer::Update() {
 void CMetalRenderer::EndFrame() {
   FlushDebugCommands();
   CMetalBaseRenderer::EndFrame();
+
+  if (CRenderer::CV_r_metalrenderdiag >= 2 && iLog && m_nFrameID > 0
+      && (m_nFrameID % 300) == 0) {
+    const int tot = g_ef3dMissingPsoTotalSkips.load(std::memory_order_relaxed);
+    const int sup = g_ef3dMissingPsoSuppressedDetail.load(std::memory_order_relaxed);
+    if (tot > 0) {
+      iLog->Log("[Metal] EF_EndEf3D missing-PSO summary: total_skips=%d events_without_detail_line=%d",
+                 tot, sup);
+    }
+  }
 
 #ifdef DEBUG
   if (m_metalGPUCaptureFlag > 0) {

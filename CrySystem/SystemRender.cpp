@@ -1043,6 +1043,10 @@ void CSystem::Render()
 		else
 		{
 			static int s_skipOriginFrame = 0;
+			static int s_gateARenderHits = 0;
+			++s_gateARenderHits;
+			if (GetILog() && (s_gateARenderHits == 1 || (s_gateARenderHits % 300) == 0))
+				GetILog()->Log("[EngineGate] CSystem::Render: skipped m_pProcess->Draw (PROC_3DENGINE, view camera at origin)");
 			if ((++s_skipOriginFrame % 120) == 0 && GetIConsole())
 			{
 				ICVar* pTr = GetIConsole()->GetCVar("cry_trace_render_gates");

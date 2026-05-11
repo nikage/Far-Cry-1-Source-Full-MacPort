@@ -41,6 +41,10 @@ void C3DEngine::Draw()
 
 	if (!m_bEnabled)
 	{
+		static int s_gateBHits = 0;
+		++s_gateBHits;
+		if (GetLog() && (s_gateBHits == 1 || (s_gateBHits % 300) == 0))
+			GetLog()->Log("[EngineGate] C3DEngine::Draw skipped: I3DEngine::Enable(0) (menu/UI blocked world render)");
 		static int s_traceDisFrame = 0;
 		if ((++s_traceDisFrame % 120) == 0 && GetConsole())
 		{
@@ -175,6 +179,10 @@ void C3DEngine::RenderScene(unsigned int dwDrawFlags)
 	FUNCTION_PROFILER( GetSystem(),PROFILE_3DENGINE );
   if (!m_pTerrain)
   {
+		static int s_gateCTerrainHits = 0;
+		++s_gateCTerrainHits;
+		if (GetLog() && (s_gateCTerrainHits == 1 || (s_gateCTerrainHits % 300) == 0))
+			GetLog()->Log("[EngineGate] RenderScene: m_pTerrain is NULL — no EF_StartEf / world submission");
 		static int s_traceTerrFrame = 0;
 		if ((++s_traceTerrFrame % 120) == 0 && GetConsole())
 		{
@@ -195,7 +203,22 @@ void C3DEngine::RenderScene(unsigned int dwDrawFlags)
 	assert(nRecursionLevel>=0);
 	m_pObjManager->m_nRenderStackLevel = m_pTerrain->m_nRenderStackLevel = nRecursionLevel;
 	if(m_pObjManager->m_nRenderStackLevel<0 || m_pObjManager->m_nRenderStackLevel>1)
+	{
+		static int s_gateCStackHits = 0;
+		++s_gateCStackHits;
+		if (GetLog() && (s_gateCStackHits == 1 || (s_gateCStackHits % 300) == 0))
+			GetLog()->Log("[EngineGate] RenderScene: early return — render stack level %d (want 0..1; EFQ_RecurseLevel=%d)",
+				m_pObjManager->m_nRenderStackLevel, nRecursionLevel);
+		static int s_traceRsFrame = 0;
+		if ((++s_traceRsFrame % 120) == 0 && GetConsole())
+		{
+			ICVar* pTr = GetConsole()->GetCVar("cry_trace_render_gates");
+			if (pTr && pTr->GetIVal() != 0 && GetLog())
+				GetLog()->Log("\003[CryTrace] RenderScene: early return — render stack level %d (want 0..1; EFQ_RecurseLevel=%d)",
+					m_pObjManager->m_nRenderStackLevel, nRecursionLevel);
+		}
 		return;
+	}
 
 #ifdef WIN64
 #pragma warning( pop )									//AMD Port
