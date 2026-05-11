@@ -1473,6 +1473,7 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
         return;
 
     m_generatedVertexEntries.clear();
+    m_perShaderUniforms.Initialize(m_renderer->m_device);
 
     NSError* error = nil;
     id<MTLLibrary> generatedLibrary = nil;
@@ -1783,6 +1784,37 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
             &missingFragmentVertexCount);
         if (rc == 2)
             return;
+
+        if (!normalizedKey.empty())
+        {
+            NSArray* uniformArray = entry[@"uniforms"];
+            NSString* uniformStructName = entry[@"uniformStruct"];
+            NSUInteger structSize = 0;
+            std::vector<MetalPerShaderUniforms::FieldDescriptor> fields =
+                MetalPerShaderUniforms::Binder::BuildFieldsFromManifestUniforms(
+                    uniformArray, &structSize);
+            if (!fields.empty() && structSize > 0)
+            {
+                m_perShaderUniforms.RegisterShader(
+                    normalizedKey.c_str(),
+                    uniformStructName ? [uniformStructName UTF8String] : "",
+                    fields,
+                    structSize);
+            }
+            NSArray* textureArray = entry[@"textures"];
+            if ([textureArray isKindOfClass:[NSArray class]] && [textureArray count] > 0)
+            {
+                m_materialTextureBinder.RegisterShader(normalizedKey.c_str(), textureArray);
+            }
+        }
+    }
+
+    if (iLog)
+    {
+        iLog->Log("\003[MaterialTextureBinder] registered %zu fragment-shader texture layouts",
+                  m_materialTextureBinder.RegisteredShaderCount());
+        iLog->Log("\003[PerShaderUniforms] registered %zu fragment-shader uniform layouts",
+                  m_perShaderUniforms.RegisteredShaderCount());
     }
 
     NSString* builtinAliasPath = [[manifestPath stringByDeletingLastPathComponent]

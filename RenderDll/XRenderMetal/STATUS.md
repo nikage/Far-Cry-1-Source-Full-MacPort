@@ -146,6 +146,177 @@ When `cry_trace_render_gates >= 2`, `ClearStencilBuffer` and the
 `EF_EndEf3D` loop each emit a one-shot `[CryTrace]` line so future
 regressions of the contract are visible in `log.txt`.
 
+## Bisection cvars for the "draws > 0, screen black" symptom
+
+Three console variables drive the investigation path described in
+[`black_3d_scene_investigation_637e93ce.plan.md`](../../.cursor/plans/black_3d_scene_investigation_637e93ce.plan.md).
+All are gated, default-off, and read from the same render thread that submits
+the frame, so toggling them has no measurable cost in shipping builds.
+
+| CVar | Type | Effect |
+|---|---|---|
+| `metal_debug_clear_color`   | packed `0xRRGGBB` | Overrides the swapchain colour clear with the supplied RGB and forces `MTLLoadActionClear`. Splits "swapchain never presents" from "swapchain presents but draws emit black". |
+| `metal_debug_dump_draws`    | non-negative int  | Logs the first N *real* encoder draw submissions across **every** instrumented path — `DrawBuffer(idx/prim)`, `DrawDynVB(pool/idx)`, `DrawTriStrip`, `FullscreenPass`, `HDRToneMap`, `DebugBatched`, `RESky::SkySphere`, `RESky::FogLayer`, `REOcean::mfDraw`, `REOcean::Sector/ScreenLodSetup/ScreenLodFinal`, `Utility::DrawImage`. Each entry lists `site`, `enc`, `pso`, `prim`, `verts`, `indices`. Decrements per logged call. |
+| `metal_debug_disable_depth` | int 0/1           | Forces `SetDepthTest(false)` for every `EF_EndEf3D` scene draw, and emits a one-shot `[MetalDiag] depth-disable engaged` line the first time the path fires so the override is independently observable in the log. |
+
+Because the in-game console is unreachable when the screen is black, the
+canonical way to set them is `SystemCfgOverride.Cfg` next to the executable
+(`FarCry.app/Contents/MacOS/SystemCfgOverride.Cfg`) — that directory is the
+process cwd at launch on macOS, which is what `CSystem::LoadConfiguration`
+opens via `fopen`. Example:
+
+```
+metal_debug_clear_color = "16711935"  -- 0xFF00FF magenta
+metal_debug_dump_draws  = "8"
+cry_trace_render_gates  = "2"
+```
+
+`CSystem::LoadConfiguration` runs the file once at `SystemInit.cpp:1292`,
+which is **before** the renderer registers its cvars in
+`CMetalRenderer::Init`. To make renderer-owned cvars from the override
+take effect, `RegisterMetalConsoleVariables` re-invokes
+`iSystem->LoadConfiguration("SystemCfgOverride.Cfg")` immediately after
+registration. It also accepts environment-variable fallbacks
+(`METAL_DEBUG_CLEAR_COLOR`, `METAL_DEBUG_DUMP_DRAWS`,
+`METAL_DEBUG_DISABLE_DEPTH`, `CRY_TRACE_RENDER_GATES`) so the bisection
+can be driven without modifying any file:
+
+```
+METAL_DEBUG_CLEAR_COLOR=16711935 \
+METAL_DEBUG_DUMP_DRAWS=16 \
+CRY_TRACE_RENDER_GATES=2 \
+./cmake-build-debug/FarCry.app/Contents/MacOS/FarCry
+```
+
+Diagnostic flow:
+
+```mermaid
+flowchart TD
+  startBlack[Black scene with draws_gt_0]
+  startBlack --> clear[Set metal_debug_clear_color = 0xFF00FF]
+  clear --> question{Screen turns magenta?}
+  question -->|"no"| present[Swapchain present or RT path is broken]
+  question -->|"yes"| dumpDraws[Set metal_debug_dump_draws = 32]
+  dumpDraws --> inspect[Inspect MetalDiag DrawBuffer entries for nil PSO or empty buffers]
+  inspect --> depthExp[Set metal_debug_disable_depth = 1]
+  depthExp --> outcome{Scene appears?}
+  outcome -->|"yes"| depthFix[Depth attachment or projection problem]
+  outcome -->|"no"| shading[Uniform or light buffer problem, see EF_Eval gaps]
+```
+
+The dump helper lives in `RenderDll/XRenderMetal/MetalDrawDiag.{h,mm}` and is
+invoked immediately before every `[encoder draw*Primitives:]` call in the
+renderer. The DrawBuffer-only dump that used to live inline in
+`CMetalBaseRenderer::DrawBuffer` is removed — RE-paths such as `CMetalRESky`,
+`CMetalREOcean`, and `CMetalRenderer::ExecuteDebugCommands` bypass `DrawBuffer`
+and would otherwise drop out of the bisection. A consequence: when the dump
+reports zero entries but `EndFrame draws=N (>0)`, the only explanation is that
+draws are going through a *non-instrumented* path (only `MetalOptimizations.mm`
+indirect command encoder and the test shaders are exempt today), which is itself
+a bug worth surfacing.
+
+Source-level tests in `RendererLogicTests.cpp`
+(`test_metal_debug_cvars_registered`,
+`test_metal_draw_diag_module_present`,
+`test_metal_draw_diag_instrumented_at_every_encoder_draw_site`,
+`test_metal_draw_diag_call_precedes_encoder_draw`,
+`test_metal_debug_clear_color_overrides_pass_descriptor`,
+`test_metal_debug_disable_depth_disables_depth_in_EF_EndEf3D`)
+lock the wiring against future regressions.
+
+## Per-shader uniform buffer at fragment slot 2
+
+The generated fragment shaders (`RenderDll/XRenderMetal/Generated/*.metal`)
+declare their per-shader uniform struct at `[[buffer(2)]]`
+(`kMetalPerShaderFragmentUniformSlot`). Slots 0 and 1 are reserved for the
+global `Uniforms` and the per-draw `MaterialUniforms`. Until this fix
+landed, slot 2 was never bound, so every `uniforms.Diffuse`,
+`uniforms.Ambient`, `uniforms.GlobalFogColor` access read zero. The result
+was `OUT.Color = decalColor * NdotL * 0 = black` for the entire world,
+even though PSOs, textures, depth state, and vertex streams were all
+correct. The black-scene investigation log nailed it down to this slot
+once the diagnostic firehose showed 481/512 world draws hitting the
+`cgrcbump_diff` PSO with the proper encoder.
+
+`RenderDll/XRenderMetal/MetalPerShaderUniforms.{h,mm}` introduces
+`MetalPerShaderUniforms::Binder`, a single-responsibility module that:
+
+1. Parses each fragment shader's `uniforms` array out of
+   `generated_manifest.json` at startup (offsets computed from the field
+   types, struct size aligned to 16 bytes).
+2. Owns a Metal ring buffer (`PerShaderUniformsRing`) that is reset every
+   `BeginFrame` and grown if a frame ever exceeds its 64 KB starting
+   capacity.
+3. Looks up the active shader's field list at draw time, packs the
+   current values from the engine's `MaterialUniformsData` /
+   `UniformBufferData` snapshots into the next 256-byte-aligned slot, and
+   binds the buffer at slot 2 of the fragment stage.
+
+The named field → CPU-source mapping is intentionally small and explicit
+(`Diffuse`, `Ambient`, `Specular`, `FogColor`/`GlobalFogColor`,
+`DiffuseSun`). Unknown fields are zero-filled and emit a one-shot
+`[PerShaderUniforms] no supplier for field 'X' — zeroed` log line so the
+gap is visible without flooding. Adding suppliers for the long tail of
+post-process uniforms is straightforward: register the source pointer in
+`Binder::PackField`.
+
+Wiring lives in `CMetalShaderManager::LoadGeneratedShaders`
+(`MetalShaderLoader.mm`, registers each shader's field list once) and in
+`CMetalRenderer::EF_EndEf3D` (binds the packed slot immediately after
+`setRenderPipelineState` and before the draw). Source-level regressions
+(`test_metal_per_shader_uniforms_module_present`,
+`test_metal_per_shader_uniforms_registered_in_manifest_loader`,
+`test_metal_per_shader_uniforms_bound_in_ef_endef3d`,
+`test_metal_per_shader_uniforms_reset_each_frame`) keep the four call
+sites from drifting.
+
+## Material texture binding (fragment slots 0..N)
+
+The Metal port stubs `CShader::mfCompileHW` to `return nullptr` in
+`RenderDll/Common/MacOSStubs.cpp`, which means `pShader->m_HWTechniques`
+stays empty for every game material shader. The render-item loop in
+`EF_EndEf3D` then computes `pPass = nullptr` and the engine's normal
+texture-binding entry point (`pPass->mfSetTextures()`, which would have
+populated fragment slots via `SShaderPass::m_TUnits`) is a silent no-op.
+That left **fragment texture slots 0..N unbound** for every world draw;
+the generated `cgrcbump_diff` fragment sampled nil at `baseMap` and
+`bumpMap`, returning zero, which the rest of the math multiplied out to
+pure black — even after the per-shader uniform fix above. The
+`metal_debug_dump_texunits` cvar made this visible by logging
+`pPass=nil` for all 16 instrumented draws.
+
+`RenderDll/XRenderMetal/MetalMaterialTextureBinder.{h,mm}` introduces
+`MetalMaterialTextureBinder::Binder`, which sidesteps the dead
+`m_HWTechniques` path entirely:
+
+1. Reads each fragment shader's `textures` array out of
+   `generated_manifest.json` (e.g. `cgrcbump_diff →
+   baseMap@0, bumpMap@1, normCubeMap@2`) at startup and stores it
+   keyed by the normalized shader name.
+2. Maps each manifest texture name to its `EFTT_*` slot in
+   `SRenderShaderResources::m_Textures[]` via a static name table
+   (`baseMap → EFTT_DIFFUSE`, `bumpMap → EFTT_BUMP`,
+   `glossMap → EFTT_GLOSS`, etc.).
+3. At draw time, for each entry in the layout, resolves the
+   live `ITexPic` from the current `pRes` and binds the corresponding
+   `id<MTLTexture>` and the default `MTLSamplerState` to the
+   fragment slot the shader expects.
+4. Engine-built-in textures (`normCubeMap`, `attenMap`, `projMap`,
+   `shadMap*`, fog/screen/HDR luminance maps, …) have no entry in
+   `m_Textures`. They fall back to the 1×1 white texture so geometry
+   is visible while we keep porting the built-in suppliers. The
+   binder logs a single `[MaterialTextureBinder] no EFTT mapping for
+   fragment texture name 'X'` line per unknown non-built-in name so
+   regressions are still surfaced.
+
+Wiring lives in `CMetalShaderManager::LoadGeneratedShaders`
+(registers each shader once) and in `CMetalRenderer::EF_EndEf3D`
+(`GetMaterialTextureBinder().BindForShader(...)` runs immediately after
+the PSO and per-shader uniform binds, before `ri.Item->mfDraw`).
+Source-level regressions (`test_metal_material_texture_binder_module_present`,
+`test_metal_material_texture_binder_registered_in_manifest_loader`,
+`test_metal_material_texture_binder_bound_in_ef_endef3d`) lock the wiring.
+
 ## Telemetry conventions
 
 - Stub-hit telemetry uses `METAL_STUB_TRACE(tag, fmt, ...)` /

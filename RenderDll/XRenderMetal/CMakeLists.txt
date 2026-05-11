@@ -25,6 +25,9 @@ set(XRENDER_METAL_SOURCES
     MetalREFlareGeom.mm
     MetalOptimizations.mm
     MetalImageStubs.mm
+    MetalDrawDiag.mm
+    MetalPerShaderUniforms.mm
+    MetalMaterialTextureBinder.mm
 )
 
 # Metal renderer header files (not compiled, only included)
@@ -142,6 +145,18 @@ set_source_files_properties(MetalOptimizations.mm PROPERTIES
 )
 
 set_source_files_properties(MetalImageStubs.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalDrawDiag.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalPerShaderUniforms.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalMaterialTextureBinder.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 

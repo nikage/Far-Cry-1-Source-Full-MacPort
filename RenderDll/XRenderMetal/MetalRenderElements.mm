@@ -21,6 +21,7 @@
 #include "MetalRenderer.m"
 #include "MetalTextureManager.m"
 #include "MetalShaderManager.m"
+#include "MetalDrawDiag.h"
 #include "I3DEngine.h"
 #include "ISystem.h"
 #include "LeafBuffer.h"
@@ -203,6 +204,10 @@ public:
             [enc setRenderPipelineState:pso];
             [enc setVertexBuffer:vbuf   offset:0 atIndex:0];
             [enc setVertexBuffer:r->m_uniformBuffer offset:0 atIndex:kMetalVertexUniformSlot];
+            MetalDrawDiag::OnDrawCall("RESky::SkySphere", enc, pso,
+                                      MTLPrimitiveTypeTriangle,
+                                      (NSUInteger)vertices.size(),
+                                      (NSUInteger)indices.size());
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                             indexCount:(NSUInteger)indices.size()
                              indexType:MTLIndexTypeUInt16
@@ -251,6 +256,8 @@ public:
         [r->m_renderEncoder setVertexBuffer:r->m_uniformBuffer
                                      offset:0
                                     atIndex:kMetalVertexUniformSlot];
+        MetalDrawDiag::OnDrawCall("RESky::FogLayer", r->m_renderEncoder, pso,
+                                  MTLPrimitiveTypeTriangle, (NSUInteger)nFogVerts, 0);
         [r->m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle
                                vertexStart:0
                                vertexCount:(NSUInteger)nFogVerts];
@@ -711,6 +718,8 @@ public:
         [r->m_renderEncoder setVertexBuffer:r->m_uniformBuffer
                                      offset:0
                                     atIndex:kMetalVertexUniformSlot];
+        MetalDrawDiag::OnDrawCall("REOcean::mfDraw", r->m_renderEncoder, pso,
+                                  MTLPrimitiveTypeTriangle, 0, (NSUInteger)m_indexCount);
         [r->m_renderEncoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                                        indexCount:m_indexCount
                                         indexType:MTLIndexTypeUInt16

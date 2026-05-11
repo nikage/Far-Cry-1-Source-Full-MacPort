@@ -23,6 +23,7 @@
 #include "I3DEngine.h"
 #include "VertexFormats.h"
 #include "../Common/StubTelemetry.h"
+#include "MetalDrawDiag.h"
 #include <Cocoa/Cocoa.h>
 #include <cstring>
 #include <cmath>
@@ -680,9 +681,21 @@ MTLRenderPassDescriptor* CMetalBaseRenderer::GetOrCreateRenderPassDescriptor(id<
             }
             
             renderPassDescriptor.colorAttachments[0].texture = colorTexture;
-            renderPassDescriptor.colorAttachments[0].loadAction = colorLoad;
+            extern int g_metal_debug_clear_color;
+            MTLLoadAction effectiveColorLoad = colorLoad;
+            MTLClearColor effectiveColorClear = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+            if (g_metal_debug_clear_color != 0)
+            {
+                const int packed = g_metal_debug_clear_color;
+                const double r = ((packed >> 16) & 0xFF) / 255.0;
+                const double g = ((packed >>  8) & 0xFF) / 255.0;
+                const double b = ((packed >>  0) & 0xFF) / 255.0;
+                effectiveColorClear = MTLClearColorMake(r, g, b, 1.0);
+                effectiveColorLoad  = MTLLoadActionClear;
+            }
+            renderPassDescriptor.colorAttachments[0].loadAction = effectiveColorLoad;
             renderPassDescriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
-            renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+            renderPassDescriptor.colorAttachments[0].clearColor = effectiveColorClear;
         }
         
         if (depthStencilTexture)
@@ -1018,13 +1031,13 @@ void CMetalBaseRenderer::BeginFrame()
 #if DEBUG
     if (needsDrawable && m_currentDrawable && m_nFrameID <= 3 && iLog)
     {
-        iLog->Log("[MetalDiag] BeginFrame #%d m_width=%d m_height=%d hdrRT=%dx%d vp=%dx%d",
+        iLog->Log("\003[MetalDiag] BeginFrame #%d m_width=%d m_height=%d hdrRT=%dx%d vp=%dx%d",
                   m_nFrameID, m_width, m_height, m_hdrRTWidth, m_hdrRTHeight,
                   m_viewportWidth, m_viewportHeight);
         if (m_metalLayer)
         {
             CGSize ds = m_metalLayer.drawableSize;
-            iLog->Log("[MetalDiag] layer drawable=%.0fx%.0f contentsScale=%.3f",
+            iLog->Log("\003[MetalDiag] layer drawable=%.0fx%.0f contentsScale=%.3f",
                       ds.width, ds.height, m_metalLayer.contentsScale);
         }
     }
@@ -1074,7 +1087,7 @@ void CMetalBaseRenderer::EndFrame()
 #if DEBUG
     if (iLog && (m_nFrameID <= 15 || (m_nFrameID % 300) == 0))
     {
-        iLog->Log("[MetalDiag] EndFrame frame=%d draws=%d tris=%d size=%dx%d lastEF3D_HDR=%d",
+        iLog->Log("\003[MetalDiag] EndFrame frame=%d draws=%d tris=%d size=%dx%d lastEF3D_HDR=%d",
                   m_nFrameID, m_numDrawCalls, m_numTriangles, m_width, m_height,
                   m_lastEf3DUsedHDR ? 1 : 0);
     }
@@ -1084,7 +1097,7 @@ void CMetalBaseRenderer::EndFrame()
         static bool s_loggedZeroDrawSession = false;
         if (!s_loggedZeroDrawSession)
         {
-            iLog->Log("[MetalDiag] EndFrame: zero draws/tris after frame 60 — check EF_EndEf3D / PSO / buckets");
+            iLog->Log("\003[MetalDiag] EndFrame: zero draws/tris after frame 60 — check EF_EndEf3D / PSO / buckets");
             s_loggedZeroDrawSession = true;
         }
     }
@@ -1865,6 +1878,8 @@ void CMetalBaseRenderer::DrawDynVB(int nOffs, int Pool, int nVerts)
     
     [m_renderEncoder setVertexBuffer:pool.buffer offset:offset atIndex:kMetalVertexStream_General];
     [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
+    MetalDrawDiag::OnDrawCall("DrawDynVB(pool)", m_renderEncoder, m_currentPipelineState,
+                              MTLPrimitiveTypeTriangle, (NSUInteger)nVerts, 0);
     [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:nVerts];
     
     m_numDrawCalls++;
@@ -1911,6 +1926,8 @@ void CMetalBaseRenderer::DrawDynVB(struct_VERTEX_FORMAT_P3F_COL4UB_TEX2F* pBuf,
             static_cast<size_t>(nOffs) * static_cast<size_t>(vertexSize);
         [m_renderEncoder setVertexBuffer:m_dynamicVBPools[0].buffer offset:vertexByteOffset atIndex:kMetalVertexStream_General];
         [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
+        MetalDrawDiag::OnDrawCall("DrawDynVB(idx)", m_renderEncoder, m_currentPipelineState,
+                                  primType, (NSUInteger)nVerts, (NSUInteger)nInds);
         [m_renderEncoder drawIndexedPrimitives:primType 
                                     indexCount:nInds 
                                      indexType:MTLIndexTypeUInt16 
@@ -1982,6 +1999,9 @@ void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices,
             return;
         }
         size_t indexOffset = offsindex * sizeof(unsigned short);
+        MetalDrawDiag::OnDrawCall("DrawBuffer(idx)", m_renderEncoder, m_currentPipelineState,
+                                  primType, (NSUInteger)(vert_stop > vert_start ? vert_stop - vert_start : 0),
+                                  (NSUInteger)numindices);
         [m_renderEncoder drawIndexedPrimitives:primType 
                                     indexCount:numindices 
                                      indexType:MTLIndexTypeUInt16 
@@ -1994,6 +2014,8 @@ void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices,
     else
     {
         int vertCount = (vert_stop > 0) ? (vert_stop - vert_start) : src->m_NumVerts;
+        MetalDrawDiag::OnDrawCall("DrawBuffer(prim)", m_renderEncoder, m_currentPipelineState,
+                                  primType, (NSUInteger)vertCount, 0);
         [m_renderEncoder drawPrimitives:primType vertexStart:vert_start vertexCount:vertCount];
         
         m_numDrawCalls++;
@@ -2023,6 +2045,8 @@ void CMetalBaseRenderer::DrawTriStrip(CVertexBuffer* src, int vert_num)
     {
         [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
     }
+    MetalDrawDiag::OnDrawCall("DrawTriStrip", m_renderEncoder, m_currentPipelineState,
+                              MTLPrimitiveTypeTriangleStrip, (NSUInteger)vert_num, 0);
     [m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip 
                         vertexStart:0 
                         vertexCount:vert_num];
@@ -2551,6 +2575,7 @@ static void runFullscreenPass(id<MTLCommandBuffer> cb,
     [enc setRenderPipelineState:pso];
     [enc setFragmentTexture:srcTex atIndex:0];
     [enc setFragmentSamplerState:samp atIndex:0];
+    MetalDrawDiag::OnDrawCall("FullscreenPass", enc, pso, MTLPrimitiveTypeTriangle, 3, 0);
     [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [enc endEncoding];
 }
@@ -2644,7 +2669,7 @@ bool CMetalBaseRenderer::BeginHDRPass()
         SetScissor(0, 0, m_hdrRTWidth, m_hdrRTHeight);
 #if DEBUG
         if (m_nFrameID <= 3 && iLog)
-            iLog->Log("[MetalDiag] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
+            iLog->Log("\003[MetalDiag] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
 #endif
         if (CRenderer::CV_r_metalrenderdiag >= 1 && m_nFrameID <= 5 && iLog)
             iLog->Log("[Metal] BeginHDRPass frame=%d hdrRT=%dx%d", m_nFrameID, m_hdrRTWidth, m_hdrRTHeight);
@@ -2705,11 +2730,13 @@ void CMetalBaseRenderer::EndHDRPass()
     [tonemapEncoder setFragmentTexture:m_hdrColorRT atIndex:0];
     [tonemapEncoder setFragmentTexture:(m_bloomBlurVRT ? m_bloomBlurVRT : m_hdrColorRT) atIndex:1];
     [tonemapEncoder setFragmentSamplerState:m_hdrSampler atIndex:0];
+    MetalDrawDiag::OnDrawCall("HDRToneMap", tonemapEncoder, m_hdrToneMapPSO,
+                              MTLPrimitiveTypeTriangle, 3, 0);
     [tonemapEncoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [tonemapEncoder endEncoding];
 #if DEBUG
     if (m_nFrameID <= 3 && iLog)
-        iLog->Log("[MetalDiag] EndHDRPass frame=%d tonemap dst=%lux%lu hdrTex=%dx%d",
+        iLog->Log("\003[MetalDiag] EndHDRPass frame=%d tonemap dst=%lux%lu hdrTex=%dx%d",
                   m_nFrameID,
                   (unsigned long)[dstTexture width], (unsigned long)[dstTexture height],
                   m_hdrRTWidth, m_hdrRTHeight);

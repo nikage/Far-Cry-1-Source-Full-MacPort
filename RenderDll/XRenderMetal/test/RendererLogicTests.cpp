@@ -2848,6 +2848,448 @@ static void test_ef_endef3d_resets_prev_shader_on_encoder_swap()
     CHECK(swapBlock.find("encoder = m_renderEncoder") != std::string::npos);
 }
 
+static void test_metal_debug_cvars_registered()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    CHECK(src.find("int g_metal_debug_clear_color") != std::string::npos);
+    CHECK(src.find("int g_metal_debug_dump_draws")  != std::string::npos);
+    CHECK(src.find("int g_metal_debug_disable_depth") != std::string::npos);
+    CHECK(src.find("int g_metal_debug_dump_scope")    != std::string::npos);
+    CHECK(src.find("int g_metal_debug_dump_texunits") != std::string::npos);
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::RegisterMetalConsoleVariables()");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+    CHECK(body.find("\"metal_debug_clear_color\"")   != std::string::npos);
+    CHECK(body.find("\"metal_debug_dump_draws\"")    != std::string::npos);
+    CHECK(body.find("\"metal_debug_disable_depth\"") != std::string::npos);
+    CHECK(body.find("\"metal_debug_dump_scope\"")    != std::string::npos);
+    CHECK(body.find("\"metal_debug_dump_texunits\"") != std::string::npos);
+    CHECK(body.find("&g_metal_debug_clear_color")   != std::string::npos);
+    CHECK(body.find("&g_metal_debug_dump_draws")    != std::string::npos);
+    CHECK(body.find("&g_metal_debug_disable_depth") != std::string::npos);
+    CHECK(body.find("&g_metal_debug_dump_scope")    != std::string::npos);
+    CHECK(body.find("&g_metal_debug_dump_texunits") != std::string::npos);
+
+    const std::string unregBody =
+        _find_function_body(src, "void CMetalRenderer::UnregisterMetalConsoleVariables()");
+    CHECK(!unregBody.empty());
+    if (unregBody.empty()) return;
+    CHECK(unregBody.find("\"metal_debug_clear_color\"")   != std::string::npos);
+    CHECK(unregBody.find("\"metal_debug_dump_draws\"")    != std::string::npos);
+    CHECK(unregBody.find("\"metal_debug_disable_depth\"") != std::string::npos);
+    CHECK(unregBody.find("\"metal_debug_dump_scope\"")    != std::string::npos);
+    CHECK(unregBody.find("\"metal_debug_dump_texunits\"") != std::string::npos);
+
+    CHECK(body.find("iSystem->LoadConfiguration(\"SystemCfgOverride.Cfg\")") != std::string::npos);
+    CHECK(body.find("getenv(envName)") != std::string::npos);
+    CHECK(body.find("\"METAL_DEBUG_CLEAR_COLOR\",")   != std::string::npos);
+    CHECK(body.find("\"METAL_DEBUG_DUMP_DRAWS\",")    != std::string::npos);
+    CHECK(body.find("\"METAL_DEBUG_DISABLE_DEPTH\",") != std::string::npos);
+    CHECK(body.find("\"METAL_DEBUG_DUMP_SCOPE\",")    != std::string::npos);
+    CHECK(body.find("\"CRY_TRACE_RENDER_GATES\",")    != std::string::npos);
+
+    const size_t registerEnd = body.rfind("iConsole->Register");
+    const size_t reapply     = body.find("iSystem->LoadConfiguration(\"SystemCfgOverride.Cfg\")");
+    if (registerEnd != std::string::npos && reapply != std::string::npos)
+        CHECK(reapply > registerEnd);
+}
+
+static void test_metal_debug_clear_color_overrides_pass_descriptor()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalBaseRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src,
+        "MTLRenderPassDescriptor* CMetalBaseRenderer::GetOrCreateRenderPassDescriptor(id<MTLTexture> colorTexture, ");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    CHECK(body.find("extern int g_metal_debug_clear_color") != std::string::npos);
+    CHECK(body.find("g_metal_debug_clear_color != 0")       != std::string::npos);
+    CHECK(body.find("MTLLoadActionClear")                   != std::string::npos);
+
+    const size_t check = body.find("g_metal_debug_clear_color != 0");
+    if (check != std::string::npos)
+    {
+        const std::string after = body.substr(check, 600);
+        CHECK(after.find(">> 16") != std::string::npos);
+        CHECK(after.find(">>  8") != std::string::npos);
+        CHECK(after.find("0xFF")  != std::string::npos);
+        CHECK(after.find("MTLClearColorMake(r, g, b, 1.0)") != std::string::npos);
+    }
+}
+
+static void test_metal_draw_diag_module_present()
+{
+    const std::string hPath  = _walk_up_for("RenderDll/XRenderMetal/MetalDrawDiag.h");
+    const std::string mmPath = _walk_up_for("RenderDll/XRenderMetal/MetalDrawDiag.mm");
+    CHECK(!hPath.empty());
+    CHECK(!mmPath.empty());
+    if (hPath.empty() || mmPath.empty()) return;
+
+    const std::string hdr  = _read_file(hPath);
+    const std::string body = _read_file(mmPath);
+    CHECK(!hdr.empty());
+    CHECK(!body.empty());
+
+    CHECK(hdr.find("namespace MetalDrawDiag") != std::string::npos);
+    CHECK(hdr.find("void OnDrawCall(")        != std::string::npos);
+    CHECK(hdr.find("void OnDepthDisableFired(") != std::string::npos);
+    CHECK(hdr.find("void EnterEf3DScope(")    != std::string::npos);
+    CHECK(hdr.find("void LeaveEf3DScope(")    != std::string::npos);
+    CHECK(hdr.find("struct Ef3DScopeGuard")   != std::string::npos);
+    CHECK(hdr.find("void OnPSOBind(")         != std::string::npos);
+
+    CHECK(body.find("extern int g_metal_debug_dump_draws")  != std::string::npos);
+    CHECK(body.find("extern int g_metal_debug_dump_scope")  != std::string::npos);
+    CHECK(body.find("--g_metal_debug_dump_draws")           != std::string::npos);
+    CHECK(body.find("[MetalDiag] Draw site=")               != std::string::npos);
+    CHECK(body.find("ef3d=%d")                              != std::string::npos);
+    CHECK(body.find("[MetalDiag] depth-disable engaged")    != std::string::npos);
+    CHECK(body.find("static bool s_loggedOnce")             != std::string::npos);
+    CHECK(body.find("s_ef3dScopeDepth")                     != std::string::npos);
+    CHECK(body.find("g_metal_debug_dump_scope == 1")        != std::string::npos);
+    CHECK(body.find("[MetalDiag] PSO bind site=")           != std::string::npos);
+}
+
+static void test_metal_draw_diag_ef_endef3d_updates_current_pso_cache()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t set        = body.find("[encoder setRenderPipelineState:pso]");
+    const size_t cache      = body.find("m_currentPipelineState = pso");
+    const size_t prevShader = body.find("prevShader = pShader");
+    const size_t diagBind   = body.find("MetalDrawDiag::OnPSOBind(\"EF_EndEf3D\"");
+
+    CHECK(set        != std::string::npos);
+    CHECK(cache      != std::string::npos);
+    CHECK(prevShader != std::string::npos);
+    CHECK(diagBind   != std::string::npos);
+
+    if (set != std::string::npos && cache != std::string::npos)
+        CHECK(cache > set);
+    if (cache != std::string::npos && prevShader != std::string::npos)
+        CHECK(cache < prevShader);
+    if (diagBind != std::string::npos && cache != std::string::npos)
+        CHECK(diagBind > cache);
+}
+
+static void test_metal_per_shader_uniforms_module_present()
+{
+    const std::string hPath  = _walk_up_for("RenderDll/XRenderMetal/MetalPerShaderUniforms.h");
+    const std::string mmPath = _walk_up_for("RenderDll/XRenderMetal/MetalPerShaderUniforms.mm");
+    CHECK(!hPath.empty());
+    CHECK(!mmPath.empty());
+    if (hPath.empty() || mmPath.empty()) return;
+    const std::string hSrc  = _read_file(hPath);
+    const std::string mmSrc = _read_file(mmPath);
+    CHECK(!hSrc.empty());
+    CHECK(!mmSrc.empty());
+
+    CHECK(hSrc.find("namespace MetalPerShaderUniforms") != std::string::npos);
+    CHECK(hSrc.find("class Binder")                     != std::string::npos);
+    CHECK(hSrc.find("RegisterShader")                   != std::string::npos);
+    CHECK(hSrc.find("PackAndBind")                      != std::string::npos);
+    CHECK(hSrc.find("BuildFieldsFromManifestUniforms")  != std::string::npos);
+    CHECK(hSrc.find("MaterialView")                     != std::string::npos);
+    CHECK(hSrc.find("GlobalView")                       != std::string::npos);
+
+    CHECK(mmSrc.find("Binder::PackAndBind")             != std::string::npos);
+    CHECK(mmSrc.find("setFragmentBuffer:m_ringBuffer")  != std::string::npos);
+    CHECK(mmSrc.find("BuildFieldsFromManifestUniforms") != std::string::npos);
+}
+
+static void test_metal_per_shader_uniforms_registered_in_manifest_loader()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalShaderLoader.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src, "void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    CHECK(body.find("m_perShaderUniforms.Initialize")                      != std::string::npos);
+    CHECK(body.find("BuildFieldsFromManifestUniforms")                     != std::string::npos);
+    CHECK(body.find("m_perShaderUniforms.RegisterShader")                  != std::string::npos);
+    CHECK(body.find("entry[@\"uniforms\"]")                                != std::string::npos);
+    CHECK(body.find("entry[@\"uniformStruct\"]")                           != std::string::npos);
+}
+
+static void test_metal_per_shader_uniforms_bound_in_ef_endef3d()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t psoBind   = body.find("[encoder setRenderPipelineState:pso]");
+    const size_t binderCall = body.find("binder.PackAndBind(encoder, pShader->m_Name.c_str(), kMetalPerShaderFragmentUniformSlot)");
+    const size_t mvDiffuse = body.find("mv.Diffuse  = m_materialBufferCPU->Diffuse");
+    const size_t mvAmbient = body.find("mv.Ambient  = m_materialBufferCPU->Ambient");
+    const size_t setMv     = body.find("binder.SetMaterialView(mv)");
+    const size_t setGv     = body.find("binder.SetGlobalView(gv)");
+
+    CHECK(psoBind    != std::string::npos);
+    CHECK(binderCall != std::string::npos);
+    CHECK(mvDiffuse  != std::string::npos);
+    CHECK(mvAmbient  != std::string::npos);
+    CHECK(setMv      != std::string::npos);
+    CHECK(setGv      != std::string::npos);
+    if (psoBind != std::string::npos && binderCall != std::string::npos)
+        CHECK(binderCall > psoBind);
+}
+
+static void test_metal_material_texture_binder_module_present()
+{
+    const std::string hPath  = _walk_up_for("RenderDll/XRenderMetal/MetalMaterialTextureBinder.h");
+    const std::string mmPath = _walk_up_for("RenderDll/XRenderMetal/MetalMaterialTextureBinder.mm");
+    CHECK(!hPath.empty());
+    CHECK(!mmPath.empty());
+    if (hPath.empty() || mmPath.empty()) return;
+    const std::string hSrc  = _read_file(hPath);
+    const std::string mmSrc = _read_file(mmPath);
+    CHECK(!hSrc.empty());
+    CHECK(!mmSrc.empty());
+    CHECK(hSrc.find("namespace MetalMaterialTextureBinder") != std::string::npos);
+    CHECK(hSrc.find("class Binder")                         != std::string::npos);
+    CHECK(hSrc.find("RegisterShader")                       != std::string::npos);
+    CHECK(hSrc.find("BindForShader")                        != std::string::npos);
+    CHECK(hSrc.find("LookupEfttIndexForName")               != std::string::npos);
+
+    CHECK(mmSrc.find("Binder::BindForShader")               != std::string::npos);
+    CHECK(mmSrc.find("setFragmentTexture:tex atIndex:fts.slot") != std::string::npos);
+    CHECK(mmSrc.find("\"baseMap\",")                        != std::string::npos);
+    CHECK(mmSrc.find("EFTT_DIFFUSE")                        != std::string::npos);
+    CHECK(mmSrc.find("\"bumpMap\",")                        != std::string::npos);
+    CHECK(mmSrc.find("EFTT_BUMP")                           != std::string::npos);
+}
+
+static void test_metal_material_texture_binder_registered_in_manifest_loader()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalShaderLoader.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src, "void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    CHECK(body.find("entry[@\"textures\"]")                       != std::string::npos);
+    CHECK(body.find("m_materialTextureBinder.RegisterShader")     != std::string::npos);
+}
+
+static void test_metal_material_texture_binder_bound_in_ef_endef3d()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t psoBind = body.find("[encoder setRenderPipelineState:pso]");
+    const size_t bindCall = body.find("matTexBinder.BindForShader");
+    const size_t mfDraw  = body.find("ri.Item->mfDraw(pShader, pPass)");
+
+    CHECK(psoBind  != std::string::npos);
+    CHECK(bindCall != std::string::npos);
+    CHECK(mfDraw   != std::string::npos);
+    if (psoBind != std::string::npos && bindCall != std::string::npos)
+        CHECK(bindCall > psoBind);
+    if (bindCall != std::string::npos && mfDraw != std::string::npos)
+        CHECK(bindCall < mfDraw);
+}
+
+static void test_metal_per_shader_uniforms_reset_each_frame()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::BeginFrame()");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+    CHECK(body.find("GetPerShaderUniformBinder().BeginFrame()") != std::string::npos);
+}
+
+static void test_metal_draw_diag_scope_guard_wraps_ef_endef3d_bucket_loop()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t guard = body.find("MetalDrawDiag::Ef3DScopeGuard");
+    const size_t bucketGeneral = body.find("drawBucket(EFSLIST_GENERAL_ID)");
+    const size_t bucketLast    = body.find("drawBucket(EFSLIST_LAST_ID)");
+    CHECK(guard         != std::string::npos);
+    CHECK(bucketGeneral != std::string::npos);
+    CHECK(bucketLast    != std::string::npos);
+    if (guard != std::string::npos && bucketGeneral != std::string::npos)
+        CHECK(guard < bucketGeneral);
+    if (bucketLast != std::string::npos)
+        CHECK(bucketLast > guard);
+}
+
+static void test_metal_draw_diag_instrumented_at_every_encoder_draw_site()
+{
+    struct Site {
+        const char* relPath;
+        const char* tag;
+    };
+    const Site sites[] = {
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "DrawDynVB(pool)"},
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "DrawDynVB(idx)"},
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "DrawBuffer(idx)"},
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "DrawBuffer(prim)"},
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "DrawTriStrip"},
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "FullscreenPass"},
+        {"RenderDll/XRenderMetal/MetalBaseRenderer.mm", "HDRToneMap"},
+        {"RenderDll/XRenderMetal/MetalRenderer.mm",     "DebugBatched"},
+        {"RenderDll/XRenderMetal/MetalRenderElements.mm", "RESky::SkySphere"},
+        {"RenderDll/XRenderMetal/MetalRenderElements.mm", "RESky::FogLayer"},
+        {"RenderDll/XRenderMetal/MetalRenderElements.mm", "REOcean::mfDraw"},
+        {"RenderDll/XRenderMetal/MetalUtilityRenderer.mm", "Utility::DrawImage"},
+        {"RenderDll/XRenderMetal/MetalREOcean.mm",        "REOcean::ScreenLodSetup"},
+        {"RenderDll/XRenderMetal/MetalREOcean.mm",        "REOcean::Sector"},
+        {"RenderDll/XRenderMetal/MetalREOcean.mm",        "REOcean::ScreenLodFinal"},
+    };
+
+    for (const Site& s : sites)
+    {
+        const std::string p = _walk_up_for(s.relPath);
+        CHECK(!p.empty());
+        if (p.empty()) continue;
+        const std::string src = _read_file(p);
+        CHECK(!src.empty());
+        if (src.empty()) continue;
+        const std::string needle = std::string("MetalDrawDiag::OnDrawCall(\"") + s.tag + "\"";
+        if (src.find(needle) == std::string::npos)
+            std::fprintf(stderr, "missing OnDrawCall(\"%s\") in %s\n", s.tag, s.relPath);
+        CHECK(src.find(needle) != std::string::npos);
+
+        const std::string include = "#include \"MetalDrawDiag.h\"";
+        CHECK(src.find(include) != std::string::npos);
+    }
+}
+
+static void test_metal_draw_diag_call_precedes_encoder_draw()
+{
+    const std::string baseSrc = _read_file(
+        _walk_up_for("RenderDll/XRenderMetal/MetalBaseRenderer.mm"));
+    CHECK(!baseSrc.empty());
+    if (baseSrc.empty()) return;
+
+    const std::string drawBufBody = _find_function_body(
+        baseSrc,
+        "void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices, ");
+    CHECK(!drawBufBody.empty());
+
+    const size_t onIdx = drawBufBody.find("MetalDrawDiag::OnDrawCall(\"DrawBuffer(idx)\"");
+    const size_t encIdx = drawBufBody.find("[m_renderEncoder drawIndexedPrimitives:primType");
+    CHECK(onIdx != std::string::npos);
+    CHECK(encIdx != std::string::npos);
+    if (onIdx != std::string::npos && encIdx != std::string::npos)
+        CHECK(onIdx < encIdx);
+
+    const size_t onPrim = drawBufBody.find("MetalDrawDiag::OnDrawCall(\"DrawBuffer(prim)\"");
+    const size_t encPrim = drawBufBody.find(
+        "[m_renderEncoder drawPrimitives:primType vertexStart:vert_start");
+    CHECK(onPrim != std::string::npos);
+    CHECK(encPrim != std::string::npos);
+    if (onPrim != std::string::npos && encPrim != std::string::npos)
+        CHECK(onPrim < encPrim);
+}
+
+static void test_metal_debug_disable_depth_disables_depth_in_EF_EndEf3D()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t check = body.find("g_metal_debug_disable_depth");
+    CHECK(check != std::string::npos);
+    if (check == std::string::npos) return;
+
+    const std::string after = body.substr(check, 400);
+    CHECK(after.find("SetDepthTest(false)") != std::string::npos);
+    CHECK(after.find("MetalDrawDiag::OnDepthDisableFired()") != std::string::npos);
+
+    const size_t depthCall = body.find("SetDepthTest(false)", check);
+    const size_t mfDraw    = body.find("ri.Item->mfDraw(pShader, pPass)", check);
+    const size_t depthLog  = body.find("MetalDrawDiag::OnDepthDisableFired()", check);
+    CHECK(depthCall != std::string::npos);
+    CHECK(mfDraw    != std::string::npos);
+    CHECK(depthLog  != std::string::npos);
+    if (depthCall != std::string::npos && mfDraw != std::string::npos)
+        CHECK(depthCall < mfDraw);
+    if (depthLog != std::string::npos && depthCall != std::string::npos)
+        CHECK(depthLog < depthCall);
+}
+
 static void test_ef_endef3d_binds_pass_textures_before_mfdraw()
 {
     const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
@@ -3885,6 +4327,27 @@ int main()
 
     // Phase 7 — per-pass texture binding (root cause of black-scene-with-draws)
     test_ef_endef3d_binds_pass_textures_before_mfdraw();
+
+    // Phase 8 — black-scene investigation: bisection cvars
+    test_metal_debug_cvars_registered();
+    test_metal_debug_clear_color_overrides_pass_descriptor();
+    test_metal_draw_diag_module_present();
+    test_metal_draw_diag_scope_guard_wraps_ef_endef3d_bucket_loop();
+    test_metal_draw_diag_ef_endef3d_updates_current_pso_cache();
+    test_metal_draw_diag_instrumented_at_every_encoder_draw_site();
+    test_metal_draw_diag_call_precedes_encoder_draw();
+    test_metal_debug_disable_depth_disables_depth_in_EF_EndEf3D();
+
+    // Phase 9 — per-shader uniform binding at fragment slot 2 (root cause of black scene)
+    test_metal_per_shader_uniforms_module_present();
+    test_metal_per_shader_uniforms_registered_in_manifest_loader();
+    test_metal_per_shader_uniforms_bound_in_ef_endef3d();
+    test_metal_per_shader_uniforms_reset_each_frame();
+
+    // Phase 10 — material→fragment texture binding from manifest (root cause of black scene)
+    test_metal_material_texture_binder_module_present();
+    test_metal_material_texture_binder_registered_in_manifest_loader();
+    test_metal_material_texture_binder_bound_in_ef_endef3d();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

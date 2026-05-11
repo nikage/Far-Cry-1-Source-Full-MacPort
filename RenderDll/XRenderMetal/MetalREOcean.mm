@@ -6,6 +6,7 @@
 #include "RenderPCH.h"
 #include "../Common/RendElements/CREOcean.h"
 #include "MetalBaseRenderer.m"
+#include "MetalDrawDiag.h"
 #include <I3DEngine.h>
 #include <vector>
 
@@ -171,6 +172,8 @@ void CREOcean::DrawOceanSector(SOceanIndicies* oi)
                                 options:MTLResourceStorageModeShared];
 
     [enc setVertexBuffer:posBuf offset:0 atIndex:0];
+    MetalDrawDiag::OnDrawCall("REOcean::ScreenLodSetup", enc, nil,
+                              MTLPrimitiveTypeTriangle, 0, (NSUInteger)oi->m_nInds);
     [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                     indexCount:(NSUInteger)oi->m_nInds
                      indexType:MTLIndexTypeUInt16
@@ -303,6 +306,8 @@ void CREOcean::mfDrawOceanSectors()
                                      length:(NSUInteger)oi->m_nInds * sizeof(ushort)
                                     options:MTLResourceStorageModeShared];
 
+        MetalDrawDiag::OnDrawCall("REOcean::Sector", enc, nil,
+                                  MTLPrimitiveTypeTriangle, 0, (NSUInteger)oi->m_nInds);
         [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                         indexCount:(NSUInteger)oi->m_nInds
                          indexType:MTLIndexTypeUInt16
@@ -344,6 +349,8 @@ void CREOcean::mfDrawOceanScreenLod()
                                  length:(NSUInteger)oi->m_nInds * sizeof(ushort)
                                 options:MTLResourceStorageModeShared];
 
+    MetalDrawDiag::OnDrawCall("REOcean::ScreenLodFinal", enc, nil,
+                              MTLPrimitiveTypeTriangle, 0, (NSUInteger)oi->m_nInds);
     [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                     indexCount:(NSUInteger)oi->m_nInds
                      indexType:MTLIndexTypeUInt16

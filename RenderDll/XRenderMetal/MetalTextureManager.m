@@ -84,6 +84,8 @@ public:
     id<MTLSamplerState> GetBoundFragmentSampler(int index) const;
     void SetWhiteTexture();
     id<MTLTexture> GetWhiteTexture() const { return m_whiteTexture; }
+    id<MTLTexture> EnsureWhiteTexture();
+    id<MTLTexture> ResolveMetalTextureByID(int textureId);
     void SetClampModeForLastTexture(bool clamp);
     void ApplyTexUnit(int stage, SShaderTexUnit& unit);
     id<MTLSamplerState> AcquireDefaultSampler();

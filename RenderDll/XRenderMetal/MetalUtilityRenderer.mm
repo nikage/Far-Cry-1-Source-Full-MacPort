@@ -20,6 +20,7 @@
 #include "MetalRenderer.m"
 #include "MetalTextureManager.m"
 #include "MetalShaderManager.m"
+#include "MetalDrawDiag.h"
 #include "I3DEngine.h"
 #include "IFont.h"
 #include <Cocoa/Cocoa.h>
@@ -330,6 +331,8 @@ void CMetalUtilityRenderer::Draw2dImage(float xpos, float ypos, float w, float h
         [m_renderer->m_renderEncoder setScissorRect:fullViewport];
     }
 
+    MetalDrawDiag::OnDrawCall("Utility::DrawImage", m_renderer->m_renderEncoder,
+                              nil, MTLPrimitiveTypeTriangleStrip, 4, 0);
     [m_renderer->m_renderEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip
                                     vertexStart:0
                                     vertexCount:4];

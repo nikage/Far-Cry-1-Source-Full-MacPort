@@ -2549,7 +2549,7 @@ void CMetalTextureManager::FontSetRenderingState(unsigned long nVirtualScreenWid
     }
 #if DEBUG
     if (m_renderer->GetFrameID() <= 3 && iLog)
-        iLog->Log("[MetalDiag] FontSetRenderingState frame=%d virtualOrtho=%lux%lu",
+        iLog->Log("\003[MetalDiag] FontSetRenderingState frame=%d virtualOrtho=%lux%lu",
                   m_renderer->GetFrameID(), (unsigned long)width, (unsigned long)height);
 #endif
     if (m_fontOrthoBuffer) {
@@ -3489,6 +3489,35 @@ void CMetalTextureManager::UpdateMetalTexture(id<MTLTexture> texture, const void
                mipmapLevel:0
                  withBytes:data
                bytesPerRow:updateWidth * bytesPerPixel];
+}
+
+id<MTLTexture> CMetalTextureManager::EnsureWhiteTexture()
+{
+    if (m_whiteTexture)
+        return m_whiteTexture;
+    if (!m_renderer || !m_renderer->m_device)
+        return nil;
+    m_whiteTexture = CreateMetalTexture(1, 1, MTLPixelFormatRGBA8Unorm);
+    if (m_whiteTexture)
+    {
+        uint32_t whitePixel = 0xFFFFFFFF;
+        [m_whiteTexture replaceRegion:MTLRegionMake2D(0, 0, 1, 1)
+                          mipmapLevel:0
+                            withBytes:&whitePixel
+                          bytesPerRow:4];
+        [m_whiteTexture setLabel:@"MetalTextureManager.white1x1"];
+    }
+    return m_whiteTexture;
+}
+
+id<MTLTexture> CMetalTextureManager::ResolveMetalTextureByID(int textureId)
+{
+    if (textureId <= 0)
+        return nil;
+    TextureInfoHandle* handle = FindHandle(textureId);
+    if (!handle || !*handle)
+        return nil;
+    return (*handle)->metalTexture;
 }
 
 void CMetalTextureManager::BindTexture(int slot, id<MTLTexture> texture)

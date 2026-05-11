@@ -20,6 +20,7 @@
 #include "MetalRenderPCH.h"
 #include "CryMetalGameView.h"
 #include "MetalRenderer.m"
+#include "MetalDrawDiag.h"
 #include "I3DEngine.h"
 #include "CryCommon/IEntityRenderState.h"
 #include "../Common/Textures/dxtlib.h"  // For nvDXT function signatures
@@ -166,6 +167,12 @@ namespace
         blend = (state & (GS_BLSRC_MASK | GS_BLDST_MASK)) != 0 || NeedsBlend(color);
     }
 }
+
+int g_metal_debug_clear_color = 0;
+int g_metal_debug_dump_draws  = 0;
+int g_metal_debug_disable_depth = 0;
+int g_metal_debug_dump_scope    = 0;
+int g_metal_debug_dump_texunits = 0;
 
 namespace
 {
@@ -713,6 +720,8 @@ void CMetalRenderer::FlushDebugCommands()
 
     [m_renderEncoder setVertexBuffer:buffer offset:0 atIndex:kMetalVertexStream_General];
     [m_renderEncoder setVertexBuffer:nil offset:0 atIndex:kMetalVertexStream_Tangents];
+    MetalDrawDiag::OnDrawCall("DebugBatched", m_renderEncoder, m_currentPipelineState,
+                              cmd.primitiveType, (NSUInteger)cmd.vertices.size(), 0);
     [m_renderEncoder drawPrimitives:cmd.primitiveType
                          vertexStart:0
                          vertexCount:cmd.vertices.size()];
@@ -1233,7 +1242,7 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     static int s_endEf3DCount = 0;
     if (++s_endEf3DCount <= 3 && iLog) {
       iLog->Log("[Renderer] EF_EndEf3D call #%d nFlags=0x%x frame=%d", s_endEf3DCount, nFlags, m_nFrameID);
-      iLog->Log("[MetalDiag] EF_EndEf3D #%d useHDR=%d m_size=%dx%d hdrRT=%dx%d (A/B: r_HDRRendering=0 forces LDR)",
+      iLog->Log("\003[MetalDiag] EF_EndEf3D #%d useHDR=%d m_size=%dx%d hdrRT=%dx%d (A/B: r_HDRRendering=0 forces LDR)",
                  s_endEf3DCount, useHDR ? 1 : 0, m_width, m_height, m_hdrRTWidth, m_hdrRTHeight);
     }
   }
@@ -1434,7 +1443,25 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
           continue;
         }
         [encoder setRenderPipelineState:pso];
+        m_currentPipelineState = pso;
+        MetalDrawDiag::OnPSOBind("EF_EndEf3D", pShader->m_Name.c_str(), encoder, pso,
+                                 (int)m_RP.m_CurVFormat);
         prevShader = pShader;
+      }
+
+      if (m_shaderManager && m_materialBufferCPU && m_uniformBufferCPU)
+      {
+        MetalPerShaderUniforms::MaterialView mv;
+        mv.Ambient  = m_materialBufferCPU->Ambient;
+        mv.Diffuse  = m_materialBufferCPU->Diffuse;
+        mv.Specular = m_materialBufferCPU->Specular;
+        mv.FogColor = m_materialBufferCPU->FogColor;
+        MetalPerShaderUniforms::GlobalView gv;
+        gv.DiffuseSun = m_uniformBufferCPU->lightColor;
+        auto& binder = m_shaderManager->GetPerShaderUniformBinder();
+        binder.SetMaterialView(mv);
+        binder.SetGlobalView(gv);
+        binder.PackAndBind(encoder, pShader->m_Name.c_str(), kMetalPerShaderFragmentUniformSlot);
       }
 
       // Bind global and material uniforms
@@ -1464,18 +1491,57 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
       m_RP.m_pRE = ri.Item;
       if (pPass)
         pPass->mfSetTextures();
+      if (m_shaderManager && m_textureManager)
+      {
+        auto& matTexBinder = m_shaderManager->GetMaterialTextureBinder();
+        if (g_metal_debug_dump_texunits > 0)
+          matTexBinder.EnableOneShotDiagnostic(1);
+        matTexBinder.BindForShader(
+            encoder, pShader->m_Name.c_str(), pRes, m_textureManager.get());
+      }
+      if (g_metal_debug_dump_texunits > 0 && iLog)
+      {
+        --g_metal_debug_dump_texunits;
+        if (!pPass)
+        {
+          iLog->Log("\003[MetalDiag] TexUnits shader=%s pPass=nil",
+                    pShader->m_Name.c_str());
+        }
+        else
+        {
+          const int nUnits = pPass->m_TUnits.Num();
+          iLog->Log("\003[MetalDiag] TexUnits shader=%s pPass=%p units=%d",
+                    pShader->m_Name.c_str(), (void*)pPass, nUnits);
+          const int cap = nUnits < 4 ? nUnits : 4;
+          for (int u = 0; u < cap; ++u)
+          {
+            SShaderTexUnit& tu = pPass->m_TUnits[u];
+            const int texId = tu.m_ITexPic ? tu.m_ITexPic->GetTextureID() : -1;
+            iLog->Log("\003[MetalDiag]   tu[%d] ITexPic=%p textureID=%d animInfo=%p",
+                      u, (void*)tu.m_ITexPic, texId, (void*)tu.m_AnimInfo);
+          }
+        }
+      }
+      if (g_metal_debug_disable_depth)
+      {
+        MetalDrawDiag::OnDepthDisableFired();
+        SetDepthTest(false);
+      }
       ri.Item->mfDraw(pShader, pPass);
     }
   };
 
-  // Match CD3D9Renderer::EF_RenderPipeLine order (D3DRendPipeline.cpp)
-  drawBucket(EFSLIST_PREPROCESS_ID);
-  drawBucket(EFSLIST_STENCIL_ID);
-  drawBucket(EFSLIST_GENERAL_ID);
-  drawBucket(EFSLIST_UNSORTED_ID);
-  drawBucket(EFSLIST_DISTSORT_ID);
-  if (SRendItem::m_RecurseLevel <= 1)
-    drawBucket(EFSLIST_LAST_ID);
+  {
+    MetalDrawDiag::Ef3DScopeGuard scopeGuard;
+    // Match CD3D9Renderer::EF_RenderPipeLine order (D3DRendPipeline.cpp)
+    drawBucket(EFSLIST_PREPROCESS_ID);
+    drawBucket(EFSLIST_STENCIL_ID);
+    drawBucket(EFSLIST_GENERAL_ID);
+    drawBucket(EFSLIST_UNSORTED_ID);
+    drawBucket(EFSLIST_DISTSORT_ID);
+    if (SRendItem::m_RecurseLevel <= 1)
+      drawBucket(EFSLIST_LAST_ID);
+  }
 
   // HDR: tone-map the float16 RT into the drawable
   if (useHDR) EndHDRPass();
@@ -2911,6 +2977,8 @@ void CMetalRenderer::BeginFrame() {
 
   CMetalBaseRenderer::BeginFrame();
 
+  if (m_shaderManager)
+    m_shaderManager->GetPerShaderUniformBinder().BeginFrame();
 }
 
 void CMetalRenderer::Update() {
@@ -2975,11 +3043,49 @@ void CMetalRenderer::RegisterMetalConsoleVariables()
   iConsole->Register("metal_dumpstats", &m_metalDumpStatsFlag, 0, 0,
                      "Set to 1 to log Metal renderer diagnostics at the end of the next frame");
 
+  iConsole->Register("metal_debug_clear_color", &g_metal_debug_clear_color, 0, 0,
+                     "Override swapchain color clear with packed 0xRRGGBB. "
+                     "Non-zero turns the empty framebuffer that colour so a black-scene "
+                     "regression can be split into swapchain-present vs draw-output causes.");
+  iConsole->Register("metal_debug_dump_draws", &g_metal_debug_dump_draws, 0, 0,
+                     "Set to N to log the first N DrawBuffer submissions on the next frame "
+                     "(encoder/PSO validity, vertex/index sizes, primitive type).");
+  iConsole->Register("metal_debug_disable_depth", &g_metal_debug_disable_depth, 0, 0,
+                     "Force depth test off in EF_EndEf3D scene draws to confirm or rule out "
+                     "depth-rejection as the cause of a black scene.");
+  iConsole->Register("metal_debug_dump_scope", &g_metal_debug_dump_scope, 0, 0,
+                     "Scope filter for metal_debug_dump_draws. 0 = dump from any draw site, "
+                     "1 = only dump draws issued from inside CMetalRenderer::EF_EndEf3D's bucket "
+                     "loop (skips menu/HUD/font UI traffic so the budget reaches world geometry).");
+  iConsole->Register("metal_debug_dump_texunits", &g_metal_debug_dump_texunits, 0, 0,
+                     "Set to N to log the first N EF_EndEf3D draws' SShaderPass texture units: "
+                     "pass ptr, m_TUnits count, and for each unit the m_TexPic pointer + textureID. "
+                     "Pinpoints whether textures reach fragment slots or fall through to nil/white.");
+
 #ifdef DEBUG
   // Register GPU capture trigger (DEBUG builds only)
   iConsole->Register("metal_gpucapture", &m_metalGPUCaptureFlag, 0, 0,
                      "Set to 1 to trigger a single-frame GPU capture via MTLCaptureManager");
 #endif
+
+  if (iSystem)
+    iSystem->LoadConfiguration("SystemCfgOverride.Cfg");
+
+  auto applyEnvIntCVar = [](const char* envName, const char* cvarName) {
+    if (!iConsole)
+      return;
+    const char* envValue = getenv(envName);
+    if (!envValue || !envValue[0])
+      return;
+    if (ICVar* var = iConsole->GetCVar(cvarName))
+      var->Set(envValue);
+  };
+  applyEnvIntCVar("METAL_DEBUG_CLEAR_COLOR",   "metal_debug_clear_color");
+  applyEnvIntCVar("METAL_DEBUG_DUMP_DRAWS",    "metal_debug_dump_draws");
+  applyEnvIntCVar("METAL_DEBUG_DISABLE_DEPTH", "metal_debug_disable_depth");
+  applyEnvIntCVar("METAL_DEBUG_DUMP_SCOPE",    "metal_debug_dump_scope");
+  applyEnvIntCVar("METAL_DEBUG_DUMP_TEXUNITS", "metal_debug_dump_texunits");
+  applyEnvIntCVar("CRY_TRACE_RENDER_GATES",    "cry_trace_render_gates");
 }
 
 void CMetalRenderer::UnregisterMetalConsoleVariables()
@@ -2987,6 +3093,11 @@ void CMetalRenderer::UnregisterMetalConsoleVariables()
   if (!iConsole)
     return;
   iConsole->UnregisterVariable("metal_dumpstats");
+  iConsole->UnregisterVariable("metal_debug_clear_color");
+  iConsole->UnregisterVariable("metal_debug_dump_draws");
+  iConsole->UnregisterVariable("metal_debug_disable_depth");
+  iConsole->UnregisterVariable("metal_debug_dump_scope");
+  iConsole->UnregisterVariable("metal_debug_dump_texunits");
 #ifdef DEBUG
   iConsole->UnregisterVariable("metal_gpucapture");
 #endif

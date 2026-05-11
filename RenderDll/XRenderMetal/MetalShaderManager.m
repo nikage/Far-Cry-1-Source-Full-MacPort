@@ -26,6 +26,8 @@
 #include <string>
 #include <cstdint>
 #include "MetalGeneratedVertex.h"
+#include "MetalPerShaderUniforms.h"
+#include "MetalMaterialTextureBinder.h"
 
 // Include CryEngine interfaces
 #include "IRenderer.h"
@@ -307,6 +309,12 @@ public:
     int GetLastGeneratedShaderPsoFailureCount() const { return m_lastGeneratedShaderPsoFailureCount; }
     int GetLastValidateShaderPairsFailureCount() const { return m_lastValidateShaderPairsFailureCount; }
 
+    MetalPerShaderUniforms::Binder& GetPerShaderUniformBinder() { return m_perShaderUniforms; }
+    const MetalPerShaderUniforms::Binder& GetPerShaderUniformBinder() const { return m_perShaderUniforms; }
+
+    MetalMaterialTextureBinder::Binder& GetMaterialTextureBinder() { return m_materialTextureBinder; }
+    const MetalMaterialTextureBinder::Binder& GetMaterialTextureBinder() const { return m_materialTextureBinder; }
+
 protected:
     // Metal-specific shader management
     bool InitializeDefaultShaderLibrary();
@@ -380,6 +388,9 @@ protected:
     int m_nStartupMissingShaders;
     int m_lastGeneratedShaderPsoFailureCount;
     int m_lastValidateShaderPairsFailureCount;
+
+    MetalPerShaderUniforms::Binder m_perShaderUniforms;
+    MetalMaterialTextureBinder::Binder m_materialTextureBinder;
 };
 
 #endif // __APPLE__ && __MACH__
