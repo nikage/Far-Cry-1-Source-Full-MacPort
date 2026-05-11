@@ -1336,6 +1336,24 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
     SShader *prevShader = nullptr;
 
     for (int i = nStart; i < nEnd; ++i) {
+      if (m_renderEncoder != encoder) {
+        if (iConsole && iLog) {
+          ICVar* pTr = iConsole->GetCVar("cry_trace_render_gates");
+          if (pTr && pTr->GetIVal() >= 2) {
+            static int s_encoderSwapTrace = 0;
+            if (s_encoderSwapTrace < 16) {
+              ++s_encoderSwapTrace;
+              iLog->Log("\003[CryTrace] EF_EndEf3D encoder swapped mid-bucket bid=%d i=%d old=%p new=%p — rebinding PSO",
+                         bucketId, i, (void*)encoder, (void*)m_renderEncoder);
+            }
+          }
+        }
+        encoder = m_renderEncoder;
+        prevShader = nullptr;
+      }
+      if (!encoder)
+        continue;
+
       SRendItemPre &ri = SRendItem::m_RendItems[bucketId][i];
 
       SShader *pShader = nullptr;
@@ -1444,6 +1462,8 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
       m_RP.m_pShader       = pShader;
       m_RP.m_pShaderResources = pRes;
       m_RP.m_pRE = ri.Item;
+      if (pPass)
+        pPass->mfSetTextures();
       ri.Item->mfDraw(pShader, pPass);
     }
   };

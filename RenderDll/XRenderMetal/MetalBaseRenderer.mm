@@ -2295,6 +2295,16 @@ void CMetalBaseRenderer::ClearStencilBuffer()
     if (!depthTexture)
         return;
 
+    if (StubTelemetry::ShouldTraceStubs())
+    {
+        static int s_clearStencilTrace = 0;
+        if (s_clearStencilTrace < 8)
+        {
+            ++s_clearStencilTrace;
+            iLog->Log("\003[CryTrace] ClearStencilBuffer ending current encoder and restarting pass (stencil=Clear, color/depth=Load) — callers must refresh their encoder reference");
+        }
+    }
+
     ReleaseRenderEncoder();
 
     id<MTLTexture> colorTexture = m_currentDrawable ? m_currentDrawable.texture : nil;

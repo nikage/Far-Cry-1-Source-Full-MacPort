@@ -2777,6 +2777,143 @@ static void test_metal_endframe_per_second_diag_present()
     CHECK(body.find("m_numTriangles") != std::string::npos);
 }
 
+static void test_ef_endef3d_refreshes_encoder_inside_bucket_loop()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t bucketPos = body.find("auto drawBucket =");
+    CHECK(bucketPos != std::string::npos);
+    if (bucketPos == std::string::npos) return;
+
+    const size_t forPos = body.find("for (int i = nStart;", bucketPos);
+    CHECK(forPos != std::string::npos);
+    if (forPos == std::string::npos) return;
+
+    const size_t firstPsoBindPos = body.find("[encoder setRenderPipelineState:", forPos);
+    CHECK(firstPsoBindPos != std::string::npos);
+    if (firstPsoBindPos == std::string::npos) return;
+
+    const std::string loopHead = body.substr(forPos, firstPsoBindPos - forPos);
+
+    CHECK(loopHead.find("m_renderEncoder != encoder") != std::string::npos);
+    CHECK(loopHead.find("encoder = m_renderEncoder") != std::string::npos);
+}
+
+static void test_ef_endef3d_resets_prev_shader_on_encoder_swap()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t swapCheck = body.find("m_renderEncoder != encoder");
+    CHECK(swapCheck != std::string::npos);
+    if (swapCheck == std::string::npos) return;
+
+    const size_t blockOpen = body.find('{', swapCheck);
+    CHECK(blockOpen != std::string::npos);
+    if (blockOpen == std::string::npos) return;
+
+    int depth = 0;
+    size_t blockClose = std::string::npos;
+    for (size_t i = blockOpen; i < body.size(); ++i) {
+        if (body[i] == '{') ++depth;
+        else if (body[i] == '}') {
+            if (--depth == 0) { blockClose = i; break; }
+        }
+    }
+    CHECK(blockClose != std::string::npos);
+    if (blockClose == std::string::npos) return;
+
+    const std::string swapBlock = body.substr(blockOpen, blockClose - blockOpen);
+
+    CHECK(swapBlock.find("prevShader = nullptr") != std::string::npos);
+    CHECK(swapBlock.find("encoder = m_renderEncoder") != std::string::npos);
+}
+
+static void test_ef_endef3d_binds_pass_textures_before_mfdraw()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // Without per-pass texture binding the scene fragment shaders sample
+    // nil textures (rendered as opaque black on Metal); this is the root
+    // cause of the "180 draws/frame but black screen" symptom. The bucket
+    // loop must call SShaderPass::mfSetTextures() before mfDraw so each
+    // material's m_TUnits propagate through CMetalTextureManager::ApplyTexUnit
+    // onto the active render encoder.
+    const size_t textureCall = body.find("pPass->mfSetTextures()");
+    CHECK(textureCall != std::string::npos);
+    if (textureCall == std::string::npos) return;
+
+    const size_t mfDrawCall = body.find("ri.Item->mfDraw(pShader, pPass)");
+    CHECK(mfDrawCall != std::string::npos);
+    if (mfDrawCall == std::string::npos) return;
+
+    // mfSetTextures() must precede mfDraw so the textures are live on the
+    // encoder when drawIndexedPrimitives is recorded.
+    CHECK(textureCall < mfDrawCall);
+
+    // The pPass null guard must be present so a shader without HW techniques
+    // does not segfault.
+    const size_t guard = body.rfind("if (pPass)", textureCall);
+    CHECK(guard != std::string::npos);
+}
+
+static void test_ef_endef3d_handles_null_encoder_after_pass_restart()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t swapCheck = body.find("m_renderEncoder != encoder");
+    CHECK(swapCheck != std::string::npos);
+    if (swapCheck == std::string::npos) return;
+
+    const size_t firstPsoBindPos = body.find("[encoder setRenderPipelineState:", swapCheck);
+    CHECK(firstPsoBindPos != std::string::npos);
+    if (firstPsoBindPos == std::string::npos) return;
+
+    const std::string betweenRefreshAndUse = body.substr(swapCheck, firstPsoBindPos - swapCheck);
+
+    CHECK(betweenRefreshAndUse.find("if (!encoder)") != std::string::npos);
+    CHECK(betweenRefreshAndUse.find("continue") != std::string::npos);
+}
+
 // -----------------------------------------------------------------------
 
 int main()
@@ -3740,6 +3877,14 @@ int main()
     test_metal_brushlm_diagnostic_present();
     test_metal_brushlm_lightmapped_brush_uses_evs_nosharing();
     test_metal_endframe_per_second_diag_present();
+
+    // Phase 6 — EF_EndEf3D encoder-staleness fix after mid-frame pass restarts
+    test_ef_endef3d_refreshes_encoder_inside_bucket_loop();
+    test_ef_endef3d_resets_prev_shader_on_encoder_swap();
+    test_ef_endef3d_handles_null_encoder_after_pass_restart();
+
+    // Phase 7 — per-pass texture binding (root cause of black-scene-with-draws)
+    test_ef_endef3d_binds_pass_textures_before_mfdraw();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;
