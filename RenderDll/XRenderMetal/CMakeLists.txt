@@ -20,6 +20,9 @@ set(XRENDER_METAL_SOURCES
     MetalRenderElements.mm
     MetalCREScreenProcess.mm
     MetalREOcean.mm
+    MetalRETempMesh.mm
+    MetalREClearStencil.mm
+    MetalREFlareGeom.mm
     MetalOptimizations.mm
     MetalImageStubs.mm
 )
@@ -119,6 +122,18 @@ set_source_files_properties(MetalCREScreenProcess.mm PROPERTIES
 )
 
 set_source_files_properties(MetalREOcean.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalRETempMesh.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalREClearStencil.mm PROPERTIES
+    COMPILE_FLAGS "-x objective-c++"
+)
+
+set_source_files_properties(MetalREFlareGeom.mm PROPERTIES
     COMPILE_FLAGS "-x objective-c++"
 )
 

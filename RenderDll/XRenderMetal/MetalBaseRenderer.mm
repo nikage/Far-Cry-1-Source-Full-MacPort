@@ -22,6 +22,7 @@
 #include "MetalBaseRenderer.m"
 #include "I3DEngine.h"
 #include "VertexFormats.h"
+#include "../Common/StubTelemetry.h"
 #include <Cocoa/Cocoa.h>
 #include <cstring>
 #include <cmath>
@@ -1928,12 +1929,24 @@ void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices,
                                    int numindices, int offsindex, int prmode, 
                                    int vert_start, int vert_stop, CMatInfo* mi)
 {
-    if (!m_renderEncoder || !src)
+    if (!m_renderEncoder)
+    {
+        METAL_STUB_TRACE_BARE("DrawBuffer::early-return no-encoder");
         return;
+    }
+    if (!src)
+    {
+        METAL_STUB_TRACE_BARE("DrawBuffer::early-return null-vertex-buffer");
+        return;
+    }
     
     id<MTLBuffer> vertexBuffer = LookupStreamBuffer(src, VSF_GENERAL);
     if (!vertexBuffer)
+    {
+        METAL_STUB_TRACE("DrawBuffer::early-return missing-vertex-stream",
+                         "src=%p stream=VSF_GENERAL", (void*)src);
         return;
+    }
     
     [m_renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:kMetalVertexStream_General];
     
@@ -1955,22 +1968,28 @@ void CMetalBaseRenderer::DrawBuffer(CVertexBuffer* src, SVertexStream* indices,
     if (indices && numindices > 0)
     {
         int indexBufferId = indices->m_VertBuf.m_nID;
-        if (indexBufferId > 0 && indexBufferId < (int)m_indexBuffers.size())
+        if (indexBufferId <= 0 || indexBufferId >= (int)m_indexBuffers.size())
         {
-            id<MTLBuffer> indexBuffer = m_indexBuffers[indexBufferId];
-            if (indexBuffer)
-            {
-                size_t indexOffset = offsindex * sizeof(unsigned short);
-                [m_renderEncoder drawIndexedPrimitives:primType 
-                                            indexCount:numindices 
-                                             indexType:MTLIndexTypeUInt16 
-                                           indexBuffer:indexBuffer 
-                                     indexBufferOffset:indexOffset];
-                
-                m_numDrawCalls++;
-                m_numTriangles += numindices / 3;
-            }
+            METAL_STUB_TRACE("DrawBuffer::early-return index-buffer-id-out-of-range",
+                             "id=%d size=%d", indexBufferId, (int)m_indexBuffers.size());
+            return;
         }
+        id<MTLBuffer> indexBuffer = m_indexBuffers[indexBufferId];
+        if (!indexBuffer)
+        {
+            METAL_STUB_TRACE("DrawBuffer::early-return nil-index-buffer-slot",
+                             "id=%d", indexBufferId);
+            return;
+        }
+        size_t indexOffset = offsindex * sizeof(unsigned short);
+        [m_renderEncoder drawIndexedPrimitives:primType 
+                                    indexCount:numindices 
+                                     indexType:MTLIndexTypeUInt16 
+                                   indexBuffer:indexBuffer 
+                             indexBufferOffset:indexOffset];
+        
+        m_numDrawCalls++;
+        m_numTriangles += numindices / 3;
     }
     else
     {
@@ -2257,6 +2276,44 @@ void CMetalBaseRenderer::ClearDepthBuffer()
     rpd.stencilAttachment.texture   = depthTexture;
     rpd.stencilAttachment.loadAction  = MTLLoadActionClear;
     rpd.stencilAttachment.storeAction = MTLStoreActionDontCare;
+    rpd.stencilAttachment.clearStencil = 0;
+
+    m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:rpd] retain];
+    if (m_renderEncoder)
+    {
+        m_renderEncoderOpen = true;
+        ApplyRenderState();
+    }
+}
+
+void CMetalBaseRenderer::ClearStencilBuffer()
+{
+    if (!m_currentCommandBuffer)
+        return;
+
+    id<MTLTexture> depthTexture = m_depthStencilTextures[m_currentFrameIndex];
+    if (!depthTexture)
+        return;
+
+    ReleaseRenderEncoder();
+
+    id<MTLTexture> colorTexture = m_currentDrawable ? m_currentDrawable.texture : nil;
+    if (!colorTexture && m_metalView)
+        colorTexture = m_metalView.currentDrawable.texture;
+
+    MTLRenderPassDescriptor* rpd = [MTLRenderPassDescriptor renderPassDescriptor];
+    if (colorTexture)
+    {
+        rpd.colorAttachments[0].texture     = colorTexture;
+        rpd.colorAttachments[0].loadAction  = MTLLoadActionLoad;
+        rpd.colorAttachments[0].storeAction = MTLStoreActionStore;
+    }
+    rpd.depthAttachment.texture       = depthTexture;
+    rpd.depthAttachment.loadAction    = MTLLoadActionLoad;
+    rpd.depthAttachment.storeAction   = MTLStoreActionStore;
+    rpd.stencilAttachment.texture     = depthTexture;
+    rpd.stencilAttachment.loadAction  = MTLLoadActionClear;
+    rpd.stencilAttachment.storeAction = MTLStoreActionStore;
     rpd.stencilAttachment.clearStencil = 0;
 
     m_renderEncoder = [[m_currentCommandBuffer renderCommandEncoderWithDescriptor:rpd] retain];

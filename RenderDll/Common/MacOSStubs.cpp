@@ -14,6 +14,7 @@
 #if defined(__APPLE__) && defined(__MACH__)
 
 #include "../RenderPCH.h"
+#include "StubTelemetry.h"
 
 namespace
 {
@@ -158,28 +159,93 @@ bool SShader::Reload(int flags)
     return false;
 }
 
-// CTexMan stub methods
+// CTexMan::CheckTexLimits — no-op on Metal. The legacy CTexMan-driven LRU
+// eviction policy in the OGL/D3D9 backends does not apply: Metal manages its
+// own texture lifecycle through CMetalTextureManager, which performs its own
+// memory accounting and eviction. Telemetry remains so any unexpected
+// caller from the Common layer is surfaced.
 void CTexMan::CheckTexLimits(STexPic* pic)
 {
-    // TODO: Implement texture limit checking
-    assert(false && "TODO: Implement texture limit checking");
+    METAL_STUB_TRACE("CTexMan::CheckTexLimits", "pic=%p", (void*)pic);
 }
 
-// CCObject stub methods
+// CCObject::GetInvMatrix — port of the D3D9 implementation
+// (RenderDll/XRenderD3D9/D3DRendPipeline.cpp:1025) using the portable
+// QQinvertMatrixf fallback baked into mathMatrixInverse on ARM/Apple Silicon.
+// Caches inverted matrices in the shared CCObject::m_ObjMatrices pool.
+namespace
+{
+    Matrix44& AcquireIdentityInvMatrix()
+    {
+        static Matrix44 sIdentity;
+        static bool sSeeded = false;
+        if (!sSeeded)
+        {
+            sIdentity.SetIdentity();
+            sSeeded = true;
+        }
+        return sIdentity;
+    }
+}
+
 Matrix44& CCObject::GetInvMatrix()
 {
-    // TODO: Implement inverse matrix retrieval
-    assert(false && "TODO: Implement inverse matrix retrieval");
-    static Matrix44 identity;
-    identity.SetIdentity();
-    return identity;
+    if (m_InvMatrixId == 0)
+        return AcquireIdentityInvMatrix();
+    if (m_InvMatrixId > 0)
+        return m_ObjMatrices[m_InvMatrixId];
+
+    int n = m_ObjMatrices.size();
+    m_ObjMatrices.resize(n + 1);
+    m_InvMatrixId = (short)n;
+
+    Matrix44& m = m_ObjMatrices[m_InvMatrixId];
+
+    if (m_ObjFlags & FOB_TRANS_ROTATE)
+    {
+        mathMatrixInverse(m.GetData(), m_Matrix.GetData(), g_CpuFlags);
+    }
+    else if (m_ObjFlags & FOB_TRANS_SCALE)
+    {
+        const float fiScaleX = 1.0f / m_Matrix(0, 0);
+        const float fiScaleY = 1.0f / m_Matrix(1, 1);
+        const float fiScaleZ = 1.0f / m_Matrix(2, 2);
+        m(0, 0) = fiScaleX;       m(0, 1) = m_Matrix(0, 1); m(0, 2) = m_Matrix(0, 2); m(0, 3) = m_Matrix(0, 3);
+        m(1, 0) = m_Matrix(1, 0); m(1, 1) = fiScaleY;       m(1, 2) = m_Matrix(1, 2); m(1, 3) = m_Matrix(1, 3);
+        m(2, 0) = m_Matrix(2, 0); m(2, 1) = m_Matrix(2, 1); m(2, 2) = fiScaleZ;       m(2, 3) = m_Matrix(2, 3);
+        m(3, 0) = -m_Matrix(3, 0) * fiScaleX;
+        m(3, 1) = -m_Matrix(3, 1) * fiScaleY;
+        m(3, 2) = -m_Matrix(3, 2) * fiScaleZ;
+        m(3, 3) = m_Matrix(3, 3);
+    }
+    else if (m_ObjFlags & FOB_TRANS_TRANSLATE)
+    {
+        m(0, 0) = m_Matrix(0, 0); m(0, 1) = m_Matrix(0, 1); m(0, 2) = m_Matrix(0, 2); m(0, 3) = m_Matrix(0, 3);
+        m(1, 0) = m_Matrix(1, 0); m(1, 1) = m_Matrix(1, 1); m(1, 2) = m_Matrix(1, 2); m(1, 3) = m_Matrix(1, 3);
+        m(2, 0) = m_Matrix(2, 0); m(2, 1) = m_Matrix(2, 1); m(2, 2) = m_Matrix(2, 2); m(2, 3) = m_Matrix(2, 3);
+        m(3, 0) = -m_Matrix(3, 0);
+        m(3, 1) = -m_Matrix(3, 1);
+        m(3, 2) = -m_Matrix(3, 2);
+        m(3, 3) = m_Matrix(3, 3);
+    }
+    else
+    {
+        m.SetIdentity();
+    }
+
+    return m;
 }
 
-// CRenderer stub methods
+// CRenderer::EF_SetState — forward to the virtual SetState() so the Metal
+// renderer's full GS_*-flag translation in CMetalRenderer::SetState runs.
+// EF_SetState is the legacy fixed-function entry point used by the OGL/D3D9
+// backends; on Apple it is reachable only as the implementation behind the
+// inline CRenderer::SetState in Renderer.h, which the derived
+// CMetalRenderer::SetState already overrides. The forward here makes any
+// direct EF_SetState caller pick up the same translation.
 void CRenderer::EF_SetState(int state)
 {
-    // TODO: Implement render state setting
-    assert(false && "TODO: Implement render state setting");
+    SetState(state);
 }
 
 // CVProgram stub static members and methods
@@ -187,153 +253,109 @@ TArray<CVProgram*> CVProgram::m_VPrograms;
 
 CVProgram* CVProgram::mfForName(const char* name, uint64 maskGen)
 {
-    // TODO: Implement vertex program lookup
-    assert(false && "TODO: Implement vertex program lookup");
+    METAL_STUB_TRACE("CVProgram::mfForName", "name=%s", name ? name : "(null)");
     return nullptr;
 }
 
-// CRETempMesh stub for vtable
-bool CRETempMesh::mfDraw(SShader* ef, SShaderPass* sfm)
-{
-    // TODO: Implement temp mesh rendering
-    assert(false && "TODO: Implement temp mesh rendering");
-    return false;
-}
+// CRETempMesh is implemented in RenderDll/XRenderMetal/MetalRETempMesh.mm
 
-void CRETempMesh::mfReset()
-{
-    // TODO: Implement reset
-    assert(false && "TODO: Implement reset");
-}
+// CREClearStencil is implemented in RenderDll/XRenderMetal/MetalREClearStencil.mm
 
-bool CRETempMesh::mfPreDraw(SShaderPass* sl)
-{
-    // TODO: Implement pre-draw
-    assert(false && "// TODO: Implement pre-draw");
-    return false;
-}
+// CREFlareGeom::mfCheckVis is implemented in RenderDll/XRenderMetal/MetalREFlareGeom.mm
 
-void CRETempMesh::mfPrepare()
-{
-    // TODO: Implement prepare
-    assert(false && "TODO: Implement prepare");
-}
-
-void* CRETempMesh::mfGetPointer(ESrcPointer ePT, int *Stride, int Type, ESrcPointer Dst, int Flags)
-{
-    // TODO: Implement pointer retrieval
-    assert(false && "TODO: Implement pointer retrieval");
-    if (Stride)
-        *Stride = 0;
-    return nullptr;
-}
-
-// CREClearStencil stub for vtable
-bool CREClearStencil::mfDraw(SShader* ef, SShaderPass* sfm)
-{
-    // TODO: Implement stencil clear
-    assert(false && "TODO: Implement stencil clear");
-    return false;
-}
-
-// CREFlareGeom stub method
-void CREFlareGeom::mfCheckVis(CFColor& col, CCObject* obj)
-{
-    // TODO: Implement flare visibility check
-    assert(false && "TODO: Implement flare visibility check");
-    assert(false && "Implement flare visibility check");
-}
-
-// Platform-specific device query stubs
+// Platform-specific device query stubs — safe nullptr on Metal. These are
+// only invoked by editor/screenshot paths that branch on a non-null return.
 void* gGet_D3DDevice()
 {
-    // macOS doesn't use D3D
-    assert(false && "macOS doesn't use D3D");
+    METAL_STUB_TRACE_BARE("gGet_D3DDevice");
     return nullptr;
 }
 
 void* gGet_glReadPixels()
 {
-    // macOS doesn't have OpenGL equivalent for Metal
-    assert(false && "macOS doesn't have OpenGL equivalent for Metal");
+    METAL_STUB_TRACE_BARE("gGet_glReadPixels");
     return nullptr;
 }
 
-// CLeafBuffer stub method
+// CLeafBuffer::DrawImmediately — empty in D3D9, D3D8 and NULL renderers
+// (only the OGL backend implements it, as a debug/immediate-mode helper that
+// is not part of the main draw path). Match the canonical no-op convention.
 void CLeafBuffer::DrawImmediately()
 {
-    // macOS: immediate mode drawing not implemented
-    assert(false && "macOS: immediate mode drawing not implemented");
 }
 
-// CVertexBuffer stub method
-void* CVertexBuffer::GetStream(int StreamMask, int* nOffset)
+// CVertexBuffer::GetStream — Metal port.
+// Callers in LeafBufferCreate.cpp test the result against nullptr to decide
+// whether to (re-)create a tangent stream; the D3D9 version returns the
+// IDirect3DVertexBuffer9 pointer. For Metal we return the cached CPU-side
+// pointer when the stream exists, nullptr otherwise — same null/non-null
+// semantics required by the callers.
+void* CVertexBuffer::GetStream(int nStream, int* nOffset)
 {
-    // macOS: vertex stream not implemented
-    assert(false && "macOS: vertex stream not implemented");
     if (nOffset)
         *nOffset = 0;
-    return nullptr;
+
+    if (nStream < 0 || nStream >= VSF_NUM)
+        return nullptr;
+
+    if (m_VS[nStream].m_VertBuf.m_nID <= 0 && !m_VS[nStream].m_VData)
+        return nullptr;
+
+    return m_VS[nStream].m_VData;
 }
 
-// CShader stub methods
+// CShader::mfXxx — legacy fixed-function shader compile/hash/list/load path.
+// Replaced on Metal by CMetalShaderManager which owns its own pipeline. The
+// definitions here exist purely to satisfy the linker; telemetry surfaces any
+// caller that escapes into them.
 void CShader::mfAddToHash(char* name, SShader* shader)
 {
-    // macOS: shader hash not implemented
-    assert(false && "macOS: shader hash not implemented");
+    METAL_STUB_TRACE("CShader::mfAddToHash", "name=%s", name ? name : "(null)");
 }
 
 SShaderTechnique* CShader::mfCompileHW(SShader* shader, char* script, int flags)
 {
-    // macOS: hardware shader compilation not implemented
-    assert(false && "macOS: hardware shader compilation not implemented");
+    METAL_STUB_TRACE("CShader::mfCompileHW", "shader=%p flags=0x%x", (void*)shader, flags);
     return nullptr;
 }
 
 bool CShader::mfReloadFile(const char* filename, const char* name, int flags)
 {
-    // macOS: shader reload not implemented
-    assert(false && "macOS: shader reload not implemented");
+    METAL_STUB_TRACE("CShader::mfReloadFile", "name=%s", name ? name : "(null)");
     return false;
 }
 
 char** CShader::mfListInScript(char* name)
 {
-    // macOS: shader listing not implemented
-    assert(false && "macOS: shader listing not implemented");
+    METAL_STUB_TRACE("CShader::mfListInScript", "name=%s", name ? name : "(null)");
     return nullptr;
 }
 
 bool CShader::mfCompileTexGen(char* name, char* params, SShader* shader, SShaderTexUnit* unit)
 {
-    // macOS: texture generation not implemented
-    assert(false && "macOS: texture generation not implemented");
+    METAL_STUB_TRACE("CShader::mfCompileTexGen", "name=%s", name ? name : "(null)");
     return false;
 }
 
 void CShader::mfLoadFromFiles(int flags)
 {
-    // macOS: shader loading not implemented
-    assert(false && "macOS: shader loading not implemented");
+    METAL_STUB_TRACE("CShader::mfLoadFromFiles", "flags=0x%x", flags);
 }
 
 void CShader::mfRemoveFromHash(SShader* shader)
 {
-    // macOS: shader hash removal not implemented
-    assert(false && "macOS: shader hash removal not implemented");
+    METAL_STUB_TRACE("CShader::mfRemoveFromHash", "shader=%p", (void*)shader);
 }
 
 char* CShader::mfScriptForFileName(const char* filename, SShader* shader, uint64 maskGen)
 {
-    // macOS: script naming not implemented
-    assert(false && "macOS: script naming not implemented");
+    METAL_STUB_TRACE("CShader::mfScriptForFileName", "fn=%s", filename ? filename : "(null)");
     return nullptr;
 }
 
 void CShader::mfStartScriptPreprocess()
 {
-    // macOS: script preprocessing not implemented
-    assert(false && "macOS: script preprocessing not implemented");
+    METAL_STUB_TRACE_BARE("CShader::mfStartScriptPreprocess");
 }
 
 // CPShader stub methods and static members
@@ -342,123 +364,107 @@ TArray<CPShader*> CPShader::m_PShaders;
 
 CPShader* CPShader::mfForName(const char* name, uint64 nMaskGen)
 {
-    // macOS: pixel shader lookup not implemented
-    assert(false && "macOS: pixel shader lookup not implemented");
+    METAL_STUB_TRACE("CPShader::mfForName", "name=%s", name ? name : "(null)");
     return nullptr;
 }
 
-// Virtual table stub implementations for shader system classes
+// Virtual-table anchors for the legacy fixed-function array/matrix/fog
+// parameter binding classes. Replaced on Metal by direct uniform-buffer
+// writes inside CMetalShaderManager; these are pure linker bait. Telemetry
+// catches any caller that escapes back into them.
 
-// SParamComp_Fog stub
 float SParamComp_Fog::mfGet()
 {
-    // macOS: fog parameter not implemented
-    assert(false && "macOS: fog parameter not implemented");
+    METAL_STUB_TRACE_BARE("SParamComp_Fog::mfGet");
     return 0.0f;
 }
 
-// SArrayPointer stubs
 void SArrayPointer_Vertex::mfSet(int Id)
 {
-    // macOS: vertex array pointer not implemented
-    assert(false && "macOS: vertex array pointer not implemented");
+    METAL_STUB_TRACE("SArrayPointer_Vertex::mfSet", "id=%d", Id);
 }
 
 void SArrayPointer_Color::mfSet(int Id)
 {
-    // macOS: color array pointer not implemented
-    assert(false && "macOS: color array pointer not implemented");
+    METAL_STUB_TRACE("SArrayPointer_Color::mfSet", "id=%d", Id);
 }
 
 void SArrayPointer_SecColor::mfSet(int Id)
 {
-    // macOS: secondary color array pointer not implemented
-    assert(false && "macOS: secondary color array pointer not implemented");
+    METAL_STUB_TRACE("SArrayPointer_SecColor::mfSet", "id=%d", Id);
 }
 
 void SArrayPointer_Normal::mfSet(int Id)
 {
-    // macOS: normal array pointer not implemented
-    assert(false && "macOS: normal array pointer not implemented");
+    METAL_STUB_TRACE("SArrayPointer_Normal::mfSet", "id=%d", Id);
 }
 
 void SArrayPointer_Texture::mfSet(int Id)
 {
-    // macOS: texture array pointer not implemented
-    assert(false && "macOS: texture array pointer not implemented");
+    METAL_STUB_TRACE("SArrayPointer_Texture::mfSet", "id=%d", Id);
 }
 
-// SMatrixTransform stubs
 void SMatrixTransform_Identity::mfSet(bool bSet)
 {
-    // macOS: identity matrix transform not implemented
-    assert(false && "macOS: identity matrix transform not implemented");
+    METAL_STUB_TRACE("SMatrixTransform_Identity::mfSet(bool)", "bSet=%d", (int)bSet);
 }
 
 void SMatrixTransform_Identity::mfSet(Matrix44& matr)
 {
-    // macOS: identity matrix transform not implemented
-    assert(false && "macOS: identity matrix transform not implemented");
+    METAL_STUB_TRACE_BARE("SMatrixTransform_Identity::mfSet(Matrix44)");
 }
 
 void SMatrixTransform_Scale::mfSet(bool bSet)
 {
-    // macOS: scale matrix transform not implemented
-    assert(false && "macOS: scale matrix transform not implemented");
+    METAL_STUB_TRACE("SMatrixTransform_Scale::mfSet(bool)", "bSet=%d", (int)bSet);
 }
 
 void SMatrixTransform_Scale::mfSet(Matrix44& matr)
 {
-    // macOS: scale matrix transform not implemented
-    assert(false && "macOS: scale matrix transform not implemented");
+    METAL_STUB_TRACE_BARE("SMatrixTransform_Scale::mfSet(Matrix44)");
 }
 
 void SMatrixTransform_Translate::mfSet(bool bSet)
 {
-    // macOS: translate matrix transform not implemented
-    assert(false && "macOS: translate matrix transform not implemented");
+    METAL_STUB_TRACE("SMatrixTransform_Translate::mfSet(bool)", "bSet=%d", (int)bSet);
 }
 
 void SMatrixTransform_Translate::mfSet(Matrix44& matr)
 {
-    // macOS: translate matrix transform not implemented
-    assert(false && "macOS: translate matrix transform not implemented");
+    METAL_STUB_TRACE_BARE("SMatrixTransform_Translate::mfSet(Matrix44)");
 }
 
 void SMatrixTransform_Matrix::mfSet(bool bSet)
 {
-    // macOS: matrix transform not implemented
-    assert(false && "macOS: matrix transform not implemented");
+    METAL_STUB_TRACE("SMatrixTransform_Matrix::mfSet(bool)", "bSet=%d", (int)bSet);
 }
 
 void SMatrixTransform_Matrix::mfSet(Matrix44& matr)
 {
-    // macOS: matrix transform not implemented
-    assert(false && "macOS: matrix transform not implemented");
+    METAL_STUB_TRACE_BARE("SMatrixTransform_Matrix::mfSet(Matrix44)");
 }
 
 void SMatrixTransform_Rotate::mfSet(bool bSet)
 {
-    // macOS: rotate matrix transform not implemented
-    assert(false && "macOS: rotate matrix transform not implemented");
+    METAL_STUB_TRACE("SMatrixTransform_Rotate::mfSet(bool)", "bSet=%d", (int)bSet);
 }
 
 void SMatrixTransform_Rotate::mfSet(Matrix44& matr)
 {
-    // macOS: rotate matrix transform not implemented
-    assert(false && "macOS: rotate matrix transform not implemented");
+    METAL_STUB_TRACE_BARE("SMatrixTransform_Rotate::mfSet(Matrix44)");
 }
 
+// Standalone WriteJPG / WriteTGA helpers — only invoked by OGL/D3D9 backend
+// code excluded from the Apple build. The 3D engine screenshot path goes
+// through CRenderer::WriteJPG / WriteTGA virtuals, not these symbols.
 void WriteJPG(byte* data, int width, int height, char* filename)
 {
-    // macOS: JPEG writing not implemented
-    assert(false && "macOS: JPEG writing not implemented");
+    METAL_STUB_TRACE("WriteJPG", "%dx%d fn=%s", width, height, filename ? filename : "(null)");
 }
 
 void WriteTGA(byte* data, int width, int height, char* filename, int bpp)
 {
-    // macOS: TGA writing not implemented
-    assert(false && "macOS: TGA writing not implemented");
+    METAL_STUB_TRACE("WriteTGA", "%dx%d bpp=%d fn=%s", width, height, bpp, filename ? filename : "(null)");
 }
 
 // ---------------------------------------------------------------------------

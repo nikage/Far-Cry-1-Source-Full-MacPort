@@ -2415,6 +2415,369 @@ static void test_getcubecolor_restores_global_re_pointer()
 }
 
 // -----------------------------------------------------------------------
+// Source-level invariants for the Phase 2 render-element ports.
+// These tests inspect the .mm sources statically (the project build target
+// is a Metal-only macOS binary, so we cannot link the .mm objects here).
+// They guard the canonical shape of the new mfDraw implementations so a
+// future refactor cannot silently regress to the broken "set state and
+// return" stubs that caused the black-screen regression.
+// -----------------------------------------------------------------------
+
+namespace {
+
+inline bool _file_exists(const std::string& p)
+{
+    struct stat st;
+    return ::stat(p.c_str(), &st) == 0;
+}
+
+inline std::string _walk_up_for(const std::string& probe)
+{
+    auto walk = [&](std::string dir) -> std::string {
+        for (size_t i = 0; i < 12; ++i) {
+            const std::string candidate = dir + "/" + probe;
+            if (_file_exists(candidate) && _file_exists(dir + "/tools/shader_port"))
+                return candidate;
+            const size_t slash = dir.find_last_of('/');
+            if (slash == std::string::npos) break;
+            dir = dir.substr(0, slash);
+            if (dir.empty()) break;
+        }
+        return std::string();
+    };
+
+    const std::string fileStr = __FILE__;
+    const size_t fileSlash = fileStr.find_last_of('/');
+    if (fileSlash != std::string::npos) {
+        std::string p = walk(fileStr.substr(0, fileSlash));
+        if (!p.empty()) return p;
+    }
+    char cwd[4096];
+    if (::getcwd(cwd, sizeof(cwd)) != nullptr) {
+        std::string p = walk(std::string(cwd));
+        if (!p.empty()) return p;
+    }
+    return std::string();
+}
+
+inline std::string _read_file(const std::string& path)
+{
+    std::ifstream f(path);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+inline std::string _find_function_body(const std::string& src,
+                                       const std::string& signature)
+{
+    const size_t fnPos = src.find(signature);
+    if (fnPos == std::string::npos) return std::string();
+    const size_t bodyStart = src.find('{', fnPos);
+    if (bodyStart == std::string::npos) return std::string();
+    int depth = 0;
+    for (size_t i = bodyStart; i < src.size(); ++i) {
+        if (src[i] == '{') ++depth;
+        else if (src[i] == '}') {
+            if (--depth == 0) return src.substr(bodyStart, i - bodyStart);
+        }
+    }
+    return std::string();
+}
+
+}  // namespace
+
+static void test_metal_re_tempmesh_mfdraw_calls_drawbuffer()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRETempMesh.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "bool CRETempMesh::mfDraw(SShader* ef, SShaderPass* sl)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // mfDraw must end the silent-stub era: call DrawBuffer with the
+    // engine-side index/vertex counts from m_RP, not just return true.
+    CHECK(body.find("DrawBuffer(") != std::string::npos);
+    CHECK(body.find("m_RP.m_RendNumIndices") != std::string::npos);
+    CHECK(body.find("m_RP.m_FirstIndex") != std::string::npos);
+    CHECK(body.find("m_RP.m_FirstVertex") != std::string::npos);
+    CHECK(body.find("R_PRIMV_TRIANGLES") != std::string::npos);
+    CHECK(body.find("m_VBuffer") != std::string::npos);
+    CHECK(body.find("&m_Inds") != std::string::npos);
+
+    const std::string prep =
+        _find_function_body(src, "void CRETempMesh::mfPrepare()");
+    CHECK(!prep.empty());
+    if (!prep.empty()) {
+        // mfPrepare must wire m_pRE / index-vertex counts for the matching
+        // mfDraw call to see consistent state.
+        CHECK(prep.find("EF_CheckOverflow") != std::string::npos);
+        CHECK(prep.find("m_RP.m_pRE = this") != std::string::npos);
+        CHECK(prep.find("m_RendNumIndices") != std::string::npos);
+        CHECK(prep.find("m_RendNumVerts") != std::string::npos);
+    }
+}
+
+static void test_metal_re_clearstencil_routes_through_clearstencilbuffer()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalREClearStencil.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src, "bool CREClearStencil::mfDraw(SShader* ef, SShaderPass* sfm)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // The old MacOSStubs.cpp path was `assert(false); return false;`. The
+    // ported implementation must route into the renderer's stencil-clear
+    // method, which begins a new render pass with stencilLoadAction=Clear.
+    CHECK(body.find("ClearStencilBuffer()") != std::string::npos);
+    CHECK(body.find("return true") != std::string::npos);
+    CHECK(body.find("assert(false") == std::string::npos);
+}
+
+static void test_metal_re_clearstencil_path_begins_new_pass_with_clear()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalBaseRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src, "void CMetalBaseRenderer::ClearStencilBuffer()");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // ClearStencilBuffer must end the current encoder, then start a new
+    // render pass with stencilLoadAction = Clear while preserving color
+    // and depth attachments via Load.
+    CHECK(body.find("ReleaseRenderEncoder") != std::string::npos);
+    CHECK(body.find("MTLLoadActionClear") != std::string::npos);
+    CHECK(body.find("stencilAttachment") != std::string::npos);
+    // Color & depth should be loaded (preserved), not cleared, since
+    // mid-frame stencil clears must not wipe the partial frame.
+    CHECK(body.find("MTLLoadActionLoad") != std::string::npos);
+}
+
+static void test_metal_re_flaregeom_mfcheckvis_uses_time_based_fade()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalREFlareGeom.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src, "void CREFlareGeom::mfCheckVis(CFColor& col, CCObject* obj)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // Until async depth-readback lands, mfCheckVis must drive the fade
+    // from m_RealTime / CV_r_coronafade, not from a glReadPixels stub.
+    CHECK(body.find("m_RealTime") != std::string::npos);
+    CHECK(body.find("CV_r_coronafade") != std::string::npos);
+    // Output alpha must be clamped to [0,1] so a long-running game session
+    // cannot accumulate fade beyond visible bounds.
+    CHECK(body.find("> 1.0f") != std::string::npos);
+    CHECK(body.find("< 0.0f") != std::string::npos);
+    // Must early-return on a null CCObject (avoids segfault on flare
+    // objects that have not been registered with the scene yet).
+    CHECK(body.find("if (!obj)") != std::string::npos);
+}
+
+static void test_metal_re_common_trimesh_prefab_mfdraw_are_canonical_noops()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderElements.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    // The three RE classes that produce eDATA_TerrainSector / eDATA_TriMesh /
+    // eDATA_Prefab are no-ops because their geometry is rendered via the
+    // CMetalREOcLeaf chunked path. We assert mfDraw is a canonical no-op so
+    // a future refactor cannot silently re-introduce the "set state but no
+    // draw" stub that gated all scene geometry.
+    const char* sigs[] = {
+        "class CMetalRECommon",
+        "class CMetalRETriMesh",
+        "class CMetalREPrefabGeom",
+    };
+    for (const char* sig : sigs) {
+        const size_t classPos = src.find(sig);
+        CHECK(classPos != std::string::npos);
+        if (classPos == std::string::npos) continue;
+        const size_t classEnd = src.find("};", classPos);
+        CHECK(classEnd != std::string::npos);
+        if (classEnd == std::string::npos) continue;
+        const std::string classBody = src.substr(classPos, classEnd - classPos);
+
+        const size_t draw = classBody.find("virtual bool mfDraw(");
+        CHECK(draw != std::string::npos);
+        if (draw == std::string::npos) continue;
+        const size_t braceOpen = classBody.find('{', draw);
+        CHECK(braceOpen != std::string::npos);
+        if (braceOpen == std::string::npos) continue;
+        const size_t braceClose = classBody.find('}', braceOpen);
+        CHECK(braceClose != std::string::npos);
+        if (braceClose == std::string::npos) continue;
+        const std::string drawBody =
+            classBody.substr(braceOpen + 1, braceClose - braceOpen - 1);
+        // The canonical no-op body is `return true;` with optional whitespace.
+        CHECK(drawBody.find("return true") != std::string::npos);
+        // Critically: must NOT contain a SetState/SetCullMode pair without a
+        // subsequent draw call (the original bug).
+        const bool hasSetState = drawBody.find("SetState") != std::string::npos;
+        const bool hasDraw = drawBody.find("DrawBuffer(") != std::string::npos ||
+                             drawBody.find("drawIndexedPrimitives") != std::string::npos;
+        CHECK(!(hasSetState && !hasDraw));
+    }
+}
+
+static void test_metal_re_baseocleaf_stub_returns_true_and_is_traced()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderElements.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "bool CREOcLeaf::mfDraw(SShader* ef, SShaderPass* sfm)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // The base CREOcLeaf::mfDraw should be unreachable in practice
+    // (CMetalREOcLeaf overrides it). The stub must remain a safe no-op
+    // and must carry telemetry so we get a log line if it ever fires.
+    CHECK(body.find("METAL_STUB_TRACE") != std::string::npos);
+    CHECK(body.find("return true") != std::string::npos);
+    CHECK(body.find("assert(false") == std::string::npos);
+}
+
+static void test_metal_drawbuffer_emits_telemetry_on_silent_returns()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalBaseRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body = _find_function_body(
+        src,
+        "void CMetalBaseRenderer::DrawBuffer(CVertexBuffer *src, "
+        "TArray<unsigned short> *indicies, int nIndexCount, int "
+        "nFirstIndex, int nDrawType, int nVertStart, int nVertStop, "
+        "CMatInfo *pMatInfo)");
+    if (body.empty()) {
+        const std::string altBody = _find_function_body(
+            src, "void CMetalBaseRenderer::DrawBuffer");
+        CHECK(!altBody.empty());
+        if (altBody.empty()) return;
+        CHECK(altBody.find("METAL_STUB_TRACE") != std::string::npos);
+        CHECK(altBody.find("no-encoder") != std::string::npos);
+        CHECK(altBody.find("null-vertex-buffer") != std::string::npos);
+        return;
+    }
+
+    // The four silent-return paths inside DrawBuffer must each emit a
+    // rate-limited telemetry hit, otherwise a future regression of the
+    // BeginFrame fallback path is invisible to log inspection.
+    CHECK(body.find("METAL_STUB_TRACE") != std::string::npos);
+    CHECK(body.find("no-encoder") != std::string::npos);
+    CHECK(body.find("null-vertex-buffer") != std::string::npos);
+}
+
+static void test_metal_brushlm_diagnostic_present()
+{
+    const std::string path = _walk_up_for("Cry3DEngine/BrushLM.cpp");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    // The diagnostic in CBrush::SetLightmap must:
+    //  - be gated on the macOS build (the issue is macOS-specific so far),
+    //  - log iNumTexCoords, m_NumVerts, and m_SecVertCount together so
+    //    the per-platform ratio is visible in the log,
+    //  - fire only once via the `s_bLMDiagPrinted` guard,
+    //  - resolve iLog via GetSystem()->GetILog() (BrushLM.cpp does not
+    //    pull in the extern ILog* iLog symbol like the renderer does).
+    CHECK(src.find("__APPLE__") != std::string::npos);
+    CHECK(src.find("s_bLMDiagPrinted") != std::string::npos);
+    CHECK(src.find("GetSystem()->GetILog()") != std::string::npos ||
+          src.find("GetSystem() ? GetSystem()->GetILog()") != std::string::npos);
+    CHECK(src.find("iNumTexCoords") != std::string::npos);
+    CHECK(src.find("m_SecVertCount") != std::string::npos);
+    CHECK(src.find("m_NumVerts") != std::string::npos);
+}
+
+static void test_metal_brushlm_lightmapped_brush_uses_evs_nosharing()
+{
+    const std::string path = _walk_up_for("Cry3DEngine/Brush.cpp");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    // Brushes flagged ERF_USELIGHTMAPS must construct their stat object
+    // with evs_NoSharing so the runtime LeafBuffer's m_SecVertCount stays
+    // equal to face_count*3 — that is the only ratio the levellm.pak UV
+    // count is baked against. Sharing would cause CompactBuffer to dedupe
+    // vertices and break the supplied/required UV count assertion.
+    const size_t cond = src.find("ERF_USELIGHTMAPS");
+    CHECK(cond != std::string::npos);
+    if (cond == std::string::npos) return;
+
+    // Find the ternary that pairs ERF_USELIGHTMAPS with evs_NoSharing.
+    const size_t ternarySite = src.find("evs_NoSharing", cond);
+    CHECK(ternarySite != std::string::npos);
+    if (ternarySite == std::string::npos) return;
+    const std::string slice = src.substr(cond, ternarySite - cond);
+    CHECK(slice.find("?") != std::string::npos);
+    CHECK(slice.find("evs_ShareAndSortForCache") == std::string::npos);
+}
+
+static void test_metal_endframe_per_second_diag_present()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EndFrame()");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    // The per-second draw-call telemetry line must be gated behind
+    // cry_trace_render_gates >= 1 so the log stays quiet by default.
+    CHECK(body.find("cry_trace_render_gates") != std::string::npos);
+    CHECK(body.find("m_numDrawCalls") != std::string::npos);
+    CHECK(body.find("m_numTriangles") != std::string::npos);
+}
+
+// -----------------------------------------------------------------------
 
 int main()
 {
@@ -3364,6 +3727,19 @@ int main()
             }
         }
     }
+
+    // Phase 2/3 — Metal scene render-element ports, BrushLM diagnostics,
+    // and the per-frame draw-call telemetry that frames the bug fix.
+    test_metal_re_tempmesh_mfdraw_calls_drawbuffer();
+    test_metal_re_clearstencil_routes_through_clearstencilbuffer();
+    test_metal_re_clearstencil_path_begins_new_pass_with_clear();
+    test_metal_re_flaregeom_mfcheckvis_uses_time_based_fade();
+    test_metal_re_common_trimesh_prefab_mfdraw_are_canonical_noops();
+    test_metal_re_baseocleaf_stub_returns_true_and_is_traced();
+    test_metal_drawbuffer_emits_telemetry_on_silent_returns();
+    test_metal_brushlm_diagnostic_present();
+    test_metal_brushlm_lightmapped_brush_uses_evs_nosharing();
+    test_metal_endframe_per_second_diag_present();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

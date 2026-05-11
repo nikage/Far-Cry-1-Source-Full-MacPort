@@ -2916,6 +2916,25 @@ void CMetalRenderer::EndFrame() {
     }
   }
 
+  if (iConsole && iLog) {
+    ICVar* pTr = iConsole->GetCVar("cry_trace_render_gates");
+    if (pTr && pTr->GetIVal() >= 1) {
+      static int s_lastReportFrame = 0;
+      static int s_lastReportedDrawCalls = 0;
+      static int s_lastReportedTriangles = 0;
+      if (m_nFrameID - s_lastReportFrame >= 60) {
+        const int deltaDraws = m_numDrawCalls - s_lastReportedDrawCalls;
+        const int deltaTris  = m_numTriangles - s_lastReportedTriangles;
+        iLog->Log("\003[CryTrace] EndFrame frame=%d draws=%d(+%d) tris=%d(+%d)",
+                   m_nFrameID, m_numDrawCalls, deltaDraws,
+                   m_numTriangles, deltaTris);
+        s_lastReportFrame      = m_nFrameID;
+        s_lastReportedDrawCalls = m_numDrawCalls;
+        s_lastReportedTriangles = m_numTriangles;
+      }
+    }
+  }
+
 #ifdef DEBUG
   if (m_metalGPUCaptureFlag > 0) {
     [[MTLCaptureManager sharedCaptureManager] stopCapture];

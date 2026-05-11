@@ -101,6 +101,35 @@ void CBrush::SetLightmap(RenderLMData *pLMData, float *pTexCoords, UINT iNumTexC
 	if (pLeafBuffer == NULL)
 		return;
 
+#if defined(__APPLE__) && defined(__MACH__)
+	// One-shot diagnostic: surface the supplied vs required UV count and the
+	// first few UV pairs so we can characterise the split-vertex bug.
+	static bool s_bLMDiagPrinted = false;
+	ILog* pLog = GetSystem() ? GetSystem()->GetILog() : NULL;
+	if (!s_bLMDiagPrinted && pLog)
+	{
+		s_bLMDiagPrinted = true;
+		const int nVertexBufferVerts =
+		    pLeafBuffer->m_pVertexBuffer ? pLeafBuffer->m_pVertexBuffer->m_NumVerts : -1;
+		pLog->Log("[BrushLM] First SetLightmap: supplied iNumTexCoords=%u "
+		           "leafBuffer.m_pVertexBuffer.m_NumVerts=%d leafBuffer.m_SecVertCount=%d "
+		           "uv[0]=(%.4f,%.4f) uv[1]=(%.4f,%.4f) "
+		           "uv[2]=(%.4f,%.4f) uv[3]=(%.4f,%.4f) file=%s",
+		           iNumTexCoords,
+		           nVertexBufferVerts,
+		           pLeafBuffer->m_SecVertCount,
+		           iNumTexCoords > 0 ? pTexCoords[0] : 0.0f,
+		           iNumTexCoords > 0 ? pTexCoords[1] : 0.0f,
+		           iNumTexCoords > 1 ? pTexCoords[2] : 0.0f,
+		           iNumTexCoords > 1 ? pTexCoords[3] : 0.0f,
+		           iNumTexCoords > 2 ? pTexCoords[4] : 0.0f,
+		           iNumTexCoords > 2 ? pTexCoords[5] : 0.0f,
+		           iNumTexCoords > 3 ? pTexCoords[6] : 0.0f,
+		           iNumTexCoords > 3 ? pTexCoords[7] : 0.0f,
+		           pIStatObj->GetFileName());
+	}
+#endif
+
 	// Renderer expect 2 floats
 	std::vector<float> vTexCoord2;
 	vTexCoord2.reserve(iNumTexCoords * 2);

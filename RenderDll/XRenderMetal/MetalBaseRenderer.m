@@ -23,6 +23,7 @@
 #include "MetalRenderPCH.h"
 #include "MetalStateCache.m"
 #include "MetalRenderElements.m"
+#include "../Common/StubTelemetry.h"
 #include <atomic>
 #include <unordered_map>
 
@@ -241,7 +242,8 @@ virtual void PushMatrix();
                               ETEX_Format eSrcTF, bool bUseHW, int nDstBytesPerPix) { return false; }
     virtual void RemoveTexture(unsigned int TextureId) { }
     virtual void RemoveTexture(ITexPic* pTexPic) { }
-    virtual bool SetGammaDelta(const float fGamma) { return false; }
+    virtual bool SetGammaDelta(const float fGamma)
+    { METAL_STUB_TRACE("CMetalBaseRenderer::SetGammaDelta", "gamma=%.3f", (double)fGamma); return false; }
     
     // Text and UI Rendering stubs
     virtual void WriteXY(CXFont* currfont, int x, int y, float xscale, float yscale, 
@@ -255,11 +257,16 @@ virtual void PushMatrix();
                           float s0, float t0, float s1, float t1, float r, float g, float b, float a) { }
     virtual int SetPolygonMode(int mode) { return 0; }
     
-    // All EF_ (shader system) methods as stubs
-    virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags) { return false; }
-    virtual bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags) { return false; }
+    // EF_ (shader/asset precache) entry points — telemetry-wrapped so any
+    // gameplay-path caller is surfaced.
+    virtual bool EF_PrecacheResource(IShader* pSH, float fDist, float fTimeToReady, int Flags)
+    { METAL_STUB_TRACE_BARE("CMetalBaseRenderer::EF_PrecacheResource(IShader)"); return false; }
+    virtual bool EF_PrecacheResource(ITexPic* pTP, float fDist, float fTimeToReady, int Flags)
+    { METAL_STUB_TRACE_BARE("CMetalBaseRenderer::EF_PrecacheResource(ITexPic)"); return false; }
+    virtual bool EF_PrecacheResource(CLeafBuffer* pPB, float fDist, float fTimeToReady, int Flags)
+    { METAL_STUB_TRACE_BARE("CMetalBaseRenderer::EF_PrecacheResource(CLeafBuffer)"); return false; }
+    virtual bool EF_PrecacheResource(CDLight* pLS, float fDist, float fTimeToReady, int Flags)
+    { METAL_STUB_TRACE_BARE("CMetalBaseRenderer::EF_PrecacheResource(CDLight)"); return false; }
     virtual void EF_EnableHeatVision(bool bEnable) { }
     virtual bool EF_GetHeatVision() { return false; }
     virtual void EF_PolygonOffset(bool bEnable, float fFactor, float fUnits) { }
@@ -355,20 +362,26 @@ virtual void PushMatrix();
     virtual void DrawBall(const Vec3& pos, float radius) { }
     virtual void DrawPoint(float x, float y, float z, float fSize = 0.0f) { }
     virtual void FlushTextMessages() { }
-    virtual void DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan) { }
+    virtual void DrawObjSprites(list2<CStatObjInst*>* pList, float fMaxViewDist, CObjManager* pObjMan)
+    { METAL_STUB_TRACE_BARE("CMetalBaseRenderer::DrawObjSprites"); }
     virtual void DrawQuad(const Vec3& right, const Vec3& up, const Vec3& origin, int nFlipMode = 0) { }
     virtual void DrawQuad(float dy, float dx, float dz, float x, float y, float z) { }
     virtual void ClearDepthBuffer();
     virtual void ClearColorBuffer(const Vec3 vColor);
-    virtual void ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, bool bBackBuffer, bool bRGBA, int nScaledX = -1, int nScaledY = -1) {}
+    void         ClearStencilBuffer();
+    virtual void ReadFrameBuffer(unsigned char* pRGB, int nSizeX, int nSizeY, bool bBackBuffer, bool bRGBA, int nScaledX = -1, int nScaledY = -1)
+    { METAL_STUB_TRACE("CMetalBaseRenderer::ReadFrameBuffer", "%dx%d backbuf=%d", nSizeX, nSizeY, (int)bBackBuffer); }
     virtual void SetFogColor(float* color);
     virtual void TransformTextureMatrix(float x, float y, float angle, float scale) { }
     virtual void ResetTextureMatrix() { }
-    virtual unsigned int MakeSprite(float object_scale, int tex_size, float angle, IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid) { return 0; }
-    virtual unsigned int Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj) { return 0; }
+    virtual unsigned int MakeSprite(float object_scale, int tex_size, float angle, IStatObj* pStatObj, uchar* pTmpBuffer, uint def_tid)
+    { METAL_STUB_TRACE("CMetalBaseRenderer::MakeSprite", "tex_size=%d", tex_size); return 0; }
+    virtual unsigned int Make3DSprite(int nTexSize, float fAngleStep, IStatObj* pStatObj)
+    { METAL_STUB_TRACE("CMetalBaseRenderer::Make3DSprite", "nTexSize=%d", nTexSize); return 0; }
     virtual ShadowMapFrustum* MakeShadowMapFrustum(ShadowMapFrustum* lof, ShadowMapLightSource* pLs, const Vec3& obj_pos, list2<IStatObj*>* pStatObjects, int shadow_type) { return nullptr; }
     virtual void Set2DMode(bool enable, int ortox, int ortoy) { }
-    virtual int ScreenToTexture() { return 0; }
+    virtual int ScreenToTexture()
+    { METAL_STUB_TRACE_BARE("CMetalBaseRenderer::ScreenToTexture"); return 0; }
     virtual void SetTexClampMode(bool clamp) { }
     virtual void DrawLabelImage(const Vec3& vPos, float fSize, int nTextureId) { }
     virtual void DrawLabel(Vec3 pos, float font_size, const char* label_text, ...) { }

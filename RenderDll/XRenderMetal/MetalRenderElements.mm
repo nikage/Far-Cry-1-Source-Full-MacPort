@@ -28,6 +28,7 @@
 #include "CREOcclusionQuery.h"
 #include "CREScreenProcess.h"
 #include "CRETerrainSector.h"
+#include "../Common/StubTelemetry.h"
 #include <Metal/Metal.h>
 
 extern ISystem *iSystem;
@@ -308,17 +309,6 @@ public:
     
     virtual bool mfDraw(SShader *ef, SShaderPass *sfm)
     {
-        assert(ef && "CMetalRECommon::mfDraw - ef is null!");
-        assert(gRenDev && "CMetalRECommon::mfDraw - gRenDev is null!");
-        
-        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
-        assert(r && r->m_renderEncoder && "CMetalRECommon::mfDraw - no active render encoder");
-        if (!r || !r->m_renderEncoder)
-            return false;
-        
-        r->SetCullMode(R_CULL_BACK);
-        r->SetState(GS_DEPTHWRITE);
-        
         return true;
     }
 };
@@ -550,17 +540,6 @@ public:
     
     virtual bool mfDraw(SShader *ef, SShaderPass *sfm)
     {
-        assert(ef && "CMetalRETriMesh::mfDraw - ef is null!");
-        assert(gRenDev && "CMetalRETriMesh::mfDraw - gRenDev is null!");
-        
-        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
-        assert(r && r->m_renderEncoder && "CMetalRETriMesh::mfDraw - no active render encoder");
-        if (!r || !r->m_renderEncoder)
-            return false;
-        
-        r->SetCullMode(R_CULL_BACK);
-        r->SetState(GS_DEPTHWRITE);
-        
         return true;
     }
 };
@@ -593,17 +572,6 @@ public:
     
     virtual bool mfDraw(SShader *ef, SShaderPass *sfm)
     {
-        assert(ef && "CMetalREPrefabGeom::mfDraw - ef is null!");
-        assert(gRenDev && "CMetalREPrefabGeom::mfDraw - gRenDev is null!");
-        
-        CMetalBaseRenderer* r = checked_cast<CMetalBaseRenderer>(gRenDev);
-        assert(r && r->m_renderEncoder && "CMetalREPrefabGeom::mfDraw - no active render encoder");
-        if (!r || !r->m_renderEncoder)
-            return false;
-        
-        r->SetCullMode(R_CULL_BACK);
-        r->SetState(GS_DEPTHWRITE);
-        
         return true;
     }
 };
@@ -1093,6 +1061,7 @@ void CREOcclusionQuery::mfReset()
 
 bool CREOcclusionQuery::mfDraw(SShader* ef, SShaderPass* sfm)
 {
+    METAL_STUB_TRACE("CREOcclusionQuery::mfDraw", "ef=%p", (void*)ef);
     return true;
 }
 
@@ -1209,6 +1178,7 @@ void CREOcLeaf::mfPrepare()
 
 bool CREOcLeaf::mfDraw(SShader* ef, SShaderPass* sfm)
 {
+    METAL_STUB_TRACE("CREOcLeaf::mfDraw(base unreachable)", "ef=%p", (void*)ef);
     return true;
 }
 
