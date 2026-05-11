@@ -1801,6 +1801,38 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                     fields,
                     structSize);
             }
+
+            NSString* vepNS = entry[@"vertexEntryPoint"];
+            if (vepNS && [vepNS length] > 0)
+            {
+                for (NSDictionary* vEntry in entries)
+                {
+                    if (![vEntry isKindOfClass:[NSDictionary class]])
+                        continue;
+                    NSString* vStage = vEntry[@"stage"];
+                    if (!vStage || ![[vStage lowercaseString] isEqualToString:@"vertex"])
+                        continue;
+                    NSString* vEntryPoint = vEntry[@"entryPoint"];
+                    if (!vEntryPoint || ![vEntryPoint isEqualToString:vepNS])
+                        continue;
+                    NSArray* vUniformArray = vEntry[@"uniforms"];
+                    NSString* vUniformStruct = vEntry[@"uniformStruct"];
+                    NSUInteger vStructSize = 0;
+                    std::vector<MetalPerShaderUniforms::FieldDescriptor> vFields =
+                        MetalPerShaderUniforms::Binder::BuildFieldsFromManifestUniforms(
+                            vUniformArray, &vStructSize);
+                    if (!vFields.empty() && vStructSize > 0)
+                    {
+                        m_perShaderUniforms.RegisterShaderVertex(
+                            normalizedKey.c_str(),
+                            vUniformStruct ? [vUniformStruct UTF8String] : "",
+                            vFields,
+                            vStructSize);
+                    }
+                    break;
+                }
+            }
+
             NSArray* textureArray = entry[@"textures"];
             if ([textureArray isKindOfClass:[NSArray class]] && [textureArray count] > 0)
             {
@@ -1815,6 +1847,8 @@ void CMetalShaderManager::LoadGeneratedShaders(id<MTLLibrary> vertexLibrary)
                   m_materialTextureBinder.RegisteredShaderCount());
         iLog->Log("\003[PerShaderUniforms] registered %zu fragment-shader uniform layouts",
                   m_perShaderUniforms.RegisteredShaderCount());
+        iLog->Log("\003[PerShaderUniforms] registered %zu vertex-shader uniform layouts",
+                  m_perShaderUniforms.RegisteredVertexShaderCount());
     }
 
     NSString* builtinAliasPath = [[manifestPath stringByDeletingLastPathComponent]

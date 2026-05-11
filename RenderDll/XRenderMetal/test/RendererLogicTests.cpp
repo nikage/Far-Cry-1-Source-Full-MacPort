@@ -3226,6 +3226,102 @@ static void test_metal_ef_loadshaderitem_registers_shader_resources()
     CHECK(body.find("tex->m_TU.m_TexPic = (STexPic*)pic") != std::string::npos);
 }
 
+static void test_metal_per_shader_vertex_uniforms_wired()
+{
+    const std::string hPath = _walk_up_for("RenderDll/XRenderMetal/MetalPerShaderUniforms.h");
+    const std::string mPath = _walk_up_for("RenderDll/XRenderMetal/MetalPerShaderUniforms.mm");
+    CHECK(!hPath.empty());
+    CHECK(!mPath.empty());
+    if (hPath.empty() || mPath.empty()) return;
+    const std::string hSrc = _read_file(hPath);
+    const std::string mSrc = _read_file(mPath);
+    CHECK(!hSrc.empty());
+    CHECK(!mSrc.empty());
+    if (hSrc.empty() || mSrc.empty()) return;
+
+    CHECK(hSrc.find("struct MatrixView")                  != std::string::npos);
+    CHECK(hSrc.find("ModelViewProj")                      != std::string::npos);
+    CHECK(hSrc.find("ProjMatrix")                         != std::string::npos);
+    CHECK(hSrc.find("LightPos")                           != std::string::npos);
+    CHECK(hSrc.find("SetMatrixView(")                     != std::string::npos);
+    CHECK(hSrc.find("RegisterShaderVertex(")              != std::string::npos);
+    CHECK(hSrc.find("PackAndBindVertex(")                 != std::string::npos);
+    CHECK(hSrc.find("m_vertexLayouts")                    != std::string::npos);
+
+    CHECK(mSrc.find("\"float4x4\"")                       != std::string::npos);
+    CHECK(mSrc.find("return 64")                          != std::string::npos);
+    CHECK(mSrc.find("m_matrix.ModelViewProj")             != std::string::npos);
+    CHECK(mSrc.find("m_matrix.LightPos")                  != std::string::npos);
+    CHECK(mSrc.find("setVertexBuffer:m_ringBuffer")       != std::string::npos);
+    CHECK(mSrc.find("m_vertexLayouts.find")               != std::string::npos);
+}
+
+static void test_metal_shader_loader_registers_vertex_uniforms()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalShaderLoader.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    CHECK(src.find("RegisterShaderVertex(")                  != std::string::npos);
+    CHECK(src.find("vertexEntryPoint")                       != std::string::npos);
+    CHECK(src.find("isEqualToString:@\"vertex\"")            != std::string::npos);
+    CHECK(src.find("registered %zu vertex-shader uniform")   != std::string::npos);
+}
+
+static void test_metal_ef_endef3d_binds_per_shader_vertex_uniforms()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    CHECK(body.find("MetalPerShaderUniforms::MatrixView")              != std::string::npos);
+    CHECK(body.find("mxv.ModelViewProj")                               != std::string::npos);
+    CHECK(body.find("mxv.ProjMatrix")                                  != std::string::npos);
+    CHECK(body.find("mxv.LightPos")                                    != std::string::npos);
+    CHECK(body.find("binder.SetMatrixView(mxv)")                       != std::string::npos);
+    CHECK(body.find("PackAndBindVertex(encoder")                       != std::string::npos);
+    CHECK(body.find("kMetalPerShaderVertexUniformSlot")                != std::string::npos);
+}
+
+static void test_metal_ef_endef3d_defaults_material_when_no_lmaterial()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src, "void CMetalRenderer::EF_EndEf3D(int nFlags)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    const size_t guarded = body.find("if (pRes && pRes->m_LMaterial)");
+    const size_t elseBranch = guarded != std::string::npos
+        ? body.find("else {", guarded) : std::string::npos;
+    CHECK(guarded     != std::string::npos);
+    CHECK(elseBranch  != std::string::npos);
+
+    if (elseBranch != std::string::npos) {
+        const std::string elseSlice = body.substr(elseBranch, 600);
+        CHECK(elseSlice.find("m_materialBufferCPU->Diffuse[0]  = 1.0f")  != std::string::npos);
+        CHECK(elseSlice.find("m_materialBufferCPU->Diffuse[3]  = 1.0f")  != std::string::npos);
+        CHECK(elseSlice.find("m_materialBufferCPU->Ambient[0]  = 1.0f")  != std::string::npos);
+        CHECK(elseSlice.find("m_materialBufferCPU->Specular[0] = 1.0f")  != std::string::npos);
+    }
+}
+
 static void test_metal_per_shader_uniforms_reset_each_frame()
 {
     const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
@@ -4437,6 +4533,17 @@ int main()
     // Phase 12 — root cause of black scene: register pRes in m_ShaderResources_known
     // so mfAdd/mfGet round-trip produces a non-null pRes for every render-item.
     test_metal_ef_loadshaderitem_registers_shader_resources();
+
+    // Phase 14 — default Diffuse/Ambient/Specular to (1,1,1,1) when LMaterial is null
+    // so cgrcbump_diff's `uniforms.Diffuse.xyz * 2` modulator isn't zero.
+    test_metal_ef_endef3d_defaults_material_when_no_lmaterial();
+
+    // Phase 15 — bind per-shader VERTEX uniforms (ModelViewProj, ProjMatrix, LightPos)
+    // to slot kMetalPerShaderVertexUniformSlot=5 so vertex shaders can transform
+    // positions to clip space.
+    test_metal_per_shader_vertex_uniforms_wired();
+    test_metal_shader_loader_registers_vertex_uniforms();
+    test_metal_ef_endef3d_binds_per_shader_vertex_uniforms();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

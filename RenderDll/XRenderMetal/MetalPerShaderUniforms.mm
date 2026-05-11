@@ -18,6 +18,10 @@ NSUInteger AlignUp(NSUInteger value, NSUInteger alignment)
 
 NSUInteger SizeForType(const std::string& type)
 {
+    if (type == "float4x4" || type == "FLOAT4X4" || type == "matrix")
+        return 64;
+    if (type == "float3x3" || type == "FLOAT3X3")
+        return 48;
     if (type == "float4" || type == "FLOAT4" || type == "half4")
         return 16;
     if (type == "float3" || type == "FLOAT3" || type == "half3")
@@ -121,6 +125,28 @@ bool Binder::HasShader(const char* shaderName) const
     return m_layouts.find(shaderName) != m_layouts.end();
 }
 
+void Binder::RegisterShaderVertex(const char* fragmentShaderName,
+                                  const char* uniformStructName,
+                                  const std::vector<FieldDescriptor>& fields,
+                                  NSUInteger structSize)
+{
+    if (!fragmentShaderName || fields.empty() || structSize == 0)
+        return;
+    ShaderLayout layout;
+    layout.shaderName = fragmentShaderName;
+    layout.uniformStructName = uniformStructName ? uniformStructName : "";
+    layout.fields = fields;
+    layout.structSize = structSize;
+    m_vertexLayouts[layout.shaderName] = std::move(layout);
+}
+
+bool Binder::HasVertexShader(const char* fragmentShaderName) const
+{
+    if (!fragmentShaderName)
+        return false;
+    return m_vertexLayouts.find(fragmentShaderName) != m_vertexLayouts.end();
+}
+
 void Binder::BeginFrame()
 {
     m_ringCursor = 0;
@@ -161,11 +187,20 @@ void Binder::PackField(const FieldDescriptor& field, uint8_t* dst)
         src = m_material.FogColor;
     else if (field.name == "DiffuseSun")
         src = m_global.DiffuseSun;
+    else if (field.name == "ModelViewProj")
+        src = m_matrix.ModelViewProj;
+    else if (field.name == "ProjMatrix")
+        src = m_matrix.ProjMatrix;
+    else if (field.name == "ViewMatrix")
+        src = m_matrix.ViewMatrix;
+    else if (field.name == "ModelMatrix")
+        src = m_matrix.ModelMatrix;
+    else if (field.name == "LightPos")
+        src = m_matrix.LightPos;
 
     if (src)
     {
-        NSUInteger bytes = field.size < 16 ? field.size : 16;
-        memcpy(slot, src, bytes);
+        memcpy(slot, src, field.size);
     }
     else
     {
@@ -235,6 +270,39 @@ bool Binder::PackAndBind(id<MTLRenderCommandEncoder> encoder,
     }
 
     [encoder setFragmentBuffer:m_ringBuffer offset:alignedCursor atIndex:slot];
+    m_ringCursor = alignedCursor + needed;
+    return true;
+}
+
+bool Binder::PackAndBindVertex(id<MTLRenderCommandEncoder> encoder,
+                               const char* fragmentShaderName,
+                               NSUInteger slot)
+{
+    if (!encoder || !fragmentShaderName || !m_ringBuffer)
+        return false;
+    auto it = m_vertexLayouts.find(fragmentShaderName);
+    if (it == m_vertexLayouts.end())
+        return false;
+    const ShaderLayout& layout = it->second;
+    if (layout.structSize == 0)
+        return false;
+
+    NSUInteger alignedCursor = AlignUp(m_ringCursor, kSlotAlignment);
+    NSUInteger needed = layout.structSize;
+    if (alignedCursor + needed > m_ringCapacity)
+    {
+        m_ringCursor = alignedCursor;
+        if (!EnsureCapacity(needed))
+            return false;
+        alignedCursor = m_ringCursor;
+    }
+
+    uint8_t* base = (uint8_t*)[m_ringBuffer contents] + alignedCursor;
+    memset(base, 0, needed);
+    for (const FieldDescriptor& field : layout.fields)
+        PackField(field, base);
+
+    [encoder setVertexBuffer:m_ringBuffer offset:alignedCursor atIndex:slot];
     m_ringCursor = alignedCursor + needed;
     return true;
 }

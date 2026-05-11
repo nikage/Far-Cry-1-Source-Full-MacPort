@@ -1424,9 +1424,8 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
           m_projectionMatrix * m_viewMatrix * pObj->m_Matrix;
       }
 
-      // Apply material colours from shader resources
-      if (pRes && m_materialBufferCPU) {
-        if (pRes->m_LMaterial) {
+      if (m_materialBufferCPU) {
+        if (pRes && pRes->m_LMaterial) {
           m_materialBufferCPU->Ambient[0]  = pRes->m_LMaterial->Front.m_Ambient.r;
           m_materialBufferCPU->Ambient[1]  = pRes->m_LMaterial->Front.m_Ambient.g;
           m_materialBufferCPU->Ambient[2]  = pRes->m_LMaterial->Front.m_Ambient.b;
@@ -1439,6 +1438,20 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
           m_materialBufferCPU->Specular[1] = pRes->m_LMaterial->Front.m_Specular.g;
           m_materialBufferCPU->Specular[2] = pRes->m_LMaterial->Front.m_Specular.b;
           m_materialBufferCPU->Specular[3] = pRes->m_LMaterial->Front.m_Specular.a;
+        }
+        else {
+          m_materialBufferCPU->Ambient[0]  = 1.0f;
+          m_materialBufferCPU->Ambient[1]  = 1.0f;
+          m_materialBufferCPU->Ambient[2]  = 1.0f;
+          m_materialBufferCPU->Ambient[3]  = 1.0f;
+          m_materialBufferCPU->Diffuse[0]  = 1.0f;
+          m_materialBufferCPU->Diffuse[1]  = 1.0f;
+          m_materialBufferCPU->Diffuse[2]  = 1.0f;
+          m_materialBufferCPU->Diffuse[3]  = 1.0f;
+          m_materialBufferCPU->Specular[0] = 1.0f;
+          m_materialBufferCPU->Specular[1] = 1.0f;
+          m_materialBufferCPU->Specular[2] = 1.0f;
+          m_materialBufferCPU->Specular[3] = 1.0f;
         }
       }
 
@@ -1478,10 +1491,18 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
         mv.FogColor = m_materialBufferCPU->FogColor;
         MetalPerShaderUniforms::GlobalView gv;
         gv.DiffuseSun = m_uniformBufferCPU->lightColor;
+        MetalPerShaderUniforms::MatrixView mxv;
+        mxv.ModelViewProj = reinterpret_cast<const float*>(&m_uniformBufferCPU->modelViewProjectionMatrix);
+        mxv.ProjMatrix    = reinterpret_cast<const float*>(&m_uniformBufferCPU->projectionMatrix);
+        mxv.ViewMatrix    = reinterpret_cast<const float*>(&m_uniformBufferCPU->viewMatrix);
+        mxv.ModelMatrix   = reinterpret_cast<const float*>(&m_uniformBufferCPU->modelMatrix);
+        mxv.LightPos      = m_uniformBufferCPU->lightPos;
         auto& binder = m_shaderManager->GetPerShaderUniformBinder();
         binder.SetMaterialView(mv);
         binder.SetGlobalView(gv);
+        binder.SetMatrixView(mxv);
         binder.PackAndBind(encoder, pShader->m_Name.c_str(), kMetalPerShaderFragmentUniformSlot);
+        binder.PackAndBindVertex(encoder, pShader->m_Name.c_str(), kMetalPerShaderVertexUniformSlot);
       }
 
       // Bind global and material uniforms

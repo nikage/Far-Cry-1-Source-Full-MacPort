@@ -38,6 +38,15 @@ struct GlobalView
     const float* DiffuseSun = nullptr;
 };
 
+struct MatrixView
+{
+    const float* ModelViewProj = nullptr;
+    const float* ProjMatrix    = nullptr;
+    const float* ViewMatrix    = nullptr;
+    const float* ModelMatrix   = nullptr;
+    const float* LightPos      = nullptr;
+};
+
 class Binder
 {
 public:
@@ -52,16 +61,27 @@ public:
                         const std::vector<FieldDescriptor>& fields,
                         NSUInteger structSize);
 
+    void RegisterShaderVertex(const char* fragmentShaderName,
+                              const char* uniformStructName,
+                              const std::vector<FieldDescriptor>& fields,
+                              NSUInteger structSize);
+
     bool HasShader(const char* shaderName) const;
+    bool HasVertexShader(const char* fragmentShaderName) const;
     size_t RegisteredShaderCount() const { return m_layouts.size(); }
+    size_t RegisteredVertexShaderCount() const { return m_vertexLayouts.size(); }
 
     void SetMaterialView(const MaterialView& view) { m_material = view; }
     void SetGlobalView(const GlobalView& view) { m_global = view; }
+    void SetMatrixView(const MatrixView& view) { m_matrix = view; }
 
     void BeginFrame();
     bool PackAndBind(id<MTLRenderCommandEncoder> encoder,
                      const char* shaderName,
                      NSUInteger slot);
+    bool PackAndBindVertex(id<MTLRenderCommandEncoder> encoder,
+                           const char* fragmentShaderName,
+                           NSUInteger slot);
 
     static std::vector<FieldDescriptor> BuildFieldsFromManifestUniforms(
         NSArray* manifestUniforms,
@@ -80,8 +100,10 @@ private:
 
     MaterialView                         m_material;
     GlobalView                           m_global;
+    MatrixView                           m_matrix;
 
     std::unordered_map<std::string, ShaderLayout> m_layouts;
+    std::unordered_map<std::string, ShaderLayout> m_vertexLayouts;
 
     mutable std::unordered_map<std::string, int> m_unknownFieldWarnings;
     int                                  m_diagCallsRemaining = 0;
