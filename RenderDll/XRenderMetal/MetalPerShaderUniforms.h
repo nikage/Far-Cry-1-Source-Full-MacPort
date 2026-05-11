@@ -67,6 +67,8 @@ public:
         NSArray* manifestUniforms,
         NSUInteger* outStructSize);
 
+    void EnableOneShotDiagnostic(int remainingCalls) { m_diagCallsRemaining = remainingCalls; }
+
 private:
     bool                                 EnsureCapacity(NSUInteger neededBytes);
     void                                 PackField(const FieldDescriptor& field, uint8_t* dst);
@@ -82,6 +84,7 @@ private:
     std::unordered_map<std::string, ShaderLayout> m_layouts;
 
     mutable std::unordered_map<std::string, int> m_unknownFieldWarnings;
+    int                                  m_diagCallsRemaining = 0;
 };
 
 } // namespace MetalPerShaderUniforms

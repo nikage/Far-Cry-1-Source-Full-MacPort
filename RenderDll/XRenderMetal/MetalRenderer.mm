@@ -1469,6 +1469,8 @@ void CMetalRenderer::EF_EndEf3D(int nFlags) {
 
       if (m_shaderManager && m_materialBufferCPU && m_uniformBufferCPU)
       {
+        if (g_metal_debug_dump_texunits > 0)
+          m_shaderManager->GetPerShaderUniformBinder().EnableOneShotDiagnostic(1);
         MetalPerShaderUniforms::MaterialView mv;
         mv.Ambient  = m_materialBufferCPU->Ambient;
         mv.Diffuse  = m_materialBufferCPU->Diffuse;

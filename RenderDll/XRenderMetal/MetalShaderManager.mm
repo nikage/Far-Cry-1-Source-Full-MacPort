@@ -1231,6 +1231,62 @@ SShaderItem CMetalShaderManager::EF_LoadShaderItem(const char* name, EShClass Cl
                                        : new SRenderShaderResources();
     pRes->m_LMaterial = nullptr;
     pRes->m_nRefCounter = 1;
+
+    if (Res && m_textureManager)
+    {
+        const char* path = pRes->m_TexturePath.c_str();
+        for (int i = 0; i < EFTT_MAX; ++i)
+        {
+            SEfResTexture* tex = pRes->m_Textures[i];
+            if (!tex || tex->m_Name.empty() || tex->m_TU.m_ITexPic)
+                continue;
+
+            const uint flags  = (uint)tex->m_TU.GetTexFlags();
+            const uint flags2 = (uint)tex->m_TU.GetTexFlags2();
+            const byte eTT    = tex->m_TU.m_eTexType ? tex->m_TU.m_eTexType : (byte)eTT_Base;
+
+            ITexPic* pic = m_textureManager->EF_LoadTexture(
+                tex->m_Name.c_str(), flags, flags2, eTT, tex->m_Amount, -1.0f);
+
+            if ((!pic || !pic->IsTextureLoaded()) && path && path[0])
+            {
+                if (pic)
+                    pic->Release(false);
+                char combined[512];
+                snprintf(combined, sizeof(combined), "%s%s", path, tex->m_Name.c_str());
+                pic = m_textureManager->EF_LoadTexture(
+                    combined, flags, flags2, eTT, tex->m_Amount, -1.0f);
+            }
+
+            if (pic)
+                tex->m_TU.m_TexPic = (STexPic*)pic;
+        }
+    }
+
+    if (!SShader::m_ShaderResources_known.Num())
+    {
+        SShader::m_ShaderResources_known.AddIndex(1);
+        SRenderShaderResources* pSRNULL = new SRenderShaderResources;
+        pSRNULL->m_nRefCounter = 1;
+        SShader::m_ShaderResources_known[0] = pSRNULL;
+    }
+
+    if (SShader::m_ShaderResources_known.Num() < MAX_SHADER_RES)
+    {
+        pRes->m_Id = SShader::m_ShaderResources_known.Num();
+        SShader::m_ShaderResources_known.AddElem(pRes);
+    }
+    else
+    {
+        if (iLog)
+            iLog->LogWarning("CMetalShaderManager::EF_LoadShaderItem: "
+                             "MAX_SHADER_RES (%d) hit, reusing sentinel for '%s'",
+                             MAX_SHADER_RES, name ? name : "(null)");
+        delete pRes;
+        pRes = SShader::m_ShaderResources_known[1];
+        if (pRes)
+            pRes->m_nRefCounter++;
+    }
     item.m_pShaderResources = pRes;
 
     if (!item.m_pShader && (flags & EF_SYSTEM) != 0)

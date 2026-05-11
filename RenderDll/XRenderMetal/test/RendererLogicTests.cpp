@@ -3183,6 +3183,49 @@ static void test_metal_elem_histogram_wired_in_ef_endef3d()
         CHECK(triBefore < okReturn);
 }
 
+static void test_metal_ef_loadshaderitem_registers_shader_resources()
+{
+    const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalShaderManager.mm");
+    CHECK(!path.empty());
+    if (path.empty()) return;
+    const std::string src = _read_file(path);
+    CHECK(!src.empty());
+    if (src.empty()) return;
+
+    const std::string body =
+        _find_function_body(src,
+            "SShaderItem CMetalShaderManager::EF_LoadShaderItem(const char* name, "
+            "EShClass Class, bool bShare, const char* templName, int flags, "
+            "SInputShaderResources* Res, uint64 nMaskGen)");
+    CHECK(!body.empty());
+    if (body.empty()) return;
+
+    CHECK(body.find("SShader::m_ShaderResources_known") != std::string::npos);
+    CHECK(body.find("AddElem(pRes)") != std::string::npos);
+    CHECK(body.find("pRes->m_Id = SShader::m_ShaderResources_known.Num()") != std::string::npos);
+
+    const size_t alloc = body.find("new SRenderShaderResources");
+    const size_t idAssign = body.find("pRes->m_Id = SShader::m_ShaderResources_known.Num()");
+    const size_t addElem = body.find("AddElem(pRes)");
+    const size_t finalAssign = body.find("item.m_pShaderResources = pRes");
+    CHECK(alloc != std::string::npos);
+    CHECK(idAssign != std::string::npos);
+    CHECK(addElem != std::string::npos);
+    CHECK(finalAssign != std::string::npos);
+    if (alloc != std::string::npos && idAssign != std::string::npos)
+        CHECK(alloc < idAssign);
+    if (idAssign != std::string::npos && addElem != std::string::npos)
+        CHECK(idAssign < addElem);
+    if (addElem != std::string::npos && finalAssign != std::string::npos)
+        CHECK(addElem < finalAssign);
+
+    CHECK(body.find("MAX_SHADER_RES") != std::string::npos);
+
+    CHECK(body.find("m_textureManager->EF_LoadTexture") != std::string::npos);
+    CHECK(body.find("for (int i = 0; i < EFTT_MAX; ++i)") != std::string::npos);
+    CHECK(body.find("tex->m_TU.m_TexPic = (STexPic*)pic") != std::string::npos);
+}
+
 static void test_metal_per_shader_uniforms_reset_each_frame()
 {
     const std::string path = _walk_up_for("RenderDll/XRenderMetal/MetalRenderer.mm");
@@ -4390,6 +4433,10 @@ int main()
 
     // Phase 11 — versatile per-render-element histogram diagnostic
     test_metal_elem_histogram_wired_in_ef_endef3d();
+
+    // Phase 12 — root cause of black scene: register pRes in m_ShaderResources_known
+    // so mfAdd/mfGet round-trip produces a non-null pRes for every render-item.
+    test_metal_ef_loadshaderitem_registers_shader_resources();
 
     printf("\n%d passed, %d failed\n", g_passed, g_failed);
     return g_failed > 0 ? 1 : 0;

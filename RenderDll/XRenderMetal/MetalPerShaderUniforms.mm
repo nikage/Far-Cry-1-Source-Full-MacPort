@@ -208,6 +208,32 @@ bool Binder::PackAndBind(id<MTLRenderCommandEncoder> encoder,
     for (const FieldDescriptor& field : layout.fields)
         PackField(field, base);
 
+    if (m_diagCallsRemaining > 0 && iLog)
+    {
+        --m_diagCallsRemaining;
+        iLog->Log("\003[PerShaderUniforms] PACK shader=%s structSize=%lu fields=%zu",
+                  shaderName, (unsigned long)layout.structSize, layout.fields.size());
+        for (const FieldDescriptor& field : layout.fields)
+        {
+            const float* src = nullptr;
+            if (field.name == "Diffuse")        src = m_material.Diffuse;
+            else if (field.name == "Ambient")   src = m_material.Ambient;
+            else if (field.name == "Specular")  src = m_material.Specular;
+            else if (field.name == "FogColor" ||
+                     field.name == "GlobalFogColor") src = m_material.FogColor;
+            else if (field.name == "DiffuseSun") src = m_global.DiffuseSun;
+            if (src)
+                iLog->Log("\003[PerShaderUniforms]   %s = (%g, %g, %g, %g)",
+                          field.name.c_str(),
+                          src[0], src[1],
+                          field.size >= 12 ? src[2] : 0.0f,
+                          field.size >= 16 ? src[3] : 0.0f);
+            else
+                iLog->Log("\003[PerShaderUniforms]   %s = (no supplier — zero)",
+                          field.name.c_str());
+        }
+    }
+
     [encoder setFragmentBuffer:m_ringBuffer offset:alignedCursor atIndex:slot];
     m_ringCursor = alignedCursor + needed;
     return true;
